@@ -16,13 +16,20 @@ check_command() {
 }
 
 printf '%s\n' "Mozais toolchain: $repo_root"
-check_command dart
 check_command fvm
 check_command dbus-run-session
 check_command busctl
-check_command gdb
-check_command sway
-check_command greetd
+check_command clang
+check_command cmake
+check_command ninja
+check_command pkg-config
+
+if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists gtk+-3.0; then
+  printf 'ok   %-20s GTK 3 development files\n' gtk+-3.0
+else
+  printf 'miss %-20s install the gtk3 package\n' gtk+-3.0
+  missing=1
+fi
 
 if [[ -x "$repo_root/.fvm/flutter_sdk/bin/flutter" ]]; then
   printf 'ok   %-20s %s\n' flutter "$repo_root/.fvm/flutter_sdk/bin/flutter"
@@ -31,6 +38,9 @@ else
   printf 'miss %-20s run scripts/bootstrap-toolchain.sh first\n' flutter
   missing=1
 fi
+
+check_command sway
+check_command greetd
 
 if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
   printf 'ok   %-20s %s\n' WAYLAND_DISPLAY "$WAYLAND_DISPLAY"
