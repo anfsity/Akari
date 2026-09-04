@@ -1,0 +1,52 @@
+# Ignore everything by default. Add new project paths to the allow-list below.
+*
+
+# Keep directories traversable so the rules below can re-include files.
+!*/
+
+# Project metadata.
+!/.fvmrc
+!/.gitignore
+!/README.md
+!/pubspec.yaml
+!/pubspec.lock
+!/analysis_options.yaml
+!/.metadata
+
+# Flutter/Dart application code and tests.
+!/lib/
+!/lib/**
+!/test/
+!/test/**
+!/integration_test/
+!/integration_test/**
+
+# Linux runner and application resources.
+!/linux/
+!/linux/**
+!/assets/
+!/assets/**
+
+# Project-owned configuration, documentation, and tools.
+!/config/
+!/config/**
+!/docs/
+!/docs/**
+!/scripts/
+!/scripts/**
+
+# Shared VSCodium/VS Code debug configuration.
+!/.vscode/
+!/.vscode/**
+
+# Generated, local, and editor-specific artifacts remain ignored.
+**/.dart_tool/
+**/.fvm/
+**/build/
+**/logs/
+**/.idea/
+**/.DS_Store
+*.iml
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
