@@ -35,16 +35,13 @@
 !/scripts/
 !/scripts/**
 
-# Shared VSCodium/VS Code debug configuration.
-!/.vscode/
-!/.vscode/**
-
 # Generated, local, and editor-specific artifacts remain ignored.
 **/.dart_tool/
 **/.fvm/
 **/build/
 **/logs/
 **/.idea/
+/.vscode/
 **/.DS_Store
 *.iml
 .flutter-plugins
