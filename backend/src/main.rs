@@ -1,4 +1,5 @@
 mod dbus_service;
+mod state;
 
 use std::error::Error;
 
