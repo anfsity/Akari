@@ -56,6 +56,16 @@ pub enum StateEvent {
     ProtocolFailure { detail: String },
 }
 
+#[derive(Debug, Error, Eq, PartialEq)]
+pub enum BeginAuthenticationError {
+    #[error("username must not be empty")]
+    EmptyUsername,
+    #[error("authentication cannot begin in state {0:?}")]
+    InvalidState(AuthState),
+    #[error("attempt id sequence is exhausted")]
+    AttemptIdExhausted,
+}
+
 #[allow(dead_code)]
 impl StateEvent {
     const fn name(&self) -> &'static str {
@@ -94,6 +104,14 @@ pub enum StateTransitionError {
 pub struct AuthStateMachine {
     state: AuthState,
     detail: String,
+    active_attempt: Option<ActiveAttempt>,
+    next_attempt_number: u64,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct ActiveAttempt {
+    id: String,
+    username: String,
 }
 
 #[allow(dead_code)]
@@ -104,6 +122,77 @@ impl AuthStateMachine {
 
     pub fn detail(&self) -> &str {
         &self.detail
+    }
+
+    pub fn active_attempt_id(&self) -> Option<&str> {
+        self.active_attempt
+            .as_ref()
+            .map(|attempt| attempt.id.as_str())
+    }
+
+    pub fn active_username(&self) -> Option<&str> {
+        self.active_attempt
+            .as_ref()
+            .map(|attempt| attempt.username.as_str())
+    }
+
+    pub fn is_current_attempt(&self, attempt_id: &str) -> bool {
+        self.active_attempt_id() == Some(attempt_id)
+    }
+
+    pub fn begin_authentication(
+        &mut self,
+        username: String,
+    ) -> Result<String, BeginAuthenticationError> {
+        if username.trim().is_empty() {
+            return Err(BeginAuthenticationError::EmptyUsername);
+        }
+
+        let next_attempt_number = self
+            .next_attempt_number
+            .checked_add(1)
+            .ok_or(BeginAuthenticationError::AttemptIdExhausted)?;
+
+        match self.state {
+            AuthState::Idle => {}
+            AuthState::Failed => {
+                self.transition(StateEvent::Reset)
+                    .expect("Failed must accept Reset");
+            }
+            AuthState::Cancelling => {
+                self.transition(StateEvent::CancellationFinished)
+                    .expect("Cancelling must accept CancellationFinished");
+            }
+            AuthState::CreatingSession
+            | AuthState::PromptPending
+            | AuthState::WaitingForInput
+            | AuthState::SubmittingResponse
+            | AuthState::Authenticated
+            | AuthState::ResolvingSession
+            | AuthState::StartingSession => {
+                self.transition(StateEvent::CancelRequested)
+                    .expect("active states must accept CancelRequested");
+                self.transition(StateEvent::CancellationFinished)
+                    .expect("Cancelling must accept CancellationFinished");
+            }
+            AuthState::HandingOff => {
+                return Err(BeginAuthenticationError::InvalidState(
+                    AuthState::HandingOff,
+                ));
+            }
+        }
+
+        self.transition(StateEvent::BeginAuthentication)
+            .expect("Idle must accept BeginAuthentication");
+
+        let attempt_id = format!("attempt-{next_attempt_number:016x}");
+        self.next_attempt_number = next_attempt_number;
+        self.active_attempt = Some(ActiveAttempt {
+            id: attempt_id.clone(),
+            username,
+        });
+
+        Ok(attempt_id)
     }
 
     pub fn transition(&mut self, event: StateEvent) -> Result<AuthState, StateTransitionError> {
@@ -169,6 +258,12 @@ impl AuthStateMachine {
         };
 
         self.state = next_state;
+        if matches!(
+            next_state,
+            AuthState::Idle | AuthState::HandingOff | AuthState::Failed
+        ) {
+            self.active_attempt = None;
+        }
         self.update_detail(previous_state, event);
         Ok(next_state)
     }
@@ -187,7 +282,9 @@ impl AuthStateMachine {
 
 #[cfg(test)]
 mod tests {
-    use super::{AuthState, AuthStateMachine, StateEvent, StateTransitionError};
+    use super::{
+        AuthState, AuthStateMachine, BeginAuthenticationError, StateEvent, StateTransitionError,
+    };
 
     #[test]
     fn default_state_is_idle() {
@@ -297,5 +394,52 @@ mod tests {
 
         assert_eq!(machine.state(), AuthState::Idle);
         assert_eq!(machine.detail(), "");
+    }
+
+    #[test]
+    fn begin_authentication_replaces_the_active_attempt() {
+        let mut machine = AuthStateMachine::default();
+
+        let first_id = machine.begin_authentication("alice".to_owned()).unwrap();
+        assert_eq!(first_id, "attempt-0000000000000001");
+        assert!(machine.is_current_attempt(&first_id));
+        assert_eq!(machine.active_username(), Some("alice"));
+        assert_eq!(machine.state(), AuthState::CreatingSession);
+
+        let second_id = machine.begin_authentication("bob".to_owned()).unwrap();
+
+        assert_eq!(second_id, "attempt-0000000000000002");
+        assert_ne!(first_id, second_id);
+        assert!(!machine.is_current_attempt(&first_id));
+        assert!(machine.is_current_attempt(&second_id));
+        assert_eq!(machine.active_username(), Some("bob"));
+        assert_eq!(machine.state(), AuthState::CreatingSession);
+    }
+
+    #[test]
+    fn empty_username_does_not_create_an_attempt() {
+        let mut machine = AuthStateMachine::default();
+
+        let error = machine.begin_authentication("   ".to_owned()).unwrap_err();
+
+        assert_eq!(error, BeginAuthenticationError::EmptyUsername);
+        assert_eq!(machine.state(), AuthState::Idle);
+        assert_eq!(machine.active_attempt_id(), None);
+    }
+
+    #[test]
+    fn terminal_failure_invalidates_the_active_attempt() {
+        let mut machine = AuthStateMachine::default();
+        let attempt_id = machine.begin_authentication("alice".to_owned()).unwrap();
+
+        machine
+            .transition(StateEvent::AuthenticationFailed {
+                detail: "authentication failed".to_owned(),
+            })
+            .unwrap();
+
+        assert_eq!(machine.state(), AuthState::Failed);
+        assert!(!machine.is_current_attempt(&attempt_id));
+        assert_eq!(machine.active_attempt_id(), None);
     }
 }
