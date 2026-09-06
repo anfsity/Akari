@@ -27,6 +27,11 @@
 !/assets/
 !/assets/**
 
+# Backend
+!/backend/
+!/backend/**
+**/target/
+
 # Project-owned configuration, documentation, and tools.
 !/config/
 !/config/**
@@ -47,3 +52,5 @@
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
+# Widget Preview related
+.widget_preview/
