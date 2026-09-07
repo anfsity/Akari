@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-Bus Object Introspection 1.0//EN"
+  "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node>
+  <interface name="io.mozais.Greeter1">
+    <method name="GetState">
+      <arg name="state" type="s" direction="out" />
+      <arg name="detail" type="s" direction="out" />
+    </method>
+    <method name="ListUsers">
+      <arg name="users" type="a(sss)" direction="out" />
+    </method>
+    <method name="ListSessions">
+      <arg name="sessions" type="a(ssas)" direction="out" />
+    </method>
+    <method name="BeginAuthentication">
+      <arg name="username" type="s" direction="in" />
+      <arg name="attempt_id" type="s" direction="out" />
+    </method>
+    <method name="Respond">
+      <arg name="attempt_id" type="s" direction="in" />
+      <arg name="response" type="s" direction="in" />
+    </method>
+    <method name="Cancel">
+      <arg name="attempt_id" type="s" direction="in" />
+    </method>
+    <method name="StartSession">
+      <arg name="attempt_id" type="s" direction="in" />
+      <arg name="session_id" type="s" direction="in" />
+    </method>
+    <method name="PowerAction">
+      <arg name="action" type="s" direction="in" />
+    </method>
+    <signal name="Prompt">
+      <arg name="attempt_id" type="s" />
+      <arg name="prompt_kind" type="s" />
+      <arg name="text" type="s" />
+    </signal>
+    <signal name="StateChanged">
+      <arg name="attempt_id" type="s" />
+      <arg name="state" type="s" />
+      <arg name="detail" type="s" />
+    </signal>
+  </interface>
+</node>
