@@ -1,6 +1,5 @@
 use thiserror::Error;
 
-#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum AuthState {
     #[default]
@@ -35,7 +34,6 @@ impl AuthState {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub enum StateEvent {
     BeginAuthentication,
@@ -66,7 +64,6 @@ pub enum BeginAuthenticationError {
     AttemptIdExhausted,
 }
 
-#[allow(dead_code)]
 impl StateEvent {
     const fn name(&self) -> &'static str {
         match self {
@@ -90,7 +87,6 @@ impl StateEvent {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum StateTransitionError {
     #[error("event {event} is invalid in state {state:?}")]
@@ -114,7 +110,6 @@ struct ActiveAttempt {
     username: String,
 }
 
-#[allow(dead_code)]
 impl AuthStateMachine {
     pub fn state(&self) -> AuthState {
         self.state
@@ -260,7 +255,7 @@ impl AuthStateMachine {
         self.state = next_state;
         if matches!(
             next_state,
-            AuthState::Idle | AuthState::HandingOff | AuthState::Failed
+            AuthState::Cancelling | AuthState::Idle | AuthState::HandingOff | AuthState::Failed
         ) {
             self.active_attempt = None;
         }
@@ -386,8 +381,9 @@ mod tests {
     fn cancellation_returns_to_idle_and_clears_detail() {
         let mut machine = AuthStateMachine::default();
 
-        machine.transition(StateEvent::BeginAuthentication).unwrap();
+        let attempt_id = machine.begin_authentication("alice".to_owned()).unwrap();
         machine.transition(StateEvent::CancelRequested).unwrap();
+        assert!(!machine.is_current_attempt(&attempt_id));
         machine
             .transition(StateEvent::CancellationFinished)
             .unwrap();

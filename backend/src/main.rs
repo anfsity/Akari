@@ -1,10 +1,15 @@
 mod dbus_service;
+mod greetd;
+mod session_catalog;
 mod state;
+mod users;
 
 use std::error::Error;
 
 use dbus_service::{BUS_NAME, GreeterService, OBJECT_PATH};
-use tokio::signal;
+use std::sync::Arc;
+
+use tokio::{signal, sync::Notify};
 use tracing_subscriber::EnvFilter;
 use zbus::connection::Builder;
 
@@ -14,9 +19,10 @@ type AppResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 async fn main() -> AppResult<()> {
     init_tracing()?;
 
+    let handoff = Arc::new(Notify::new());
     let _connection = Builder::session()?
         .name(BUS_NAME)?
-        .serve_at(OBJECT_PATH, GreeterService::default())?
+        .serve_at(OBJECT_PATH, GreeterService::new(Arc::clone(&handoff)))?
         .build()
         .await?;
 
@@ -26,7 +32,13 @@ async fn main() -> AppResult<()> {
         "D-Bus service ready"
     );
 
-    signal::ctrl_c().await?;
+    tokio::select! {
+        result = signal::ctrl_c() => result?,
+        _ = handoff.notified() => {
+            tracing::info!("session handoff requested");
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        },
+    }
     tracing::info!("shutting down");
 
     Ok(())
