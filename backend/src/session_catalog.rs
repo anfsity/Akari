@@ -1,3 +1,10 @@
+//! Discovery and validation of login sessions advertised by desktop files.
+//!
+//! The catalog reads Wayland and X11 session directories, parses only the
+//! `[Desktop Entry]` group, and keeps the launch command private to the
+//! backend. The D-Bus API exposes a stable session ID and display metadata;
+//! callers never submit an arbitrary `Exec` command.
+
 use std::{
     env, fs, io,
     path::{Path, PathBuf},
@@ -5,29 +12,43 @@ use std::{
 
 use thiserror::Error;
 
+const SESSION_COMMAND_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
+
+/// Errors encountered while reading a configured session directory.
 #[derive(Debug, Error)]
 pub enum SessionCatalogError {
     #[error("could not read session directory")]
     ReadDirectory(#[source] io::Error),
 }
 
+/// A validated desktop-session candidate and the command used to launch it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SessionEntry {
+    /// Stable backend-owned identifier, such as `wayland:sway`.
     pub session_id: String,
+    /// Whether the entry came from the Wayland or X11 catalog.
     pub session_type: SessionType,
+    /// User-facing `Name=` value from the desktop entry.
     pub name: String,
+    /// Tokenized, backend-owned `Exec=` command passed to greetd.
     pub exec: Vec<String>,
+    /// Sanitized `DesktopNames=` values used to construct session metadata.
     pub desktop_names: Vec<String>,
+    /// Source desktop-entry path, retained for backend diagnostics and selection.
     pub source: PathBuf,
 }
 
+/// Display-server family advertised by a session desktop entry.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SessionType {
+    /// A Wayland session from the Wayland session directory.
     Wayland,
+    /// An X11 session from the X session directory.
     X11,
 }
 
 impl SessionType {
+    /// Returns the stable lowercase value used in session IDs and environment variables.
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Wayland => "wayland",
@@ -36,6 +57,7 @@ impl SessionType {
     }
 }
 
+/// Reads, filters, and resolves available Wayland and X11 session entries.
 #[derive(Clone, Debug)]
 pub struct SessionCatalog {
     roots: Vec<(SessionType, PathBuf)>,
@@ -55,6 +77,7 @@ impl Default for SessionCatalog {
 }
 
 impl SessionCatalog {
+    /// Creates a catalog from explicit roots, primarily for isolated tests and alternate layouts.
     pub fn from_roots(wayland_root: PathBuf, x11_root: PathBuf) -> Self {
         Self {
             roots: vec![
@@ -64,6 +87,11 @@ impl SessionCatalog {
         }
     }
 
+    /// Lists available sessions in deterministic `session_id` order.
+    ///
+    /// Missing roots are treated as empty catalogs. Unreadable individual
+    /// entries and entries whose launch command is unavailable are skipped,
+    /// while failures reading an existing directory are returned.
     pub fn list(&self) -> Result<Vec<SessionEntry>, SessionCatalogError> {
         let mut sessions = Vec::new();
 
@@ -75,6 +103,7 @@ impl SessionCatalog {
             };
 
             for entry in entries {
+                // One broken desktop file should not hide otherwise usable sessions.
                 let entry = match entry {
                     Ok(entry) => entry,
                     Err(_) => continue,
@@ -96,6 +125,7 @@ impl SessionCatalog {
         Ok(sessions)
     }
 
+    /// Finds one session by its backend-owned ID after refreshing the catalog from disk.
     pub fn find(&self, session_id: &str) -> Result<Option<SessionEntry>, SessionCatalogError> {
         Ok(self
             .list()?
@@ -104,6 +134,7 @@ impl SessionCatalog {
     }
 }
 
+/// Parses and validates one desktop entry before it can reach the launch path.
 fn parse_session_file(path: &Path, session_type: SessionType) -> Option<SessionEntry> {
     let contents = fs::read_to_string(path).ok()?;
     let fields = parse_desktop_entry(&contents);
@@ -116,13 +147,14 @@ fn parse_session_file(path: &Path, session_type: SessionType) -> Option<SessionE
     }
 
     let name = fields.get("Name")?.to_owned();
-    let exec = tokenize_exec(fields.get("Exec")?).ok()?;
+    let mut exec = tokenize_exec(fields.get("Exec")?).ok()?;
     if exec.is_empty() || exec.iter().any(|token| token.contains('%')) {
         return None;
     }
+    exec[0] = resolve_command(&exec[0])?;
     if fields
         .get("TryExec")
-        .is_some_and(|command| !command_available(command))
+        .is_some_and(|command| resolve_command(command).is_none())
     {
         return None;
     }
@@ -132,6 +164,8 @@ fn parse_session_file(path: &Path, session_type: SessionType) -> Option<SessionE
         return None;
     }
 
+    // DesktopNames is metadata supplied to the launched session, so reject
+    // values that could break an environment assignment before storing them.
     let desktop_names = fields
         .get("DesktopNames")
         .map(|value| {
@@ -154,6 +188,11 @@ fn parse_session_file(path: &Path, session_type: SessionType) -> Option<SessionE
     })
 }
 
+/// Extracts scalar keys from the `[Desktop Entry]` group.
+///
+/// Group headers, comments, localized keys, malformed assignments, and other
+/// groups are ignored. Values use the desktop-entry backslash escapes handled
+/// by [`unescape_desktop_value`].
 fn parse_desktop_entry(contents: &str) -> std::collections::BTreeMap<String, String> {
     let mut fields = std::collections::BTreeMap::new();
     let mut in_desktop_entry = false;
@@ -180,6 +219,7 @@ fn parse_desktop_entry(contents: &str) -> std::collections::BTreeMap<String, Str
     fields
 }
 
+/// Decodes the desktop-entry escapes needed by session metadata and commands.
 fn unescape_desktop_value(value: &str) -> String {
     let mut result = String::with_capacity(value.len());
     let mut escaped = false;
@@ -208,6 +248,11 @@ fn unescape_desktop_value(value: &str) -> String {
     result
 }
 
+/// Tokenizes an `Exec=` value while preserving quoted arguments.
+///
+/// This implements the small command-line grammar needed for these desktop
+/// entries; field-code substitutions are rejected by the caller. Unclosed
+/// quotes and trailing escapes return `Err(())`.
 fn tokenize_exec(value: &str) -> Result<Vec<String>, ()> {
     let mut tokens = Vec::new();
     let mut token = String::new();
@@ -246,29 +291,39 @@ fn tokenize_exec(value: &str) -> Result<Vec<String>, ()> {
     Ok(tokens)
 }
 
+/// Checks that the executable at the head of a parsed session command exists.
 fn session_available(session: &SessionEntry) -> bool {
-    let Some(command) = session.exec.first() else {
-        return false;
-    };
-    command_available(command)
+    session
+        .exec
+        .first()
+        .is_some_and(|command| is_executable(Path::new(command)))
 }
 
-fn command_available(command: &str) -> bool {
+/// Resolves a command name through a backend-owned path, or checks an explicit
+/// absolute path.
+///
+/// Empty names, NUL bytes, and relative paths containing `/` are rejected
+/// before filesystem inspection. Arguments remain the already-tokenized
+/// values from the desktop entry.
+fn resolve_command(command: &str) -> Option<String> {
     if command.is_empty()
         || command.contains('\0')
         || (command.contains('/') && !Path::new(command).is_absolute())
     {
-        return false;
+        return None;
     }
 
     if command.contains('/') {
-        return is_executable(Path::new(command));
+        return is_executable(Path::new(command)).then(|| command.to_owned());
     }
 
-    let path = env::var_os("PATH").unwrap_or_else(|| "/usr/local/bin:/usr/bin:/bin".into());
-    env::split_paths(&path).any(|directory| is_executable(&directory.join(command)))
+    env::split_paths(SESSION_COMMAND_PATH)
+        .map(|directory| directory.join(command))
+        .find(|path| is_executable(path))
+        .map(|path| path.to_string_lossy().into_owned())
 }
 
+/// Returns whether `path` is a regular file with an executable Unix mode bit.
 fn is_executable(path: &Path) -> bool {
     let Ok(metadata) = fs::metadata(path) else {
         return false;
@@ -293,6 +348,7 @@ fn is_true(value: Option<&String>) -> bool {
     value.is_some_and(|value| value.eq_ignore_ascii_case("true"))
 }
 
+/// Accepts environment-safe desktop names that can be serialized as `KEY=value`.
 fn is_safe_env_value(value: &str) -> bool {
     !value.is_empty()
         && !value.contains('\0')
@@ -342,7 +398,7 @@ mod tests {
         assert_eq!(sessions[0].session_id, "wayland:sway");
         assert_eq!(sessions[0].session_type, SessionType::Wayland);
         assert_eq!(sessions[0].desktop_names, ["sway", "wlroots"]);
-        assert_eq!(sessions[0].exec, ["sh", "-c", "exec sway"]);
+        assert_eq!(sessions[0].exec, ["/usr/bin/sh", "-c", "exec sway"]);
 
         fs::remove_dir_all(root).unwrap();
     }
