@@ -1,22 +1,41 @@
+//! Authentication state and transition rules for one greetd transaction.
+//!
+//! The state machine is independent from D-Bus and socket I/O. Callers first
+//! validate external input, then apply a [`StateEvent`]; invalid events are
+//! rejected without mutating the machine.
+
 use thiserror::Error;
 
+/// Public authentication phase exposed through the Greeter1 D-Bus interface.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum AuthState {
+    /// No authentication transaction is active.
     #[default]
     Idle,
+    /// The backend is waiting for greetd's first response.
     CreatingSession,
+    /// A greetd authentication message is being classified by the backend.
     PromptPending,
+    /// The UI must provide a response to a visible or secret prompt.
     WaitingForInput,
+    /// A UI response, or an automatic empty response, is being sent to greetd.
     SubmittingResponse,
+    /// Authentication succeeded and the backend is waiting for a session choice.
     Authenticated,
+    /// The selected desktop session is being resolved and validated.
     ResolvingSession,
+    /// The validated desktop command is being submitted to greetd.
     StartingSession,
+    /// greetd accepted the session start and the greeter is about to exit.
     HandingOff,
+    /// The active greetd transaction is being cancelled.
     Cancelling,
+    /// The transaction failed; display-safe context is retained in the detail field.
     Failed,
 }
 
 impl AuthState {
+    /// Returns the stable wire representation used by D-Bus replies and signals.
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Idle => "Idle",
@@ -32,28 +51,69 @@ impl AuthState {
             Self::Failed => "Failed",
         }
     }
+
+    pub const fn is_active(self) -> bool {
+        matches!(
+            self,
+            Self::CreatingSession
+                | Self::PromptPending
+                | Self::WaitingForInput
+                | Self::SubmittingResponse
+                | Self::Authenticated
+                | Self::ResolvingSession
+                | Self::StartingSession
+        )
+    }
+
+    pub const fn invalidates_attempt(self) -> bool {
+        matches!(
+            self,
+            Self::Cancelling | Self::Idle | Self::HandingOff | Self::Failed
+        )
+    }
 }
 
+/// Events accepted by [`AuthStateMachine::transition`].
+///
+/// Transport responses and D-Bus operations are interpreted by the service
+/// before they are converted into these state-machine events.
 #[derive(Debug)]
 pub enum StateEvent {
+    /// Starts a new authentication transaction from [`AuthState::Idle`].
     BeginAuthentication,
+    /// Indicates that greetd returned an authentication message.
     AuthMessage,
+    /// Leaves a pending prompt waiting for user input.
     PromptNeedsInput,
+    /// Leaves a pending informational or error prompt with an empty response queued.
     PromptAutoResponse,
+    /// Indicates that the UI response was accepted for transmission.
     ResponseSubmitted,
+    /// Indicates that greetd completed authentication successfully.
     AuthenticationSucceeded,
+    /// Records a display-safe authentication failure.
     AuthenticationFailed { detail: String },
+    /// Begins resolution of the session selected by the UI.
     StartSessionRequested,
+    /// Keeps authentication available when the selected session is unavailable.
     SessionUnavailable { detail: String },
+    /// Indicates that the selected session passed backend validation.
     SessionResolved,
+    /// Indicates that greetd accepted the session start request.
     SessionStarted,
+    /// Records a display-safe session-start failure.
     SessionStartFailed { detail: String },
+    /// Starts cancellation of the current transaction.
     CancelRequested,
+    /// Completes cancellation and returns the machine to [`AuthState::Idle`].
     CancellationFinished,
+    /// Clears a recoverable failure before starting another transaction.
     Reset,
+    /// Converts a transport or protocol failure into [`AuthState::Failed`].
     ProtocolFailure { detail: String },
 }
 
+/// Errors that can prevent a new authentication transaction from starting.
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum BeginAuthenticationError {
     #[error("username must not be empty")]
@@ -87,6 +147,7 @@ impl StateEvent {
     }
 }
 
+/// Error returned when an event is not valid for the current authentication phase.
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum StateTransitionError {
     #[error("event {event} is invalid in state {state:?}")]
@@ -96,6 +157,11 @@ pub enum StateTransitionError {
     },
 }
 
+/// Owns the authentication phase, display-safe failure detail, and active attempt token.
+///
+/// There is at most one active attempt. Terminal and cancellation states
+/// invalidate that attempt so delayed D-Bus calls cannot operate on an older
+/// greetd transaction.
 #[derive(Debug, Default)]
 pub struct AuthStateMachine {
     state: AuthState,
@@ -125,16 +191,30 @@ impl AuthStateMachine {
             .map(|attempt| attempt.id.as_str())
     }
 
+    pub fn is_current_attempt(&self, attempt_id: &str) -> bool {
+        self.active_attempt_id() == Some(attempt_id)
+    }
+
+    #[cfg(test)]
     pub fn active_username(&self) -> Option<&str> {
         self.active_attempt
             .as_ref()
             .map(|attempt| attempt.username.as_str())
     }
 
-    pub fn is_current_attempt(&self, attempt_id: &str) -> bool {
-        self.active_attempt_id() == Some(attempt_id)
-    }
-
+    /// Starts authentication for `username` and returns its new monotonic attempt ID.
+    ///
+    /// An active transaction is cancelled before it is replaced. A failed
+    /// transaction is reset automatically, while a handoff already in progress
+    /// cannot be replaced. Whitespace-only usernames are rejected before any
+    /// existing transaction is changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BeginAuthenticationError::EmptyUsername`] for blank input,
+    /// [`BeginAuthenticationError::InvalidState`] during handoff, or
+    /// [`BeginAuthenticationError::AttemptIdExhausted`] if the counter cannot
+    /// be incremented.
     pub fn begin_authentication(
         &mut self,
         username: String,
@@ -190,88 +270,60 @@ impl AuthStateMachine {
         Ok(attempt_id)
     }
 
+    /// Applies one event and returns the resulting state.
+    ///
+    /// Invalid events return [`StateTransitionError`] and leave the state,
+    /// active attempt, and detail unchanged. Successful transitions maintain
+    /// the attempt invalidation and failure-detail rules of the public contract.
     pub fn transition(&mut self, event: StateEvent) -> Result<AuthState, StateTransitionError> {
-        let previous_state = self.state;
-        let next_state = match (&self.state, &event) {
-            (AuthState::Idle, StateEvent::BeginAuthentication) => AuthState::CreatingSession,
-            (AuthState::CreatingSession, StateEvent::AuthMessage)
-            | (AuthState::SubmittingResponse, StateEvent::AuthMessage) => AuthState::PromptPending,
-            (AuthState::PromptPending, StateEvent::PromptNeedsInput) => AuthState::WaitingForInput,
-            (AuthState::PromptPending, StateEvent::PromptAutoResponse)
-            | (AuthState::WaitingForInput, StateEvent::ResponseSubmitted) => {
-                AuthState::SubmittingResponse
+        use AuthState::*;
+        use StateEvent::*;
+
+        let current = self.state;
+        let event_name = event.name();
+
+        let (next_state, new_detail) = match (current, event) {
+            (Idle, BeginAuthentication) => (CreatingSession, None),
+
+            (CreatingSession | SubmittingResponse, AuthMessage) => (PromptPending, None),
+            (PromptPending, PromptNeedsInput) => (WaitingForInput, None),
+            (PromptPending, PromptAutoResponse) | (WaitingForInput, ResponseSubmitted) => {
+                (SubmittingResponse, None)
             }
-            (AuthState::CreatingSession, StateEvent::AuthenticationSucceeded)
-            | (AuthState::SubmittingResponse, StateEvent::AuthenticationSucceeded) => {
-                AuthState::Authenticated
+
+            (CreatingSession | SubmittingResponse, AuthenticationSucceeded) => {
+                (Authenticated, None)
             }
-            (AuthState::CreatingSession, StateEvent::AuthenticationFailed { .. })
-            | (AuthState::SubmittingResponse, StateEvent::AuthenticationFailed { .. }) => {
-                AuthState::Failed
+            (CreatingSession | SubmittingResponse, AuthenticationFailed { detail }) => {
+                (Failed, Some(detail))
             }
-            (AuthState::Authenticated, StateEvent::StartSessionRequested) => {
-                AuthState::ResolvingSession
-            }
-            (AuthState::ResolvingSession, StateEvent::SessionUnavailable { .. }) => {
-                AuthState::Authenticated
-            }
-            (AuthState::ResolvingSession, StateEvent::SessionResolved) => {
-                AuthState::StartingSession
-            }
-            (AuthState::StartingSession, StateEvent::SessionStarted) => AuthState::HandingOff,
-            (AuthState::StartingSession, StateEvent::SessionStartFailed { .. }) => {
-                AuthState::Failed
-            }
-            (
-                AuthState::CreatingSession
-                | AuthState::PromptPending
-                | AuthState::WaitingForInput
-                | AuthState::SubmittingResponse
-                | AuthState::Authenticated
-                | AuthState::ResolvingSession
-                | AuthState::StartingSession,
-                StateEvent::CancelRequested,
-            ) => AuthState::Cancelling,
-            (AuthState::Cancelling, StateEvent::CancellationFinished) => AuthState::Idle,
-            (AuthState::Failed, StateEvent::Reset) => AuthState::Idle,
-            (
-                AuthState::CreatingSession
-                | AuthState::PromptPending
-                | AuthState::WaitingForInput
-                | AuthState::SubmittingResponse
-                | AuthState::Authenticated
-                | AuthState::ResolvingSession
-                | AuthState::StartingSession,
-                StateEvent::ProtocolFailure { .. },
-            ) => AuthState::Failed,
+
+            (Authenticated, StartSessionRequested) => (ResolvingSession, None),
+            (ResolvingSession, SessionUnavailable { detail }) => (Authenticated, Some(detail)),
+            (ResolvingSession, SessionResolved) => (StartingSession, None),
+            (StartingSession, SessionStarted) => (HandingOff, None),
+            (StartingSession, SessionStartFailed { detail }) => (Failed, Some(detail)),
+
+            (s, CancelRequested) if s.is_active() => (Cancelling, None),
+            (Cancelling, CancellationFinished) => (Idle, None),
+            (Failed, Reset) => (Idle, Some(std::mem::take(&mut self.detail))),
+            (s, ProtocolFailure { detail }) if s.is_active() => (Failed, Some(detail)),
+
             _ => {
                 return Err(StateTransitionError::Invalid {
-                    state: self.state,
-                    event: event.name(),
+                    state: current,
+                    event: event_name,
                 });
             }
         };
 
         self.state = next_state;
-        if matches!(
-            next_state,
-            AuthState::Cancelling | AuthState::Idle | AuthState::HandingOff | AuthState::Failed
-        ) {
+        self.detail = new_detail.unwrap_or_default();
+        if next_state.invalidates_attempt() {
             self.active_attempt = None;
         }
-        self.update_detail(previous_state, event);
-        Ok(next_state)
-    }
 
-    fn update_detail(&mut self, previous_state: AuthState, event: StateEvent) {
-        match event {
-            StateEvent::AuthenticationFailed { detail }
-            | StateEvent::SessionStartFailed { detail }
-            | StateEvent::ProtocolFailure { detail }
-            | StateEvent::SessionUnavailable { detail } => self.detail = detail,
-            StateEvent::Reset if previous_state == AuthState::Failed => {}
-            _ => self.detail.clear(),
-        }
+        Ok(next_state)
     }
 }
 
