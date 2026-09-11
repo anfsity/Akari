@@ -83,7 +83,7 @@ For `info` and `error` authentication messages, the backend emits the prompt for
 
 ### Key Architectural Benefits
 * **Framework Isolation**: The Flutter frontend remains strictly agnostic of Unix domain sockets, PAM message formats, binary frame packing, and `systemd` DBus interfaces.
-* **Testability**: The backend interface can be replaced with a mock service (`MOZAIS_BACKEND=mock`) on a private D-Bus session (`dbus-run-session`), allowing complete UI development and automated integration testing without running a real `greetd` daemon or requiring elevated privileges.
+* **Testability**: A separate mock backend build (`cargo run --features mock`) can be used on a private D-Bus session (`dbus-run-session`), allowing complete UI development and automated integration testing without running a real `greetd` daemon or requiring elevated privileges. The production build does not contain the mock transport and never selects it from a runtime environment variable.
 * **Least Privilege Enforcement**: The UI runs as an unprivileged client with zero direct access to root or system-level control interfaces.
 
 ---
@@ -349,7 +349,7 @@ stateDiagram-v2
 ## 6. Development Workflow & Client Implementation
 
 ### Mock Backend Strategy
-For local UI development, executing `scripts/debug-ui.sh` passes `--dart-define=MOZAIS_BACKEND=mock`. The D-Bus integration wrapper `scripts/debug-dbus.sh` establishes a private session bus (`dbus-run-session`) and exports `MOZAIS_BUS_MODE=private`.
+For local UI development, build and run the backend with `cargo run --manifest-path backend/Cargo.toml --features mock`. The D-Bus integration wrapper `scripts/debug-dbus.sh` establishes a private session bus (`dbus-run-session`) and exports `MOZAIS_BUS_MODE=private`. `MOZAIS_BACKEND` is a Flutter UI setting only; it does not select the backend transport.
 
 The mock backend implements the complete `io.mozais.Greeter1` interface specification without making system PAM calls or opening a `greetd` socket:
 
