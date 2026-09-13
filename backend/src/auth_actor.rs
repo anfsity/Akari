@@ -30,6 +30,7 @@ pub(super) struct AuthActorHandle {
 }
 
 impl AuthActorHandle {
+    /// Starts the actor and returns the D-Bus-facing command and snapshot handle.
     pub(super) fn spawn(handoff: Arc<Notify>) -> Self {
         let (commands, receiver) = mpsc::channel(COMMAND_BUFFER);
         let (power_releases, release_receiver) = mpsc::unbounded_channel();
@@ -51,11 +52,17 @@ impl AuthActorHandle {
         }
     }
 
+    /// Returns the latest state without waiting for greetd I/O.
     pub(super) fn current_state(&self) -> (String, String) {
         let snapshot = self.snapshot.borrow().clone();
         (snapshot.state, snapshot.detail)
     }
 
+    /// Cancels the current attempt when it still matches `expected_attempt`.
+    ///
+    /// The token is cancelled before the command is queued so an in-flight
+    /// transport operation observes cancellation while the actor preserves
+    /// the ordering of state cleanup.
     pub(super) fn interrupt_current(&self, expected_attempt: Option<&str>) -> bool {
         let control = self.control.borrow().clone();
         if let Some(control) = control
@@ -67,6 +74,7 @@ impl AuthActorHandle {
         false
     }
 
+    /// Replaces the current attempt and starts a new greetd transaction.
     pub(super) async fn begin(
         &self,
         caller: String,
@@ -87,6 +95,7 @@ impl AuthActorHandle {
         .await
     }
 
+    /// Submits a UI response to the actor for the active prompt.
     pub(super) async fn respond(
         &self,
         attempt_id: String,
@@ -106,6 +115,7 @@ impl AuthActorHandle {
         .await
     }
 
+    /// Requests cancellation of one specific authentication attempt.
     pub(super) async fn cancel(
         &self,
         attempt_id: String,
@@ -126,6 +136,7 @@ impl AuthActorHandle {
         .await
     }
 
+    /// Moves an authenticated attempt into backend-owned session resolution.
     pub(super) async fn begin_session_resolution(
         &self,
         attempt_id: String,
@@ -143,6 +154,7 @@ impl AuthActorHandle {
         .await
     }
 
+    /// Reports that the selected session disappeared during catalog lookup.
     pub(super) async fn session_unavailable(
         &self,
         attempt_id: String,
@@ -162,6 +174,7 @@ impl AuthActorHandle {
         .await
     }
 
+    /// Reports a session-catalog failure while retaining actor ownership of state.
     pub(super) async fn fail_session_resolution(
         &self,
         attempt_id: String,
@@ -181,6 +194,7 @@ impl AuthActorHandle {
         .await
     }
 
+    /// Starts the backend-validated session through the active greetd transport.
     pub(super) async fn start_session(
         &self,
         attempt_id: String,
@@ -200,12 +214,14 @@ impl AuthActorHandle {
         .await
     }
 
+    /// Reserves the actor while a power action uses the system D-Bus.
     pub(super) async fn reserve_power(&self) -> fdo::Result<PowerLease> {
         let (reply, receiver) = oneshot::channel();
         self.send(AuthCommand::AcquirePower { reply }, receiver)
             .await
     }
 
+    /// Enqueues a command and waits for the result produced by the actor.
     async fn send<T>(
         &self,
         command: AuthCommand,
@@ -263,6 +279,7 @@ struct AttemptControl {
     cancellation: CancellationToken,
 }
 
+/// Commands are serialized so state transitions and greetd I/O share one owner.
 enum AuthCommand {
     Begin {
         caller: String,
@@ -311,6 +328,7 @@ enum AuthCommand {
     },
 }
 
+/// Mutable authentication resources owned exclusively by `run_actor`.
 #[derive(Default)]
 struct ActorState {
     auth: AuthStateMachine,
@@ -332,6 +350,8 @@ async fn run_actor(
 ) {
     let mut actor = ActorState::default();
     loop {
+        // Process lease releases in the same loop as D-Bus commands so a
+        // completed power action cannot leave the actor permanently busy.
         let command = tokio::select! {
             command = commands.recv() => command,
             release = power_releases.recv() => {
@@ -516,6 +536,8 @@ async fn handle_begin(
         commands.clone(),
     );
 
+    // Connection and create_session are part of this actor command. A failed
+    // or cancelled exchange therefore reaches cleanup before the next command.
     let transport = match GreetdTransport::connect(&cancellation).await {
         Ok(transport) => transport,
         Err(GreetdError::Cancelled) => {
@@ -782,6 +804,9 @@ async fn consume_response(
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<AuthenticationOutcome> {
+    // One greetd response can require several follow-up frames: visible and
+    // secret prompts wait for the UI, while informational messages are
+    // acknowledged automatically and continue the same transaction.
     loop {
         if cancellation.is_cancelled() {
             return Err(
@@ -942,6 +967,8 @@ async fn cancel_current(
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<()> {
+    // Invalidate resources before publishing Idle. Delayed disconnect or UI
+    // cancellation commands are then harmless after cleanup completes.
     validate_cancel_target(&actor.auth, expected_attempt, allow_after_cleanup)?;
     if let Some(expected_caller) = expected_caller
         && actor.caller.as_deref() != Some(expected_caller)
@@ -1074,6 +1101,8 @@ async fn fail_transaction(
 }
 
 fn detach_resources(actor: &mut ActorState, controls: &watch::Sender<Option<AttemptControl>>) {
+    // Dropping the transport closes the protocol session; cancelling both
+    // tokens also stops the caller watcher and any pending greetd operation.
     actor.transport.take();
     if let Some(token) = actor.cancellation.take() {
         token.cancel();
@@ -1151,6 +1180,8 @@ fn spawn_caller_watcher(
     cancellation: CancellationToken,
     commands: CommandSender,
 ) {
+    // D-Bus may remove the caller while the original request is blocked in
+    // greetd, so this watcher must outlive the initiating method call.
     tokio::spawn(async move {
         let proxy = match zbus::fdo::DBusProxy::new(&connection).await {
             Ok(proxy) => proxy,
@@ -1304,6 +1335,8 @@ fn is_active_authentication_state(state: AuthState) -> bool {
 }
 
 fn session_environment(session: &SessionEntry) -> Vec<String> {
+    // The backend owns the launch environment and does not inherit a caller's
+    // PATH when executing a desktop entry selected through D-Bus.
     let mut environment = vec![
         "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
         format!("XDG_SESSION_TYPE={}", session.session_type.as_str()),
@@ -1319,6 +1352,8 @@ fn session_environment(session: &SessionEntry) -> Vec<String> {
 }
 
 fn display_detail(detail: &str) -> String {
+    // Error text crosses the D-Bus boundary, so remove control characters and
+    // cap its size before retaining or displaying it.
     detail
         .chars()
         .filter(|character| !character.is_control() || *character == '\n' || *character == '\t')

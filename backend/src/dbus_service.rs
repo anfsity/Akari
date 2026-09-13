@@ -18,6 +18,7 @@ pub const BUS_NAME: &str = "io.mozais.Greeter";
 pub const OBJECT_PATH: &str = "/io/mozais/Greeter";
 
 #[derive(Clone, Debug)]
+/// D-Bus service exposing user/session catalogs and serialized authentication.
 pub struct GreeterService {
     auth: AuthActorHandle,
     sessions: SessionCatalog,
@@ -31,6 +32,7 @@ impl Default for GreeterService {
 }
 
 impl GreeterService {
+    /// Creates a service whose successful session handoff notifies the backend runtime.
     pub fn new(handoff: Arc<Notify>) -> Self {
         Self {
             auth: AuthActorHandle::spawn(handoff),
@@ -161,6 +163,8 @@ impl GreeterService {
             }
         };
 
+        // The actor revalidates the attempt after the blocking catalog lookup,
+        // so a stale lookup cannot start a session for a newer transaction.
         self.auth.start_session(attempt_id, session, emitter).await
     }
 
