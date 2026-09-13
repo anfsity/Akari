@@ -1,14 +1,14 @@
 //! D-Bus bridge between the Flutter greeter, greetd, session catalogs, and logind.
 
-#[path = "auth_actor.rs"]
-mod auth_actor;
+#[path = "auth.rs"]
+mod auth;
 
 use std::sync::Arc;
 
 use tokio::sync::Notify;
 use zbus::{fdo, interface, message::Header, object_server::SignalEmitter};
 
-use self::auth_actor::AuthActorHandle;
+use self::auth::AuthActorHandle;
 use crate::{
     session_catalog::{SessionCatalog, SessionCatalogError},
     users::UserCatalog,
@@ -69,7 +69,7 @@ impl GreeterService {
         let sessions = tokio::task::spawn_blocking(move || sessions.list())
             .await
             .map_err(|error| fdo::Error::Failed(format!("session catalog task failed: {error}")))?
-            .map_err(map_session_catalog_error)?;
+            .map_err(map_session_error)?;
         Ok(sessions
             .into_iter()
             .map(|session| (session.session_id, session.name, session.desktop_names))
@@ -129,7 +129,7 @@ impl GreeterService {
     ) -> fdo::Result<()> {
         let emitter = Self::owned_emitter(emitter);
         self.auth
-            .begin_session_resolution(attempt_id.clone(), emitter.clone())
+            .resolve_session(attempt_id.clone(), emitter.clone())
             .await?;
 
         let sessions = self.sessions.clone();
@@ -140,7 +140,7 @@ impl GreeterService {
             Err(error) => {
                 let detail = format!("session catalog task failed: {error}");
                 self.auth
-                    .fail_session_resolution(attempt_id, detail.clone(), emitter)
+                    .session_resolution_failed(attempt_id, detail.clone(), emitter)
                     .await?;
                 return Err(fdo::Error::Failed(detail));
             }
@@ -157,9 +157,9 @@ impl GreeterService {
             Err(error) => {
                 let detail = error.to_string();
                 self.auth
-                    .fail_session_resolution(attempt_id, detail.clone(), emitter)
+                    .session_resolution_failed(attempt_id, detail.clone(), emitter)
                     .await?;
-                return Err(map_session_catalog_error(error));
+                return Err(map_session_error(error));
             }
         };
 
@@ -213,6 +213,6 @@ impl GreeterService {
     ) -> zbus::Result<()>;
 }
 
-fn map_session_catalog_error(error: SessionCatalogError) -> fdo::Error {
+fn map_session_error(error: SessionCatalogError) -> fdo::Error {
     fdo::Error::Failed(error.to_string())
 }

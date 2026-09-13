@@ -531,7 +531,10 @@ mod tests {
         net::UnixListener,
     };
 
-    use super::{AuthMessageResponseRequest, GreetdClient, GreetdResponse, encode_frame};
+    use super::{
+        AuthMessageResponseRequest, GreetdClient, GreetdError, GreetdResponse, MAX_FRAME_SIZE,
+        encode_frame,
+    };
 
     use tokio_util::sync::CancellationToken;
 
@@ -539,7 +542,7 @@ mod tests {
     use super::GreetdTransport;
 
     #[test]
-    fn encodes_native_endian_length_prefixed_json() {
+    fn encodes_framed_json() {
         let payload = serde_json::to_vec(&serde_json::json!({
             "type": "create_session",
             "username": "alice"
@@ -554,7 +557,7 @@ mod tests {
     }
 
     #[test]
-    fn omits_response_for_informational_messages() {
+    fn omits_empty_response() {
         let request = AuthMessageResponseRequest {
             kind: "post_auth_message_response",
             response: None,
@@ -565,9 +568,30 @@ mod tests {
         assert!(value.get("response").is_none());
     }
 
+    #[test]
+    fn rejects_oversized_frames() {
+        let payload = vec![0_u8; MAX_FRAME_SIZE + 1];
+
+        assert!(matches!(
+            encode_frame(&payload, GreetdError::RequestTooLarge),
+            Err(GreetdError::RequestTooLarge)
+        ));
+    }
+
+    #[tokio::test]
+    async fn cancelled_connect_returns_error() {
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+
+        let result =
+            GreetdClient::connect_at("/mozais/path-that-does-not-exist.sock", &cancellation).await;
+
+        assert!(result.is_err());
+    }
+
     #[cfg(feature = "mock")]
     #[tokio::test]
-    async fn mockall_transport_follows_authentication_flow() {
+    async fn mock_transport_auth_flow() {
         let cancellation = CancellationToken::new();
         let mut transport = GreetdTransport::connect(&cancellation)
             .await
@@ -603,7 +627,7 @@ mod tests {
 
     #[cfg(feature = "mock")]
     #[tokio::test]
-    async fn mockall_transport_rejects_wrong_password() {
+    async fn mock_transport_rejects_password() {
         let cancellation = CancellationToken::new();
         let mut transport = GreetdTransport::connect(&cancellation)
             .await
@@ -625,7 +649,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn real_transport_exchanges_framed_requests_with_fake_greetd() {
+    async fn real_transport_roundtrip() {
         let socket = test_socket_path();
         let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
         let server = tokio::spawn(async move {

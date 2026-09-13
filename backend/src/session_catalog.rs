@@ -365,7 +365,9 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use super::{SessionCatalog, SessionType, tokenize_exec};
+    use super::{
+        SessionCatalog, SessionType, is_safe_env_value, parse_desktop_entry, tokenize_exec,
+    };
 
     fn test_root() -> PathBuf {
         let suffix = SystemTime::now()
@@ -378,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_and_filters_session_desktop_entries() {
+    fn parses_valid_sessions() {
         let root = test_root();
         fs::write(
             root.join("sway.desktop"),
@@ -404,7 +406,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unclosed_quotes_and_preserves_quoted_arguments() {
+    fn tokenizes_exec_values() {
         assert_eq!(
             tokenize_exec("uwsm start -e -D Hyprland hyprland.desktop")
                 .unwrap()
@@ -416,5 +418,35 @@ mod tests {
             ["wrapper", "argument with spaces"]
         );
         assert!(tokenize_exec("wrapper 'unfinished").is_err());
+    }
+
+    #[test]
+    fn parses_desktop_group_only() {
+        let fields = parse_desktop_entry(
+            "# comment\n[Other]\nName=Wrong\n[Desktop Entry]\nName=Right\nbroken\n\n[Other]\nExec=nope\n",
+        );
+
+        assert_eq!(fields.get("Name"), Some(&"Right".to_owned()));
+        assert!(!fields.contains_key("Exec"));
+    }
+
+    #[test]
+    fn validates_desktop_names() {
+        assert!(is_safe_env_value("sway"));
+        assert!(!is_safe_env_value("name=value"));
+        assert!(!is_safe_env_value("name\nvalue"));
+        assert!(!is_safe_env_value("name\0value"));
+        assert!(!is_safe_env_value(""));
+    }
+
+    #[test]
+    fn missing_roots_are_empty() {
+        let catalog = SessionCatalog::from_roots(
+            PathBuf::from("/mozais/path-that-does-not-exist"),
+            PathBuf::from("/mozais/another-missing-path"),
+        );
+
+        assert!(catalog.list().unwrap().is_empty());
+        assert_eq!(catalog.find("wayland:sway").unwrap(), None);
     }
 }

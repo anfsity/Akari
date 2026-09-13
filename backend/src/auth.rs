@@ -125,7 +125,7 @@ impl AuthActorHandle {
     }
 
     /// Moves an authenticated attempt into backend-owned session resolution.
-    pub(super) async fn begin_session_resolution(
+    pub(super) async fn resolve_session(
         &self,
         attempt_id: String,
         emitter: SignalEmitter<'static>,
@@ -155,7 +155,7 @@ impl AuthActorHandle {
     }
 
     /// Reports a session-catalog failure while retaining actor ownership of state.
-    pub(super) async fn fail_session_resolution(
+    pub(super) async fn session_resolution_failed(
         &self,
         attempt_id: String,
         detail: String,
@@ -404,8 +404,7 @@ async fn run_actor(
                 emitter,
                 reply,
             } => {
-                let result =
-                    begin_session_resolution(&mut actor, &attempt_id, &emitter, &snapshots).await;
+                let result = resolve_session(&mut actor, &attempt_id, &emitter, &snapshots).await;
                 let _ = reply.send(result);
             }
             AuthCommand::SessionUnavailable {
@@ -425,7 +424,7 @@ async fn run_actor(
                 emitter,
                 reply,
             } => {
-                let result = fail_session_resolution(
+                let result = session_resolution_failed(
                     &mut actor,
                     &attempt_id,
                     detail,
@@ -483,7 +482,7 @@ async fn handle_begin(
     let attempt_id = actor
         .auth
         .begin_authentication(username.clone())
-        .map_err(map_begin_authentication_error)?;
+        .map_err(map_begin_error)?;
     actor.cancellation = Some(cancellation.clone());
     actor.caller = Some(caller.clone());
     actor.caller_watcher = Some(watcher_token.clone());
@@ -507,9 +506,14 @@ async fn handle_begin(
     let transport = match GreetdTransport::connect(&cancellation).await {
         Ok(transport) => transport,
         Err(GreetdError::Cancelled) => {
-            return Err(
-                finish_cancelled(actor, &attempt_id, Some(&emitter), snapshots, controls).await,
-            );
+            return Err(finish_cancellation(
+                actor,
+                &attempt_id,
+                Some(&emitter),
+                snapshots,
+                controls,
+            )
+            .await);
         }
         Err(error) => {
             return Err(
@@ -523,9 +527,14 @@ async fn handle_begin(
     let response = match response {
         Ok(response) => response,
         Err(GreetdError::Cancelled) => {
-            return Err(
-                finish_cancelled(actor, &attempt_id, Some(&emitter), snapshots, controls).await,
-            );
+            return Err(finish_cancellation(
+                actor,
+                &attempt_id,
+                Some(&emitter),
+                snapshots,
+                controls,
+            )
+            .await);
         }
         Err(error) => {
             actor.transport.take();
@@ -583,9 +592,14 @@ async fn handle_respond(
     let next_response = match result {
         Ok(response) => response,
         Err(GreetdError::Cancelled) => {
-            return Err(
-                finish_cancelled(actor, attempt_id, Some(&emitter), snapshots, controls).await,
-            );
+            return Err(finish_cancellation(
+                actor,
+                attempt_id,
+                Some(&emitter),
+                snapshots,
+                controls,
+            )
+            .await);
         }
         Err(error) => {
             actor.transport.take();
@@ -608,7 +622,7 @@ async fn handle_respond(
     .map(|_| ())
 }
 
-async fn begin_session_resolution(
+async fn resolve_session(
     actor: &mut ActorState,
     attempt_id: &str,
     emitter: &SignalEmitter<'static>,
@@ -643,7 +657,7 @@ async fn session_unavailable(
     Ok(())
 }
 
-async fn fail_session_resolution(
+async fn session_resolution_failed(
     actor: &mut ActorState,
     attempt_id: &str,
     detail: String,
@@ -702,9 +716,14 @@ async fn handle_start_session(
     let response = match response {
         Ok(response) => response,
         Err(GreetdError::Cancelled) => {
-            return Err(
-                finish_cancelled(actor, attempt_id, Some(&emitter), snapshots, controls).await,
-            );
+            return Err(finish_cancellation(
+                actor,
+                attempt_id,
+                Some(&emitter),
+                snapshots,
+                controls,
+            )
+            .await);
         }
         Err(error) => {
             actor.transport.take();
@@ -725,7 +744,7 @@ async fn handle_start_session(
             publish_state(&actor.auth, attempt_id, snapshots);
             emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
             detach_resources(actor, controls);
-            schedule_handoff_after_reply(emitter.connection().clone(), Arc::clone(handoff));
+            notify_handoff_after_reply(emitter.connection().clone(), Arc::clone(handoff));
             Ok(())
         }
         GreetdResponse::Error {
@@ -775,9 +794,14 @@ async fn consume_response(
     // acknowledged automatically and continue the same transaction.
     loop {
         if cancellation.is_cancelled() {
-            return Err(
-                finish_cancelled(actor, attempt_id, Some(&emitter), snapshots, controls).await,
-            );
+            return Err(finish_cancellation(
+                actor,
+                attempt_id,
+                Some(&emitter),
+                snapshots,
+                controls,
+            )
+            .await);
         }
         match response {
             GreetdResponse::Success => {
@@ -818,7 +842,7 @@ async fn consume_response(
                 publish_state(&actor.auth, attempt_id, snapshots);
                 emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
                 if cancellation.is_cancelled() {
-                    return Err(finish_cancelled(
+                    return Err(finish_cancellation(
                         actor,
                         attempt_id,
                         Some(&emitter),
@@ -832,7 +856,7 @@ async fn consume_response(
                 match auth_message_type.as_str() {
                     "visible" | "secret" => {
                         if cancellation.is_cancelled() {
-                            return Err(finish_cancelled(
+                            return Err(finish_cancellation(
                                 actor,
                                 attempt_id,
                                 Some(&emitter),
@@ -849,7 +873,7 @@ async fn consume_response(
                         emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id))
                             .await;
                         if cancellation.is_cancelled() {
-                            return Err(finish_cancelled(
+                            return Err(finish_cancellation(
                                 actor,
                                 attempt_id,
                                 Some(&emitter),
@@ -880,7 +904,7 @@ async fn consume_response(
                         response = match request_post_response(actor, None, &cancellation).await {
                             Ok(response) => response,
                             Err(GreetdError::Cancelled) => {
-                                return Err(finish_cancelled(
+                                return Err(finish_cancellation(
                                     actor,
                                     attempt_id,
                                     Some(&emitter),
@@ -941,9 +965,7 @@ async fn cancel_current(
     {
         return Ok(());
     }
-    if !is_active_authentication_state(actor.auth.state())
-        || actor.auth.state() == AuthState::Cancelling
-    {
+    if !auth_in_progress(actor.auth.state()) || actor.auth.state() == AuthState::Cancelling {
         return Ok(());
     }
 
@@ -1013,7 +1035,7 @@ async fn cancel_current(
     }
 }
 
-async fn finish_cancelled(
+async fn finish_cancellation(
     actor: &mut ActorState,
     attempt_id: &str,
     emitter: Option<&SignalEmitter<'static>>,
@@ -1052,7 +1074,7 @@ async fn fail_transaction(
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Error {
     if matches!(error, GreetdError::Cancelled) {
-        return finish_cancelled(actor, attempt_id, Some(emitter), snapshots, controls).await;
+        return finish_cancellation(actor, attempt_id, Some(emitter), snapshots, controls).await;
     }
     let detail = display_detail(&error.to_string());
     if actor.auth.is_current_attempt(attempt_id) {
@@ -1153,7 +1175,7 @@ fn spawn_caller_watcher(
             Ok(proxy) => proxy,
             Err(error) => {
                 tracing::warn!(%error, "could not create D-Bus disconnect watcher");
-                request_caller_cancel(commands, attempt_id, caller, cancellation).await;
+                cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await;
                 return;
             }
         };
@@ -1164,7 +1186,7 @@ fn spawn_caller_watcher(
             Ok(stream) => stream,
             Err(error) => {
                 tracing::warn!(%error, "could not subscribe to D-Bus client disconnects");
-                request_caller_cancel(commands, attempt_id, caller, cancellation).await;
+                cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await;
                 return;
             }
         };
@@ -1176,17 +1198,17 @@ fn spawn_caller_watcher(
             }
         };
         if !proxy.name_has_owner(caller_name).await.unwrap_or(false) {
-            request_caller_cancel(commands, attempt_id, caller, cancellation).await;
+            cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await;
             return;
         }
         tokio::select! {
             _ = watcher_token.cancelled() => {}
-            _ = stream.next() => request_caller_cancel(commands, attempt_id, caller, cancellation).await,
+            _ = stream.next() => cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await,
         }
     });
 }
 
-async fn request_caller_cancel(
+async fn cancel_for_caller_disconnect(
     commands: CommandSender,
     attempt_id: String,
     caller: String,
@@ -1203,7 +1225,7 @@ async fn request_caller_cancel(
     .await;
 }
 
-fn schedule_handoff_after_reply(connection: zbus::Connection, handoff: Arc<Notify>) {
+fn notify_handoff_after_reply(connection: zbus::Connection, handoff: Arc<Notify>) {
     let activity = connection.monitor_activity();
     tokio::spawn(async move {
         activity.await;
@@ -1215,7 +1237,7 @@ async fn emit_state_best_effort(emitter: Option<&SignalEmitter<'_>>, snapshot: &
     let Some(emitter) = emitter else {
         return;
     };
-    if let Err(error) = crate::dbus_service::GreeterService::state_changed(
+    if let Err(error) = crate::service::GreeterService::state_changed(
         emitter,
         snapshot.attempt_id.clone(),
         snapshot.state.clone(),
@@ -1233,7 +1255,7 @@ async fn emit_prompt_best_effort(
     prompt_kind: &str,
     text: String,
 ) {
-    if let Err(error) = crate::dbus_service::GreeterService::prompt(
+    if let Err(error) = crate::service::GreeterService::prompt(
         emitter,
         attempt_id.to_owned(),
         prompt_kind.to_owned(),
@@ -1280,7 +1302,7 @@ fn require_state(auth: &AuthStateMachine, expected: AuthState) -> fdo::Result<()
     }
 }
 
-fn is_active_authentication_state(state: AuthState) -> bool {
+fn auth_in_progress(state: AuthState) -> bool {
     matches!(
         state,
         AuthState::CreatingSession
@@ -1302,7 +1324,7 @@ fn acquire_power(
         Err(fdo::Error::Failed(
             "power action is already in progress".to_owned(),
         ))
-    } else if is_active_authentication_state(actor.auth.state()) {
+    } else if auth_in_progress(actor.auth.state()) {
         Err(fdo::Error::Failed(
             "power action rejected while authentication is active".to_owned(),
         ))
@@ -1343,7 +1365,7 @@ fn cancelled_error() -> fdo::Error {
     fdo::Error::Failed("authentication attempt was cancelled".to_owned())
 }
 
-fn map_begin_authentication_error(error: BeginAuthenticationError) -> fdo::Error {
+fn map_begin_error(error: BeginAuthenticationError) -> fdo::Error {
     let detail = error.to_string();
     match error {
         BeginAuthenticationError::EmptyUsername => fdo::Error::InvalidArgs(detail),
@@ -1364,10 +1386,13 @@ mod tests {
     use tokio::{sync::watch, task::yield_now};
 
     use super::{
-        ActorState, AuthActorHandle, AuthSnapshot, acquire_power, cancel_current,
-        validate_cancel_target,
+        ActorState, AuthActorHandle, AuthSnapshot, acquire_power, cancel_current, display_detail,
+        session_environment, snapshot, validate_attempt, validate_cancel_target,
     };
-    use crate::state::{AuthState, AuthStateMachine, StateEvent};
+    use crate::{
+        session_catalog::{SessionEntry, SessionType},
+        state::{AuthState, AuthStateMachine, StateEvent},
+    };
 
     fn cancelled_attempt() -> (AuthStateMachine, String) {
         let mut auth = AuthStateMachine::default();
@@ -1378,7 +1403,7 @@ mod tests {
     }
 
     #[test]
-    fn disconnect_cancel_cannot_cross_cleanup_boundary() {
+    fn disconnect_cancel_stops_at_cleanup() {
         let (auth, attempt_id) = cancelled_attempt();
 
         assert_eq!(auth.state(), AuthState::Idle);
@@ -1386,14 +1411,92 @@ mod tests {
     }
 
     #[test]
-    fn explicit_cancel_is_idempotent_when_cleanup_wins_the_race() {
+    fn cancel_is_idempotent_after_cleanup() {
         let (auth, attempt_id) = cancelled_attempt();
 
         assert!(validate_cancel_target(&auth, Some(&attempt_id), true).is_ok());
     }
 
+    #[test]
+    fn validates_current_attempt() {
+        let mut auth = AuthStateMachine::default();
+        let attempt_id = auth.begin_authentication("alice".to_owned()).unwrap();
+
+        assert!(validate_attempt(&auth, &attempt_id).is_ok());
+        assert!(validate_attempt(&auth, "attempt-stale").is_err());
+    }
+
+    #[test]
+    fn snapshot_has_state_and_detail() {
+        let mut auth = AuthStateMachine::default();
+        let attempt_id = auth.begin_authentication("alice".to_owned()).unwrap();
+        auth.transition(StateEvent::AuthenticationFailed {
+            detail: "bad password".to_owned(),
+        })
+        .unwrap();
+
+        assert_eq!(
+            snapshot(&auth, &attempt_id),
+            AuthSnapshot {
+                attempt_id,
+                state: "Failed".to_owned(),
+                detail: "bad password".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn sanitizes_detail() {
+        let detail = format!("before\r\u{0}\nafter{}", "x".repeat(600));
+        let sanitized = display_detail(&detail);
+
+        assert!(!sanitized.contains('\r'));
+        assert!(!sanitized.contains('\0'));
+        assert!(sanitized.contains("before\nafter"));
+        assert_eq!(sanitized.chars().count(), 512);
+    }
+
+    #[test]
+    fn builds_session_environment() {
+        let session = SessionEntry {
+            session_id: "wayland:sway".to_owned(),
+            session_type: SessionType::Wayland,
+            name: "Sway".to_owned(),
+            exec: vec!["/usr/bin/sway".to_owned()],
+            desktop_names: vec!["sway".to_owned(), "wlroots".to_owned()],
+            source: "/tmp/sway.desktop".into(),
+        };
+
+        assert_eq!(
+            session_environment(&session),
+            [
+                "PATH=/usr/local/bin:/usr/bin:/bin",
+                "XDG_SESSION_TYPE=wayland",
+                "XDG_SESSION_DESKTOP=sway",
+                "XDG_CURRENT_DESKTOP=sway:wlroots",
+            ]
+        );
+    }
+
+    #[test]
+    fn env_without_desktop_names() {
+        let session = SessionEntry {
+            session_id: "x11:test".to_owned(),
+            session_type: SessionType::X11,
+            name: "Test".to_owned(),
+            exec: vec!["/usr/bin/test-session".to_owned()],
+            desktop_names: Vec::new(),
+            source: "/tmp/test.desktop".into(),
+        };
+
+        assert_eq!(
+            session_environment(&session),
+            ["PATH=/usr/local/bin:/usr/bin:/bin", "XDG_SESSION_TYPE=x11",]
+        );
+    }
+
     #[tokio::test]
-    async fn explicit_cancel_after_cleanup_does_not_mutate_idle_state() {
+    async fn cancel_after_cleanup_keeps_idle() {
         let mut actor = ActorState::default();
         let attempt_id = actor.auth.begin_authentication("alice".to_owned()).unwrap();
         let (snapshots, _) = watch::channel(AuthSnapshot::idle());
@@ -1426,7 +1529,7 @@ mod tests {
     }
 
     #[test]
-    fn power_is_rejected_for_active_authentication() {
+    fn power_rejected_during_auth() {
         let mut actor = ActorState::default();
         actor.auth.begin_authentication("alice".to_owned()).unwrap();
         let (release, _) = tokio::sync::mpsc::unbounded_channel();
@@ -1441,7 +1544,7 @@ mod tests {
     }
 
     #[test]
-    fn power_is_rejected_while_another_lease_is_held() {
+    fn power_rejected_when_busy() {
         let mut actor = ActorState {
             power_busy: true,
             ..ActorState::default()
@@ -1456,8 +1559,18 @@ mod tests {
         assert!(error.to_string().contains("already in progress"));
     }
 
+    #[test]
+    fn power_allowed_when_idle() {
+        let mut actor = ActorState::default();
+        let (release, _) = tokio::sync::mpsc::unbounded_channel();
+
+        let lease = acquire_power(&mut actor, release).expect("idle power should be allowed");
+        assert!(actor.power_busy);
+        drop(lease);
+    }
+
     #[tokio::test]
-    async fn power_lease_release_allows_the_next_operation() {
+    async fn lease_release_unblocks() {
         let actor = AuthActorHandle::spawn(Arc::new(Notify::new()));
         let lease = actor.reserve_power().await.unwrap();
         assert!(actor.reserve_power().await.is_err());

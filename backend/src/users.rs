@@ -183,7 +183,7 @@ mod tests {
     use super::{UserEntry, is_login_shell, make_user_entry};
 
     #[test]
-    fn filters_non_login_and_system_accounts() {
+    fn filters_system_accounts() {
         assert!(
             make_user_entry(
                 "daemon".to_owned(),
@@ -210,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    fn preserves_accounts_service_metadata() {
+    fn preserves_user_metadata() {
         let user = make_user_entry(
             "alice".to_owned(),
             " Alice Example ".to_owned(),

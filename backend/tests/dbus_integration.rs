@@ -15,7 +15,7 @@ use tokio::{
 use zbus::Proxy;
 
 #[tokio::test]
-async fn dbus_client_backend_and_greetd_socket_complete_authentication() {
+async fn auth_roundtrip() {
     let socket = test_socket_path();
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = tokio::spawn(fake_greetd(listener));

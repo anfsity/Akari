@@ -1,12 +1,12 @@
-mod dbus_service;
 mod greetd;
+mod service;
 mod session_catalog;
 mod state;
 mod users;
 
 use std::error::Error;
 
-use dbus_service::{BUS_NAME, GreeterService, OBJECT_PATH};
+use service::{BUS_NAME, GreeterService, OBJECT_PATH};
 use std::sync::Arc;
 
 use tokio::{signal, sync::Notify};

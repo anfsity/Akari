@@ -334,7 +334,7 @@ mod tests {
     };
 
     #[test]
-    fn default_state_is_idle() {
+    fn default_is_idle() {
         let machine = AuthStateMachine::default();
 
         assert_eq!(machine.state(), AuthState::Idle);
@@ -342,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    fn state_names_match_the_dbus_contract() {
+    fn state_names_match_wire_values() {
         let states = [
             (AuthState::Idle, "Idle"),
             (AuthState::CreatingSession, "CreatingSession"),
@@ -363,7 +363,46 @@ mod tests {
     }
 
     #[test]
-    fn authentication_flow_reaches_handoff() {
+    fn state_lifecycle_properties() {
+        let active = [
+            AuthState::CreatingSession,
+            AuthState::PromptPending,
+            AuthState::WaitingForInput,
+            AuthState::SubmittingResponse,
+            AuthState::Authenticated,
+            AuthState::ResolvingSession,
+            AuthState::StartingSession,
+        ];
+        for state in active {
+            assert!(state.is_active(), "{state:?} should be active");
+            assert!(!state.invalidates_attempt());
+        }
+
+        for state in [
+            AuthState::Idle,
+            AuthState::HandingOff,
+            AuthState::Cancelling,
+            AuthState::Failed,
+        ] {
+            assert!(state.invalidates_attempt(), "{state:?} should invalidate");
+        }
+    }
+
+    #[test]
+    fn protocol_failure_sets_detail() {
+        let mut machine = authenticated_machine();
+
+        machine
+            .transition(StateEvent::ProtocolFailure {
+                detail: "protocol failure".to_owned(),
+            })
+            .unwrap();
+        assert_eq!(machine.state(), AuthState::Failed);
+        assert_eq!(machine.detail(), "protocol failure");
+    }
+
+    #[test]
+    fn auth_flow_reaches_handoff() {
         let mut machine = AuthStateMachine::default();
 
         for event in [
@@ -384,7 +423,7 @@ mod tests {
     }
 
     #[test]
-    fn informational_prompt_automatically_submits() {
+    fn info_prompt_auto_submits() {
         let mut machine = AuthStateMachine::default();
 
         machine.transition(StateEvent::BeginAuthentication).unwrap();
@@ -395,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn failure_detail_is_retained_after_reset() {
+    fn reset_retains_failure_detail() {
         let mut machine = AuthStateMachine::default();
 
         machine.transition(StateEvent::BeginAuthentication).unwrap();
@@ -411,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn invalid_transition_does_not_change_state() {
+    fn invalid_transition_is_atomic() {
         let mut machine = AuthStateMachine::default();
 
         let error = machine
@@ -430,7 +469,7 @@ mod tests {
     }
 
     #[test]
-    fn cancellation_returns_to_idle_and_clears_detail() {
+    fn cancellation_returns_to_idle() {
         let mut machine = AuthStateMachine::default();
 
         let attempt_id = machine.begin_authentication("alice".to_owned()).unwrap();
@@ -445,7 +484,7 @@ mod tests {
     }
 
     #[test]
-    fn begin_authentication_replaces_the_active_attempt() {
+    fn begin_replaces_attempt() {
         let mut machine = AuthStateMachine::default();
 
         let first_id = machine.begin_authentication("alice".to_owned()).unwrap();
@@ -465,7 +504,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_username_does_not_create_an_attempt() {
+    fn blank_username_is_rejected() {
         let mut machine = AuthStateMachine::default();
 
         let error = machine.begin_authentication("   ".to_owned()).unwrap_err();
@@ -476,7 +515,7 @@ mod tests {
     }
 
     #[test]
-    fn terminal_failure_invalidates_the_active_attempt() {
+    fn failure_invalidates_attempt() {
         let mut machine = AuthStateMachine::default();
         let attempt_id = machine.begin_authentication("alice".to_owned()).unwrap();
 
@@ -492,7 +531,7 @@ mod tests {
     }
 
     #[test]
-    fn session_unavailable_returns_to_authenticated_with_detail() {
+    fn unavailable_session_returns_to_auth() {
         let mut machine = authenticated_machine();
 
         machine
@@ -509,7 +548,7 @@ mod tests {
     }
 
     #[test]
-    fn protocol_and_session_start_failures_are_terminal() {
+    fn protocol_and_start_failures_are_terminal() {
         let mut protocol_failure = AuthStateMachine::default();
         protocol_failure
             .begin_authentication("alice".to_owned())
@@ -540,7 +579,7 @@ mod tests {
     }
 
     #[test]
-    fn handoff_rejects_a_new_authentication_attempt() {
+    fn handoff_rejects_new_auth() {
         let mut machine = authenticated_machine();
         machine
             .transition(StateEvent::StartSessionRequested)
@@ -557,7 +596,7 @@ mod tests {
     }
 
     #[test]
-    fn attempt_id_exhaustion_does_not_change_state() {
+    fn exhausted_ids_leave_state_unchanged() {
         let mut machine = AuthStateMachine {
             next_attempt_number: u64::MAX,
             ..AuthStateMachine::default()
@@ -572,7 +611,7 @@ mod tests {
     }
 
     #[test]
-    fn terminal_states_reject_state_events() {
+    fn terminal_states_reject_events() {
         let mut machine = AuthStateMachine::default();
         machine.begin_authentication("alice".to_owned()).unwrap();
         machine
