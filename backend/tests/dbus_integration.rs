@@ -56,6 +56,55 @@ async fn auth_roundtrip() {
     let _ = std::fs::remove_file(socket);
 }
 
+#[tokio::test]
+async fn blank_username_is_rejected() {
+    let socket = test_socket_path();
+    let mut backend = start_backend(&socket);
+    let connection = connect_to_backend().await;
+    let proxy = greeter_proxy(&connection).await;
+
+    let result: zbus::Result<String> = proxy.call("BeginAuthentication", &("   ",)).await;
+
+    assert!(result.is_err());
+    stop_backend(&mut backend);
+}
+
+#[tokio::test]
+async fn wrong_password_sets_failed_state() {
+    let socket = test_socket_path();
+    let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
+    let server = tokio::spawn(fake_greetd_wrong_password(listener));
+    let mut backend = start_backend(&socket);
+    let connection = connect_to_backend().await;
+    let proxy = greeter_proxy(&connection).await;
+
+    let attempt_id: String = proxy
+        .call("BeginAuthentication", &("alice",))
+        .await
+        .expect("begin authentication should succeed");
+    let state: (String, String) = proxy
+        .call("GetState", &())
+        .await
+        .expect("state query should succeed");
+    assert_eq!(state.0, "WaitingForInput");
+
+    let result: zbus::Result<()> = proxy.call("Respond", &(attempt_id, "wrong")).await;
+    assert!(result.is_err());
+
+    let state: (String, String) = proxy
+        .call("GetState", &())
+        .await
+        .expect("failed state query should succeed");
+    assert_eq!(
+        state,
+        ("Failed".to_owned(), "authentication failed".to_owned())
+    );
+
+    server.await.expect("fake greetd should finish");
+    stop_backend(&mut backend);
+    let _ = std::fs::remove_file(socket);
+}
+
 async fn fake_greetd(listener: UnixListener) {
     let (mut stream, _) = listener.accept().await.expect("backend should connect");
 
@@ -90,6 +139,35 @@ async fn fake_greetd(listener: UnixListener) {
     write_response(&mut stream, serde_json::json!({ "type": "success" })).await;
 }
 
+async fn fake_greetd_wrong_password(listener: UnixListener) {
+    let (mut stream, _) = listener.accept().await.expect("backend should connect");
+
+    let create = read_request(&mut stream).await;
+    assert_eq!(create["type"], "create_session");
+    write_response(
+        &mut stream,
+        serde_json::json!({
+            "type": "auth_message",
+            "auth_message_type": "secret",
+            "auth_message": "Password: "
+        }),
+    )
+    .await;
+
+    let password = read_request(&mut stream).await;
+    assert_eq!(password["type"], "post_auth_message_response");
+    assert_eq!(password["response"], "wrong");
+    write_response(
+        &mut stream,
+        serde_json::json!({
+            "type": "error",
+            "error_type": "auth_error",
+            "description": "authentication failed"
+        }),
+    )
+    .await;
+}
+
 async fn connect_to_backend() -> zbus::Connection {
     for _ in 0..100 {
         if let Ok(connection) = zbus::Connection::session().await {
@@ -113,6 +191,17 @@ async fn connect_to_backend() -> zbus::Connection {
         sleep(Duration::from_millis(20)).await;
     }
     panic!("backend did not appear on the session bus");
+}
+
+async fn greeter_proxy(connection: &zbus::Connection) -> zbus::Proxy<'_> {
+    Proxy::new(
+        connection,
+        "io.mozais.Greeter",
+        "/io/mozais/Greeter",
+        "io.mozais.Greeter1",
+    )
+    .await
+    .expect("backend proxy should be available")
 }
 
 fn start_backend(socket: &PathBuf) -> Child {
