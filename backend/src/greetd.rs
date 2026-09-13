@@ -522,7 +522,7 @@ async fn read_exact_with_timeout(
 mod tests {
     use std::{
         path::PathBuf,
-        time::{SystemTime, UNIX_EPOCH},
+        time::{Duration, SystemTime, UNIX_EPOCH},
     };
 
     use serde_json::Value;
@@ -587,6 +587,163 @@ mod tests {
             GreetdClient::connect_at("/mozais/path-that-does-not-exist.sock", &cancellation).await;
 
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn truncated_response_is_rejected() {
+        let socket = test_socket_path();
+        let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let _ = read_request(&mut stream).await;
+            stream.write_all(&4_u32.to_ne_bytes()).await.unwrap();
+            stream.write_all(b"{}").await.unwrap();
+        });
+
+        let cancellation = CancellationToken::new();
+        let mut client = GreetdClient::connect_at(&socket, &cancellation)
+            .await
+            .unwrap();
+        let error = client
+            .create_session("alice", &cancellation)
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, GreetdError::ResponseTruncated));
+        server.await.unwrap();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    #[tokio::test]
+    async fn malformed_response_is_rejected() {
+        let socket = test_socket_path();
+        let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let _ = read_request(&mut stream).await;
+            write_raw(&mut stream, b"not-json").await;
+        });
+
+        let cancellation = CancellationToken::new();
+        let mut client = GreetdClient::connect_at(&socket, &cancellation)
+            .await
+            .unwrap();
+        let error = client
+            .create_session("alice", &cancellation)
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, GreetdError::Decode(_)));
+        server.await.unwrap();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    #[tokio::test]
+    async fn oversized_response_is_rejected_before_allocation() {
+        let socket = test_socket_path();
+        let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let _ = read_request(&mut stream).await;
+            stream
+                .write_all(&((MAX_FRAME_SIZE as u32) + 1).to_ne_bytes())
+                .await
+                .unwrap();
+        });
+
+        let cancellation = CancellationToken::new();
+        let mut client = GreetdClient::connect_at(&socket, &cancellation)
+            .await
+            .unwrap();
+        let error = client
+            .create_session("alice", &cancellation)
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, GreetdError::ResponseTooLarge));
+        server.await.unwrap();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    #[tokio::test]
+    async fn request_cancellation_interrupts_response_read() {
+        let socket = test_socket_path();
+        let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let _ = read_request(&mut stream).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        });
+
+        let cancellation = CancellationToken::new();
+        let mut client = GreetdClient::connect_at(&socket, &cancellation)
+            .await
+            .unwrap();
+        let cancel = cancellation.clone();
+        let task = tokio::spawn(async move { client.create_session("alice", &cancel).await });
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        cancellation.cancel();
+        let error = task.await.unwrap().unwrap_err();
+
+        assert!(matches!(error, GreetdError::Cancelled));
+        server.await.unwrap();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    #[tokio::test]
+    async fn error_response_is_decoded() {
+        let socket = test_socket_path();
+        let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let _ = read_request(&mut stream).await;
+            write_response(
+                &mut stream,
+                serde_json::json!({
+                    "type": "error",
+                    "error_type": "auth_error",
+                    "description": "denied"
+                }),
+            )
+            .await;
+        });
+
+        let cancellation = CancellationToken::new();
+        let mut client = GreetdClient::connect_at(&socket, &cancellation)
+            .await
+            .unwrap();
+        assert!(matches!(
+            client.create_session("alice", &cancellation).await,
+            Ok(GreetdResponse::Error { error_type, description })
+                if error_type == "auth_error" && description == "denied"
+        ));
+
+        server.await.unwrap();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    #[tokio::test]
+    async fn cancel_request_roundtrip() {
+        let socket = test_socket_path();
+        let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let request = read_request(&mut stream).await;
+            assert_eq!(request["type"], "cancel_session");
+            write_response(&mut stream, serde_json::json!({"type": "success"})).await;
+        });
+
+        let cancellation = CancellationToken::new();
+        let mut client = GreetdClient::connect_at(&socket, &cancellation)
+            .await
+            .unwrap();
+        assert!(matches!(
+            client.cancel_session(&cancellation).await,
+            Ok(GreetdResponse::Success)
+        ));
+
+        server.await.unwrap();
+        let _ = std::fs::remove_file(socket);
     }
 
     #[cfg(feature = "mock")]
@@ -749,6 +906,15 @@ mod tests {
         let payload = serde_json::to_vec(&response).unwrap();
         let frame = encode_frame(&payload, super::GreetdError::RequestTooLarge).unwrap();
         stream.write_all(&frame).await.unwrap();
+        stream.flush().await.unwrap();
+    }
+
+    async fn write_raw(stream: &mut tokio::net::UnixStream, payload: &[u8]) {
+        stream
+            .write_all(&(payload.len() as u32).to_ne_bytes())
+            .await
+            .unwrap();
+        stream.write_all(payload).await.unwrap();
         stream.flush().await.unwrap();
     }
 }
