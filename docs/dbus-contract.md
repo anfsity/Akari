@@ -86,6 +86,12 @@ For `info` and `error` authentication messages, the backend emits the prompt for
 * **Testability**: A separate mock backend build (`cargo run --features mock`) can be used on a private D-Bus session (`dbus-run-session`), allowing complete UI development and automated integration testing without running a real `greetd` daemon or requiring elevated privileges. The production build does not contain the mock transport and never selects it from a runtime environment variable.
 * **Least Privilege Enforcement**: The UI runs as an unprivileged client with zero direct access to root or system-level control interfaces.
 
+### Concurrency Model
+
+Authentication is owned by one actor. D-Bus state-changing methods enqueue commands and await a per-call reply; the actor exclusively owns `AuthStateMachine`, the active `GreetdTransport`, cancellation handles, caller ownership, and the power-action reservation. `GetState()` reads a `watch` snapshot and does not contend with greetd I/O.
+
+The actor processes one authentication command at a time, so a greetd request and its state transition cannot overlap with `Respond()`, `Cancel()`, or a replacement `BeginAuthentication()`. Session catalog scans remain outside the actor on blocking worker tasks; their completion is committed only if the attempt ID is still current. This is the stale-result boundary for catalog work and removes the need for backend, operation, transport, and request-gate locks.
+
 ---
 
 ## 2. Interface Specification: `io.mozais.Greeter1`
