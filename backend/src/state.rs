@@ -490,4 +490,107 @@ mod tests {
         assert!(!machine.is_current_attempt(&attempt_id));
         assert_eq!(machine.active_attempt_id(), None);
     }
+
+    #[test]
+    fn session_unavailable_returns_to_authenticated_with_detail() {
+        let mut machine = authenticated_machine();
+
+        machine
+            .transition(StateEvent::StartSessionRequested)
+            .unwrap();
+        machine
+            .transition(StateEvent::SessionUnavailable {
+                detail: "session is unavailable".to_owned(),
+            })
+            .unwrap();
+
+        assert_eq!(machine.state(), AuthState::Authenticated);
+        assert_eq!(machine.detail(), "session is unavailable");
+    }
+
+    #[test]
+    fn protocol_and_session_start_failures_are_terminal() {
+        let mut protocol_failure = AuthStateMachine::default();
+        protocol_failure
+            .begin_authentication("alice".to_owned())
+            .unwrap();
+        protocol_failure
+            .transition(StateEvent::ProtocolFailure {
+                detail: "socket closed".to_owned(),
+            })
+            .unwrap();
+        assert_eq!(protocol_failure.state(), AuthState::Failed);
+        assert_eq!(protocol_failure.detail(), "socket closed");
+
+        let mut session_failure = authenticated_machine();
+        session_failure
+            .transition(StateEvent::StartSessionRequested)
+            .unwrap();
+        session_failure
+            .transition(StateEvent::SessionResolved)
+            .unwrap();
+        session_failure
+            .transition(StateEvent::SessionStartFailed {
+                detail: "command failed".to_owned(),
+            })
+            .unwrap();
+        assert_eq!(session_failure.state(), AuthState::Failed);
+        assert_eq!(session_failure.detail(), "command failed");
+        assert_eq!(session_failure.active_attempt_id(), None);
+    }
+
+    #[test]
+    fn handoff_rejects_a_new_authentication_attempt() {
+        let mut machine = authenticated_machine();
+        machine
+            .transition(StateEvent::StartSessionRequested)
+            .unwrap();
+        machine.transition(StateEvent::SessionResolved).unwrap();
+        machine.transition(StateEvent::SessionStarted).unwrap();
+
+        assert_eq!(
+            machine.begin_authentication("bob".to_owned()),
+            Err(BeginAuthenticationError::InvalidState(
+                AuthState::HandingOff
+            ))
+        );
+    }
+
+    #[test]
+    fn attempt_id_exhaustion_does_not_change_state() {
+        let mut machine = AuthStateMachine {
+            next_attempt_number: u64::MAX,
+            ..AuthStateMachine::default()
+        };
+
+        assert_eq!(
+            machine.begin_authentication("alice".to_owned()),
+            Err(BeginAuthenticationError::AttemptIdExhausted)
+        );
+        assert_eq!(machine.state(), AuthState::Idle);
+        assert_eq!(machine.active_attempt_id(), None);
+    }
+
+    #[test]
+    fn terminal_states_reject_state_events() {
+        let mut machine = AuthStateMachine::default();
+        machine.begin_authentication("alice".to_owned()).unwrap();
+        machine
+            .transition(StateEvent::ProtocolFailure {
+                detail: "failure".to_owned(),
+            })
+            .unwrap();
+
+        assert!(machine.transition(StateEvent::ResponseSubmitted).is_err());
+        assert!(machine.transition(StateEvent::SessionResolved).is_err());
+    }
+
+    fn authenticated_machine() -> AuthStateMachine {
+        let mut machine = AuthStateMachine::default();
+        machine.begin_authentication("alice".to_owned()).unwrap();
+        machine
+            .transition(StateEvent::AuthenticationSucceeded)
+            .unwrap();
+        machine
+    }
 }

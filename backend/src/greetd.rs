@@ -520,15 +520,23 @@ async fn read_exact_with_timeout(
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
     use serde_json::Value;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::UnixListener,
+    };
 
-    use super::{AuthMessageResponseRequest, encode_frame};
+    use super::{AuthMessageResponseRequest, GreetdClient, GreetdResponse, encode_frame};
 
-    #[cfg(feature = "mock")]
     use tokio_util::sync::CancellationToken;
 
     #[cfg(feature = "mock")]
-    use super::{GreetdResponse, GreetdTransport};
+    use super::GreetdTransport;
 
     #[test]
     fn encodes_native_endian_length_prefixed_json() {
@@ -614,5 +622,109 @@ mod tests {
                 description
             }) if error_type == "auth_error" && description == "authentication failed"
         ));
+    }
+
+    #[tokio::test]
+    async fn real_transport_exchanges_framed_requests_with_fake_greetd() {
+        let socket = test_socket_path();
+        let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("client should connect");
+
+            let create = read_request(&mut stream).await;
+            assert_eq!(create["type"], "create_session");
+            assert_eq!(create["username"], "alice");
+            write_response(
+                &mut stream,
+                serde_json::json!({
+                    "type": "auth_message",
+                    "auth_message_type": "secret",
+                    "auth_message": "Password: "
+                }),
+            )
+            .await;
+
+            let response = read_request(&mut stream).await;
+            assert_eq!(response["type"], "post_auth_message_response");
+            assert_eq!(response["response"], "password");
+            write_response(
+                &mut stream,
+                serde_json::json!({
+                    "type": "auth_message",
+                    "auth_message_type": "info",
+                    "auth_message": "Authentication successful."
+                }),
+            )
+            .await;
+
+            let automatic_response = read_request(&mut stream).await;
+            assert_eq!(automatic_response["type"], "post_auth_message_response");
+            assert!(automatic_response.get("response").is_none());
+            write_response(&mut stream, serde_json::json!({"type": "success"})).await;
+
+            let start = read_request(&mut stream).await;
+            assert_eq!(start["type"], "start_session");
+            assert_eq!(start["cmd"], serde_json::json!(["/bin/test-session"]));
+            assert_eq!(start["env"], serde_json::json!(["TEST_MODE=1"]));
+            write_response(&mut stream, serde_json::json!({"type": "success"})).await;
+        });
+
+        let cancellation = CancellationToken::new();
+        let mut client = GreetdClient::connect_at(&socket, &cancellation)
+            .await
+            .expect("real client should connect to fake greetd");
+        assert!(matches!(
+            client.create_session("alice", &cancellation).await,
+            Ok(GreetdResponse::AuthMessage { .. })
+        ));
+        assert!(matches!(
+            client
+                .post_auth_message_response(Some("password"), &cancellation)
+                .await,
+            Ok(GreetdResponse::AuthMessage { .. })
+        ));
+        assert!(matches!(
+            client.post_auth_message_response(None, &cancellation).await,
+            Ok(GreetdResponse::Success)
+        ));
+        assert!(matches!(
+            client
+                .start_session(
+                    &["/bin/test-session".to_owned()],
+                    &["TEST_MODE=1".to_owned()],
+                    &cancellation,
+                )
+                .await,
+            Ok(GreetdResponse::Success)
+        ));
+
+        server.await.expect("fake greetd should finish");
+        let _ = std::fs::remove_file(socket);
+    }
+
+    fn test_socket_path() -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be valid")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "mozais-greetd-test-{}-{nonce}.sock",
+            std::process::id()
+        ))
+    }
+
+    async fn read_request(stream: &mut tokio::net::UnixStream) -> Value {
+        let mut length = [0_u8; 4];
+        stream.read_exact(&mut length).await.unwrap();
+        let mut payload = vec![0_u8; u32::from_ne_bytes(length) as usize];
+        stream.read_exact(&mut payload).await.unwrap();
+        serde_json::from_slice(&payload).unwrap()
+    }
+
+    async fn write_response(stream: &mut tokio::net::UnixStream, response: Value) {
+        let payload = serde_json::to_vec(&response).unwrap();
+        let frame = encode_frame(&payload, super::GreetdError::RequestTooLarge).unwrap();
+        stream.write_all(&frame).await.unwrap();
+        stream.flush().await.unwrap();
     }
 }

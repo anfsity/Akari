@@ -82,16 +82,12 @@ impl AuthActorHandle {
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<String> {
         self.interrupt_current(None);
-        let (reply, receiver) = oneshot::channel();
-        self.send(
-            AuthCommand::Begin {
-                caller,
-                username,
-                emitter,
-                reply,
-            },
-            receiver,
-        )
+        self.send_with(|reply| AuthCommand::Begin {
+            caller,
+            username,
+            emitter,
+            reply,
+        })
         .await
     }
 
@@ -102,16 +98,12 @@ impl AuthActorHandle {
         response: zeroize::Zeroizing<String>,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
-        let (reply, receiver) = oneshot::channel();
-        self.send(
-            AuthCommand::Respond {
-                attempt_id,
-                response,
-                emitter,
-                reply,
-            },
-            receiver,
-        )
+        self.send_with(|reply| AuthCommand::Respond {
+            attempt_id,
+            response,
+            emitter,
+            reply,
+        })
         .await
     }
 
@@ -122,17 +114,13 @@ impl AuthActorHandle {
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
         let allow_after_cleanup = self.interrupt_current(Some(&attempt_id));
-        let (reply, receiver) = oneshot::channel();
-        self.send(
-            AuthCommand::Cancel {
-                expected_attempt: Some(attempt_id),
-                expected_caller: None,
-                allow_after_cleanup,
-                emitter: Some(emitter),
-                reply,
-            },
-            receiver,
-        )
+        self.send_with(|reply| AuthCommand::Cancel {
+            expected_attempt: Some(attempt_id),
+            expected_caller: None,
+            allow_after_cleanup,
+            emitter: Some(emitter),
+            reply,
+        })
         .await
     }
 
@@ -142,15 +130,11 @@ impl AuthActorHandle {
         attempt_id: String,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
-        let (reply, receiver) = oneshot::channel();
-        self.send(
-            AuthCommand::BeginSessionResolution {
-                attempt_id,
-                emitter,
-                reply,
-            },
-            receiver,
-        )
+        self.send_with(|reply| AuthCommand::BeginSessionResolution {
+            attempt_id,
+            emitter,
+            reply,
+        })
         .await
     }
 
@@ -161,16 +145,12 @@ impl AuthActorHandle {
         detail: String,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
-        let (reply, receiver) = oneshot::channel();
-        self.send(
-            AuthCommand::SessionUnavailable {
-                attempt_id,
-                detail,
-                emitter,
-                reply,
-            },
-            receiver,
-        )
+        self.send_with(|reply| AuthCommand::SessionUnavailable {
+            attempt_id,
+            detail,
+            emitter,
+            reply,
+        })
         .await
     }
 
@@ -181,16 +161,12 @@ impl AuthActorHandle {
         detail: String,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
-        let (reply, receiver) = oneshot::channel();
-        self.send(
-            AuthCommand::FailSessionResolution {
-                attempt_id,
-                detail,
-                emitter,
-                reply,
-            },
-            receiver,
-        )
+        self.send_with(|reply| AuthCommand::FailSessionResolution {
+            attempt_id,
+            detail,
+            emitter,
+            reply,
+        })
         .await
     }
 
@@ -201,40 +177,43 @@ impl AuthActorHandle {
         session: SessionEntry,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
-        let (reply, receiver) = oneshot::channel();
-        self.send(
-            AuthCommand::StartSession {
-                attempt_id,
-                session,
-                emitter,
-                reply,
-            },
-            receiver,
-        )
+        self.send_with(|reply| AuthCommand::StartSession {
+            attempt_id,
+            session,
+            emitter,
+            reply,
+        })
         .await
     }
 
     /// Reserves the actor while a power action uses the system D-Bus.
     pub(super) async fn reserve_power(&self) -> fdo::Result<PowerLease> {
-        let (reply, receiver) = oneshot::channel();
-        self.send(AuthCommand::AcquirePower { reply }, receiver)
+        self.send_with(|reply| AuthCommand::AcquirePower { reply })
             .await
     }
 
-    /// Enqueues a command and waits for the result produced by the actor.
-    async fn send<T>(
-        &self,
-        command: AuthCommand,
-        receiver: oneshot::Receiver<fdo::Result<T>>,
-    ) -> fdo::Result<T> {
-        self.commands
-            .send(command)
-            .await
-            .map_err(|_| fdo::Error::Failed("authentication actor is unavailable".to_owned()))?;
-        receiver
-            .await
-            .map_err(|_| fdo::Error::Failed("authentication actor stopped".to_owned()))?
+    /// Builds, enqueues, and awaits one typed command reply.
+    async fn send_with<T, Build>(&self, build: Build) -> fdo::Result<T>
+    where
+        Build: FnOnce(oneshot::Sender<fdo::Result<T>>) -> AuthCommand,
+    {
+        send_command(&self.commands, build).await
     }
+}
+
+/// Enqueues one typed command and waits for the actor's reply.
+async fn send_command<T, Build>(commands: &CommandSender, build: Build) -> fdo::Result<T>
+where
+    Build: FnOnce(oneshot::Sender<fdo::Result<T>>) -> AuthCommand,
+{
+    let (reply, receiver) = oneshot::channel();
+    commands
+        .send(build(reply))
+        .await
+        .map_err(|_| fdo::Error::Failed("authentication actor is unavailable".to_owned()))?;
+    receiver
+        .await
+        .map_err(|_| fdo::Error::Failed("authentication actor stopped".to_owned()))?
 }
 
 /// Reservation held by a power action while it performs the system D-Bus call.
@@ -476,20 +455,7 @@ async fn run_actor(
                 let _ = reply.send(result);
             }
             AuthCommand::AcquirePower { reply } => {
-                let result = if actor.power_busy {
-                    Err(fdo::Error::Failed(
-                        "power action is already in progress".to_owned(),
-                    ))
-                } else if is_active_authentication_state(actor.auth.state()) {
-                    Err(fdo::Error::Failed(
-                        "power action rejected while authentication is active".to_owned(),
-                    ))
-                } else {
-                    actor.power_busy = true;
-                    Ok(PowerLease {
-                        release: power_release_sender.clone(),
-                    })
-                };
+                let result = acquire_power(&mut actor, power_release_sender.clone());
                 let _ = reply.send(result);
             }
         }
@@ -1227,20 +1193,14 @@ async fn request_caller_cancel(
     cancellation: CancellationToken,
 ) {
     cancellation.cancel();
-    let (reply, receiver) = oneshot::channel();
-    if commands
-        .send(AuthCommand::Cancel {
-            expected_attempt: Some(attempt_id),
-            expected_caller: Some(caller),
-            allow_after_cleanup: false,
-            emitter: None,
-            reply,
-        })
-        .await
-        .is_ok()
-    {
-        let _ = receiver.await;
-    }
+    let _ = send_command(&commands, |reply| AuthCommand::Cancel {
+        expected_attempt: Some(attempt_id),
+        expected_caller: Some(caller),
+        allow_after_cleanup: false,
+        emitter: None,
+        reply,
+    })
+    .await;
 }
 
 fn schedule_handoff_after_reply(connection: zbus::Connection, handoff: Arc<Notify>) {
@@ -1334,6 +1294,24 @@ fn is_active_authentication_state(state: AuthState) -> bool {
     )
 }
 
+fn acquire_power(
+    actor: &mut ActorState,
+    release: mpsc::UnboundedSender<()>,
+) -> fdo::Result<PowerLease> {
+    if actor.power_busy {
+        Err(fdo::Error::Failed(
+            "power action is already in progress".to_owned(),
+        ))
+    } else if is_active_authentication_state(actor.auth.state()) {
+        Err(fdo::Error::Failed(
+            "power action rejected while authentication is active".to_owned(),
+        ))
+    } else {
+        actor.power_busy = true;
+        Ok(PowerLease { release })
+    }
+}
+
 fn session_environment(session: &SessionEntry) -> Vec<String> {
     // The backend owns the launch environment and does not inherit a caller's
     // PATH when executing a desktop entry selected through D-Bus.
@@ -1380,9 +1358,15 @@ fn map_transition_error(error: crate::state::StateTransitionError) -> fdo::Error
 
 #[cfg(test)]
 mod tests {
-    use tokio::sync::watch;
+    use std::sync::Arc;
 
-    use super::{ActorState, AuthSnapshot, cancel_current, validate_cancel_target};
+    use tokio::sync::Notify;
+    use tokio::{sync::watch, task::yield_now};
+
+    use super::{
+        ActorState, AuthActorHandle, AuthSnapshot, acquire_power, cancel_current,
+        validate_cancel_target,
+    };
     use crate::state::{AuthState, AuthStateMachine, StateEvent};
 
     fn cancelled_attempt() -> (AuthStateMachine, String) {
@@ -1439,5 +1423,48 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(actor.auth.state(), AuthState::Idle);
+    }
+
+    #[test]
+    fn power_is_rejected_for_active_authentication() {
+        let mut actor = ActorState::default();
+        actor.auth.begin_authentication("alice".to_owned()).unwrap();
+        let (release, _) = tokio::sync::mpsc::unbounded_channel();
+
+        let error = match acquire_power(&mut actor, release) {
+            Ok(_) => panic!("power action should be rejected during authentication"),
+            Err(error) => error,
+        };
+
+        assert!(error.to_string().contains("authentication is active"));
+        assert!(!actor.power_busy);
+    }
+
+    #[test]
+    fn power_is_rejected_while_another_lease_is_held() {
+        let mut actor = ActorState {
+            power_busy: true,
+            ..ActorState::default()
+        };
+        let (release, _) = tokio::sync::mpsc::unbounded_channel();
+
+        let error = match acquire_power(&mut actor, release) {
+            Ok(_) => panic!("power action should be rejected while busy"),
+            Err(error) => error,
+        };
+
+        assert!(error.to_string().contains("already in progress"));
+    }
+
+    #[tokio::test]
+    async fn power_lease_release_allows_the_next_operation() {
+        let actor = AuthActorHandle::spawn(Arc::new(Notify::new()));
+        let lease = actor.reserve_power().await.unwrap();
+        assert!(actor.reserve_power().await.is_err());
+
+        drop(lease);
+        yield_now().await;
+
+        assert!(actor.reserve_power().await.is_ok());
     }
 }
