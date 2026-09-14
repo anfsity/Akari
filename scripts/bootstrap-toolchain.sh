@@ -2,16 +2,17 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd -- "$script_dir/.." && pwd)"
+# shellcheck source=lib.sh
+source "$script_dir/lib.sh"
+repo_root="$(mozais_repo_root)"
 
-if ! command -v fvm >/dev/null 2>&1; then
-  printf '%s\n' 'fvm is missing. Install the Arch packages listed in README.md.' >&2
-  exit 1
-fi
+mozais_require_command fvm
+mozais_require_command cargo
+mozais_require_file "$repo_root/backend/Cargo.toml" 'backend Cargo manifest'
 
 cd -- "$repo_root"
 
-fvm install stable
+fvm install
 fvm use stable --force
 fvm flutter config --enable-linux-desktop
 
@@ -25,5 +26,6 @@ if [[ ! -f pubspec.yaml ]]; then
 fi
 
 fvm flutter pub get
+cargo fetch --manifest-path "$repo_root/backend/Cargo.toml" --locked
 printf '%s\n' 'Flutter toolchain ready.'
 fvm flutter doctor -v
