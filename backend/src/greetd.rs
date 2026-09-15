@@ -542,7 +542,7 @@ mod tests {
     use super::GreetdTransport;
 
     #[test]
-    fn encodes_framed_json() {
+    fn encodes_frame() {
         let payload = serde_json::to_vec(&serde_json::json!({
             "type": "create_session",
             "username": "alice"
@@ -557,7 +557,7 @@ mod tests {
     }
 
     #[test]
-    fn omits_empty_response() {
+    fn omits_response() {
         let request = AuthMessageResponseRequest {
             kind: "post_auth_message_response",
             response: None,
@@ -569,7 +569,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_oversized_frames() {
+    fn rejects_big_frame() {
         let payload = vec![0_u8; MAX_FRAME_SIZE + 1];
 
         assert!(matches!(
@@ -579,7 +579,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn cancelled_connect_returns_error() {
+    async fn cancelled_connect() {
         let cancellation = CancellationToken::new();
         cancellation.cancel();
 
@@ -590,8 +590,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn truncated_response_is_rejected() {
-        let socket = test_socket_path();
+    async fn rejects_truncated_response() {
+        let socket = socket_path();
         let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.unwrap();
@@ -615,8 +615,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn malformed_response_is_rejected() {
-        let socket = test_socket_path();
+    async fn rejects_bad_response() {
+        let socket = socket_path();
         let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.unwrap();
@@ -639,8 +639,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn oversized_response_is_rejected_before_allocation() {
-        let socket = test_socket_path();
+    async fn rejects_big_response() {
+        let socket = socket_path();
         let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.unwrap();
@@ -666,8 +666,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn request_cancellation_interrupts_response_read() {
-        let socket = test_socket_path();
+    async fn cancels_read() {
+        let socket = socket_path();
         let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.unwrap();
@@ -691,8 +691,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn error_response_is_decoded() {
-        let socket = test_socket_path();
+    async fn decodes_error() {
+        let socket = socket_path();
         let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.unwrap();
@@ -723,8 +723,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn cancel_request_roundtrip() {
-        let socket = test_socket_path();
+    async fn cancel_roundtrip() {
+        let socket = socket_path();
         let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.unwrap();
@@ -748,7 +748,7 @@ mod tests {
 
     #[cfg(feature = "mock")]
     #[tokio::test]
-    async fn mock_transport_auth_flow() {
+    async fn mock_auth_flow() {
         let cancellation = CancellationToken::new();
         let mut transport = GreetdTransport::connect(&cancellation)
             .await
@@ -784,7 +784,7 @@ mod tests {
 
     #[cfg(feature = "mock")]
     #[tokio::test]
-    async fn mock_transport_rejects_password() {
+    async fn mock_rejects_password() {
         let cancellation = CancellationToken::new();
         let mut transport = GreetdTransport::connect(&cancellation)
             .await
@@ -806,8 +806,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn real_transport_roundtrip() {
-        let socket = test_socket_path();
+    async fn real_roundtrip() {
+        let socket = socket_path();
         let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.expect("client should connect");
@@ -883,15 +883,17 @@ mod tests {
         let _ = std::fs::remove_file(socket);
     }
 
-    fn test_socket_path() -> PathBuf {
+    fn socket_path() -> PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system clock should be valid")
             .as_nanos();
-        std::env::temp_dir().join(format!(
+        let path = std::env::temp_dir().join(format!(
             "mozais-greetd-test-{}-{nonce}.sock",
             std::process::id()
-        ))
+        ));
+        let _ = std::fs::remove_file(&path);
+        path
     }
 
     async fn read_request(stream: &mut tokio::net::UnixStream) -> Value {

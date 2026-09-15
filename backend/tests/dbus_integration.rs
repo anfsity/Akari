@@ -18,13 +18,13 @@ use zbus::Proxy;
 
 #[tokio::test]
 async fn auth_roundtrip() {
-    let _guard = test_lock().lock().await;
-    let socket = test_socket_path();
+    let _guard = lock().lock().await;
+    let socket = socket_path();
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
-    let server = tokio::spawn(fake_greetd(listener));
+    let server = tokio::spawn(fake_auth(listener));
     let mut backend = start_backend(&socket);
 
-    let connection = connect_to_backend().await;
+    let connection = connect_backend().await;
     let proxy = Proxy::new(
         &connection,
         "io.mozais.Greeter",
@@ -61,11 +61,11 @@ async fn auth_roundtrip() {
 
 #[tokio::test]
 async fn blank_username_is_rejected() {
-    let _guard = test_lock().lock().await;
-    let socket = test_socket_path();
+    let _guard = lock().lock().await;
+    let socket = socket_path();
     let mut backend = start_backend(&socket);
-    let connection = connect_to_backend().await;
-    let proxy = greeter_proxy(&connection).await;
+    let connection = connect_backend().await;
+    let proxy = make_proxy(&connection).await;
 
     let result: zbus::Result<String> = proxy.call("BeginAuthentication", &("   ",)).await;
 
@@ -75,13 +75,13 @@ async fn blank_username_is_rejected() {
 
 #[tokio::test]
 async fn wrong_password_sets_failed_state() {
-    let _guard = test_lock().lock().await;
-    let socket = test_socket_path();
+    let _guard = lock().lock().await;
+    let socket = socket_path();
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
-    let server = tokio::spawn(fake_greetd_wrong_password(listener));
+    let server = tokio::spawn(fake_bad_password(listener));
     let mut backend = start_backend(&socket);
-    let connection = connect_to_backend().await;
-    let proxy = greeter_proxy(&connection).await;
+    let connection = connect_backend().await;
+    let proxy = make_proxy(&connection).await;
 
     let attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -114,14 +114,14 @@ async fn wrong_password_sets_failed_state() {
 }
 
 #[tokio::test]
-async fn stale_attempt_is_rejected() {
-    let _guard = test_lock().lock().await;
-    let socket = test_socket_path();
+async fn stale_attempt() {
+    let _guard = lock().lock().await;
+    let socket = socket_path();
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
-    let server = tokio::spawn(fake_greetd(listener));
+    let server = tokio::spawn(fake_auth(listener));
     let mut backend = start_backend(&socket);
-    let connection = connect_to_backend().await;
-    let proxy = greeter_proxy(&connection).await;
+    let connection = connect_backend().await;
+    let proxy = make_proxy(&connection).await;
 
     let _attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -136,18 +136,18 @@ async fn stale_attempt_is_rejected() {
 }
 
 #[tokio::test]
-async fn respond_before_prompt_is_rejected() {
-    let _guard = test_lock().lock().await;
-    let socket = test_socket_path();
+async fn respond_early() {
+    let _guard = lock().lock().await;
+    let socket = socket_path();
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
-    let server = tokio::spawn(fake_greetd_prompt_after_delay(listener));
+    let server = tokio::spawn(fake_delayed_prompt(listener));
     let mut backend = start_backend(&socket);
-    let connection = connect_to_backend().await;
-    let proxy = greeter_proxy(&connection).await;
+    let connection = connect_backend().await;
+    let proxy = make_proxy(&connection).await;
 
     let begin_connection = zbus::Connection::session().await.unwrap();
     let begin = tokio::spawn(async move {
-        let attempt_proxy = greeter_proxy(&begin_connection).await;
+        let attempt_proxy = make_proxy(&begin_connection).await;
         attempt_proxy
             .call::<_, _, String>("BeginAuthentication", &("alice",))
             .await
@@ -163,14 +163,14 @@ async fn respond_before_prompt_is_rejected() {
 }
 
 #[tokio::test]
-async fn invalid_session_is_rejected_after_authentication() {
-    let _guard = test_lock().lock().await;
-    let socket = test_socket_path();
+async fn bad_session() {
+    let _guard = lock().lock().await;
+    let socket = socket_path();
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
-    let server = tokio::spawn(fake_greetd(listener));
+    let server = tokio::spawn(fake_auth(listener));
     let mut backend = start_backend(&socket);
-    let connection = connect_to_backend().await;
-    let proxy = greeter_proxy(&connection).await;
+    let connection = connect_backend().await;
+    let proxy = make_proxy(&connection).await;
 
     let attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -194,14 +194,14 @@ async fn invalid_session_is_rejected_after_authentication() {
 }
 
 #[tokio::test]
-async fn cancel_returns_to_idle() {
-    let _guard = test_lock().lock().await;
-    let socket = test_socket_path();
+async fn cancel_to_idle() {
+    let _guard = lock().lock().await;
+    let socket = socket_path();
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
-    let server = tokio::spawn(fake_greetd_cancel(listener));
+    let server = tokio::spawn(fake_cancel(listener));
     let mut backend = start_backend(&socket);
-    let connection = connect_to_backend().await;
-    let proxy = greeter_proxy(&connection).await;
+    let connection = connect_backend().await;
+    let proxy = make_proxy(&connection).await;
 
     let attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -218,12 +218,12 @@ async fn cancel_returns_to_idle() {
 }
 
 #[tokio::test]
-async fn invalid_power_action_is_rejected() {
-    let _guard = test_lock().lock().await;
-    let socket = test_socket_path();
+async fn bad_power_action() {
+    let _guard = lock().lock().await;
+    let socket = socket_path();
     let mut backend = start_backend(&socket);
-    let connection = connect_to_backend().await;
-    let proxy = greeter_proxy(&connection).await;
+    let connection = connect_backend().await;
+    let proxy = make_proxy(&connection).await;
 
     let result: zbus::Result<()> = proxy.call("PowerAction", &("Shutdown",)).await;
 
@@ -232,16 +232,16 @@ async fn invalid_power_action_is_rejected() {
 }
 
 #[tokio::test]
-async fn session_start_roundtrip() {
-    let _guard = test_lock().lock().await;
-    let socket = test_socket_path();
-    let session_root = test_dir("sessions");
-    write_session_file(&session_root, "test.desktop", "Test");
+async fn start_session() {
+    let _guard = lock().lock().await;
+    let socket = socket_path();
+    let session_root = temp_dir("sessions");
+    write_session(&session_root, "test.desktop", "Test");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
-    let server = tokio::spawn(fake_greetd_start(listener, false));
-    let mut backend = start_backend_with_sessions(&socket, &session_root);
-    let connection = connect_to_backend().await;
-    let proxy = greeter_proxy(&connection).await;
+    let server = tokio::spawn(fake_start(listener, false));
+    let mut backend = start_backend_for_sessions(&socket, &session_root);
+    let connection = connect_backend().await;
+    let proxy = make_proxy(&connection).await;
 
     let attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -260,21 +260,21 @@ async fn session_start_roundtrip() {
     assert_eq!(state.0, "HandingOff");
     server.await.unwrap();
     stop_backend(&mut backend);
-    cleanup_dir(session_root);
+    remove_dir(session_root);
     let _ = std::fs::remove_file(socket);
 }
 
 #[tokio::test]
-async fn session_start_failure_is_reported() {
-    let _guard = test_lock().lock().await;
-    let socket = test_socket_path();
-    let session_root = test_dir("sessions-fail");
-    write_session_file(&session_root, "test.desktop", "Test");
+async fn start_session_fails() {
+    let _guard = lock().lock().await;
+    let socket = socket_path();
+    let session_root = temp_dir("sessions-fail");
+    write_session(&session_root, "test.desktop", "Test");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
-    let server = tokio::spawn(fake_greetd_start(listener, true));
-    let mut backend = start_backend_with_sessions(&socket, &session_root);
-    let connection = connect_to_backend().await;
-    let proxy = greeter_proxy(&connection).await;
+    let server = tokio::spawn(fake_start(listener, true));
+    let mut backend = start_backend_for_sessions(&socket, &session_root);
+    let connection = connect_backend().await;
+    let proxy = make_proxy(&connection).await;
 
     let attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -296,11 +296,11 @@ async fn session_start_failure_is_reported() {
     );
     server.await.unwrap();
     stop_backend(&mut backend);
-    cleanup_dir(session_root);
+    remove_dir(session_root);
     let _ = std::fs::remove_file(socket);
 }
 
-async fn fake_greetd(listener: UnixListener) {
+async fn fake_auth(listener: UnixListener) {
     let (mut stream, _) = listener.accept().await.expect("backend should connect");
 
     let create = read_request(&mut stream).await;
@@ -334,7 +334,7 @@ async fn fake_greetd(listener: UnixListener) {
     write_response(&mut stream, serde_json::json!({ "type": "success" })).await;
 }
 
-async fn fake_greetd_wrong_password(listener: UnixListener) {
+async fn fake_bad_password(listener: UnixListener) {
     let (mut stream, _) = listener.accept().await.expect("backend should connect");
 
     let create = read_request(&mut stream).await;
@@ -363,7 +363,7 @@ async fn fake_greetd_wrong_password(listener: UnixListener) {
     .await;
 }
 
-async fn fake_greetd_prompt_after_delay(listener: UnixListener) {
+async fn fake_delayed_prompt(listener: UnixListener) {
     let (mut stream, _) = listener.accept().await.expect("backend should connect");
     let create = read_request(&mut stream).await;
     assert_eq!(create["type"], "create_session");
@@ -379,7 +379,7 @@ async fn fake_greetd_prompt_after_delay(listener: UnixListener) {
     .await;
 }
 
-async fn fake_greetd_cancel(listener: UnixListener) {
+async fn fake_cancel(listener: UnixListener) {
     let (mut stream, _) = listener.accept().await.expect("backend should connect");
     let create = read_request(&mut stream).await;
     assert_eq!(create["type"], "create_session");
@@ -398,7 +398,7 @@ async fn fake_greetd_cancel(listener: UnixListener) {
     write_response(&mut stream, serde_json::json!({ "type": "success" })).await;
 }
 
-async fn fake_greetd_start(listener: UnixListener, fail_start: bool) {
+async fn fake_start(listener: UnixListener, fail_start: bool) {
     let (mut stream, _) = listener.accept().await.expect("backend should connect");
     let _ = read_request(&mut stream).await;
     write_response(
@@ -441,7 +441,7 @@ async fn fake_greetd_start(listener: UnixListener, fail_start: bool) {
     }
 }
 
-async fn connect_to_backend() -> zbus::Connection {
+async fn connect_backend() -> zbus::Connection {
     for _ in 0..100 {
         if let Ok(connection) = zbus::Connection::session().await {
             if let Ok(proxy) = Proxy::new(
@@ -466,7 +466,7 @@ async fn connect_to_backend() -> zbus::Connection {
     panic!("backend did not appear on the session bus");
 }
 
-async fn greeter_proxy(connection: &zbus::Connection) -> zbus::Proxy<'_> {
+async fn make_proxy(connection: &zbus::Connection) -> zbus::Proxy<'_> {
     Proxy::new(
         connection,
         "io.mozais.Greeter",
@@ -477,7 +477,7 @@ async fn greeter_proxy(connection: &zbus::Connection) -> zbus::Proxy<'_> {
     .expect("backend proxy should be available")
 }
 
-fn test_lock() -> &'static tokio::sync::Mutex<()> {
+fn lock() -> &'static tokio::sync::Mutex<()> {
     TEST_LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
 }
 
@@ -491,7 +491,7 @@ fn start_backend(socket: &PathBuf) -> Child {
         .expect("backend process should start")
 }
 
-fn start_backend_with_sessions(socket: &PathBuf, session_root: &PathBuf) -> Child {
+fn start_backend_for_sessions(socket: &PathBuf, session_root: &PathBuf) -> Child {
     Command::new(env!("CARGO_BIN_EXE_backend"))
         .env("GREETD_SOCK", socket)
         .env("MOZAIS_WAYLAND_SESSIONS", session_root)
@@ -503,13 +503,13 @@ fn start_backend_with_sessions(socket: &PathBuf, session_root: &PathBuf) -> Chil
         .expect("backend process should start")
 }
 
-fn test_dir(label: &str) -> PathBuf {
+fn temp_dir(label: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!("mozais-{label}-{}", std::process::id()));
     std::fs::create_dir_all(&path).unwrap();
     path
 }
 
-fn write_session_file(root: &PathBuf, name: &str, display_name: &str) {
+fn write_session(root: &PathBuf, name: &str, display_name: &str) {
     std::fs::write(
         root.join(name),
         format!(
@@ -519,7 +519,7 @@ fn write_session_file(root: &PathBuf, name: &str, display_name: &str) {
     .unwrap();
 }
 
-fn cleanup_dir(path: PathBuf) {
+fn remove_dir(path: PathBuf) {
     let _ = std::fs::remove_dir_all(path);
 }
 
@@ -528,7 +528,7 @@ fn stop_backend(backend: &mut Child) {
     let _ = backend.wait();
 }
 
-fn test_socket_path() -> PathBuf {
+fn socket_path() -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system clock should be valid")
