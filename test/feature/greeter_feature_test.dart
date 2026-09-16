@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mozais_greeter/feature/greeter/greeter_commands.dart';
 import 'package:mozais_greeter/feature/greeter/greeter_effect.dart';
 import 'package:mozais_greeter/feature/greeter/greeter_feature.dart';
 import 'package:mozais_greeter/feature/greeter/greeter_state.dart';
@@ -22,6 +23,41 @@ void main() {
     feature.dispose();
   });
 
+  test(
+    'maps an active backend snapshot to service reconnect recovery',
+    () async {
+      final gateway = _FakeGreeterGateway()
+        ..snapshot = const BackendStateSnapshot(
+          state: BackendAuthState.waitingForInput,
+          detail: 'An authentication transaction is already active.',
+        );
+      final feature = GreeterFeature(gateway: gateway);
+
+      await feature.initialize();
+
+      expect(feature.state.serviceMode, ServiceMode.ready);
+      expect(feature.state.authMode, AuthMode.error);
+      expect(feature.state.authError?.kind, GreeterErrorKind.authentication);
+      expect(
+        feature.state.authError?.recovery,
+        GreeterRecovery.reconnectService,
+      );
+
+      gateway.snapshot = const BackendStateSnapshot(
+        state: BackendAuthState.idle,
+        detail: '',
+      );
+      await feature.dispatch(const ReconnectServiceCommand());
+
+      expect(gateway.getStateCalls, 2);
+      expect(feature.state.serviceMode, ServiceMode.ready);
+      expect(feature.state.authMode, AuthMode.userSelection);
+      expect(feature.state.authError, isNull);
+
+      feature.dispose();
+    },
+  );
+
   test('applies queued prompts and ignores stale events', () async {
     final gateway = _FakeGreeterGateway();
     final feature = GreeterFeature(gateway: gateway);
@@ -29,8 +65,8 @@ void main() {
     final effectSubscription = feature.effects.listen(effects.add);
     await feature.initialize();
 
-    feature.selectUser(gateway.users.first);
-    await feature.beginAuthentication();
+    await feature.dispatch(SelectUserCommand(gateway.users.first));
+    await feature.dispatch(const BeginAuthenticationCommand());
     await Future<void>.delayed(Duration.zero);
 
     expect(feature.state.authMode, AuthMode.prompting);
@@ -91,10 +127,10 @@ void main() {
     final feature = GreeterFeature(gateway: gateway);
     await feature.initialize();
 
-    feature.selectUser(gateway.users.first);
-    await feature.beginAuthentication();
+    await feature.dispatch(SelectUserCommand(gateway.users.first));
+    await feature.dispatch(const BeginAuthenticationCommand());
     await Future<void>.delayed(Duration.zero);
-    await feature.cancelAuthentication();
+    await feature.dispatch(const CancelAuthenticationCommand());
     await Future<void>.delayed(Duration.zero);
 
     expect(gateway.cancelledAttemptId, 'attempt-1');
@@ -104,6 +140,139 @@ void main() {
 
     feature.dispose();
   });
+
+  test(
+    'dispatches power actions without changing authentication state',
+    () async {
+      final gateway = _FakeGreeterGateway();
+      final feature = await _createPromptedFeature(gateway);
+      gateway.powerActionError = const GreeterGatewayException(
+        'Power action denied.',
+        kind: GreeterErrorKind.power,
+      );
+
+      await feature.dispatch(
+        const RequestPowerActionCommand(PowerAction.suspend),
+      );
+
+      expect(gateway.requestedPowerAction, PowerAction.suspend);
+      expect(feature.state.powerMode, PowerMode.failed);
+      expect(feature.state.powerError?.kind, GreeterErrorKind.power);
+      expect(feature.state.authMode, AuthMode.prompting);
+      expect(feature.state.authError, isNull);
+      expect(feature.state.backendAuthState, BackendAuthState.waitingForInput);
+
+      feature.dispose();
+    },
+  );
+
+  test('rejects a blank prompt response without calling the gateway', () async {
+    final gateway = _FakeGreeterGateway();
+    final feature = await _createPromptedFeature(gateway);
+
+    await feature.dispatch(const RespondToPromptCommand('   '));
+
+    expect(gateway.respondCalls, 0);
+    expect(feature.state.authMode, AuthMode.error);
+    expect(feature.state.authError?.kind, GreeterErrorKind.input);
+    expect(feature.state.authError?.recovery, GreeterRecovery.retryPrompt);
+
+    await feature.dispatch(const RetryPromptCommand());
+
+    expect(feature.state.authMode, AuthMode.prompting);
+    expect(feature.state.authError, isNull);
+
+    feature.dispose();
+  });
+
+  test(
+    'keeps authentication state while the session catalog is loading',
+    () async {
+      final gateway = _FakeGreeterGateway();
+      final sessions = Completer<List<SessionSummary>>();
+      gateway.sessionsFuture = sessions.future;
+      final feature = await _createPromptedFeature(gateway);
+
+      gateway.emit(
+        const BackendStateChanged(
+          attemptId: 'attempt-1',
+          state: BackendAuthState.authenticated,
+          detail: '',
+        ),
+      );
+      await _flushEvents();
+
+      expect(feature.state.catalogMode, CatalogMode.loading);
+      expect(feature.state.authMode, AuthMode.sessionSelection);
+      expect(feature.state.backendAuthState, BackendAuthState.authenticated);
+      expect(feature.state.authError, isNull);
+      expect(gateway.listSessionsCalls, 1);
+
+      sessions.complete(const [
+        SessionSummary(id: 'wayland:sway', name: 'Sway'),
+      ]);
+      await _flushEvents();
+
+      expect(feature.state.catalogMode, CatalogMode.ready);
+      expect(feature.state.authMode, AuthMode.sessionSelection);
+      expect(feature.state.backendAuthState, BackendAuthState.authenticated);
+
+      feature.dispose();
+    },
+  );
+
+  test('keeps authentication state when the session catalog fails', () async {
+    final gateway = _FakeGreeterGateway();
+    gateway.sessionsError = const GreeterGatewayException(
+      'Session catalog unavailable.',
+      kind: GreeterErrorKind.session,
+    );
+    final feature = await _createPromptedFeature(gateway);
+
+    gateway.emit(
+      const BackendStateChanged(
+        attemptId: 'attempt-1',
+        state: BackendAuthState.authenticated,
+        detail: '',
+      ),
+    );
+    await _flushEvents();
+
+    expect(feature.state.catalogMode, CatalogMode.failed);
+    expect(feature.state.catalogError?.kind, GreeterErrorKind.session);
+    expect(
+      feature.state.catalogError?.recovery,
+      GreeterRecovery.retrySessionCatalog,
+    );
+    expect(feature.state.authMode, AuthMode.sessionSelection);
+    expect(feature.state.backendAuthState, BackendAuthState.authenticated);
+    expect(feature.state.authError, isNull);
+
+    gateway.sessionsError = null;
+    await feature.dispatch(const RetrySessionCatalogCommand());
+
+    expect(feature.state.catalogMode, CatalogMode.ready);
+    expect(feature.state.authMode, AuthMode.sessionSelection);
+    expect(gateway.listSessionsCalls, 2);
+
+    feature.dispose();
+  });
+}
+
+Future<GreeterFeature> _createPromptedFeature(
+  _FakeGreeterGateway gateway,
+) async {
+  final feature = GreeterFeature(gateway: gateway);
+  await feature.initialize();
+  await feature.dispatch(SelectUserCommand(gateway.users.first));
+  await feature.dispatch(const BeginAuthenticationCommand());
+  await _flushEvents();
+  return feature;
+}
+
+Future<void> _flushEvents() async {
+  await Future<void>.delayed(Duration.zero);
+  await Future<void>.delayed(Duration.zero);
 }
 
 class _FakeGreeterGateway implements GreeterGateway {
@@ -116,8 +285,18 @@ class _FakeGreeterGateway implements GreeterGateway {
   ];
 
   int getStateCalls = 0;
+  int listSessionsCalls = 0;
+  int respondCalls = 0;
   String? attemptId;
   String? cancelledAttemptId;
+  PowerAction? requestedPowerAction;
+  Future<List<SessionSummary>>? sessionsFuture;
+  Object? sessionsError;
+  Object? powerActionError;
+  BackendStateSnapshot snapshot = const BackendStateSnapshot(
+    state: BackendAuthState.idle,
+    detail: '',
+  );
 
   @override
   Stream<GreeterEvent> get events => _events.stream;
@@ -125,16 +304,25 @@ class _FakeGreeterGateway implements GreeterGateway {
   @override
   Future<BackendStateSnapshot> getState() async {
     getStateCalls++;
-    return const BackendStateSnapshot(state: BackendAuthState.idle, detail: '');
+    return snapshot;
   }
 
   @override
   Future<List<UserSummary>> listUsers() async => users;
 
   @override
-  Future<List<SessionSummary>> listSessions() async => const [
-    SessionSummary(id: 'wayland:sway', name: 'Sway'),
-  ];
+  Future<List<SessionSummary>> listSessions() async {
+    listSessionsCalls++;
+    final future = sessionsFuture;
+    if (future != null) {
+      return future;
+    }
+    final error = sessionsError;
+    if (error != null) {
+      throw error;
+    }
+    return const [SessionSummary(id: 'wayland:sway', name: 'Sway')];
+  }
 
   @override
   Future<String> beginAuthentication(String username) async {
@@ -165,7 +353,9 @@ class _FakeGreeterGateway implements GreeterGateway {
   }
 
   @override
-  Future<void> respond(String attemptId, String response) async {}
+  Future<void> respond(String attemptId, String response) async {
+    respondCalls++;
+  }
 
   @override
   Future<void> cancel(String attemptId) async {
@@ -183,7 +373,13 @@ class _FakeGreeterGateway implements GreeterGateway {
   Future<void> startSession(String attemptId, String sessionId) async {}
 
   @override
-  Future<void> powerAction(PowerAction action) async {}
+  Future<void> powerAction(PowerAction action) async {
+    requestedPowerAction = action;
+    final error = powerActionError;
+    if (error != null) {
+      throw error;
+    }
+  }
 
   void emit(GreeterEvent event) => _events.add(event);
 

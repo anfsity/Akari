@@ -66,6 +66,7 @@ class DBusGreeterGateway implements GreeterGateway {
   Future<List<SessionSummary>> listSessions() async {
     final response = await _call(
       'ListSessions',
+      errorKind: GreeterErrorKind.session,
       replySignature: DBusSignature('a(ssas)'),
     );
     return response.returnValues.single.asArray().map((value) {
@@ -78,6 +79,7 @@ class DBusGreeterGateway implements GreeterGateway {
   Future<String> beginAuthentication(String username) async {
     final response = await _call(
       'BeginAuthentication',
+      errorKind: GreeterErrorKind.authentication,
       values: [DBusString(username)],
       replySignature: DBusSignature('s'),
     );
@@ -88,19 +90,25 @@ class DBusGreeterGateway implements GreeterGateway {
   Future<void> respond(String attemptId, String response) async {
     await _call(
       'Respond',
+      errorKind: GreeterErrorKind.authentication,
       values: [DBusString(attemptId), DBusString(response)],
     );
   }
 
   @override
   Future<void> cancel(String attemptId) async {
-    await _call('Cancel', values: [DBusString(attemptId)]);
+    await _call(
+      'Cancel',
+      errorKind: GreeterErrorKind.authentication,
+      values: [DBusString(attemptId)],
+    );
   }
 
   @override
   Future<void> startSession(String attemptId, String sessionId) async {
     await _call(
       'StartSession',
+      errorKind: GreeterErrorKind.session,
       values: [DBusString(attemptId), DBusString(sessionId)],
     );
   }
@@ -109,6 +117,7 @@ class DBusGreeterGateway implements GreeterGateway {
   Future<void> powerAction(PowerAction action) async {
     await _call(
       'PowerAction',
+      errorKind: GreeterErrorKind.power,
       values: [DBusString(_getPowerActionName(action))],
     );
   }
@@ -116,6 +125,7 @@ class DBusGreeterGateway implements GreeterGateway {
   Future<DBusMethodSuccessResponse> _call(
     String method, {
     Iterable<DBusValue> values = const [],
+    GreeterErrorKind errorKind = GreeterErrorKind.transport,
     DBusSignature? replySignature,
   }) async {
     try {
@@ -126,7 +136,7 @@ class DBusGreeterGateway implements GreeterGateway {
         replySignature: replySignature,
       );
     } on Object catch (error) {
-      throw GreeterGatewayException(_getDisplayError(error));
+      throw GreeterGatewayException(_getDisplayError(error), kind: errorKind);
     }
   }
 

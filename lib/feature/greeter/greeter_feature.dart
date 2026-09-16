@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'greeter_commands.dart';
 import 'greeter_effect.dart';
 import 'greeter_slots.dart';
 import 'greeter_state.dart';
@@ -33,13 +34,43 @@ class GreeterFeature extends ChangeNotifier {
 
   Stream<FeatureEffect> get effects => _effects.stream;
 
+  Future<void> dispatch(GreeterCommand command) async {
+    switch (command) {
+      case SelectUserCommand(:final user):
+        _selectUser(user);
+      case BeginAuthenticationCommand():
+        await _beginAuthentication();
+      case RespondToPromptCommand(:final response):
+        await _respondToPrompt(response);
+      case CancelAuthenticationCommand():
+        await _cancelAuthentication();
+      case SelectSessionCommand(:final session):
+        _selectSession(session);
+      case StartSelectedSessionCommand():
+        await _startSelectedSession();
+      case RequestPowerActionCommand(:final action):
+        await _requestPowerAction(action);
+      case RetryAuthenticationCommand():
+        _retryAuthentication();
+      case RetryPromptCommand():
+        _retryPrompt();
+      case ReconnectServiceCommand():
+        await _reconnectService();
+      case RetrySessionCatalogCommand():
+        await _retrySessionCatalog();
+    }
+  }
+
   Future<void> initialize() async {
     if (_initialized) {
       return;
     }
     _initialized = true;
     _eventSubscription = _gateway.events.listen(_handleEvent);
+    await _loadService();
+  }
 
+  Future<void> _loadService() async {
     _replace(_state.copyWith(serviceMode: ServiceMode.starting));
     try {
       final snapshot = await _gateway.getState();
@@ -51,9 +82,14 @@ class GreeterFeature extends ChangeNotifier {
             users: users,
             authMode: AuthMode.error,
             backendAuthState: snapshot.state,
-            error: snapshot.detail.isEmpty
-                ? 'The greeter service has an active authentication transaction.'
-                : snapshot.detail,
+            authError: GreeterError(
+              kind: GreeterErrorKind.authentication,
+              message: snapshot.detail.isEmpty
+                  ? 'The greeter service has an active authentication transaction.'
+                  : snapshot.detail,
+              recovery: GreeterRecovery.reconnectService,
+            ),
+            clearServiceError: true,
           ),
         );
         return;
@@ -64,7 +100,8 @@ class GreeterFeature extends ChangeNotifier {
           users: users,
           authMode: AuthMode.userSelection,
           backendAuthState: snapshot.state,
-          clearError: true,
+          clearServiceError: true,
+          clearAuthError: true,
         ),
       );
     } on Object catch (error) {
@@ -72,32 +109,70 @@ class GreeterFeature extends ChangeNotifier {
         _state.copyWith(
           serviceMode: ServiceMode.unavailable,
           authMode: AuthMode.error,
-          error: _getDisplayError(error),
+          serviceError: _getGreeterError(
+            error,
+            fallbackKind: GreeterErrorKind.transport,
+            recovery: GreeterRecovery.reconnectService,
+          ),
         ),
       );
     }
   }
 
-  void selectUser(UserSummary user) {
-    if (_state.serviceMode != ServiceMode.ready) {
+  Future<void> _reconnectService() async {
+    if (_state.serviceMode == ServiceMode.starting) {
+      return;
+    }
+    _attemptId = null;
+    _eventsDuringBegin.clear();
+    _replace(
+      _state.copyWith(
+        serviceMode: ServiceMode.starting,
+        authMode: AuthMode.userSelection,
+        clearServiceError: true,
+        clearAuthError: true,
+        clearCatalogError: true,
+        catalogMode: CatalogMode.empty,
+        sessions: const [],
+        clearSelectedUser: true,
+        clearSelectedSession: true,
+        clearPrompt: true,
+        backendAuthState: BackendAuthState.idle,
+      ),
+    );
+    await _loadService();
+  }
+
+  void _selectUser(UserSummary user) {
+    if (_state.serviceMode != ServiceMode.ready ||
+        !_state.users.any((candidate) => candidate.id == user.id)) {
       return;
     }
     _replace(
       _state.copyWith(
         selectedUser: user,
         authMode: AuthMode.editing,
-        clearError: true,
+        clearAuthError: true,
       ),
     );
   }
 
-  Future<void> beginAuthentication() async {
+  Future<void> _beginAuthentication() async {
     final user = _state.selectedUser;
     if (user == null || _state.authMode == AuthMode.submitting) {
       return;
     }
 
-    _replace(_state.copyWith(authMode: AuthMode.submitting, clearError: true));
+    _replace(
+      _state.copyWith(
+        authMode: AuthMode.submitting,
+        clearAuthError: true,
+        catalogMode: CatalogMode.empty,
+        sessions: const [],
+        clearCatalogError: true,
+        clearSelectedSession: true,
+      ),
+    );
 
     _beginInFlight = true;
     _eventsDuringBegin.clear();
@@ -113,30 +188,51 @@ class GreeterFeature extends ChangeNotifier {
     } on Object catch (error) {
       _eventsDuringBegin.clear();
       _beginInFlight = false;
-      _showError(error);
+      _showAuthError(
+        _getGreeterError(
+          error,
+          fallbackKind: GreeterErrorKind.authentication,
+          recovery: GreeterRecovery.retryAuthentication,
+        ),
+      );
     }
   }
 
-  Future<void> respondToPrompt(String response) async {
+  Future<void> _respondToPrompt(String response) async {
     final attemptId = _attemptId;
     if (attemptId == null || _state.authMode != AuthMode.prompting) {
       return;
     }
+    if (response.trim().isEmpty) {
+      _showAuthError(
+        const GreeterError(
+          kind: GreeterErrorKind.input,
+          message: 'A response is required.',
+          recovery: GreeterRecovery.retryPrompt,
+        ),
+      );
+      return;
+    }
 
-    _replace(_state.copyWith(authMode: AuthMode.submitting));
+    _replace(
+      _state.copyWith(authMode: AuthMode.submitting, clearAuthError: true),
+    );
     try {
       await _gateway.respond(attemptId, response);
-      if (attemptId != _attemptId) {
-        return;
-      }
     } on Object catch (error) {
       if (attemptId == _attemptId) {
-        _showError(error);
+        _showAuthError(
+          _getGreeterError(
+            error,
+            fallbackKind: GreeterErrorKind.authentication,
+            recovery: GreeterRecovery.retryAuthentication,
+          ),
+        );
       }
     }
   }
 
-  Future<void> cancelAuthentication() async {
+  Future<void> _cancelAuthentication() async {
     final attemptId = _attemptId;
     if (attemptId == null) {
       _resetToUserSelection(clearSelectedUser: true);
@@ -146,54 +242,93 @@ class GreeterFeature extends ChangeNotifier {
     _attemptId = null;
     try {
       await _gateway.cancel(attemptId);
-    } finally {
-      _resetToUserSelection(clearSelectedUser: true);
-    }
-  }
-
-  void selectSession(SessionSummary session) {
-    if (_state.authMode != AuthMode.sessionSelection) {
+    } on Object catch (error) {
+      _replace(
+        _state.copyWith(
+          serviceMode: ServiceMode.unavailable,
+          authMode: AuthMode.error,
+          serviceError: _getGreeterError(
+            error,
+            fallbackKind: GreeterErrorKind.transport,
+            recovery: GreeterRecovery.reconnectService,
+          ),
+          clearAuthError: true,
+        ),
+      );
       return;
     }
-    _replace(_state.copyWith(selectedSession: session, clearError: true));
+    _resetToUserSelection(clearSelectedUser: true);
   }
 
-  Future<void> startSelectedSession() async {
+  void _selectSession(SessionSummary session) {
+    if (_state.authMode != AuthMode.sessionSelection ||
+        !_state.sessions.any((candidate) => candidate.id == session.id)) {
+      return;
+    }
+    _replace(
+      _state.copyWith(
+        selectedSession: session,
+        clearCatalogError: true,
+        clearAuthError: true,
+      ),
+    );
+  }
+
+  Future<void> _startSelectedSession() async {
     final attemptId = _attemptId;
     final session = _state.selectedSession;
     if (attemptId == null || session == null) {
       return;
     }
 
-    _replace(_state.copyWith(authMode: AuthMode.submitting));
+    _replace(
+      _state.copyWith(authMode: AuthMode.submitting, clearCatalogError: true),
+    );
     try {
       await _gateway.startSession(attemptId, session.id);
-      _replace(_state.copyWith(authMode: AuthMode.handingOff));
-      _effects.add(const ExitAfterHandoffEffect());
-    } on Object catch (error) {
-      _showError(error);
-    }
-  }
-
-  Future<void> requestPowerAction(PowerAction action) async {
-    if (_state.powerMode == PowerMode.executing) {
-      return;
-    }
-    _replace(_state.copyWith(powerMode: PowerMode.executing));
-    try {
-      await _gateway.powerAction(action);
-      _replace(_state.copyWith(powerMode: PowerMode.succeeded));
-    } on Object catch (error) {
       _replace(
         _state.copyWith(
-          powerMode: PowerMode.failed,
-          error: _getDisplayError(error),
+          authMode: AuthMode.handingOff,
+          clearAuthError: true,
+          clearCatalogError: true,
+        ),
+      );
+      _effects.add(const ExitAfterHandoffEffect());
+    } on Object catch (error) {
+      _showSessionError(
+        _getGreeterError(
+          error,
+          fallbackKind: GreeterErrorKind.session,
+          recovery: GreeterRecovery.selectSession,
         ),
       );
     }
   }
 
-  void retry() {
+  Future<void> _requestPowerAction(PowerAction action) async {
+    if (_state.powerMode == PowerMode.executing) {
+      return;
+    }
+    _replace(
+      _state.copyWith(powerMode: PowerMode.executing, clearPowerError: true),
+    );
+    try {
+      await _gateway.powerAction(action);
+      _replace(_state.copyWith(powerMode: PowerMode.succeeded));
+    } on Object catch (error) {
+      final powerError = _getGreeterError(
+        error,
+        fallbackKind: GreeterErrorKind.power,
+        recovery: GreeterRecovery.selectUser,
+      );
+      _replace(
+        _state.copyWith(powerMode: PowerMode.failed, powerError: powerError),
+      );
+      _effects.add(ShowNoticeEffect(powerError.message, isError: true));
+    }
+  }
+
+  void _retryAuthentication() {
     _attemptId = null;
     _replace(
       _state.copyWith(
@@ -202,10 +337,32 @@ class GreeterFeature extends ChangeNotifier {
             ? AuthMode.userSelection
             : AuthMode.editing,
         clearPrompt: true,
-        clearError: true,
+        clearAuthError: true,
+        clearCatalogError: true,
+        catalogMode: CatalogMode.empty,
+        sessions: const [],
         clearSelectedSession: true,
+        backendAuthState: BackendAuthState.idle,
       ),
     );
+  }
+
+  void _retryPrompt() {
+    if (_attemptId == null || _state.prompt == null) {
+      _retryAuthentication();
+      return;
+    }
+    _replace(
+      _state.copyWith(authMode: AuthMode.prompting, clearAuthError: true),
+    );
+    _effects.add(const RequestFocusEffect('credential'));
+  }
+
+  Future<void> _retrySessionCatalog() async {
+    if (_attemptId == null || _state.authMode != AuthMode.sessionSelection) {
+      return;
+    }
+    await _loadSessionsForCurrentAttempt();
   }
 
   void _handleEvent(GreeterEvent event) {
@@ -216,7 +373,11 @@ class GreeterFeature extends ChangeNotifier {
           _state.copyWith(
             serviceMode: ServiceMode.unavailable,
             authMode: AuthMode.error,
-            error: 'The greeter service is unavailable.',
+            serviceError: const GreeterError(
+              kind: GreeterErrorKind.transport,
+              message: 'The greeter service is unavailable.',
+              recovery: GreeterRecovery.reconnectService,
+            ),
           ),
         );
       case BackendStateChanged(:final attemptId, :final state, :final detail):
@@ -234,7 +395,7 @@ class GreeterFeature extends ChangeNotifier {
               authMode: AuthMode.prompting,
               prompt: PromptState(kind: kind, text: text),
               backendAuthState: BackendAuthState.waitingForInput,
-              clearError: true,
+              clearAuthError: true,
             ),
           );
           _effects.add(const RequestFocusEffect('credential'));
@@ -270,21 +431,30 @@ class GreeterFeature extends ChangeNotifier {
       BackendAuthState.unknown => _state.authMode,
     };
 
-    if (state == BackendAuthState.authenticated && _state.sessions.isEmpty) {
-      unawaited(_loadSessionsForCurrentAttempt());
-    }
-
     _replace(
       _state.copyWith(
         authMode: nextMode,
         backendAuthState: state,
-        error: state == BackendAuthState.failed ? detail : null,
-        clearError: state != BackendAuthState.failed,
+        authError: state == BackendAuthState.failed
+            ? GreeterError(
+                kind: GreeterErrorKind.authentication,
+                message: detail,
+                recovery: GreeterRecovery.retryAuthentication,
+              )
+            : null,
+        clearAuthError: state != BackendAuthState.failed,
+        catalogMode: state == BackendAuthState.authenticated
+            ? CatalogMode.loading
+            : _state.catalogMode,
+        clearCatalogError: state == BackendAuthState.authenticated,
         clearPrompt:
             state == BackendAuthState.authenticated ||
             state == BackendAuthState.failed,
       ),
     );
+    if (state == BackendAuthState.authenticated) {
+      unawaited(_loadSessionsForCurrentAttempt());
+    }
     if (state == BackendAuthState.failed) {
       _attemptId = null;
     }
@@ -295,14 +465,35 @@ class GreeterFeature extends ChangeNotifier {
     if (attemptId == null) {
       return;
     }
+    _replace(
+      _state.copyWith(
+        catalogMode: CatalogMode.loading,
+        clearCatalogError: true,
+      ),
+    );
     try {
       final sessions = await _gateway.listSessions();
       if (attemptId == _attemptId) {
-        _replace(_state.copyWith(sessions: sessions));
+        _replace(
+          _state.copyWith(
+            catalogMode: CatalogMode.ready,
+            sessions: sessions,
+            clearCatalogError: true,
+          ),
+        );
       }
     } on Object catch (error) {
       if (attemptId == _attemptId) {
-        _showError(error);
+        _replace(
+          _state.copyWith(
+            catalogMode: CatalogMode.failed,
+            catalogError: _getGreeterError(
+              error,
+              fallbackKind: GreeterErrorKind.session,
+              recovery: GreeterRecovery.retrySessionCatalog,
+            ),
+          ),
+        );
       }
     }
   }
@@ -314,15 +505,26 @@ class GreeterFeature extends ChangeNotifier {
         clearSelectedUser: clearSelectedUser,
         clearPrompt: true,
         clearSelectedSession: true,
-        clearError: true,
+        clearAuthError: true,
+        clearCatalogError: true,
+        catalogMode: CatalogMode.empty,
+        sessions: const [],
         backendAuthState: BackendAuthState.idle,
       ),
     );
   }
 
-  void _showError(Object error) {
+  void _showAuthError(GreeterError error) {
+    _replace(_state.copyWith(authMode: AuthMode.error, authError: error));
+  }
+
+  void _showSessionError(GreeterError error) {
     _replace(
-      _state.copyWith(authMode: AuthMode.error, error: _getDisplayError(error)),
+      _state.copyWith(
+        authMode: AuthMode.sessionSelection,
+        catalogMode: CatalogMode.failed,
+        catalogError: error,
+      ),
     );
   }
 
@@ -331,11 +533,23 @@ class GreeterFeature extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _getDisplayError(Object error) {
+  GreeterError _getGreeterError(
+    Object error, {
+    required GreeterErrorKind fallbackKind,
+    required GreeterRecovery recovery,
+  }) {
     if (error is GreeterGatewayException) {
-      return error.message;
+      return GreeterError(
+        kind: error.kind,
+        message: error.message,
+        recovery: recovery,
+      );
     }
-    return 'The greeter service is unavailable.';
+    return GreeterError(
+      kind: fallbackKind,
+      message: 'The greeter service is unavailable.',
+      recovery: recovery,
+    );
   }
 
   @override

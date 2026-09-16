@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../feature/greeter/greeter_commands.dart';
 import '../../feature/greeter/greeter_effect.dart';
 import '../../feature/greeter/greeter_feature.dart';
 import '../../feature/greeter/greeter_slots.dart';
@@ -56,7 +57,9 @@ class _GreeterSceneState extends State<GreeterScene> {
                   children: [
                     _TopBar(
                       powerMode: slots.power.mode,
-                      onPowerAction: widget.feature.requestPowerAction,
+                      onPowerAction: (action) {
+                        _dispatch(RequestPowerActionCommand(action));
+                      },
                     ),
                     Expanded(
                       child: SingleChildScrollView(
@@ -71,15 +74,34 @@ class _GreeterSceneState extends State<GreeterScene> {
                               credentialController: _credentialController,
                               credentialFocusNode: _credentialFocusNode,
                               theme: widget.theme,
-                              onSelectUser: widget.feature.selectUser,
-                              onBeginAuthentication:
-                                  widget.feature.beginAuthentication,
+                              onSelectUser: (user) {
+                                _dispatch(SelectUserCommand(user));
+                              },
+                              onBeginAuthentication: () {
+                                _dispatch(const BeginAuthenticationCommand());
+                              },
                               onRespond: _respondToPrompt,
-                              onCancel: widget.feature.cancelAuthentication,
-                              onSelectSession: widget.feature.selectSession,
-                              onStartSession:
-                                  widget.feature.startSelectedSession,
-                              onRetry: widget.feature.retry,
+                              onCancel: () {
+                                _dispatch(const CancelAuthenticationCommand());
+                              },
+                              onSelectSession: (session) {
+                                _dispatch(SelectSessionCommand(session));
+                              },
+                              onStartSession: () {
+                                _dispatch(const StartSelectedSessionCommand());
+                              },
+                              onRetryService: () {
+                                _dispatch(const ReconnectServiceCommand());
+                              },
+                              onRetryAuthentication: () {
+                                _dispatch(const RetryAuthenticationCommand());
+                              },
+                              onRetryPrompt: () {
+                                _dispatch(const RetryPromptCommand());
+                              },
+                              onRetrySessionCatalog: () {
+                                _dispatch(const RetrySessionCatalogCommand());
+                              },
                             ),
                           ),
                         ),
@@ -98,7 +120,11 @@ class _GreeterSceneState extends State<GreeterScene> {
   void _respondToPrompt() {
     final response = _credentialController.text;
     _credentialController.clear();
-    widget.feature.respondToPrompt(response);
+    _dispatch(RespondToPromptCommand(response));
+  }
+
+  void _dispatch(GreeterCommand command) {
+    unawaited(widget.feature.dispatch(command));
   }
 
   void _handleEffect(FeatureEffect effect) {
@@ -180,7 +206,10 @@ class _SceneContent extends StatelessWidget {
     required this.onCancel,
     required this.onSelectSession,
     required this.onStartSession,
-    required this.onRetry,
+    required this.onRetryService,
+    required this.onRetryAuthentication,
+    required this.onRetryPrompt,
+    required this.onRetrySessionCatalog,
   });
 
   final GreeterSceneSlots slots;
@@ -193,7 +222,10 @@ class _SceneContent extends StatelessWidget {
   final VoidCallback onCancel;
   final ValueChanged<SessionSummary> onSelectSession;
   final VoidCallback onStartSession;
-  final VoidCallback onRetry;
+  final VoidCallback onRetryService;
+  final VoidCallback onRetryAuthentication;
+  final VoidCallback onRetryPrompt;
+  final VoidCallback onRetrySessionCatalog;
 
   @override
   Widget build(BuildContext context) {
@@ -207,8 +239,9 @@ class _SceneContent extends StatelessWidget {
         radius: theme.panelRadius,
         padding: theme.panelPadding,
         child: _ErrorPanel(
-          message: slots.auth.error ?? 'Greeter service is unavailable.',
-          onRetry: onRetry,
+          message:
+              slots.service.error?.message ?? 'Greeter service is unavailable.',
+          onRetry: onRetryService,
         ),
       ),
       ServiceMode.ready => _Panel(
@@ -226,7 +259,7 @@ class _SceneContent extends StatelessWidget {
     return switch (slots.auth.mode) {
       AuthMode.userSelection => _UserSelection(
         key: const ValueKey(AuthMode.userSelection),
-        users: slots.users,
+        users: slots.userPicker.users,
         controlHeight: theme.controlHeight,
         itemGap: theme.controlGap,
         sectionGap: theme.sectionGap,
@@ -260,14 +293,17 @@ class _SceneContent extends StatelessWidget {
       ),
       AuthMode.sessionSelection => _SessionSelection(
         key: const ValueKey(AuthMode.sessionSelection),
-        sessions: slots.sessions,
-        selected: slots.auth.selectedSession,
+        sessions: slots.sessionPicker.sessions,
+        catalogMode: slots.sessionPicker.mode,
+        catalogError: slots.sessionPicker.error,
+        selected: slots.sessionPicker.selected,
         controlHeight: theme.controlHeight,
         itemGap: theme.controlGap,
         sectionGap: theme.sectionGap,
         onSelect: onSelectSession,
         onStart: onStartSession,
         onCancel: onCancel,
+        onRetry: onRetrySessionCatalog,
       ),
       AuthMode.handingOff => const _StatusPanel(
         key: ValueKey(AuthMode.handingOff),
@@ -275,8 +311,12 @@ class _SceneContent extends StatelessWidget {
       ),
       AuthMode.error => _ErrorPanel(
         key: const ValueKey(AuthMode.error),
-        message: slots.auth.error ?? 'Authentication failed.',
-        onRetry: onRetry,
+        message: slots.auth.error?.message ?? 'Authentication failed.',
+        onRetry: switch (slots.auth.error?.recovery) {
+          GreeterRecovery.retryPrompt => onRetryPrompt,
+          GreeterRecovery.reconnectService => onRetryService,
+          _ => onRetryAuthentication,
+        },
       ),
     };
   }
@@ -456,6 +496,8 @@ class _SessionSelection extends StatelessWidget {
   const _SessionSelection({
     required super.key,
     required this.sessions,
+    required this.catalogMode,
+    required this.catalogError,
     required this.selected,
     required this.controlHeight,
     required this.itemGap,
@@ -463,9 +505,12 @@ class _SessionSelection extends StatelessWidget {
     required this.onSelect,
     required this.onStart,
     required this.onCancel,
+    required this.onRetry,
   });
 
   final List<SessionSummary> sessions;
+  final CatalogMode catalogMode;
+  final GreeterError? catalogError;
   final SessionSummary? selected;
   final double controlHeight;
   final double itemGap;
@@ -473,6 +518,7 @@ class _SessionSelection extends StatelessWidget {
   final ValueChanged<SessionSummary> onSelect;
   final VoidCallback onStart;
   final VoidCallback onCancel;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -486,23 +532,34 @@ class _SessionSelection extends StatelessWidget {
         const SizedBox(height: 8),
         const Text('Select the desktop session to start.'),
         SizedBox(height: sectionGap),
-        for (final session in sessions) ...[
-          SizedBox(
-            height: controlHeight,
-            child: OutlinedButton.icon(
-              onPressed: () => onSelect(session),
-              icon: Icon(
-                selected?.id == session.id
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
-              ),
-              label: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(session.name),
+        if (catalogMode == CatalogMode.loading)
+          const _StatusPanel(message: 'Loading sessions...')
+        else if (catalogMode == CatalogMode.failed)
+          _ErrorPanel(
+            message: catalogError?.message ?? 'Sessions are unavailable.',
+            onRetry: onRetry,
+          )
+        else if (sessions.isEmpty)
+          const Text('No desktop sessions are available.')
+        else ...[
+          for (final session in sessions) ...[
+            SizedBox(
+              height: controlHeight,
+              child: OutlinedButton.icon(
+                onPressed: () => onSelect(session),
+                icon: Icon(
+                  selected?.id == session.id
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                ),
+                label: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(session.name),
+                ),
               ),
             ),
-          ),
-          SizedBox(height: itemGap),
+            SizedBox(height: itemGap),
+          ],
         ],
         const SizedBox(height: 8),
         SizedBox(

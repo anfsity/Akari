@@ -5,64 +5,92 @@ class GreeterSceneSlots {
   GreeterSceneSlots({
     required this.service,
     required this.auth,
-    required List<UserSummary> users,
-    required List<SessionSummary> sessions,
+    required this.userPicker,
+    required this.sessionPicker,
     required this.power,
     required this.background,
-  }) : users = List.unmodifiable(users),
-       sessions = List.unmodifiable(sessions);
+  });
 
   factory GreeterSceneSlots.fromState(GreeterState state) {
     return GreeterSceneSlots(
-      service: ServiceSlots(state.serviceMode),
+      service: ServiceSlots(mode: state.serviceMode, error: state.serviceError),
       auth: AuthSlots(
         mode: state.authMode,
         selectedUser: state.selectedUser,
-        selectedSession: state.selectedSession,
         prompt: state.prompt,
-        error: state.error,
+        error: state.authError,
       ),
-      users: state.users,
-      sessions: state.sessions,
-      power: PowerSlots(state.powerMode),
+      userPicker: UserPickerSlots(
+        users: state.users,
+        selected: state.selectedUser,
+      ),
+      sessionPicker: SessionPickerSlots(
+        mode: state.catalogMode,
+        sessions: state.sessions,
+        selected: state.selectedSession,
+        error: state.catalogError,
+      ),
+      power: PowerSlots(mode: state.powerMode, error: state.powerError),
       background: BackgroundSlots.fromAuthMode(state.authMode),
     );
   }
 
   final ServiceSlots service;
   final AuthSlots auth;
-  final List<UserSummary> users;
-  final List<SessionSummary> sessions;
+  final UserPickerSlots userPicker;
+  final SessionPickerSlots sessionPicker;
   final PowerSlots power;
   final BackgroundSlots background;
 }
 
 class ServiceSlots {
-  const ServiceSlots(this.mode);
+  const ServiceSlots({required this.mode, required this.error});
 
   final ServiceMode mode;
+  final GreeterError? error;
 }
 
 class AuthSlots {
   const AuthSlots({
     required this.mode,
     required this.selectedUser,
-    required this.selectedSession,
     required this.prompt,
     required this.error,
   });
 
   final AuthMode mode;
   final UserSummary? selectedUser;
-  final SessionSummary? selectedSession;
   final PromptState? prompt;
-  final String? error;
+  final GreeterError? error;
+}
+
+class UserPickerSlots {
+  UserPickerSlots({required List<UserSummary> users, required this.selected})
+    : users = List.unmodifiable(users);
+
+  final List<UserSummary> users;
+  final UserSummary? selected;
+}
+
+class SessionPickerSlots {
+  SessionPickerSlots({
+    required this.mode,
+    required List<SessionSummary> sessions,
+    required this.selected,
+    required this.error,
+  }) : sessions = List.unmodifiable(sessions);
+
+  final CatalogMode mode;
+  final List<SessionSummary> sessions;
+  final SessionSummary? selected;
+  final GreeterError? error;
 }
 
 class PowerSlots {
-  const PowerSlots(this.mode);
+  const PowerSlots({required this.mode, required this.error});
 
   final PowerMode mode;
+  final GreeterError? error;
 }
 
 enum BackgroundMood { calm, active, success, error }

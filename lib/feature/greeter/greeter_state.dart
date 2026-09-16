@@ -1,5 +1,7 @@
 enum ServiceMode { starting, ready, unavailable }
 
+enum CatalogMode { empty, loading, ready, failed }
+
 enum AuthMode {
   userSelection,
   editing,
@@ -15,6 +17,36 @@ enum PromptKind { visible, secret, info, error }
 enum PowerMode { idle, executing, succeeded, failed }
 
 enum PowerAction { powerOff, reboot, suspend, hibernate }
+
+enum GreeterErrorKind {
+  input,
+  authentication,
+  transport,
+  session,
+  power,
+  visual,
+}
+
+enum GreeterRecovery {
+  retryAuthentication,
+  retryPrompt,
+  reconnectService,
+  retrySessionCatalog,
+  selectUser,
+  selectSession,
+}
+
+class GreeterError {
+  const GreeterError({
+    required this.kind,
+    required this.message,
+    required this.recovery,
+  });
+
+  final GreeterErrorKind kind;
+  final String message;
+  final GreeterRecovery recovery;
+}
 
 class UserSummary {
   const UserSummary({required this.id, required this.displayName});
@@ -55,13 +87,17 @@ enum BackendAuthState {
 class GreeterState {
   GreeterState({
     required this.serviceMode,
+    required this.catalogMode,
     required this.authMode,
     required List<UserSummary> users,
     required List<SessionSummary> sessions,
     required this.selectedUser,
     required this.selectedSession,
     required this.prompt,
-    required this.error,
+    required this.serviceError,
+    required this.authError,
+    required this.catalogError,
+    required this.powerError,
     required this.powerMode,
     required this.backendAuthState,
   }) : users = List.unmodifiable(users),
@@ -70,31 +106,40 @@ class GreeterState {
   factory GreeterState.initial() {
     return GreeterState(
       serviceMode: ServiceMode.starting,
+      catalogMode: CatalogMode.empty,
       authMode: AuthMode.userSelection,
       users: <UserSummary>[],
       sessions: <SessionSummary>[],
       selectedUser: null,
       selectedSession: null,
       prompt: null,
-      error: null,
+      serviceError: null,
+      authError: null,
+      catalogError: null,
+      powerError: null,
       powerMode: PowerMode.idle,
       backendAuthState: BackendAuthState.idle,
     );
   }
 
   final ServiceMode serviceMode;
+  final CatalogMode catalogMode;
   final AuthMode authMode;
   final List<UserSummary> users;
   final List<SessionSummary> sessions;
   final UserSummary? selectedUser;
   final SessionSummary? selectedSession;
   final PromptState? prompt;
-  final String? error;
+  final GreeterError? serviceError;
+  final GreeterError? authError;
+  final GreeterError? catalogError;
+  final GreeterError? powerError;
   final PowerMode powerMode;
   final BackendAuthState backendAuthState;
 
   GreeterState copyWith({
     ServiceMode? serviceMode,
+    CatalogMode? catalogMode,
     AuthMode? authMode,
     List<UserSummary>? users,
     List<SessionSummary>? sessions,
@@ -104,13 +149,20 @@ class GreeterState {
     bool clearSelectedSession = false,
     PromptState? prompt,
     bool clearPrompt = false,
-    String? error,
-    bool clearError = false,
+    GreeterError? serviceError,
+    bool clearServiceError = false,
+    GreeterError? authError,
+    bool clearAuthError = false,
+    GreeterError? catalogError,
+    bool clearCatalogError = false,
+    GreeterError? powerError,
+    bool clearPowerError = false,
     PowerMode? powerMode,
     BackendAuthState? backendAuthState,
   }) {
     return GreeterState(
       serviceMode: serviceMode ?? this.serviceMode,
+      catalogMode: catalogMode ?? this.catalogMode,
       authMode: authMode ?? this.authMode,
       users: users ?? this.users,
       sessions: sessions ?? this.sessions,
@@ -121,7 +173,14 @@ class GreeterState {
           ? null
           : selectedSession ?? this.selectedSession,
       prompt: clearPrompt ? null : prompt ?? this.prompt,
-      error: clearError ? null : error ?? this.error,
+      serviceError: clearServiceError
+          ? null
+          : serviceError ?? this.serviceError,
+      authError: clearAuthError ? null : authError ?? this.authError,
+      catalogError: clearCatalogError
+          ? null
+          : catalogError ?? this.catalogError,
+      powerError: clearPowerError ? null : powerError ?? this.powerError,
       powerMode: powerMode ?? this.powerMode,
       backendAuthState: backendAuthState ?? this.backendAuthState,
     );

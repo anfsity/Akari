@@ -64,9 +64,13 @@ abstract interface class GreeterGateway {
 }
 
 class GreeterGatewayException implements Exception {
-  const GreeterGatewayException(this.message);
+  const GreeterGatewayException(
+    this.message, {
+    this.kind = GreeterErrorKind.transport,
+  });
 
   final String message;
+  final GreeterErrorKind kind;
 
   @override
   String toString() => message;
@@ -146,7 +150,10 @@ class DemoGreeterGateway implements GreeterGateway {
   @override
   Future<void> respond(String attemptId, String response) async {
     if (response.trim().isEmpty) {
-      throw const GreeterGatewayException('A response is required.');
+      throw const GreeterGatewayException(
+        'A response is required.',
+        kind: GreeterErrorKind.input,
+      );
     }
     if (_attemptId == attemptId) {
       _events.add(
