@@ -303,7 +303,10 @@ class _SceneContent extends StatelessWidget {
         onSelect: onSelectSession,
         onStart: onStartSession,
         onCancel: onCancel,
-        onRetry: onRetrySessionCatalog,
+        onRetry: switch (slots.sessionPicker.error?.recovery) {
+          GreeterRecovery.selectSession => onStartSession,
+          _ => onRetrySessionCatalog,
+        },
       ),
       AuthMode.handingOff => const _StatusPanel(
         key: ValueKey(AuthMode.handingOff),

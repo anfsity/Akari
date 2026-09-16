@@ -257,6 +257,46 @@ void main() {
 
     feature.dispose();
   });
+
+  test('retries a failed session start with the selected session', () async {
+    final gateway = _FakeGreeterGateway();
+    final feature = await _createPromptedFeature(gateway);
+
+    gateway.emit(
+      const BackendStateChanged(
+        attemptId: 'attempt-1',
+        state: BackendAuthState.authenticated,
+        detail: '',
+      ),
+    );
+    await _flushEvents();
+    await feature.dispatch(
+      const SelectSessionCommand(
+        SessionSummary(id: 'wayland:sway', name: 'Sway'),
+      ),
+    );
+
+    gateway.startSessionError = const GreeterGatewayException(
+      'Session could not be started.',
+      kind: GreeterErrorKind.session,
+    );
+    await feature.dispatch(const StartSelectedSessionCommand());
+
+    expect(gateway.startSessionCalls, 1);
+    expect(feature.state.authMode, AuthMode.sessionSelection);
+    expect(feature.state.catalogMode, CatalogMode.failed);
+    expect(feature.state.selectedSession?.id, 'wayland:sway');
+    expect(feature.state.catalogError?.kind, GreeterErrorKind.session);
+    expect(feature.state.catalogError?.recovery, GreeterRecovery.selectSession);
+
+    gateway.startSessionError = null;
+    await feature.dispatch(const StartSelectedSessionCommand());
+
+    expect(gateway.startSessionCalls, 2);
+    expect(feature.state.authMode, AuthMode.handingOff);
+
+    feature.dispose();
+  });
 }
 
 Future<GreeterFeature> _createPromptedFeature(
@@ -293,6 +333,8 @@ class _FakeGreeterGateway implements GreeterGateway {
   Future<List<SessionSummary>>? sessionsFuture;
   Object? sessionsError;
   Object? powerActionError;
+  Object? startSessionError;
+  int startSessionCalls = 0;
   BackendStateSnapshot snapshot = const BackendStateSnapshot(
     state: BackendAuthState.idle,
     detail: '',
@@ -370,7 +412,13 @@ class _FakeGreeterGateway implements GreeterGateway {
   }
 
   @override
-  Future<void> startSession(String attemptId, String sessionId) async {}
+  Future<void> startSession(String attemptId, String sessionId) async {
+    startSessionCalls++;
+    final error = startSessionError;
+    if (error != null) {
+      throw error;
+    }
+  }
 
   @override
   Future<void> powerAction(PowerAction action) async {
