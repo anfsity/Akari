@@ -12,7 +12,9 @@ import 'ports/greeter_gateway.dart';
 /// This is deliberately independent from Scene widgets. D-Bus is represented
 /// by [GreeterGateway] and never accessed directly from this class.
 class GreeterFeature extends ChangeNotifier {
-  GreeterFeature({required this._gateway});
+  // The public parameter name cannot use the library-private field name.
+  // ignore: prefer_initializing_formals
+  GreeterFeature({required GreeterGateway gateway}) : _gateway = gateway;
 
   final GreeterGateway _gateway;
   final StreamController<FeatureEffect> _effects =
@@ -40,12 +42,28 @@ class GreeterFeature extends ChangeNotifier {
 
     _replace(_state.copyWith(serviceMode: ServiceMode.starting));
     try {
+      final snapshot = await _gateway.getState();
       final users = await _gateway.listUsers();
+      if (snapshot.state != BackendAuthState.idle) {
+        _replace(
+          _state.copyWith(
+            serviceMode: ServiceMode.ready,
+            users: users,
+            authMode: AuthMode.error,
+            backendAuthState: snapshot.state,
+            error: snapshot.detail.isEmpty
+                ? 'The greeter service has an active authentication transaction.'
+                : snapshot.detail,
+          ),
+        );
+        return;
+      }
       _replace(
         _state.copyWith(
           serviceMode: ServiceMode.ready,
           users: users,
           authMode: AuthMode.userSelection,
+          backendAuthState: snapshot.state,
           clearError: true,
         ),
       );
@@ -220,6 +238,10 @@ class GreeterFeature extends ChangeNotifier {
             ),
           );
           _effects.add(const RequestFocusEffect('credential'));
+        } else {
+          _effects.add(
+            ShowNoticeEffect(text, isError: kind == PromptKind.error),
+          );
         }
     }
   }

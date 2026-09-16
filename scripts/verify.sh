@@ -20,5 +20,6 @@ cargo test --locked --features mock -- --test-threads=1
 cd -- "$repo_root"
 fvm flutter analyze
 fvm flutter test
+"$repo_root/scripts/debug-dbus.sh" fvm dart run tool/dbus_gateway_smoke.dart
 
 printf '%s\n' 'Mozais verification passed.'

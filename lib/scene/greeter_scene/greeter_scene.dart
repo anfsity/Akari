@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../feature/greeter/greeter_effect.dart';
 import '../../feature/greeter/greeter_feature.dart';
 import '../../feature/greeter/greeter_slots.dart';
 import '../../feature/greeter/greeter_state.dart';
@@ -18,10 +22,20 @@ class GreeterScene extends StatefulWidget {
 
 class _GreeterSceneState extends State<GreeterScene> {
   final TextEditingController _credentialController = TextEditingController();
+  final FocusNode _credentialFocusNode = FocusNode();
+  late final StreamSubscription<FeatureEffect> _effectSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _effectSubscription = widget.feature.effects.listen(_handleEffect);
+  }
 
   @override
   void dispose() {
+    unawaited(_effectSubscription.cancel());
     _credentialController.dispose();
+    _credentialFocusNode.dispose();
     super.dispose();
   }
 
@@ -55,6 +69,7 @@ class _GreeterSceneState extends State<GreeterScene> {
                             child: _SceneContent(
                               slots: slots,
                               credentialController: _credentialController,
+                              credentialFocusNode: _credentialFocusNode,
                               theme: widget.theme,
                               onSelectUser: widget.feature.selectUser,
                               onBeginAuthentication:
@@ -84,6 +99,35 @@ class _GreeterSceneState extends State<GreeterScene> {
     final response = _credentialController.text;
     _credentialController.clear();
     widget.feature.respondToPrompt(response);
+  }
+
+  void _handleEffect(FeatureEffect effect) {
+    switch (effect) {
+      case RequestFocusEffect(:final field):
+        if (field == 'credential') {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _credentialFocusNode.requestFocus();
+            }
+          });
+        }
+      case ShowNoticeEffect(:final message, :final isError):
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: isError
+                  ? Theme.of(context).colorScheme.error
+                  : null,
+            ),
+          );
+        });
+      case ExitAfterHandoffEffect():
+        unawaited(SystemNavigator.pop());
+    }
   }
 }
 
@@ -128,6 +172,7 @@ class _SceneContent extends StatelessWidget {
   const _SceneContent({
     required this.slots,
     required this.credentialController,
+    required this.credentialFocusNode,
     required this.theme,
     required this.onSelectUser,
     required this.onBeginAuthentication,
@@ -140,6 +185,7 @@ class _SceneContent extends StatelessWidget {
 
   final GreeterSceneSlots slots;
   final TextEditingController credentialController;
+  final FocusNode credentialFocusNode;
   final ThemeTokens theme;
   final ValueChanged<UserSummary> onSelectUser;
   final VoidCallback onBeginAuthentication;
@@ -200,6 +246,7 @@ class _SceneContent extends StatelessWidget {
         user: slots.auth.selectedUser,
         prompt: slots.auth.prompt!,
         controller: credentialController,
+        focusNode: credentialFocusNode,
         controlHeight: theme.controlHeight,
         buttonGap: theme.controlGap,
         sectionGap: theme.sectionGap,
@@ -352,6 +399,7 @@ class _PromptForm extends StatelessWidget {
     required this.user,
     required this.prompt,
     required this.controller,
+    required this.focusNode,
     required this.controlHeight,
     required this.buttonGap,
     required this.sectionGap,
@@ -363,6 +411,7 @@ class _PromptForm extends StatelessWidget {
   final UserSummary? user;
   final PromptState prompt;
   final TextEditingController controller;
+  final FocusNode focusNode;
   final double controlHeight;
   final double buttonGap;
   final double sectionGap;
@@ -381,6 +430,7 @@ class _PromptForm extends StatelessWidget {
         SizedBox(height: sectionGap),
         TextField(
           controller: controller,
+          focusNode: focusNode,
           autofocus: true,
           obscureText: isSecret,
           textInputAction: TextInputAction.done,

@@ -40,6 +40,8 @@
 !/docs/**
 !/scripts/
 !/scripts/**
+!/tool/
+!/tool/**
 
 # Generated, local, and editor-specific artifacts remain ignored.
 **/.dart_tool/
