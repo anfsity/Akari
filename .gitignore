@@ -12,6 +12,7 @@
 !/pubspec.lock
 !/analysis_options.yaml
 !/.metadata
+!/LICENSE
 
 # Flutter/Dart application code and tests.
 !/lib/
