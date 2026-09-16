@@ -81,6 +81,20 @@ sequenceDiagram
 
 For `info` and `error` authentication messages, the backend emits the prompt for display and may submit an empty response automatically. For `visible` and `secret` messages, it must wait for the UI response. The loop must not assume that there is only one password prompt.
 
+The authentication contract is factor-agnostic. A PAM stack may use a
+password, fingerprint, face provider, smart card, or more than one factor.
+Mozais does not identify a user from a face or fingerprint; the UI starts an
+attempt for the explicitly selected username and the system authentication
+stack decides which factors are required.
+
+The current `Prompt` signal describes greetd/PAM conversation messages only:
+`visible`, `secret`, `info`, and `error`. The UI must not infer a biometric
+provider from arbitrary prompt text. If a future backend can obtain
+authoritative provider progress, it should expose a separate typed
+display-safe interaction event rather than changing the meaning of these
+prompt kinds. Raw camera frames, fingerprint data, biometric templates, and
+provider secrets must remain outside the D-Bus contract.
+
 ### Key Architectural Benefits
 * **Framework Isolation**: The Flutter frontend remains strictly agnostic of Unix domain sockets, PAM message formats, binary frame packing, and `systemd` DBus interfaces.
 * **Testability**: A separate mock backend build (`cargo run --features mock`) can be used on a private D-Bus session (`dbus-run-session`), allowing complete UI development and automated integration testing without running a real `greetd` daemon or requiring elevated privileges. The production build does not contain the mock transport and never selects it from a runtime environment variable.
@@ -245,6 +259,30 @@ sequenceDiagram
 * **System Bus Isolation**: System actions (`PowerAction`) are routed across the System D-Bus to `systemd-logind`.
 * **Polkit Authorization**: Power actions rely on Polkit policies residing in `/usr/share/polkit-1/actions/` to grant or restrict shutdown/reboot capabilities to the `greeter` user without requiring `sudo` or `setuid` binaries.
 * **Unprivileged Backend Execution**: The backend daemon executes strictly under the unprivileged `greeter` system user account (belonging to groups `greeter`, `video`, `render`).
+
+### 3. Biometric Integration Boundary
+
+Biometric authentication is integrated through the system authentication stack,
+normally PAM modules used by `greetd`. The Flutter client does not open the
+camera, access the fingerprint device, store biometric templates, or decide
+which account a biometric belongs to.
+
+The UI may render only display-safe states supplied by the backend, such as:
+
+```text
+WaitingForFactor
+ProcessingFactor
+FactorAccepted
+FactorRejected
+FactorUnavailable
+FallbackRequired
+```
+
+These states are presentation information, not replacements for the primary
+`AuthState`. Password fallback, cancellation, timeout, stale-attempt rejection,
+and client disconnect continue to use the same `attempt_id` and backend state
+machine. A provider that cannot report progress remains valid; the UI shows a
+generic authentication-waiting state.
 
 ---
 

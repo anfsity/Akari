@@ -176,6 +176,8 @@ Scene responsibilities:
 - Coordinate background, foreground, overlays, dialogs, and system controls.
 - Apply responsive constraints for desktop, small screens, and unusual aspect
   ratios.
+- Compose trusted static image layers and 2.5D planes without owning
+  authentication state.
 - Decide how a semantic state change is animated.
 - Interrupt, reverse, or queue transitions according to explicit policy.
 - Keep authentication controls usable while background effects fail or load.
@@ -596,6 +598,57 @@ The background is allowed to crop or reduce quality to fit the viewport. The
 credential form is not allowed to become unreachable because the background
 needs more space.
 
+### 8.3 Normalized Layout, Display Context, and Scene Authoring
+
+Scene geometry must not depend on one fixed output resolution such as
+`1920x1080`. The authoring coordinate system uses normalized values relative to
+the current display safe area:
+
+```text
+x, y, width, height: 0.0 .. 1.0
+```
+
+The runtime converts normalized geometry to logical Flutter pixels for each
+display. Backgrounds may use the full viewport with an explicit crop policy;
+interactive controls use the safe area and intrinsic widget dimensions. A
+scene must declare how it behaves for unusual aspect ratios rather than
+silently stretching controls:
+
+```text
+crop | letterbox | reflow
+```
+
+The display environment is separate from Feature authentication state. It may
+contain the display ID, logical and physical size, scale factor, refresh rate,
+rotation, and output arrangement. Scene consumes this environment; Feature
+does not.
+
+Multi-display composition must not assume that all outputs share one canvas.
+The initial policy is one primary display for login controls and optional
+background or status layers on secondary displays. A per-display Scene can be
+added later without changing the authentication contract.
+
+The scene authoring editor is a separate tool. It edits a serializable scene
+document, previews supported presentation states, and exports typed scene data
+and bundled assets for the application. Production UI must not load arbitrary
+scripts or executable components at runtime.
+
+Each visual layer may define:
+
+```text
+position:    x, y, z
+rotation:    rotationX, rotationY, rotationZ
+scale:       scaleX, scaleY, scaleZ
+pivot:       normalized anchor point
+renderOrder: explicit draw order
+```
+
+`z` is spatial depth and `renderOrder` is draw order; they are separate
+properties. The default scene is flat with zero depth and zero rotation. The
+first 2.5D renderer only needs transformed image and widget planes with
+bounded perspective. Full 3D meshes, lighting, and arbitrary cameras are out
+of scope.
+
 ## 9. Visual Runtime Rules
 
 Animated visuals are optional enhancements around a mandatory functional core.
@@ -621,6 +674,13 @@ reference to a password field.
 
 Asset paths should come from trusted Theme or application configuration. They
 must not be derived from raw backend strings without validation.
+
+Static artwork should be composed from multiple trusted layers rather than
+flattening the whole login UI into one bitmap. Text, buttons, password fields,
+focus targets, and other interactive controls remain native Flutter widgets.
+Image layers may provide backgrounds, character art, panel frames, decoration,
+and state-specific overlays. Missing or unsupported artwork must fall back to a
+usable static layer.
 
 ### 9.3 Performance and Reduced Motion
 
@@ -676,6 +736,10 @@ Security rules:
    active transaction; the UI must not assume that its process exit is enough.
 7. Power operations remain backend-mediated and are not implemented by shell
    commands in the Flutter process.
+8. Biometric data, camera frames, fingerprint data, and biometric templates
+   never enter Flutter state, scene documents, logs, or D-Bus signals.
+9. The UI may display a provider-supplied, display-safe authentication factor
+   or progress state, but must not infer it from arbitrary prompt text.
 
 ## 11. Error Model
 
@@ -816,6 +880,9 @@ lib/
 │   ├── live2d_background.dart
 │   ├── shader_background.dart
 │   └── visual_fallback.dart
+├── display/
+│   ├── display_environment.dart
+│   └── display_catalog.dart
 ├── theme/
 │   ├── theme_tokens.dart
 │   ├── color_tokens.dart
@@ -852,7 +919,7 @@ The implementation should proceed in small vertical slices:
 
 ### Phase 3: Functional Scene
 
-1. Build a static Scene using fixed layout constraints.
+1. Build a static Scene using normalized geometry and explicit constraints.
 2. Connect user actions to Feature commands.
 3. Implement user selection, authentication prompt, error, and session
    selection flows.
@@ -862,8 +929,10 @@ The implementation should proceed in small vertical slices:
 
 1. Extract all visual constants into Theme tokens.
 2. Add a static background as the mandatory baseline.
-3. Add animated Visual implementations behind stable interfaces.
-4. Add load failure, low-power, and reduced-motion fallback behavior.
+3. Add normalized scene geometry and static image layers.
+4. Add the separate scene authoring editor and typed export path.
+5. Add animated Visual implementations behind stable interfaces.
+6. Add load failure, low-power, and reduced-motion fallback behavior.
 
 ### Phase 5: End-to-End Hardening
 
@@ -891,6 +960,9 @@ The architecture is considered implemented when all of the following are true:
 - D-Bus disconnect and handoff behavior remain owned by the backend contract.
 - Layout remains usable under resizing, text scaling, reduced motion, and
   visual resource failure.
+- Scene geometry is expressed relative to a display safe area and remains
+  usable on supported multi-display layouts.
+- 2.5D layers default to flat rendering and preserve explicit draw order.
 - Integration tests exercise real D-Bus/backend communication, while unit
   tests cover the Feature reducer and Scene transitions broadly.
 
@@ -918,6 +990,8 @@ provided they do not weaken the boundaries above:
 - The shader/video rendering implementation.
 - Whether Theme is loaded from compile-time constants, a local file, or a
   packaged profile.
+- The editor's authoring document format, provided its production export is
+  typed and bundled at build time.
 
 The following decisions should not remain open:
 
@@ -927,3 +1001,5 @@ The following decisions should not remain open:
 - Theme contains values, not business rules.
 - Secrets do not enter Scene, Visual, Theme, logs, or signals.
 - The static visual fallback always preserves a usable login flow.
+- Biometric providers remain behind the backend/PAM boundary and expose only
+  display-safe authentication interaction state.
