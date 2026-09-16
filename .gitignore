@@ -54,3 +54,6 @@
 .packages
 # Widget Preview related
 .widget_preview/
+
+# FVM Version Cache
+.fvm/
