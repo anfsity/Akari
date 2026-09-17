@@ -1,12 +1,15 @@
+import 'package:flutter/foundation.dart';
+
 import 'greeter_state.dart';
 
 /// Immutable semantic input consumed by Scene.
 class GreeterSceneSlots {
   GreeterSceneSlots({
     required this.service,
-    required this.auth,
-    required this.userPicker,
+    required this.authPrompt,
+    required this.accountPicker,
     required this.sessionPicker,
+    required this.continueAction,
     required this.power,
     required this.background,
   });
@@ -14,13 +17,15 @@ class GreeterSceneSlots {
   factory GreeterSceneSlots.fromState(GreeterState state) {
     return GreeterSceneSlots(
       service: ServiceSlots(mode: state.serviceMode, error: state.serviceError),
-      auth: AuthSlots(
+      authPrompt: AuthPromptSlots(
         mode: state.authMode,
-        selectedUser: state.selectedUser,
+        selectedUser: state.authMode == AuthMode.userSelection
+            ? null
+            : state.selectedUser,
         prompt: state.prompt,
         error: state.authError,
       ),
-      userPicker: UserPickerSlots(
+      accountPicker: AccountPickerSlots(
         users: state.users,
         selected: state.selectedUser,
       ),
@@ -30,15 +35,19 @@ class GreeterSceneSlots {
         selected: state.selectedSession,
         error: state.catalogError,
       ),
+      continueAction: ContinueSlots(
+        enabled: state.selectedUser != null && state.selectedSession != null,
+      ),
       power: PowerSlots(mode: state.powerMode, error: state.powerError),
       background: BackgroundSlots.fromAuthMode(state.authMode),
     );
   }
 
   final ServiceSlots service;
-  final AuthSlots auth;
-  final UserPickerSlots userPicker;
+  final AuthPromptSlots authPrompt;
+  final AccountPickerSlots accountPicker;
   final SessionPickerSlots sessionPicker;
+  final ContinueSlots continueAction;
   final PowerSlots power;
   final BackgroundSlots background;
 }
@@ -48,10 +57,18 @@ class ServiceSlots {
 
   final ServiceMode mode;
   final GreeterError? error;
+
+  @override
+  bool operator ==(Object other) {
+    return other is ServiceSlots && other.mode == mode && other.error == error;
+  }
+
+  @override
+  int get hashCode => Object.hash(mode, error);
 }
 
-class AuthSlots {
-  const AuthSlots({
+class AuthPromptSlots {
+  const AuthPromptSlots({
     required this.mode,
     required this.selectedUser,
     required this.prompt,
@@ -62,14 +79,36 @@ class AuthSlots {
   final UserSummary? selectedUser;
   final PromptState? prompt;
   final GreeterError? error;
+
+  @override
+  bool operator ==(Object other) {
+    return other is AuthPromptSlots &&
+        other.mode == mode &&
+        other.selectedUser == selectedUser &&
+        other.prompt == prompt &&
+        other.error == error;
+  }
+
+  @override
+  int get hashCode => Object.hash(mode, selectedUser, prompt, error);
 }
 
-class UserPickerSlots {
-  UserPickerSlots({required List<UserSummary> users, required this.selected})
+class AccountPickerSlots {
+  AccountPickerSlots({required List<UserSummary> users, required this.selected})
     : users = List.unmodifiable(users);
 
   final List<UserSummary> users;
   final UserSummary? selected;
+
+  @override
+  bool operator ==(Object other) {
+    return other is AccountPickerSlots &&
+        listEquals(other.users, users) &&
+        other.selected == selected;
+  }
+
+  @override
+  int get hashCode => Object.hash(Object.hashAll(users), selected);
 }
 
 class SessionPickerSlots {
@@ -84,6 +123,33 @@ class SessionPickerSlots {
   final List<SessionSummary> sessions;
   final SessionSummary? selected;
   final GreeterError? error;
+
+  @override
+  bool operator ==(Object other) {
+    return other is SessionPickerSlots &&
+        other.mode == mode &&
+        listEquals(other.sessions, sessions) &&
+        other.selected == selected &&
+        other.error == error;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(mode, Object.hashAll(sessions), selected, error);
+}
+
+class ContinueSlots {
+  const ContinueSlots({required this.enabled});
+
+  final bool enabled;
+
+  @override
+  bool operator ==(Object other) {
+    return other is ContinueSlots && other.enabled == enabled;
+  }
+
+  @override
+  int get hashCode => enabled.hashCode;
 }
 
 class PowerSlots {
@@ -91,6 +157,14 @@ class PowerSlots {
 
   final PowerMode mode;
   final GreeterError? error;
+
+  @override
+  bool operator ==(Object other) {
+    return other is PowerSlots && other.mode == mode && other.error == error;
+  }
+
+  @override
+  int get hashCode => Object.hash(mode, error);
 }
 
 enum BackgroundMood { calm, active, success, error }
@@ -114,4 +188,14 @@ class BackgroundSlots {
 
   final BackgroundMood mood;
   final double intensity;
+
+  @override
+  bool operator ==(Object other) {
+    return other is BackgroundSlots &&
+        other.mood == mood &&
+        other.intensity == intensity;
+  }
+
+  @override
+  int get hashCode => Object.hash(mood, intensity);
 }

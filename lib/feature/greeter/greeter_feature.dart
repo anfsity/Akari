@@ -12,7 +12,7 @@ import 'ports/greeter_gateway.dart';
 ///
 /// This is deliberately independent from Scene widgets. D-Bus is represented
 /// by [GreeterGateway] and never accessed directly from this class.
-class GreeterFeature extends ChangeNotifier {
+class GreeterFeature {
   // The public parameter name cannot use the library-private field name.
   // ignore: prefer_initializing_formals
   GreeterFeature({required GreeterGateway gateway}) : _gateway = gateway;
@@ -22,15 +22,64 @@ class GreeterFeature extends ChangeNotifier {
       StreamController<FeatureEffect>.broadcast();
   StreamSubscription<GreeterEvent>? _eventSubscription;
   final List<GreeterEvent> _eventsDuringBegin = <GreeterEvent>[];
-
+  final ValueNotifier<ServiceSlots> _serviceSlots = ValueNotifier(
+    const ServiceSlots(mode: ServiceMode.starting, error: null),
+  );
+  final ValueNotifier<AuthPromptSlots> _authPromptSlots = ValueNotifier(
+    AuthPromptSlots(
+      mode: AuthMode.userSelection,
+      selectedUser: null,
+      prompt: null,
+      error: null,
+    ),
+  );
+  final ValueNotifier<AccountPickerSlots> _accountPickerSlots = ValueNotifier(
+    AccountPickerSlots(users: const [], selected: null),
+  );
+  final ValueNotifier<SessionPickerSlots> _sessionPickerSlots = ValueNotifier(
+    SessionPickerSlots(
+      mode: CatalogMode.empty,
+      sessions: const [],
+      selected: null,
+      error: null,
+    ),
+  );
+  final ValueNotifier<ContinueSlots> _continueSlots = ValueNotifier(
+    const ContinueSlots(enabled: false),
+  );
+  final ValueNotifier<PowerSlots> _powerSlots = ValueNotifier(
+    const PowerSlots(mode: PowerMode.idle, error: null),
+  );
+  final ValueNotifier<BackgroundSlots> _backgroundSlots = ValueNotifier(
+    BackgroundSlots.fromAuthMode(AuthMode.userSelection),
+  );
   GreeterState _state = GreeterState.initial();
   String? _attemptId;
   bool _initialized = false;
   bool _beginInFlight = false;
+  bool _sessionStartInFlight = false;
+  bool _disposed = false;
+  int _sessionLoadGeneration = 0;
 
   GreeterState get state => _state;
 
   GreeterSceneSlots get slots => GreeterSceneSlots.fromState(_state);
+
+  ValueListenable<ServiceSlots> get serviceSlots => _serviceSlots;
+
+  ValueListenable<AuthPromptSlots> get authPromptSlots => _authPromptSlots;
+
+  ValueListenable<AccountPickerSlots> get accountPickerSlots =>
+      _accountPickerSlots;
+
+  ValueListenable<SessionPickerSlots> get sessionPickerSlots =>
+      _sessionPickerSlots;
+
+  ValueListenable<ContinueSlots> get continueSlots => _continueSlots;
+
+  ValueListenable<PowerSlots> get powerSlots => _powerSlots;
+
+  ValueListenable<BackgroundSlots> get backgroundSlots => _backgroundSlots;
 
   Stream<FeatureEffect> get effects => _effects.stream;
 
@@ -100,10 +149,14 @@ class GreeterFeature extends ChangeNotifier {
           users: users,
           authMode: AuthMode.userSelection,
           backendAuthState: snapshot.state,
+          catalogMode: CatalogMode.loading,
+          sessions: const [],
+          clearSelectedSession: true,
           clearServiceError: true,
           clearAuthError: true,
         ),
       );
+      unawaited(_loadSessionCatalog());
     } on Object catch (error) {
       _replace(
         _state.copyWith(
@@ -125,6 +178,7 @@ class GreeterFeature extends ChangeNotifier {
     }
     _attemptId = null;
     _eventsDuringBegin.clear();
+    _sessionLoadGeneration++;
     _replace(
       _state.copyWith(
         serviceMode: ServiceMode.starting,
@@ -148,30 +202,19 @@ class GreeterFeature extends ChangeNotifier {
         !_state.users.any((candidate) => candidate.id == user.id)) {
       return;
     }
-    _replace(
-      _state.copyWith(
-        selectedUser: user,
-        authMode: AuthMode.editing,
-        clearAuthError: true,
-      ),
-    );
+    _replace(_state.copyWith(selectedUser: user, clearAuthError: true));
   }
 
   Future<void> _beginAuthentication() async {
     final user = _state.selectedUser;
-    if (user == null || _state.authMode == AuthMode.submitting) {
+    if (user == null ||
+        _state.selectedSession == null ||
+        _state.authMode == AuthMode.submitting) {
       return;
     }
 
     _replace(
-      _state.copyWith(
-        authMode: AuthMode.submitting,
-        clearAuthError: true,
-        catalogMode: CatalogMode.empty,
-        sessions: const [],
-        clearCatalogError: true,
-        clearSelectedSession: true,
-      ),
+      _state.copyWith(authMode: AuthMode.submitting, clearAuthError: true),
     );
 
     _beginInFlight = true;
@@ -261,7 +304,8 @@ class GreeterFeature extends ChangeNotifier {
   }
 
   void _selectSession(SessionSummary session) {
-    if (_state.authMode != AuthMode.sessionSelection ||
+    if (_state.serviceMode != ServiceMode.ready ||
+        _state.catalogMode != CatalogMode.ready ||
         !_state.sessions.any((candidate) => candidate.id == session.id)) {
       return;
     }
@@ -277,10 +321,11 @@ class GreeterFeature extends ChangeNotifier {
   Future<void> _startSelectedSession() async {
     final attemptId = _attemptId;
     final session = _state.selectedSession;
-    if (attemptId == null || session == null) {
+    if (attemptId == null || session == null || _sessionStartInFlight) {
       return;
     }
 
+    _sessionStartInFlight = true;
     _replace(
       _state.copyWith(authMode: AuthMode.submitting, clearCatalogError: true),
     );
@@ -302,6 +347,8 @@ class GreeterFeature extends ChangeNotifier {
           recovery: GreeterRecovery.selectSession,
         ),
       );
+    } finally {
+      _sessionStartInFlight = false;
     }
   }
 
@@ -333,15 +380,13 @@ class GreeterFeature extends ChangeNotifier {
     _replace(
       _state.copyWith(
         serviceMode: ServiceMode.ready,
-        authMode: _state.selectedUser == null
-            ? AuthMode.userSelection
-            : AuthMode.editing,
+        authMode: AuthMode.userSelection,
         clearPrompt: true,
         clearAuthError: true,
-        clearCatalogError: true,
-        catalogMode: CatalogMode.empty,
-        sessions: const [],
-        clearSelectedSession: true,
+        clearCatalogError: _state.sessions.isNotEmpty,
+        catalogMode: _state.sessions.isNotEmpty
+            ? CatalogMode.ready
+            : _state.catalogMode,
         backendAuthState: BackendAuthState.idle,
       ),
     );
@@ -359,10 +404,10 @@ class GreeterFeature extends ChangeNotifier {
   }
 
   Future<void> _retrySessionCatalog() async {
-    if (_attemptId == null || _state.authMode != AuthMode.sessionSelection) {
+    if (_state.serviceMode != ServiceMode.ready) {
       return;
     }
-    await _loadSessionsForCurrentAttempt();
+    await _loadSessionCatalog();
   }
 
   void _handleEvent(GreeterEvent event) {
@@ -422,7 +467,7 @@ class GreeterFeature extends ChangeNotifier {
       BackendAuthState.submittingResponse ||
       BackendAuthState.resolvingSession ||
       BackendAuthState.startingSession => AuthMode.submitting,
-      BackendAuthState.authenticated => AuthMode.sessionSelection,
+      BackendAuthState.authenticated => AuthMode.submitting,
       BackendAuthState.handingOff => AuthMode.handingOff,
       BackendAuthState.failed => AuthMode.error,
       BackendAuthState.cancelling => AuthMode.submitting,
@@ -443,28 +488,30 @@ class GreeterFeature extends ChangeNotifier {
               )
             : null,
         clearAuthError: state != BackendAuthState.failed,
-        catalogMode: state == BackendAuthState.authenticated
-            ? CatalogMode.loading
-            : _state.catalogMode,
-        clearCatalogError: state == BackendAuthState.authenticated,
         clearPrompt:
             state == BackendAuthState.authenticated ||
             state == BackendAuthState.failed,
       ),
     );
     if (state == BackendAuthState.authenticated) {
-      unawaited(_loadSessionsForCurrentAttempt());
+      if (_state.selectedSession == null) {
+        _replace(
+          _state.copyWith(
+            authMode: AuthMode.sessionSelection,
+            clearAuthError: true,
+          ),
+        );
+      } else {
+        unawaited(_startSelectedSession());
+      }
     }
     if (state == BackendAuthState.failed) {
       _attemptId = null;
     }
   }
 
-  Future<void> _loadSessionsForCurrentAttempt() async {
-    final attemptId = _attemptId;
-    if (attemptId == null) {
-      return;
-    }
+  Future<void> _loadSessionCatalog() async {
+    final generation = ++_sessionLoadGeneration;
     _replace(
       _state.copyWith(
         catalogMode: CatalogMode.loading,
@@ -473,28 +520,36 @@ class GreeterFeature extends ChangeNotifier {
     );
     try {
       final sessions = await _gateway.listSessions();
-      if (attemptId == _attemptId) {
-        _replace(
-          _state.copyWith(
-            catalogMode: CatalogMode.ready,
-            sessions: sessions,
-            clearCatalogError: true,
-          ),
-        );
+      if (generation != _sessionLoadGeneration) {
+        return;
       }
+      final selectedSession = _state.selectedSession;
+      final selectedStillAvailable =
+          selectedSession != null &&
+          sessions.any((candidate) => candidate.id == selectedSession.id);
+      _replace(
+        _state.copyWith(
+          catalogMode: CatalogMode.ready,
+          sessions: sessions,
+          clearSelectedSession:
+              selectedSession != null && !selectedStillAvailable,
+          clearCatalogError: true,
+        ),
+      );
     } on Object catch (error) {
-      if (attemptId == _attemptId) {
-        _replace(
-          _state.copyWith(
-            catalogMode: CatalogMode.failed,
-            catalogError: _getGreeterError(
-              error,
-              fallbackKind: GreeterErrorKind.session,
-              recovery: GreeterRecovery.retrySessionCatalog,
-            ),
-          ),
-        );
+      if (generation != _sessionLoadGeneration) {
+        return;
       }
+      _replace(
+        _state.copyWith(
+          catalogMode: CatalogMode.failed,
+          catalogError: _getGreeterError(
+            error,
+            fallbackKind: GreeterErrorKind.session,
+            recovery: GreeterRecovery.retrySessionCatalog,
+          ),
+        ),
+      );
     }
   }
 
@@ -504,11 +559,11 @@ class GreeterFeature extends ChangeNotifier {
         authMode: AuthMode.userSelection,
         clearSelectedUser: clearSelectedUser,
         clearPrompt: true,
-        clearSelectedSession: true,
         clearAuthError: true,
-        clearCatalogError: true,
-        catalogMode: CatalogMode.empty,
-        sessions: const [],
+        clearCatalogError: _state.sessions.isNotEmpty,
+        catalogMode: _state.sessions.isNotEmpty
+            ? CatalogMode.ready
+            : _state.catalogMode,
         backendAuthState: BackendAuthState.idle,
       ),
     );
@@ -522,15 +577,40 @@ class GreeterFeature extends ChangeNotifier {
     _replace(
       _state.copyWith(
         authMode: AuthMode.sessionSelection,
-        catalogMode: CatalogMode.failed,
-        catalogError: error,
+        catalogMode: CatalogMode.ready,
+        clearCatalogError: true,
       ),
     );
+    _effects.add(ShowNoticeEffect(error.message, isError: true));
   }
 
   void _replace(GreeterState next) {
+    if (_disposed) {
+      return;
+    }
     _state = next;
-    notifyListeners();
+    final nextSlots = GreeterSceneSlots.fromState(next);
+    if (_serviceSlots.value != nextSlots.service) {
+      _serviceSlots.value = nextSlots.service;
+    }
+    if (_authPromptSlots.value != nextSlots.authPrompt) {
+      _authPromptSlots.value = nextSlots.authPrompt;
+    }
+    if (_accountPickerSlots.value != nextSlots.accountPicker) {
+      _accountPickerSlots.value = nextSlots.accountPicker;
+    }
+    if (_sessionPickerSlots.value != nextSlots.sessionPicker) {
+      _sessionPickerSlots.value = nextSlots.sessionPicker;
+    }
+    if (_continueSlots.value != nextSlots.continueAction) {
+      _continueSlots.value = nextSlots.continueAction;
+    }
+    if (_powerSlots.value != nextSlots.power) {
+      _powerSlots.value = nextSlots.power;
+    }
+    if (_backgroundSlots.value != nextSlots.background) {
+      _backgroundSlots.value = nextSlots.background;
+    }
   }
 
   GreeterError _getGreeterError(
@@ -552,11 +632,17 @@ class GreeterFeature extends ChangeNotifier {
     );
   }
 
-  @override
   void dispose() {
+    _disposed = true;
     unawaited(_eventSubscription?.cancel());
     unawaited(_gateway.close());
     unawaited(_effects.close());
-    super.dispose();
+    _serviceSlots.dispose();
+    _authPromptSlots.dispose();
+    _accountPickerSlots.dispose();
+    _sessionPickerSlots.dispose();
+    _continueSlots.dispose();
+    _powerSlots.dispose();
+    _backgroundSlots.dispose();
   }
 }

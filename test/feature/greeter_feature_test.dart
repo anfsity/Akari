@@ -13,12 +13,15 @@ void main() {
     final feature = GreeterFeature(gateway: gateway);
 
     await feature.initialize();
+    await _flushEvents();
 
     expect(gateway.getStateCalls, 1);
     expect(feature.state.serviceMode, ServiceMode.ready);
     expect(feature.state.backendAuthState, BackendAuthState.idle);
     expect(feature.state.authMode, AuthMode.userSelection);
     expect(feature.state.users, hasLength(2));
+    expect(feature.state.catalogMode, CatalogMode.ready);
+    expect(feature.state.sessions, hasLength(1));
 
     feature.dispose();
   });
@@ -48,6 +51,7 @@ void main() {
         detail: '',
       );
       await feature.dispatch(const ReconnectServiceCommand());
+      await _flushEvents();
 
       expect(gateway.getStateCalls, 2);
       expect(feature.state.serviceMode, ServiceMode.ready);
@@ -64,7 +68,9 @@ void main() {
     final effects = <FeatureEffect>[];
     final effectSubscription = feature.effects.listen(effects.add);
     await feature.initialize();
+    await _flushEvents();
 
+    await _selectDefaultSession(feature);
     await feature.dispatch(SelectUserCommand(gateway.users.first));
     await feature.dispatch(const BeginAuthenticationCommand());
     await Future<void>.delayed(Duration.zero);
@@ -126,7 +132,9 @@ void main() {
     final gateway = _FakeGreeterGateway();
     final feature = GreeterFeature(gateway: gateway);
     await feature.initialize();
+    await _flushEvents();
 
+    await _selectDefaultSession(feature);
     await feature.dispatch(SelectUserCommand(gateway.users.first));
     await feature.dispatch(const BeginAuthenticationCommand());
     await Future<void>.delayed(Duration.zero);
@@ -166,6 +174,61 @@ void main() {
     },
   );
 
+  test('power actions only update the power slot', () async {
+    final gateway = _FakeGreeterGateway();
+    final feature = await _createPromptedFeature(gateway);
+    var authPromptChanges = 0;
+    var powerChanges = 0;
+    feature.authPromptSlots.addListener(() => authPromptChanges++);
+    feature.powerSlots.addListener(() => powerChanges++);
+
+    await feature.dispatch(
+      const RequestPowerActionCommand(PowerAction.suspend),
+    );
+
+    expect(authPromptChanges, 0);
+    expect(powerChanges, 2);
+    expect(feature.powerSlots.value.mode, PowerMode.succeeded);
+
+    feature.dispose();
+  });
+
+  test(
+    'selection changes stay within account, session, and action slots',
+    () async {
+      final gateway = _FakeGreeterGateway();
+      final feature = GreeterFeature(gateway: gateway);
+      await feature.initialize();
+      await _flushEvents();
+
+      var accountChanges = 0;
+      var sessionChanges = 0;
+      var authPromptChanges = 0;
+      var continueChanges = 0;
+      feature.accountPickerSlots.addListener(() => accountChanges++);
+      feature.sessionPickerSlots.addListener(() => sessionChanges++);
+      feature.authPromptSlots.addListener(() => authPromptChanges++);
+      feature.continueSlots.addListener(() => continueChanges++);
+
+      await feature.dispatch(SelectUserCommand(gateway.users.first));
+
+      expect(accountChanges, 1);
+      expect(sessionChanges, 0);
+      expect(authPromptChanges, 0);
+      expect(continueChanges, 0);
+
+      await _selectDefaultSession(feature);
+
+      expect(accountChanges, 1);
+      expect(sessionChanges, 1);
+      expect(authPromptChanges, 0);
+      expect(continueChanges, 1);
+      expect(feature.continueSlots.value.enabled, isTrue);
+
+      feature.dispose();
+    },
+  );
+
   test('rejects a blank prompt response without calling the gateway', () async {
     final gateway = _FakeGreeterGateway();
     final feature = await _createPromptedFeature(gateway);
@@ -186,27 +249,21 @@ void main() {
   });
 
   test(
-    'keeps authentication state while the session catalog is loading',
+    'loads the session catalog independently of account selection',
     () async {
       final gateway = _FakeGreeterGateway();
       final sessions = Completer<List<SessionSummary>>();
       gateway.sessionsFuture = sessions.future;
-      final feature = await _createPromptedFeature(gateway);
-
-      gateway.emit(
-        const BackendStateChanged(
-          attemptId: 'attempt-1',
-          state: BackendAuthState.authenticated,
-          detail: '',
-        ),
-      );
-      await _flushEvents();
+      final feature = GreeterFeature(gateway: gateway);
+      await feature.initialize();
 
       expect(feature.state.catalogMode, CatalogMode.loading);
-      expect(feature.state.authMode, AuthMode.sessionSelection);
-      expect(feature.state.backendAuthState, BackendAuthState.authenticated);
-      expect(feature.state.authError, isNull);
+      expect(feature.state.authMode, AuthMode.userSelection);
       expect(gateway.listSessionsCalls, 1);
+
+      await feature.dispatch(SelectUserCommand(gateway.users.first));
+      expect(feature.state.selectedUser?.id, 'alice');
+      expect(feature.state.authMode, AuthMode.userSelection);
 
       sessions.complete(const [
         SessionSummary(id: 'wayland:sway', name: 'Sway'),
@@ -214,8 +271,8 @@ void main() {
       await _flushEvents();
 
       expect(feature.state.catalogMode, CatalogMode.ready);
-      expect(feature.state.authMode, AuthMode.sessionSelection);
-      expect(feature.state.backendAuthState, BackendAuthState.authenticated);
+      await _selectDefaultSession(feature);
+      expect(feature.state.selectedSession?.id, 'wayland:sway');
 
       feature.dispose();
     },
@@ -227,15 +284,8 @@ void main() {
       'Session catalog unavailable.',
       kind: GreeterErrorKind.session,
     );
-    final feature = await _createPromptedFeature(gateway);
-
-    gateway.emit(
-      const BackendStateChanged(
-        attemptId: 'attempt-1',
-        state: BackendAuthState.authenticated,
-        detail: '',
-      ),
-    );
+    final feature = GreeterFeature(gateway: gateway);
+    await feature.initialize();
     await _flushEvents();
 
     expect(feature.state.catalogMode, CatalogMode.failed);
@@ -244,15 +294,15 @@ void main() {
       feature.state.catalogError?.recovery,
       GreeterRecovery.retrySessionCatalog,
     );
-    expect(feature.state.authMode, AuthMode.sessionSelection);
-    expect(feature.state.backendAuthState, BackendAuthState.authenticated);
+    expect(feature.state.authMode, AuthMode.userSelection);
+    expect(feature.state.backendAuthState, BackendAuthState.idle);
     expect(feature.state.authError, isNull);
 
     gateway.sessionsError = null;
     await feature.dispatch(const RetrySessionCatalogCommand());
 
     expect(feature.state.catalogMode, CatalogMode.ready);
-    expect(feature.state.authMode, AuthMode.sessionSelection);
+    expect(feature.state.authMode, AuthMode.userSelection);
     expect(gateway.listSessionsCalls, 2);
 
     feature.dispose();
@@ -262,6 +312,10 @@ void main() {
     final gateway = _FakeGreeterGateway();
     final feature = await _createPromptedFeature(gateway);
 
+    gateway.startSessionError = const GreeterGatewayException(
+      'Session could not be started.',
+      kind: GreeterErrorKind.session,
+    );
     gateway.emit(
       const BackendStateChanged(
         attemptId: 'attempt-1',
@@ -270,30 +324,39 @@ void main() {
       ),
     );
     await _flushEvents();
-    await feature.dispatch(
-      const SelectSessionCommand(
-        SessionSummary(id: 'wayland:sway', name: 'Sway'),
-      ),
-    );
-
-    gateway.startSessionError = const GreeterGatewayException(
-      'Session could not be started.',
-      kind: GreeterErrorKind.session,
-    );
-    await feature.dispatch(const StartSelectedSessionCommand());
 
     expect(gateway.startSessionCalls, 1);
     expect(feature.state.authMode, AuthMode.sessionSelection);
-    expect(feature.state.catalogMode, CatalogMode.failed);
+    expect(feature.state.catalogMode, CatalogMode.ready);
     expect(feature.state.selectedSession?.id, 'wayland:sway');
-    expect(feature.state.catalogError?.kind, GreeterErrorKind.session);
-    expect(feature.state.catalogError?.recovery, GreeterRecovery.selectSession);
+    expect(feature.state.catalogError, isNull);
 
     gateway.startSessionError = null;
     await feature.dispatch(const StartSelectedSessionCommand());
 
     expect(gateway.startSessionCalls, 2);
     expect(feature.state.authMode, AuthMode.handingOff);
+
+    feature.dispose();
+  });
+
+  test('allows choosing a session before choosing an account', () async {
+    final gateway = _FakeGreeterGateway();
+    final feature = GreeterFeature(gateway: gateway);
+    await feature.initialize();
+    await _flushEvents();
+
+    await _selectDefaultSession(feature);
+    expect(feature.state.selectedSession?.id, 'wayland:sway');
+    expect(feature.state.authMode, AuthMode.userSelection);
+
+    await feature.dispatch(SelectUserCommand(gateway.users.first));
+    expect(feature.state.selectedUser?.id, 'alice');
+    expect(feature.state.authMode, AuthMode.userSelection);
+
+    await feature.dispatch(const BeginAuthenticationCommand());
+    await _flushEvents();
+    expect(feature.state.authMode, AuthMode.prompting);
 
     feature.dispose();
   });
@@ -304,10 +367,20 @@ Future<GreeterFeature> _createPromptedFeature(
 ) async {
   final feature = GreeterFeature(gateway: gateway);
   await feature.initialize();
+  await _flushEvents();
+  await _selectDefaultSession(feature);
   await feature.dispatch(SelectUserCommand(gateway.users.first));
   await feature.dispatch(const BeginAuthenticationCommand());
   await _flushEvents();
   return feature;
+}
+
+Future<void> _selectDefaultSession(GreeterFeature feature) async {
+  await feature.dispatch(
+    const SelectSessionCommand(
+      SessionSummary(id: 'wayland:sway', name: 'Sway'),
+    ),
+  );
 }
 
 Future<void> _flushEvents() async {

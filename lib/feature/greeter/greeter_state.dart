@@ -4,7 +4,6 @@ enum CatalogMode { empty, loading, ready, failed }
 
 enum AuthMode {
   userSelection,
-  editing,
   prompting,
   submitting,
   sessionSelection,
@@ -46,6 +45,17 @@ class GreeterError {
   final GreeterErrorKind kind;
   final String message;
   final GreeterRecovery recovery;
+
+  @override
+  bool operator ==(Object other) {
+    return other is GreeterError &&
+        other.kind == kind &&
+        other.message == message &&
+        other.recovery == recovery;
+  }
+
+  @override
+  int get hashCode => Object.hash(kind, message, recovery);
 }
 
 class UserSummary {
@@ -53,6 +63,16 @@ class UserSummary {
 
   final String id;
   final String displayName;
+
+  @override
+  bool operator ==(Object other) {
+    return other is UserSummary &&
+        other.id == id &&
+        other.displayName == displayName;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, displayName);
 }
 
 class SessionSummary {
@@ -60,6 +80,14 @@ class SessionSummary {
 
   final String id;
   final String name;
+
+  @override
+  bool operator ==(Object other) {
+    return other is SessionSummary && other.id == id && other.name == name;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name);
 }
 
 class PromptState {
@@ -67,6 +95,14 @@ class PromptState {
 
   final PromptKind kind;
   final String text;
+
+  @override
+  bool operator ==(Object other) {
+    return other is PromptState && other.kind == kind && other.text == text;
+  }
+
+  @override
+  int get hashCode => Object.hash(kind, text);
 }
 
 enum BackendAuthState {
