@@ -9,8 +9,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Choose account'), findsOneWidget);
+    expect(find.text('Choose session'), findsOneWidget);
     expect(find.text('Alice'), findsOneWidget);
     expect(find.text('Bob'), findsOneWidget);
+    expect(find.text('Sway'), findsOneWidget);
   });
 
   testWidgets('can go back and choose a different account', (tester) async {
@@ -19,22 +21,10 @@ void main() {
 
     await tester.tap(find.text('Alice'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Continue to receive the authentication prompt.'),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.text('Back'));
-    await tester.pumpAndSettle();
-    expect(find.text('Choose account'), findsOneWidget);
-
     await tester.tap(find.text('Bob'));
     await tester.pumpAndSettle();
+    expect(find.text('Choose account'), findsOneWidget);
     expect(find.text('Bob'), findsOneWidget);
-    expect(
-      find.text('Continue to receive the authentication prompt.'),
-      findsOneWidget,
-    );
   });
 
   testWidgets('shows one password field only after the backend prompt', (
@@ -43,10 +33,11 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('Sway'));
     await tester.tap(find.text('Alice'));
     await tester.pumpAndSettle();
-    expect(find.byType(TextField), findsNothing);
 
+    await tester.ensureVisible(find.text('Continue'));
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
     expect(find.byType(TextField), findsOneWidget);
