@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../feature/greeter/greeter_slots.dart';
 import 'visual_layer.dart';
 
+const _backgroundAsset = 'assets/(139810879)年越し三人娘 『OIOI × 東方Project』.jpg';
+
 class StaticBackgroundVisual extends VisualLayer {
   const StaticBackgroundVisual({required this.slots, super.key});
 
@@ -10,51 +12,38 @@ class StaticBackgroundVisual extends VisualLayer {
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (slots.mood) {
-      BackgroundMood.calm => const Color(0xff0d151a),
-      BackgroundMood.active => const Color(0xff102329),
-      BackgroundMood.success => const Color(0xff10231e),
-      BackgroundMood.error => const Color(0xff29191d),
-    };
-
-    return ColoredBox(
-      color: color,
-      child: CustomPaint(
-        painter: _BackgroundPainter(
-          color: Theme.of(context).colorScheme.primary,
-          intensity: slots.intensity,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          _backgroundAsset,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (context, error, stackTrace) {
+            return const ColoredBox(color: Color(0xff0d151a));
+          },
         ),
-        child: const SizedBox.expand(),
-      ),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 420),
+          curve: Curves.easeOut,
+          color: _overlayColor(slots.mood),
+        ),
+        IgnorePointer(
+          child: ColoredBox(
+            color: Theme.of(context).colorScheme.primary
+                .withValues(alpha: 0.035 + slots.intensity * 0.025),
+          ),
+        ),
+      ],
     );
   }
-}
 
-class _BackgroundPainter extends CustomPainter {
-  const _BackgroundPainter({required this.color, required this.intensity});
-
-  final Color color;
-  final double intensity;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color.withValues(alpha: 0.08 + intensity * 0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    final inset = size.width * 0.08;
-    final rect = Rect.fromLTWH(
-      inset,
-      size.height * 0.16,
-      size.width - inset * 2,
-      size.height * 0.68,
-    );
-    canvas.drawOval(rect, paint);
-    canvas.drawOval(rect.deflate(size.width * 0.08), paint);
-  }
-
-  @override
-  bool shouldRepaint(_BackgroundPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.intensity != intensity;
+  Color _overlayColor(BackgroundMood mood) {
+    return switch (mood) {
+      BackgroundMood.calm => const Color(0x99050d12),
+      BackgroundMood.active => const Color(0xb30b2730),
+      BackgroundMood.success => const Color(0xb30c2b1e),
+      BackgroundMood.error => const Color(0xbf35171e),
+    };
   }
 }
