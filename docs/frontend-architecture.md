@@ -128,7 +128,7 @@ semantic meaning of backend results, but it does not render pixels.
 
 Feature responsibilities:
 
-- Load users and available sessions.
+- Load users and the session catalog independently before authentication.
 - Track the selected user and selected desktop session.
 - Start, respond to, cancel, and restart authentication attempts.
 - Track the current `attempt_id` and reject stale local events.
@@ -136,7 +136,8 @@ Feature responsibilities:
 - Expose display-safe errors and prompt information.
 - Request power operations through the backend client.
 - Decide which commands are enabled in the current state.
-- Produce an immutable `GreeterSceneSlots` snapshot for Scene.
+- Produce an immutable `GreeterSceneSlots` snapshot and typed region slots for
+  Scene.
 - Emit one-shot effects such as focus requests, notification requests, or
   application exit after successful session handoff.
 
@@ -322,20 +323,17 @@ An example projection is:
 ```text
 AuthIdle
 AuthUserSelection
-AuthEditing
 AuthSubmitting
 AuthPrompting
-AuthAuthenticated
-AuthSessionSelection
 AuthError
 AuthHandingOff
 ServiceUnavailable
 ```
 
-`AuthEditing` means that the user is editing a local field. It does not mean
-that PAM or greetd has entered a new protocol phase. If a username field is
-focused and being edited before authentication begins, this can remain purely
-local interaction state rather than being sent to the backend.
+User and session selection are local presentation choices. They do not mean
+that PAM or greetd has entered a new protocol phase. The backend receives the
+selected user when authentication begins and the selected session only when
+the authenticated attempt is handed off with `StartSession`.
 
 ### 5.3 Local Interaction and Scene State
 
@@ -377,7 +375,9 @@ turning a valid authentication transaction into `AuthError`.
 ## 6. The `GreeterSceneSlots` Contract
 
 `GreeterSceneSlots` is the typed semantic boundary between Feature and Scene.
-It is a snapshot, not a service locator and not a bag of arbitrary values.
+It is an immutable aggregate snapshot, not a service locator and not a bag of
+arbitrary values. The live Scene consumes the same projection through narrow
+typed `ValueListenable` values so unrelated regions do not rebuild together.
 
 The exact Dart syntax can be chosen during implementation, but the conceptual
 shape should be close to:
@@ -385,15 +385,31 @@ shape should be close to:
 ```text
 GreeterSceneSlots {
   service: ServicePresentationState
-  auth: AuthPresentationState
-  userPicker: UserPickerSlots
-  prompt: PromptSlots?
+  authPrompt: AuthPromptSlots
+  accountPicker: AccountPickerSlots
   sessionPicker: SessionPickerSlots
+  continueAction: ContinueSlots
   power: PowerSlots
   background: BackgroundSlots
-  accessibility: AccessibilitySlots
 }
 ```
+
+The current Flutter implementation exposes the corresponding region streams:
+
+```text
+ValueListenable<ServiceSlots>
+ValueListenable<AuthPromptSlots>
+ValueListenable<AccountPickerSlots>
+ValueListenable<SessionPickerSlots>
+ValueListenable<ContinueSlots>
+ValueListenable<PowerSlots>
+ValueListenable<BackgroundSlots>
+```
+
+`SceneHost` owns the stable layer order. `SceneRegion<T>` connects one typed
+slot to one build boundary. Account selection therefore updates the account
+picker and the Continue action, while power state updates only the power
+region. The prompt region does not carry the transient response value.
 
 Each nested value should be immutable and typed. A possible authentication
 projection is:
@@ -447,7 +463,9 @@ an arbitrary asset path supplied by the backend or user input.
 Persistent rendering data and one-shot actions should be separate:
 
 ```text
-GreeterSceneSlots  // latest state; safe to rebuild from at any time
+GreeterSceneSlots  // latest aggregate state; safe to rebuild from at any time
+
+SceneHost / SceneRegion  // stable layer order and narrow build boundaries
 
 FeatureEffect      // one-shot event
   RequestFocus(field)
@@ -459,7 +477,9 @@ FeatureEffect      // one-shot event
 A Scene must be able to reconstruct the current screen from the latest slots.
 It must not depend on having observed every historical event. Effects may be
 lost during process restart, but the persistent snapshot must still describe
-the correct current state.
+the correct current state. `ValueListenableBuilder` limits widget builds;
+`RepaintBoundary` limits raster repaint propagation. Neither mechanism replaces
+the other, and neither should be added to every small text or button widget.
 
 ### 6.2 Generation and Stale Event Handling
 
@@ -487,12 +507,11 @@ and tested as a pure function. An example mapping is:
 
 | Backend state or event | Presentation state | Scene implication |
 | --- | --- | --- |
-| `Idle` with no selected user | `AuthUserSelection` | Show user selection and idle background |
-| `Idle` with selected user | `AuthEditing` or ready-to-submit | Show credential entry affordance |
+| `Idle` | `AuthUserSelection` | Show independent user and session selection |
 | `CreatingSession` | `AuthSubmitting` | Disable duplicate submission, show progress |
 | `WaitingForInput` with `visible` or `secret` prompt | `AuthPrompting` | Focus prompt input |
 | `SubmittingResponse` | `AuthSubmitting` | Keep prompt visible, prevent duplicate response |
-| `Authenticated` | `AuthSessionSelection` | Show session selection |
+| `Authenticated` | `AuthSubmitting` | Start the already selected backend-validated session |
 | `ResolvingSession` or `StartingSession` | `AuthSubmitting` | Lock session action and show progress |
 | `HandingOff` | `AuthHandingOff` | Play exit transition, then terminate UI |
 | `Failed` with display-safe detail | `AuthError` | Preserve error and offer retry |
@@ -560,9 +579,9 @@ AuthPrompting -> AuthError
   show display-safe error
   return focus to the retry action or prompt
 
-AuthAuthenticated -> AuthSessionSelection
-  transition the credential content out
-  transition the session selector in
+Authenticated -> AuthSubmitting
+  start the already selected session
+  keep session choice independent from authentication
 
 AuthHandingOff -> exit
   play bounded exit animation
