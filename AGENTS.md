@@ -43,3 +43,9 @@ These rules apply to all changes in this repository.
 
 - Write comments for future readers who need the reasoning behind non-obvious code.
 - Do not add comments merely to narrate the diff or restate what the code already says.
+
+## Commits
+
+- Keep commits atomic and split changes at the finest reasonable granularity.
+- Commit immediately after each discrete addition or modification rather than batching multiple changes together.
+- Each commit must represent a single, focused logical change that is self-contained and straightforward to review, revert, or bisect.
