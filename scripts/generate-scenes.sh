@@ -5,4 +5,4 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$script_dir/.." && pwd)"
 
 cd -- "$repo_root"
-fvm dart run build_runner build --delete-conflicting-outputs
+fvm dart run build_runner build
