@@ -137,7 +137,6 @@ Interactive nodes may be transformed, but runtime invariants still apply:
 - minimum hit target size.
 - safe-area fallback.
 - bounded interactive rotation.
-- minimum text scale.
 - deterministic keyboard traversal.
 
 Decorative nodes may use the full supported transform range. Full 3D meshes,
