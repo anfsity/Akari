@@ -206,7 +206,7 @@ size, and absence of overflow.
 
 Performance is verified separately with a Linux/Wayland profile integration
 run. Reports record p50/p95 build and raster frame time, rebuild/repaint scope,
-and whether a settled static background schedules frames. Relative regressions
+and whether a settled static background schedules more than a single platform wake-up. Relative regressions
 beyond the documented threshold fail the performance suite.
 
 ## 9. Implementation Order

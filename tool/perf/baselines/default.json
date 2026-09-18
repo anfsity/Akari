@@ -3,6 +3,6 @@
   "p95_build_ms": 33.0,
   "p50_raster_ms": 8.0,
   "p95_raster_ms": 33.0,
-  "static_background_scheduled_frames": 0,
+  "static_background_scheduled_frames": 1,
   "sample_count": 1
 }
