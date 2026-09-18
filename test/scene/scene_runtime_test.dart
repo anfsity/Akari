@@ -112,22 +112,15 @@ Widget _runtime(SceneDocument document) {
 ThemeTokens _tokens() {
   return ThemeTokens(
     materialTheme: ThemeData.dark(),
-    pagePadding: EdgeInsets.zero,
-    panelPadding: EdgeInsets.zero,
-    contentMaxWidth: 400,
-    controlHeight: 44,
     panelRadius: 12,
-    sectionGap: 12,
-    controlGap: 8,
-    shortMotion: const Duration(milliseconds: 100),
     mediumMotion: const Duration(milliseconds: 200),
     standardCurve: Curves.easeOut,
     minHitTarget: 44,
     maxInteractiveRotationDegrees: 15,
-    minTextScale: 0.9,
     allowBlur: false,
     blurSigma: 0,
     glassColor: Colors.black,
-    scrimColor: Colors.black,
+    surfaceColor: Colors.black,
+    surfaceVariantColor: Colors.black,
   );
 }

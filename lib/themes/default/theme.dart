@@ -3,10 +3,23 @@ import 'package:mozais_scene/mozais_scene.dart';
 
 import 'default.scene.g.dart';
 
+/// Accent sampled from the bundled wallpaper's dominant vibrant hue, capped to
+/// the saturation and value range the reference theme uses.
+const _accent = Color(0xfff26d7a);
+const _base = Color(0xff1a1c18);
+const _surface = Color(0xff2a2d28);
+const _surfaceVariant = Color(0xff3a3e36);
+const _text = Color(0xffe3e3dc);
+
 ThemeBundle buildDefaultTheme() {
   final colorScheme = ColorScheme.fromSeed(
-    seedColor: const Color(0xffd2a35f),
+    seedColor: _accent,
     brightness: Brightness.dark,
+  ).copyWith(
+    primary: _accent,
+    onPrimary: Colors.white,
+    surface: _base,
+    onSurface: _text,
   );
   return ThemeBundle(
     id: 'default',
@@ -16,40 +29,29 @@ ThemeBundle buildDefaultTheme() {
         scaffoldBackgroundColor: Colors.transparent,
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.black.withValues(alpha: 0.22),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.32)),
+          fillColor: _surface,
+          hintStyle: TextStyle(
+            color: Colors.white.withValues(alpha: 0.42),
+            fontSize: 16,
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.32)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide(color: colorScheme.primary),
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+          border: _fieldBorder(Colors.transparent, 0),
+          enabledBorder: _fieldBorder(Colors.transparent, 0),
+          focusedBorder: _fieldBorder(_accent, 2),
           isDense: true,
         ),
         visualDensity: VisualDensity.standard,
       ),
-      pagePadding: const EdgeInsets.all(24),
-      panelPadding: const EdgeInsets.all(28),
-      contentMaxWidth: 460,
-      controlHeight: 52,
-      panelRadius: 28,
-      sectionGap: 20,
-      controlGap: 12,
-      shortMotion: const Duration(milliseconds: 140),
+      panelRadius: 32,
       mediumMotion: const Duration(milliseconds: 260),
       standardCurve: Curves.easeOutCubic,
       minHitTarget: 44,
       maxInteractiveRotationDegrees: 15,
-      minTextScale: 0.9,
-      allowBlur: true,
-      blurSigma: 18,
-      glassColor: const Color(0x99101317),
-      scrimColor: const Color(0x55050a0d),
+      allowBlur: false,
+      blurSigma: 0,
+      glassColor: _base.withValues(alpha: 0.72),
+      surfaceColor: _surface,
+      surfaceVariantColor: _surfaceVariant,
     ),
     document: defaultSceneDocument,
     backgrounds: const {
@@ -63,5 +65,12 @@ ThemeBundle buildDefaultTheme() {
       SceneMotionPreset.hoverLift: HoverLiftMotionBuilder(),
       SceneMotionPreset.focusGlow: FocusGlowMotionBuilder(),
     },
+  );
+}
+
+OutlineInputBorder _fieldBorder(Color color, double width) {
+  return OutlineInputBorder(
+    borderRadius: BorderRadius.circular(16),
+    borderSide: BorderSide(color: color, width: width),
   );
 }
