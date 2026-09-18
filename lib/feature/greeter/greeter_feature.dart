@@ -50,9 +50,6 @@ class GreeterFeature {
   final ValueNotifier<PowerSlots> _powerSlots = ValueNotifier(
     const PowerSlots(mode: PowerMode.idle, error: null),
   );
-  final ValueNotifier<BackgroundSlots> _backgroundSlots = ValueNotifier(
-    BackgroundSlots.fromAuthMode(AuthMode.userSelection),
-  );
   GreeterState _state = GreeterState.initial();
   String? _attemptId;
   bool _initialized = false;
@@ -78,8 +75,6 @@ class GreeterFeature {
   ValueListenable<ContinueSlots> get continueSlots => _continueSlots;
 
   ValueListenable<PowerSlots> get powerSlots => _powerSlots;
-
-  ValueListenable<BackgroundSlots> get backgroundSlots => _backgroundSlots;
 
   Stream<FeatureEffect> get effects => _effects.stream;
 
@@ -608,9 +603,6 @@ class GreeterFeature {
     if (_powerSlots.value != nextSlots.power) {
       _powerSlots.value = nextSlots.power;
     }
-    if (_backgroundSlots.value != nextSlots.background) {
-      _backgroundSlots.value = nextSlots.background;
-    }
   }
 
   GreeterError _getGreeterError(
@@ -643,6 +635,5 @@ class GreeterFeature {
     _sessionPickerSlots.dispose();
     _continueSlots.dispose();
     _powerSlots.dispose();
-    _backgroundSlots.dispose();
   }
 }

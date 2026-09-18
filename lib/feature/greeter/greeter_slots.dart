@@ -11,7 +11,6 @@ class GreeterSceneSlots {
     required this.sessionPicker,
     required this.continueAction,
     required this.power,
-    required this.background,
   });
 
   factory GreeterSceneSlots.fromState(GreeterState state) {
@@ -39,7 +38,6 @@ class GreeterSceneSlots {
         enabled: state.selectedUser != null && state.selectedSession != null,
       ),
       power: PowerSlots(mode: state.powerMode, error: state.powerError),
-      background: BackgroundSlots.fromAuthMode(state.authMode),
     );
   }
 
@@ -49,7 +47,6 @@ class GreeterSceneSlots {
   final SessionPickerSlots sessionPicker;
   final ContinueSlots continueAction;
   final PowerSlots power;
-  final BackgroundSlots background;
 }
 
 class ServiceSlots {
@@ -165,37 +162,4 @@ class PowerSlots {
 
   @override
   int get hashCode => Object.hash(mode, error);
-}
-
-enum BackgroundMood { calm, active, success, error }
-
-class BackgroundSlots {
-  const BackgroundSlots({required this.mood, required this.intensity});
-
-  factory BackgroundSlots.fromAuthMode(AuthMode mode) {
-    final mood = switch (mode) {
-      AuthMode.error => BackgroundMood.error,
-      AuthMode.submitting || AuthMode.prompting => BackgroundMood.active,
-      AuthMode.handingOff => BackgroundMood.success,
-      _ => BackgroundMood.calm,
-    };
-
-    return BackgroundSlots(
-      mood: mood,
-      intensity: mood == BackgroundMood.calm ? 0.35 : 0.65,
-    );
-  }
-
-  final BackgroundMood mood;
-  final double intensity;
-
-  @override
-  bool operator ==(Object other) {
-    return other is BackgroundSlots &&
-        other.mood == mood &&
-        other.intensity == intensity;
-  }
-
-  @override
-  int get hashCode => Object.hash(mood, intensity);
 }
