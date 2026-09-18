@@ -43,7 +43,7 @@
     {
       "id": "avatar",
       "kind": "avatar",
-      "rect": {"x": 0.455, "y": 0.235, "width": 0.09, "height": 0.16},
+      "rect": {"x": 0.4625, "y": 0.245, "width": 0.075, "height": 0.1333},
       "renderOrder": 40,
       "focusOrder": 10,
       "motion": "none",
@@ -64,7 +64,7 @@
     {
       "id": "session_picker",
       "kind": "sessionPicker",
-      "rect": {"x": 0.36, "y": 0.50, "width": 0.28, "height": 0.075},
+      "rect": {"x": 0.435, "y": 0.50, "width": 0.13, "height": 0.075},
       "renderOrder": 40,
       "focusOrder": 20,
       "motion": "none",
@@ -85,7 +85,7 @@
     {
       "id": "primary_action",
       "kind": "primaryAction",
-      "rect": {"x": 0.47, "y": 0.72, "width": 0.06, "height": 0.09},
+      "rect": {"x": 0.4722, "y": 0.72, "width": 0.0556, "height": 0.0988},
       "renderOrder": 40,
       "focusOrder": 50,
       "motion": "none",
