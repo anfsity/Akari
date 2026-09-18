@@ -1,12 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:mozais_scene/mozais_scene.dart';
 
 import '../feature/greeter/greeter_feature.dart';
 import '../feature/greeter/ports/greeter_gateway.dart';
 import '../infrastructure/dbus/greeter_dbus_gateway.dart';
-import '../scene/greeter_scene/greeter_scene.dart';
-import '../theme/theme_tokens.dart';
+import '../scene/greeter_scene/greeter_scene_adapter.dart';
+import '../theme/theme_registry.dart';
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -17,7 +18,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late final GreeterFeature _feature;
-  late final ThemeTokens _theme;
+  late final ThemeBundle _theme;
 
   @override
   void initState() {
@@ -30,7 +31,12 @@ class _MyAppState extends State<MyApp> {
         ? DemoGreeterGateway()
         : DBusGreeterGateway();
     _feature = GreeterFeature(gateway: gateway);
-    _theme = ThemeTokens.dark();
+    _theme = ThemeRegistry.resolve(
+      const String.fromEnvironment(
+        'MOZAIS_THEME',
+        defaultValue: ThemeRegistry.defaultThemeName,
+      ),
+    );
     unawaited(_feature.initialize());
   }
 
@@ -46,7 +52,9 @@ class _MyAppState extends State<MyApp> {
       title: 'Mozais Greeter',
       debugShowCheckedModeBanner: false,
       theme: _theme.materialTheme,
-      home: GreeterScene(feature: _feature, theme: _theme),
+      home: Scaffold(
+        body: GreeterSceneAdapter(feature: _feature, theme: _theme),
+      ),
     );
   }
 }
