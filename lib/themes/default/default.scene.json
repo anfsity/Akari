@@ -1,0 +1,108 @@
+{
+  "id": "default",
+  "version": 1,
+  "canvas": {
+    "fit": "cover",
+    "useSafeArea": true
+  },
+  "background": {
+    "kind": "image",
+    "asset": "assets/(139810879)年越し三人娘 『OIOI × 東方Project』.jpg",
+    "color": "#090d10",
+    "scrimOpacity": 0.28
+  },
+  "nodes": [
+    {
+      "id": "clock",
+      "kind": "dateTime",
+      "rect": {"x": 0.035, "y": 0.045, "width": 0.22, "height": 0.06},
+      "renderOrder": 10,
+      "focusOrder": 0,
+      "motion": "fade",
+      "properties": {"variant": "date"}
+    },
+    {
+      "id": "power_actions",
+      "kind": "powerActions",
+      "rect": {"x": 0.84, "y": 0.035, "width": 0.13, "height": 0.08},
+      "renderOrder": 20,
+      "focusOrder": 30,
+      "motion": "fade",
+      "action": "requestPowerAction",
+      "bindings": ["powerMode", "powerError"],
+      "properties": {"variant": "icon-row"}
+    },
+    {
+      "id": "glass_panel",
+      "kind": "glassPanel",
+      "rect": {"x": 0.34, "y": 0.22, "width": 0.32, "height": 0.56},
+      "renderOrder": 30,
+      "focusOrder": 0,
+      "motion": "fadeScale",
+      "properties": {"variant": "soft-glass"}
+    },
+    {
+      "id": "avatar",
+      "kind": "avatar",
+      "rect": {"x": 0.455, "y": 0.245, "width": 0.09, "height": 0.16},
+      "renderOrder": 40,
+      "focusOrder": 10,
+      "motion": "fadeScale",
+      "action": "selectUser",
+      "bindings": ["accountSelected"],
+      "properties": {"variant": "circle"}
+    },
+    {
+      "id": "account_name",
+      "kind": "accountName",
+      "rect": {"x": 0.42, "y": 0.405, "width": 0.16, "height": 0.055},
+      "renderOrder": 40,
+      "focusOrder": 0,
+      "motion": "fade",
+      "bindings": ["accountSelected"],
+      "properties": {"variant": "center"}
+    },
+    {
+      "id": "session_picker",
+      "kind": "sessionPicker",
+      "rect": {"x": 0.38, "y": 0.49, "width": 0.24, "height": 0.07},
+      "renderOrder": 40,
+      "focusOrder": 20,
+      "motion": "fade",
+      "action": "selectSession",
+      "bindings": ["sessionMode", "sessionSessions", "sessionSelected"],
+      "properties": {"variant": "pill"}
+    },
+    {
+      "id": "credential_field",
+      "kind": "credentialField",
+      "rect": {"x": 0.36, "y": 0.585, "width": 0.28, "height": 0.075},
+      "renderOrder": 40,
+      "focusOrder": 40,
+      "motion": "fade",
+      "bindings": ["authMode", "authPrompt"],
+      "properties": {"variant": "outline"}
+    },
+    {
+      "id": "primary_action",
+      "kind": "primaryAction",
+      "rect": {"x": 0.475, "y": 0.69, "width": 0.05, "height": 0.09},
+      "renderOrder": 40,
+      "focusOrder": 50,
+      "motion": "hoverLift",
+      "action": "beginAuthentication",
+      "bindings": ["authMode", "continueEnabled"],
+      "properties": {"variant": "round-arrow"}
+    },
+    {
+      "id": "status",
+      "kind": "status",
+      "rect": {"x": 0.36, "y": 0.795, "width": 0.28, "height": 0.06},
+      "renderOrder": 40,
+      "focusOrder": 0,
+      "motion": "fade",
+      "bindings": ["serviceMode", "authError", "sessionMode"],
+      "properties": {"variant": "inline"}
+    }
+  ]
+}
