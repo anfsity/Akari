@@ -47,6 +47,7 @@ class GreeterWidgetCatalog {
         valueListenable: feature.accountPickerSlots,
         builder: (context, account) => _AccountAvatar(
           account: account,
+          tokens: theme.tokens,
           onSelect: (user) {
             onDispatch(SelectUserCommand(user));
           },
@@ -54,23 +55,13 @@ class GreeterWidgetCatalog {
       ),
       SceneNodeKind.accountName => SceneRegion<AccountPickerSlots>(
         valueListenable: feature.accountPickerSlots,
-        builder: (context, account) => Center(
-          child: Text(
-            account.selected?.displayName ?? 'Choose account',
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              shadows: const [Shadow(color: Color(0xaa000000), blurRadius: 12)],
-            ),
-          ),
-        ),
+        builder: (context, account) => _AccountName(account: account),
       ),
       SceneNodeKind.sessionPicker => SceneRegion<SessionPickerSlots>(
         valueListenable: feature.sessionPickerSlots,
         builder: (context, session) => _SessionPill(
           session: session,
+          tokens: theme.tokens,
           onSelect: (value) {
             onDispatch(SelectSessionCommand(value));
           },
@@ -175,10 +166,13 @@ class _SceneClockState extends State<_SceneClock> {
       alignment: Alignment.centerLeft,
       child: Text(
         _formatDate(_now),
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: const Color(0xffd9b16d),
-          fontWeight: FontWeight.w600,
-          shadows: const [Shadow(color: Color(0x99000000), blurRadius: 10)],
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.primary,
+          fontSize: 22,
+          fontWeight: FontWeight.w500,
+          shadows: const [Shadow(color: Color(0x66000000), blurRadius: 12)],
         ),
       ),
     );
@@ -221,27 +215,33 @@ class _PowerActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = power.mode != PowerMode.executing;
+    final accent = Theme.of(context).colorScheme.primary;
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerRight,
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
+        spacing: 8,
         children: [
           _PowerIcon(
             tooltip: 'Suspend',
-            icon: Icons.dark_mode_outlined,
+            icon: Icons.bedtime_outlined,
+            accent: accent,
             enabled: enabled,
             onPressed: () => onAction(PowerAction.suspend),
           ),
           _PowerIcon(
             tooltip: 'Reboot',
             icon: Icons.restart_alt,
+            accent: accent,
             enabled: enabled,
             onPressed: () => onAction(PowerAction.reboot),
           ),
           _PowerIcon(
             tooltip: 'Power off',
             icon: Icons.power_settings_new,
+            accent: accent,
             enabled: enabled,
             onPressed: () => onAction(PowerAction.powerOff),
           ),
@@ -255,12 +255,14 @@ class _PowerIcon extends StatelessWidget {
   const _PowerIcon({
     required this.tooltip,
     required this.icon,
+    required this.accent,
     required this.enabled,
     required this.onPressed,
   });
 
   final String tooltip;
   final IconData icon;
+  final Color accent;
   final bool enabled;
   final VoidCallback onPressed;
 
@@ -270,16 +272,14 @@ class _PowerIcon extends StatelessWidget {
       tooltip: tooltip,
       onPressed: enabled ? onPressed : null,
       icon: Icon(icon),
-      iconSize: 20,
+      iconSize: 22,
+      color: accent,
+      disabledColor: accent.withValues(alpha: 0.4),
       padding: EdgeInsets.zero,
       visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
-      color: Colors.white,
-      disabledColor: Colors.white38,
+      constraints: const BoxConstraints.tightFor(width: 40, height: 40),
       style: IconButton.styleFrom(
-        minimumSize: const Size(34, 34),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        backgroundColor: Colors.black.withValues(alpha: 0.22),
       ),
     );
   }
@@ -298,12 +298,12 @@ class _GlassPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.tokens.glassColor,
         borderRadius: radius,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-        boxShadow: const [
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x44000000),
-            blurRadius: 32,
-            offset: Offset(0, 18),
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 40,
+            offset: const Offset(0, 24),
           ),
         ],
       ),
@@ -330,41 +330,44 @@ class _GlassPanel extends StatelessWidget {
 }
 
 class _AccountAvatar extends StatelessWidget {
-  const _AccountAvatar({required this.account, required this.onSelect});
+  const _AccountAvatar({
+    required this.account,
+    required this.tokens,
+    required this.onSelect,
+  });
 
   final AccountPickerSlots account;
+  final ThemeTokens tokens;
   final ValueChanged<UserSummary> onSelect;
 
   @override
   Widget build(BuildContext context) {
     final selected = account.selected;
+    final accent = Theme.of(context).colorScheme.primary;
     return Tooltip(
       message: 'Choose account',
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: () => _showAccountPicker(context, account, onSelect),
-        child: Center(
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.black.withValues(alpha: 0.35),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  width: 2,
-                ),
-              ),
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: Material(
+            color: tokens.surfaceColor,
+            shape: CircleBorder(
+              side: BorderSide(color: tokens.surfaceVariantColor),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => _showAccountPicker(context, account, tokens, onSelect),
               child: Center(
                 child: selected == null
-                    ? const Icon(Icons.person_outline, size: 36)
+                    ? Icon(Icons.person_outline, size: 40, color: accent)
                     : Text(
                         selected.displayName.characters.first.toUpperCase(),
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style: TextStyle(
+                          color: accent,
+                          fontSize: 48,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
               ),
             ),
@@ -378,26 +381,35 @@ class _AccountAvatar extends StatelessWidget {
 Future<void> _showAccountPicker(
   BuildContext context,
   AccountPickerSlots account,
+  ThemeTokens tokens,
   ValueChanged<UserSummary> onSelect,
 ) async {
-  final selected = await showModalBottomSheet<UserSummary>(
+  final selected = await showDialog<UserSummary>(
     context: context,
-    backgroundColor: const Color(0xee11171b),
     builder: (context) {
-      return SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            for (final user in account.users)
-              ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: Text(user.displayName),
-                trailing: account.selected?.id == user.id
-                    ? const Icon(Icons.check)
-                    : null,
-                onTap: () => Navigator.of(context).pop(user),
-              ),
-          ],
+      final accent = Theme.of(context).colorScheme.primary;
+      return Dialog(
+        backgroundColor: tokens.surfaceColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: tokens.surfaceVariantColor),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 260, maxHeight: 320),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(10),
+            children: [
+              for (final user in account.users)
+                _UserTile(
+                  user: user,
+                  selected: account.selected?.id == user.id,
+                  accent: accent,
+                  tokens: tokens,
+                  onTap: () => Navigator.of(context).pop(user),
+                ),
+            ],
+          ),
         ),
       );
     },
@@ -407,88 +419,230 @@ Future<void> _showAccountPicker(
   }
 }
 
+class _UserTile extends StatelessWidget {
+  const _UserTile({
+    required this.user,
+    required this.selected,
+    required this.accent,
+    required this.tokens,
+    required this.onTap,
+  });
+
+  final UserSummary user;
+  final bool selected;
+  final Color accent;
+  final ThemeTokens tokens;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? tokens.surfaceVariantColor : Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: selected ? accent : tokens.surfaceVariantColor,
+                child: Text(
+                  user.displayName.characters.first.toUpperCase(),
+                  style: TextStyle(
+                    color: selected ? Colors.white : accent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  user.displayName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (selected) Icon(Icons.check, size: 18, color: accent),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountName extends StatelessWidget {
+  const _AccountName({required this.account});
+
+  final AccountPickerSlots account;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = account.selected?.displayName ?? 'Choose account';
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              name,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: onSurface,
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (account.users.length > 1)
+            Icon(Icons.arrow_drop_down, size: 22, color: onSurface),
+        ],
+      ),
+    );
+  }
+}
+
 class _SessionPill extends StatelessWidget {
   const _SessionPill({
     required this.session,
+    required this.tokens,
     required this.onSelect,
     required this.onRetry,
   });
 
   final SessionPickerSlots session;
+  final ThemeTokens tokens;
   final ValueChanged<SessionSummary> onSelect;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return switch (session.mode) {
-      CatalogMode.loading => const Center(child: CircularProgressIndicator()),
-      CatalogMode.failed => Center(
-        child: TextButton(
-          onPressed: onRetry,
-          child: Text(session.error?.message ?? 'Retry sessions'),
-        ),
-      ),
-      CatalogMode.empty when session.sessions.isEmpty => const Center(
-        child: Text('No desktop sessions available.'),
-      ),
-      CatalogMode.ready || CatalogMode.empty => PopupMenuButton<SessionSummary>(
-        tooltip: 'Choose a session',
-        onSelected: onSelect,
-        position: PopupMenuPosition.under,
-        itemBuilder: (context) => [
-          for (final item in session.sessions)
-            PopupMenuItem(
-              value: item,
-              child: Row(
-                children: [
-                  Icon(
-                    session.selected?.id == item.id
-                        ? Icons.check_circle
-                        : Icons.desktop_windows_outlined,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(item.name),
-                ],
-              ),
+    return Center(
+      child: SizedBox(
+        height: 36,
+        width: double.infinity,
+        child: switch (session.mode) {
+          CatalogMode.loading => const Center(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
-        ],
-        child: _PillSurface(
-          child: Row(
-            children: [
-              const Icon(Icons.desktop_windows_outlined, size: 18),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  session.selected?.name ?? 'Choose a session',
-                  overflow: TextOverflow.ellipsis,
+          ),
+          CatalogMode.failed => Center(
+            child: TextButton(
+              onPressed: onRetry,
+              child: Text(session.error?.message ?? 'Retry sessions'),
+            ),
+          ),
+          CatalogMode.empty when session.sessions.isEmpty => Center(
+            child: Text(
+              'No desktop sessions available.',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+            ),
+          ),
+          CatalogMode.ready || CatalogMode.empty => _SessionMenu(
+            session: session,
+            tokens: tokens,
+            onSelect: onSelect,
+          ),
+        },
+      ),
+    );
+  }
+}
+
+class _SessionMenu extends StatelessWidget {
+  const _SessionMenu({
+    required this.session,
+    required this.tokens,
+    required this.onSelect,
+  });
+
+  final SessionPickerSlots session;
+  final ThemeTokens tokens;
+  final ValueChanged<SessionSummary> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return PopupMenuButton<SessionSummary>(
+      tooltip: 'Choose a session',
+      onSelected: onSelect,
+      position: PopupMenuPosition.under,
+      itemBuilder: (context) => [
+        for (final item in session.sessions)
+          PopupMenuItem(
+            value: item,
+            child: Row(
+              children: [
+                Icon(
+                  session.selected?.id == item.id
+                      ? Icons.check_circle
+                      : Icons.desktop_windows_outlined,
+                  size: 18,
+                  color: session.selected?.id == item.id ? accent : null,
+                ),
+                const SizedBox(width: 12),
+                Text(item.name),
+              ],
+            ),
+          ),
+      ],
+      child: _PillSurface(
+        tokens: tokens,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.desktop_windows_outlined, size: 16, color: accent),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                session.selected?.name ?? 'Choose session',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const Icon(Icons.expand_more),
-            ],
-          ),
+            ),
+            if (session.sessions.length > 1)
+              Icon(Icons.arrow_drop_down, size: 18, color: accent),
+          ],
         ),
       ),
-    };
+    );
   }
 }
 
 class _PillSurface extends StatelessWidget {
-  const _PillSurface({required this.child});
+  const _PillSurface({required this.tokens, required this.child});
 
+  final ThemeTokens tokens;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.28),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+        color: tokens.surfaceColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: tokens.surfaceVariantColor),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: child,
+        child: Center(child: child),
       ),
     );
   }
@@ -519,9 +673,10 @@ class _CredentialField extends StatelessWidget {
       textInputAction: TextInputAction.done,
       onSubmitted: (_) => onRespond(),
       textAlign: TextAlign.center,
+      textAlignVertical: TextAlignVertical.center,
+      style: const TextStyle(color: Colors.white, fontSize: 18),
       decoration: InputDecoration(
         hintText: enabled ? auth.prompt?.text ?? 'Password' : 'Enter Password',
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20),
       ),
     );
   }
@@ -544,6 +699,7 @@ class _PrimaryAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
     final enabled = switch (auth.mode) {
       AuthMode.userSelection => continueAction.enabled,
       AuthMode.prompting => true,
@@ -566,15 +722,21 @@ class _PrimaryAction extends StatelessWidget {
           style: FilledButton.styleFrom(
             shape: const CircleBorder(),
             padding: EdgeInsets.zero,
-            backgroundColor: Theme.of(context).colorScheme.primary,
+            backgroundColor: accent,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: accent.withValues(alpha: 0.4),
+            disabledForegroundColor: Colors.white54,
           ),
           child: auth.mode == AuthMode.submitting
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
-              : const Icon(Icons.arrow_forward),
+              : const Icon(Icons.arrow_forward, size: 30),
         ),
       ),
     );
@@ -615,8 +777,9 @@ class _StatusLine extends StatelessWidget {
         message,
         textAlign: TextAlign.center,
         overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: Colors.white70,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.primary,
+          fontSize: 14,
           shadows: const [Shadow(color: Color(0xaa000000), blurRadius: 8)],
         ),
       ),
