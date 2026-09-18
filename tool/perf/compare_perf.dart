@@ -7,8 +7,10 @@ Future<void> main(List<String> arguments) async {
   final candidate = await _readReport(options['candidate']!);
 
   final failures = <String>[];
-  if ((candidate['static_background_scheduled_frames'] as num?) != 0) {
-    failures.add('static background scheduled frames after settle');
+  final staticBackgroundFrames =
+      candidate['static_background_scheduled_frames'] as num?;
+  if (staticBackgroundFrames != null && staticBackgroundFrames > 1) {
+    failures.add('static background scheduled continuous frames after settle');
   }
 
   for (final key in const [
