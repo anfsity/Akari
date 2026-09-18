@@ -18,6 +18,7 @@ cargo test --locked -- --test-threads=1
 cargo test --locked --features mock -- --test-threads=1
 
 cd -- "$repo_root"
+"$repo_root/scripts/generate-scenes.sh"
 fvm flutter analyze
 fvm flutter test
 "$repo_root/scripts/debug-dbus.sh" fvm dart run tool/dbus_gateway_smoke.dart
