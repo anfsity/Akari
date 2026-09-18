@@ -1,0 +1,107 @@
+{
+  "id": "fallback",
+  "version": 1,
+  "canvas": {
+    "fit": "contain",
+    "useSafeArea": true
+  },
+  "background": {
+    "kind": "solid",
+    "color": "#0d151a",
+    "scrimOpacity": 0
+  },
+  "nodes": [
+    {
+      "id": "clock",
+      "kind": "dateTime",
+      "rect": {"x": 0.04, "y": 0.05, "width": 0.24, "height": 0.06},
+      "renderOrder": 10,
+      "focusOrder": 0,
+      "motion": "none",
+      "properties": {"variant": "date"}
+    },
+    {
+      "id": "power_actions",
+      "kind": "powerActions",
+      "rect": {"x": 0.82, "y": 0.04, "width": 0.14, "height": 0.08},
+      "renderOrder": 20,
+      "focusOrder": 30,
+      "motion": "none",
+      "action": "requestPowerAction",
+      "bindings": ["powerMode", "powerError"],
+      "properties": {"variant": "icon-row"}
+    },
+    {
+      "id": "glass_panel",
+      "kind": "glassPanel",
+      "rect": {"x": 0.33, "y": 0.20, "width": 0.34, "height": 0.62},
+      "renderOrder": 30,
+      "focusOrder": 0,
+      "motion": "none",
+      "properties": {"variant": "solid-panel"}
+    },
+    {
+      "id": "avatar",
+      "kind": "avatar",
+      "rect": {"x": 0.455, "y": 0.235, "width": 0.09, "height": 0.16},
+      "renderOrder": 40,
+      "focusOrder": 10,
+      "motion": "none",
+      "action": "selectUser",
+      "bindings": ["accountSelected"],
+      "properties": {"variant": "circle"}
+    },
+    {
+      "id": "account_name",
+      "kind": "accountName",
+      "rect": {"x": 0.40, "y": 0.405, "width": 0.20, "height": 0.06},
+      "renderOrder": 40,
+      "focusOrder": 0,
+      "motion": "none",
+      "bindings": ["accountSelected"],
+      "properties": {"variant": "center"}
+    },
+    {
+      "id": "session_picker",
+      "kind": "sessionPicker",
+      "rect": {"x": 0.36, "y": 0.50, "width": 0.28, "height": 0.075},
+      "renderOrder": 40,
+      "focusOrder": 20,
+      "motion": "none",
+      "action": "selectSession",
+      "bindings": ["sessionMode", "sessionSessions", "sessionSelected"],
+      "properties": {"variant": "pill"}
+    },
+    {
+      "id": "credential_field",
+      "kind": "credentialField",
+      "rect": {"x": 0.34, "y": 0.60, "width": 0.32, "height": 0.08},
+      "renderOrder": 40,
+      "focusOrder": 40,
+      "motion": "none",
+      "bindings": ["authMode", "authPrompt"],
+      "properties": {"variant": "outline"}
+    },
+    {
+      "id": "primary_action",
+      "kind": "primaryAction",
+      "rect": {"x": 0.47, "y": 0.72, "width": 0.06, "height": 0.09},
+      "renderOrder": 40,
+      "focusOrder": 50,
+      "motion": "none",
+      "action": "beginAuthentication",
+      "bindings": ["authMode", "continueEnabled"],
+      "properties": {"variant": "round-arrow"}
+    },
+    {
+      "id": "status",
+      "kind": "status",
+      "rect": {"x": 0.34, "y": 0.82, "width": 0.32, "height": 0.06},
+      "renderOrder": 40,
+      "focusOrder": 0,
+      "motion": "none",
+      "bindings": ["serviceMode", "authError", "sessionMode"],
+      "properties": {"variant": "inline"}
+    }
+  ]
+}
