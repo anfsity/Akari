@@ -8,6 +8,7 @@ cd -- "$repo_root"
 "$repo_root/scripts/generate-scenes.sh"
 rm -f build/perf/scene_report.json
 fvm flutter drive \
+  -d linux \
   --profile \
   --driver=test_driver/integration_test.dart \
   --target=integration_test/performance/scene_performance_test.dart
