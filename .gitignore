@@ -16,11 +16,15 @@
 
 # Flutter/Dart application code and tests.
 !/lib/
+!/packages/
+!/packages/**
 !/lib/**
 !/test/
 !/test/**
 !/integration_test/
 !/integration_test/**
+!/test_driver/
+!/test_driver/**
 
 # Linux runner and application resources.
 !/linux/
@@ -47,6 +51,7 @@
 **/.dart_tool/
 **/.fvm/
 **/build/
+**/*.scene.g.dart
 **/logs/
 **/.idea/
 /.vscode/

@@ -1,0 +1,7 @@
+builders:
+  scene:
+    import: "package:mozais_scene_codegen/builder.dart"
+    builder_factories: ["sceneBuilder"]
+    build_extensions: {".scene.json": [".scene.g.dart"]}
+    auto_apply: dependents
+    build_to: source
