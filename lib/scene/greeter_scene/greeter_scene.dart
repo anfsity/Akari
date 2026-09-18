@@ -57,7 +57,7 @@ class _GreeterSceneState extends State<GreeterScene> {
             valueListenable: widget.feature.powerSlots,
             repaintBoundary: true,
             builder: (context, power) {
-              return _TopBar(
+              return _PowerActionMenu(
                 power: power,
                 onPowerAction: (action) {
                   _dispatch(RequestPowerActionCommand(action));
@@ -188,45 +188,52 @@ class _SceneViewport extends StatelessWidget {
   }
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.power, required this.onPowerAction});
+class _PowerActionMenu extends StatelessWidget {
+  const _PowerActionMenu({required this.power, required this.onPowerAction});
 
   final PowerSlots power;
   final ValueChanged<PowerAction> onPowerAction;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 14, 16, 0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'MOZAIS',
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 2.4),
-          ),
-          PopupMenuButton<PowerAction>(
-            enabled: power.mode != PowerMode.executing,
-            tooltip: 'Power actions',
-            icon: power.mode == PowerMode.executing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.power_settings_new),
-            onSelected: onPowerAction,
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: PowerAction.suspend, child: Text('Suspend')),
-              PopupMenuItem(value: PowerAction.reboot, child: Text('Reboot')),
-              PopupMenuItem(
-                value: PowerAction.powerOff,
-                child: Text('Power off'),
+    return Align(
+      alignment: Alignment.topRight,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 14, right: 16),
+        child: PopupMenuButton<PowerAction>(
+          enabled: power.mode != PowerMode.executing,
+          tooltip: 'Power actions',
+          icon: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface
+                  .withValues(alpha: 0.82),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+            ),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: power.mode == PowerMode.executing
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.power_settings_new),
               ),
-            ],
+            ),
           ),
-        ],
+          onSelected: onPowerAction,
+          itemBuilder: (context) => const [
+            PopupMenuItem(value: PowerAction.suspend, child: Text('Suspend')),
+            PopupMenuItem(value: PowerAction.reboot, child: Text('Reboot')),
+            PopupMenuItem(
+              value: PowerAction.powerOff,
+              child: Text('Power off'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -427,7 +434,6 @@ class _SessionSelectionRegion extends StatelessWidget {
           catalogError: session.error,
           selected: session.selected,
           controlHeight: theme.controlHeight,
-          itemGap: theme.controlGap,
           sectionGap: theme.sectionGap,
           onSelect: (value) {
             onDispatch(SelectSessionCommand(value));
@@ -492,13 +498,12 @@ class _SelectionStage extends StatelessWidget {
         SceneRegion<SessionPickerSlots>(
           valueListenable: feature.sessionPickerSlots,
           builder: (context, session) {
-            return _SessionOptions(
+            return _SessionPicker(
               sessions: session.sessions,
               catalogMode: session.mode,
               catalogError: session.error,
               selected: session.selected,
               controlHeight: theme.controlHeight,
-              itemGap: theme.controlGap,
               onSelect: (value) {
                 onDispatch(SelectSessionCommand(value));
               },
@@ -682,7 +687,6 @@ class _SessionSelection extends StatelessWidget {
     required this.catalogError,
     required this.selected,
     required this.controlHeight,
-    required this.itemGap,
     required this.sectionGap,
     required this.onSelect,
     required this.onStart,
@@ -695,7 +699,6 @@ class _SessionSelection extends StatelessWidget {
   final GreeterError? catalogError;
   final SessionSummary? selected;
   final double controlHeight;
-  final double itemGap;
   final double sectionGap;
   final ValueChanged<SessionSummary> onSelect;
   final VoidCallback onStart;
@@ -714,13 +717,12 @@ class _SessionSelection extends StatelessWidget {
         const SizedBox(height: 8),
         const Text('Select the desktop session to start.'),
         SizedBox(height: sectionGap),
-        _SessionOptions(
+        _SessionPicker(
           sessions: sessions,
           catalogMode: catalogMode,
           catalogError: catalogError,
           selected: selected,
           controlHeight: controlHeight,
-          itemGap: itemGap,
           onSelect: onSelect,
           onRetry: onRetry,
         ),
@@ -740,14 +742,13 @@ class _SessionSelection extends StatelessWidget {
   }
 }
 
-class _SessionOptions extends StatelessWidget {
-  const _SessionOptions({
+class _SessionPicker extends StatelessWidget {
+  const _SessionPicker({
     required this.sessions,
     required this.catalogMode,
     required this.catalogError,
     required this.selected,
     required this.controlHeight,
-    required this.itemGap,
     required this.onSelect,
     required this.onRetry,
   });
@@ -757,7 +758,6 @@ class _SessionOptions extends StatelessWidget {
   final GreeterError? catalogError;
   final SessionSummary? selected;
   final double controlHeight;
-  final double itemGap;
   final ValueChanged<SessionSummary> onSelect;
   final VoidCallback onRetry;
 
@@ -772,28 +772,56 @@ class _SessionOptions extends StatelessWidget {
       CatalogMode.empty when sessions.isEmpty => const Text(
         'No desktop sessions are available.',
       ),
-      CatalogMode.ready || CatalogMode.empty => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final session in sessions) ...[
-            SizedBox(
-              height: controlHeight,
-              child: OutlinedButton.icon(
-                onPressed: () => onSelect(session),
-                icon: Icon(
-                  selected?.id == session.id
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_off,
-                ),
-                label: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(session.name),
-                ),
+      CatalogMode.ready || CatalogMode.empty => PopupMenuButton<SessionSummary>(
+        tooltip: 'Choose a session',
+        onSelected: onSelect,
+        position: PopupMenuPosition.under,
+        itemBuilder: (context) => [
+          for (final session in sessions)
+            PopupMenuItem(
+              value: session,
+              child: Row(
+                children: [
+                  Icon(
+                    selected?.id == session.id
+                        ? Icons.check_circle
+                        : Icons.desktop_windows_outlined,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(session.name),
+                ],
               ),
             ),
-            SizedBox(height: itemGap),
-          ],
         ],
+        child: SizedBox(
+          width: double.infinity,
+          height: controlHeight,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface
+                  .withValues(alpha: 0.62),
+              borderRadius: BorderRadius.circular(controlHeight / 2),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.34)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Row(
+                children: [
+                  const Icon(Icons.desktop_windows_outlined, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      selected?.name ?? 'Choose a session',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Icon(Icons.expand_more),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     };
   }
