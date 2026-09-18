@@ -128,6 +128,7 @@ class SceneBackground {
     this.asset,
     this.color = const Color(0xff0d151a),
     this.scrimOpacity = 0.35,
+    this.blurSigma = 0,
     this.rendererId,
   });
 
@@ -135,6 +136,12 @@ class SceneBackground {
   final String? asset;
   final Color color;
   final double scrimOpacity;
+
+  /// Static Gaussian blur applied to the background layer.
+  ///
+  /// A non-zero value frosts the whole canvas so foreground surfaces stay
+  /// legible; the blur is cached with the background repaint boundary.
+  final double blurSigma;
   final String? rendererId;
 }
 

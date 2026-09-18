@@ -163,9 +163,11 @@ Runtime components own animation controllers, interruption, reduced-motion
 behavior, and disposal. A motion component animates only its node; global
 `AnimatedSwitcher` or full-screen animated overlays are not allowed.
 
-Blur is a local surface effect. A glass panel may use a bounded
-`BackdropFilter`; low-power or reduced-motion modes use a translucent solid
-fallback. Full-screen animated blur is out of scope.
+Blur is a static background treatment or a local surface effect. A background
+may declare a `blurSigma` that frosts the whole canvas once, cached with the
+background repaint boundary. A glass panel may use a bounded `BackdropFilter`;
+low-power or reduced-motion modes use a translucent solid fallback.
+Full-screen animated blur is out of scope.
 
 ## 7. Greeter Adapter and Slots
 

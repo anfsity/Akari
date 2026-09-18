@@ -114,6 +114,7 @@ class _BackgroundData {
     required this.asset,
     required this.color,
     required this.scrimOpacity,
+    required this.blurSigma,
     required this.rendererId,
   });
 
@@ -121,6 +122,7 @@ class _BackgroundData {
   final String? asset;
   final String color;
   final double scrimOpacity;
+  final double blurSigma;
   final String? rendererId;
 }
 
@@ -245,11 +247,16 @@ _BackgroundData _parseBackground(Map<String, dynamic> json) {
   if (scrimOpacity < 0 || scrimOpacity > 1) {
     throw FormatException('background.scrimOpacity must be in [0, 1].');
   }
+  final blurSigma = _double(json, 'blurSigma', fallback: 0);
+  if (blurSigma < 0) {
+    throw FormatException('background.blurSigma must be >= 0.');
+  }
   return _BackgroundData(
     kind: kind,
     asset: asset,
     color: color,
     scrimOpacity: scrimOpacity,
+    blurSigma: blurSigma,
     rendererId: _nullableString(json, 'rendererId'),
   );
 }
@@ -342,6 +349,7 @@ String _generate(_SceneData document) {
     ..writeln('    asset: ${_dartNullableString(document.background.asset)},')
     ..writeln('    color: ${_colorLiteral(document.background.color)},')
     ..writeln('    scrimOpacity: ${document.background.scrimOpacity},')
+    ..writeln('    blurSigma: ${document.background.blurSigma},')
     ..writeln(
       '    rendererId: ${_dartNullableString(document.background.rendererId)},',
     )
