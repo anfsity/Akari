@@ -3,40 +3,41 @@ import 'package:mozais_scene/mozais_scene.dart';
 
 import 'fallback.scene.g.dart';
 
+const _accent = Color(0xff8fb8c0);
+const _base = Color(0xff0d151a);
+const _surface = Color(0xff1a242a);
+const _surfaceVariant = Color(0xff26343c);
+
 ThemeBundle buildFallbackTheme() {
   final colorScheme = ColorScheme.fromSeed(
-    seedColor: const Color(0xff8fb8c0),
+    seedColor: _accent,
     brightness: Brightness.dark,
-  );
+  ).copyWith(primary: _accent, onPrimary: _base, surface: _base);
   return ThemeBundle(
     id: 'fallback',
     tokens: ThemeTokens(
       materialTheme: ThemeData(
         colorScheme: colorScheme,
-        scaffoldBackgroundColor: const Color(0xff0d151a),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
+        scaffoldBackgroundColor: _base,
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: _surface,
+          border: const OutlineInputBorder(),
+          enabledBorder: const OutlineInputBorder(),
           isDense: true,
         ),
         visualDensity: VisualDensity.standard,
       ),
-      pagePadding: const EdgeInsets.all(24),
-      panelPadding: const EdgeInsets.all(28),
-      contentMaxWidth: 460,
-      controlHeight: 52,
       panelRadius: 12,
-      sectionGap: 20,
-      controlGap: 12,
-      shortMotion: Duration.zero,
       mediumMotion: Duration.zero,
       standardCurve: Curves.linear,
       minHitTarget: 44,
       maxInteractiveRotationDegrees: 0,
-      minTextScale: 0.9,
       allowBlur: false,
       blurSigma: 0,
-      glassColor: const Color(0xdd11191e),
-      scrimColor: const Color(0x00000000),
+      glassColor: _base.withValues(alpha: 0.86),
+      surfaceColor: _surface,
+      surfaceVariantColor: _surfaceVariant,
     ),
     document: fallbackSceneDocument,
     backgrounds: const {
