@@ -45,7 +45,7 @@ class SceneRuntime extends StatelessWidget {
     final renderer =
         theme.backgroundRenderer(document.background.kind) ??
         const SolidBackgroundRenderer();
-    return renderer.build(context, document.background);
+    return RepaintBoundary(child: renderer.build(context, document.background));
   }
 
   Widget _buildNode(BuildContext context, Size size, SceneNode node) {
@@ -66,8 +66,11 @@ class SceneRuntime extends StatelessWidget {
     }
 
     Widget child = nodeBuilder(context, node);
-    child = _applyTransform(context, node, child);
+    child = _applyTransform(node, child);
     child = _applyMotion(context, node, child);
+    if (node.motion != SceneMotionPreset.none) {
+      child = RepaintBoundary(child: child);
+    }
 
     if (node.isInteractive) {
       child = FocusTraversalOrder(
@@ -85,7 +88,7 @@ class SceneRuntime extends StatelessWidget {
     );
   }
 
-  Widget _applyTransform(BuildContext context, SceneNode node, Widget child) {
+  Widget _applyTransform(SceneNode node, Widget child) {
     if (node.transform.isIdentity) {
       return child;
     }
