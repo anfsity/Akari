@@ -36,7 +36,10 @@ ThemeBundle buildDefaultTheme() {
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 18),
           border: _fieldBorder(Colors.transparent, 0),
-          enabledBorder: _fieldBorder(Colors.transparent, 0),
+          enabledBorder: _fieldBorder(
+            Colors.white.withValues(alpha: 0.06),
+            1,
+          ),
           focusedBorder: _fieldBorder(_accent, 2),
           isDense: true,
         ),
