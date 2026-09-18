@@ -221,28 +221,32 @@ class _PowerActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = power.mode != PowerMode.executing;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        _PowerIcon(
-          tooltip: 'Suspend',
-          icon: Icons.dark_mode_outlined,
-          enabled: enabled,
-          onPressed: () => onAction(PowerAction.suspend),
-        ),
-        _PowerIcon(
-          tooltip: 'Reboot',
-          icon: Icons.restart_alt,
-          enabled: enabled,
-          onPressed: () => onAction(PowerAction.reboot),
-        ),
-        _PowerIcon(
-          tooltip: 'Power off',
-          icon: Icons.power_settings_new,
-          enabled: enabled,
-          onPressed: () => onAction(PowerAction.powerOff),
-        ),
-      ],
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerRight,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _PowerIcon(
+            tooltip: 'Suspend',
+            icon: Icons.dark_mode_outlined,
+            enabled: enabled,
+            onPressed: () => onAction(PowerAction.suspend),
+          ),
+          _PowerIcon(
+            tooltip: 'Reboot',
+            icon: Icons.restart_alt,
+            enabled: enabled,
+            onPressed: () => onAction(PowerAction.reboot),
+          ),
+          _PowerIcon(
+            tooltip: 'Power off',
+            icon: Icons.power_settings_new,
+            enabled: enabled,
+            onPressed: () => onAction(PowerAction.powerOff),
+          ),
+        ],
+      ),
     );
   }
 }
