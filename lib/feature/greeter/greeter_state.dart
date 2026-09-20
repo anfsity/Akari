@@ -59,20 +59,28 @@ class GreeterError {
 }
 
 class UserSummary {
-  const UserSummary({required this.id, required this.displayName});
+  const UserSummary({
+    required this.id,
+    required this.displayName,
+    this.iconPath = '',
+  });
 
   final String id;
   final String displayName;
+
+  /// Absolute icon file path from AccountsService, or empty when unavailable.
+  final String iconPath;
 
   @override
   bool operator ==(Object other) {
     return other is UserSummary &&
         other.id == id &&
-        other.displayName == displayName;
+        other.displayName == displayName &&
+        other.iconPath == iconPath;
   }
 
   @override
-  int get hashCode => Object.hash(id, displayName);
+  int get hashCode => Object.hash(id, displayName, iconPath);
 }
 
 class SessionSummary {
