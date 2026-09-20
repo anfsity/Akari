@@ -27,12 +27,25 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter> {
   final TextEditingController _credentialController = TextEditingController();
   final FocusNode _credentialFocusNode = FocusNode();
   late final StreamSubscription<FeatureEffect> _effectSubscription;
-  late final GreeterWidgetCatalog _catalog;
+  late GreeterWidgetCatalog _catalog;
 
   @override
   void initState() {
     super.initState();
-    _catalog = GreeterWidgetCatalog(
+    _catalog = _createCatalog();
+    _effectSubscription = widget.feature.effects.listen(_handleEffect);
+  }
+
+  @override
+  void didUpdateWidget(GreeterSceneAdapter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.theme != oldWidget.theme) {
+      _catalog = _createCatalog();
+    }
+  }
+
+  GreeterWidgetCatalog _createCatalog() {
+    return GreeterWidgetCatalog(
       feature: widget.feature,
       theme: widget.theme,
       credentialController: _credentialController,
@@ -40,7 +53,6 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter> {
       onDispatch: _dispatch,
       onRespond: _respondToPrompt,
     );
-    _effectSubscription = widget.feature.effects.listen(_handleEffect);
   }
 
   @override

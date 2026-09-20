@@ -5,18 +5,21 @@ import 'default.scene.g.dart';
 
 /// Accent sampled from the bundled wallpaper's dominant vibrant hue, capped to
 /// the saturation and value range the reference theme uses.
-const _accent = Color(0xfff26d7a);
+/// Accent used before extraction runs and whenever the wallpaper cannot be
+/// sampled. It was sampled from the bundled wallpaper's dominant vibrant hue.
+const _fallbackAccent = Color(0xfff26d7a);
 const _base = Color(0xff1a1c18);
 const _surface = Color(0xff2a2d28);
 const _surfaceVariant = Color(0xff3a3e36);
 const _text = Color(0xffe3e3dc);
 
-ThemeBundle buildDefaultTheme() {
+ThemeBundle buildDefaultTheme({Color? accent}) {
+  final accentColor = accent ?? _fallbackAccent;
   final colorScheme = ColorScheme.fromSeed(
-    seedColor: _accent,
+    seedColor: accentColor,
     brightness: Brightness.dark,
   ).copyWith(
-    primary: _accent,
+    primary: accentColor,
     onPrimary: Colors.white,
     surface: _base,
     onSurface: _text,
@@ -40,7 +43,7 @@ ThemeBundle buildDefaultTheme() {
             Colors.white.withValues(alpha: 0.06),
             1,
           ),
-          focusedBorder: _fieldBorder(_accent, 2),
+          focusedBorder: _fieldBorder(accentColor, 2),
           isDense: true,
         ),
         visualDensity: VisualDensity.standard,
