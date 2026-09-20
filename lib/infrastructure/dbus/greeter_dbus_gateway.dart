@@ -54,10 +54,11 @@ class DBusGreeterGateway implements GreeterGateway {
       replySignature: DBusSignature('a(sss)'),
     );
     return response.returnValues.single.asArray().map((value) {
-      final [id, displayName, ...] = value.asStruct();
+      final [id, displayName, iconPath] = value.asStruct();
       return UserSummary(
         id: id.asString(),
         displayName: displayName.asString(),
+        iconPath: iconPath.asString(),
       );
     }).toList();
   }

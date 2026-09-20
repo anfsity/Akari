@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -361,13 +362,10 @@ class _AccountAvatar extends StatelessWidget {
               child: Center(
                 child: selected == null
                     ? Icon(Icons.person_outline, size: 40, color: accent)
-                    : Text(
-                        selected.displayName.characters.first.toUpperCase(),
-                        style: TextStyle(
-                          color: accent,
-                          fontSize: 48,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    : _AccountAvatarImage(
+                        user: selected,
+                        accent: accent,
+                        fontSize: 48,
                       ),
               ),
             ),
@@ -419,6 +417,41 @@ Future<void> _showAccountPicker(
   }
 }
 
+class _AccountAvatarImage extends StatelessWidget {
+  const _AccountAvatarImage({
+    required this.user,
+    required this.accent,
+    required this.fontSize,
+  });
+
+  final UserSummary user;
+  final Color accent;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    if (user.iconPath.isEmpty) {
+      return _initial();
+    }
+    return Image.file(
+      File(user.iconPath),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => _initial(),
+    );
+  }
+
+  Widget _initial() {
+    return Text(
+      user.displayName.characters.first.toUpperCase(),
+      style: TextStyle(
+        color: accent,
+        fontSize: fontSize,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
 class _UserTile extends StatelessWidget {
   const _UserTile({
     required this.user,
@@ -449,6 +482,12 @@ class _UserTile extends StatelessWidget {
               CircleAvatar(
                 radius: 16,
                 backgroundColor: selected ? accent : tokens.surfaceVariantColor,
+                foregroundImage: user.iconPath.isEmpty
+                    ? null
+                    : FileImage(File(user.iconPath)),
+                onForegroundImageError: user.iconPath.isEmpty
+                    ? null
+                    : (error, stackTrace) {},
                 child: Text(
                   user.displayName.characters.first.toUpperCase(),
                   style: TextStyle(
