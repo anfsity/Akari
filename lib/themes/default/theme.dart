@@ -3,28 +3,19 @@ import 'package:mozais_scene/mozais_scene.dart';
 
 import 'default.scene.g.dart';
 
-/// Accent sampled from the bundled wallpaper's dominant vibrant hue, capped to
-/// the saturation and value range the reference theme uses.
-/// Accent used before extraction runs and whenever the wallpaper cannot be
+/// Seed used before extraction runs and whenever the wallpaper cannot be
 /// sampled. It was sampled from the bundled wallpaper's dominant vibrant hue.
-const _fallbackAccent = Color(0xfff26d7a);
+const _fallbackSeed = Color(0xfff26d7a);
 const _base = Color(0xff1a1c18);
 const _surface = Color(0xff2a2d28);
 const _surfaceVariant = Color(0xff3a3e36);
 const _text = Color(0xffe3e3dc);
 
-ThemeBundle buildDefaultTheme({Color? accent}) {
-  final accentColor = accent ?? _fallbackAccent;
-  final colorScheme =
-      ColorScheme.fromSeed(
-        seedColor: accentColor,
-        brightness: Brightness.dark,
-      ).copyWith(
-        primary: accentColor,
-        onPrimary: Colors.white,
-        surface: _base,
-        onSurface: _text,
-      );
+ThemeBundle buildDefaultTheme({Color? seed}) {
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: seed ?? _fallbackSeed,
+    brightness: Brightness.dark,
+  ).copyWith(surface: _base, onSurface: _text);
   return ThemeBundle(
     id: 'default',
     tokens: ThemeTokens(
@@ -41,7 +32,7 @@ ThemeBundle buildDefaultTheme({Color? accent}) {
           contentPadding: const EdgeInsets.symmetric(horizontal: 18),
           border: _fieldBorder(Colors.transparent, 0),
           enabledBorder: _fieldBorder(Colors.white.withValues(alpha: 0.06), 1),
-          focusedBorder: _fieldBorder(accentColor, 2),
+          focusedBorder: _fieldBorder(colorScheme.primary, 2),
           isDense: true,
         ),
         visualDensity: VisualDensity.standard,

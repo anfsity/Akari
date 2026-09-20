@@ -769,7 +769,8 @@ class _PrimaryAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
+    final colorScheme = Theme.of(context).colorScheme;
+    final accent = colorScheme.primary;
     final enabled = switch (auth.mode) {
       AuthMode.userSelection => continueAction.enabled,
       AuthMode.prompting => true,
@@ -793,17 +794,19 @@ class _PrimaryAction extends StatelessWidget {
             shape: const CircleBorder(),
             padding: EdgeInsets.zero,
             backgroundColor: accent,
-            foregroundColor: Colors.white,
+            foregroundColor: colorScheme.onPrimary,
             disabledBackgroundColor: accent.withValues(alpha: 0.4),
-            disabledForegroundColor: Colors.white54,
+            disabledForegroundColor: colorScheme.onPrimary.withValues(
+              alpha: 0.5,
+            ),
           ),
           child: auth.mode == AuthMode.submitting
-              ? const SizedBox(
+              ? SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                   ),
                 )
               : const Icon(Icons.arrow_forward, size: 30),
