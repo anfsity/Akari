@@ -1,8 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mozais_greeter/feature/greeter/greeter_feature.dart';
+import 'package:mozais_greeter/feature/greeter/greeter_state.dart';
+import 'package:mozais_greeter/feature/greeter/ports/greeter_gateway.dart';
 import 'package:mozais_greeter/main.dart';
+import 'package:mozais_greeter/scene/greeter_scene/greeter_scene_adapter.dart';
+import 'package:mozais_greeter/theme/theme_registry.dart';
 
 void main() {
   testWidgets('starts dormant and reveals controls on wake', (tester) async {
@@ -56,7 +63,7 @@ void main() {
     expect(find.byTooltip('Choose account'), findsOneWidget);
   });
 
-  testWidgets('enter begins authentication once a session is ready', (
+  testWidgets('selecting an account begins authentication automatically', (
     tester,
   ) async {
     await tester.pumpWidget(const MyApp());
@@ -66,9 +73,6 @@ void main() {
     await tester.tap(find.byTooltip('Choose account'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Alice'));
-    await tester.pumpAndSettle();
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
 
     final field = tester.widget<TextField>(find.byType(TextField));
@@ -76,29 +80,30 @@ void main() {
     expect(field.focusNode?.hasFocus, isTrue);
   });
 
-  testWidgets('selects account and session before starting authentication', (
-    tester,
-  ) async {
-    await tester.pumpWidget(const MyApp());
-    await tester.pumpAndSettle();
-    await _wake(tester);
+  testWidgets('types the waking key into the password field', (tester) async {
+    final feature = GreeterFeature(gateway: _SingleUserGateway());
+    await feature.initialize();
+    final theme = ThemeRegistry.resolve(ThemeRegistry.defaultThemeName);
 
-    await tester.tap(find.byTooltip('Choose account'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Alice'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byTooltip('Choose a session'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Sway'));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme.materialTheme,
+        home: Scaffold(
+          body: GreeterSceneAdapter(feature: feature, theme: theme),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.arrow_forward));
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyH);
     await tester.pumpAndSettle();
 
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.enabled, isTrue);
     expect(field.focusNode?.hasFocus, isTrue);
+    expect(field.controller?.text, 'h');
+
+    feature.dispose();
   });
 
   testWidgets('submits a response and starts the selected session', (
@@ -108,21 +113,18 @@ void main() {
     await tester.pumpAndSettle();
     await _wake(tester);
 
-    await tester.tap(find.byTooltip('Choose account'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Alice'));
-    await tester.pumpAndSettle();
-
     await tester.tap(find.byTooltip('Choose a session'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sway'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.arrow_forward));
+    await tester.tap(find.byTooltip('Choose account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Alice'));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'secret');
-    await tester.tap(find.byIcon(Icons.arrow_forward));
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
 
     expect(find.text('Starting session...'), findsOneWidget);
@@ -145,4 +147,70 @@ void main() {
 Future<void> _wake(WidgetTester tester) async {
   await tester.sendKeyEvent(LogicalKeyboardKey.space);
   await tester.pumpAndSettle();
+}
+
+/// A one-account backend so the greeter starts with every default set.
+class _SingleUserGateway implements GreeterGateway {
+  final StreamController<GreeterEvent> _events =
+      StreamController<GreeterEvent>.broadcast();
+
+  String? _attemptId;
+
+  @override
+  Stream<GreeterEvent> get events => _events.stream;
+
+  @override
+  Future<BackendStateSnapshot> getState() async =>
+      const BackendStateSnapshot(state: BackendAuthState.idle, detail: '');
+
+  @override
+  Future<List<UserSummary>> listUsers() async => const [
+    UserSummary(id: 'alice', displayName: 'Alice'),
+  ];
+
+  @override
+  Future<List<SessionSummary>> listSessions() async => const [
+    SessionSummary(id: 'wayland:hyprland', name: 'Hyprland'),
+  ];
+
+  @override
+  Future<String> beginAuthentication(String username) async {
+    final attemptId = 'attempt-$username';
+    _attemptId = attemptId;
+    scheduleMicrotask(() {
+      if (_attemptId != attemptId) {
+        return;
+      }
+      _events.add(
+        BackendPromptReceived(
+          attemptId: attemptId,
+          kind: PromptKind.secret,
+          text: 'Password',
+        ),
+      );
+      _events.add(
+        BackendStateChanged(
+          attemptId: attemptId,
+          state: BackendAuthState.waitingForInput,
+          detail: '',
+        ),
+      );
+    });
+    return attemptId;
+  }
+
+  @override
+  Future<void> respond(String attemptId, String response) async {}
+
+  @override
+  Future<void> cancel(String attemptId) async {}
+
+  @override
+  Future<void> startSession(String attemptId, String sessionId) async {}
+
+  @override
+  Future<void> powerAction(PowerAction action) async {}
+
+  @override
+  Future<void> close() => _events.close();
 }

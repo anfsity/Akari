@@ -52,9 +52,6 @@ class GreeterFeature {
       error: null,
     ),
   );
-  final ValueNotifier<ContinueSlots> _continueSlots = ValueNotifier(
-    const ContinueSlots(enabled: false),
-  );
   final ValueNotifier<PowerSlots> _powerSlots = ValueNotifier(
     const PowerSlots(mode: PowerMode.idle, error: null),
   );
@@ -80,8 +77,6 @@ class GreeterFeature {
 
   ValueListenable<SessionPickerSlots> get sessionPickerSlots =>
       _sessionPickerSlots;
-
-  ValueListenable<ContinueSlots> get continueSlots => _continueSlots;
 
   ValueListenable<PowerSlots> get powerSlots => _powerSlots;
 
@@ -215,6 +210,7 @@ class GreeterFeature {
       return;
     }
     _replace(_state.copyWith(dormant: false, clearAuthError: true));
+    _beginAuthenticationIfReady();
   }
 
   void _sleepGreeter() {
@@ -254,13 +250,26 @@ class GreeterFeature {
       return;
     }
     _replace(_state.copyWith(selectedUser: user, clearAuthError: true));
+    _beginAuthenticationIfReady();
+  }
+
+  /// Starts the backend conversation as soon as an account and session are
+  /// both known, so the credential field is usable without a confirm step.
+  void _beginAuthenticationIfReady() {
+    if (_state.dormant ||
+        _state.authMode != AuthMode.userSelection ||
+        _state.selectedUser == null ||
+        _state.selectedSession == null) {
+      return;
+    }
+    unawaited(_beginAuthentication());
   }
 
   Future<void> _beginAuthentication() async {
     final user = _state.selectedUser;
     if (user == null ||
         _state.selectedSession == null ||
-        _state.authMode == AuthMode.submitting) {
+        _state.authMode != AuthMode.userSelection) {
       return;
     }
 
@@ -369,6 +378,7 @@ class GreeterFeature {
       ),
     );
     unawaited(_sessionStore.saveSelectedSessionId(session.id));
+    _beginAuthenticationIfReady();
   }
 
   Future<void> _startSelectedSession() async {
@@ -443,6 +453,7 @@ class GreeterFeature {
         backendAuthState: BackendAuthState.idle,
       ),
     );
+    _beginAuthenticationIfReady();
   }
 
   void _retryPrompt() {
@@ -591,6 +602,7 @@ class GreeterFeature {
           clearCatalogError: true,
         ),
       );
+      _beginAuthenticationIfReady();
     } on Object catch (error) {
       if (generation != _sessionLoadGeneration) {
         return;
@@ -684,9 +696,6 @@ class GreeterFeature {
     if (_sessionPickerSlots.value != nextSlots.sessionPicker) {
       _sessionPickerSlots.value = nextSlots.sessionPicker;
     }
-    if (_continueSlots.value != nextSlots.continueAction) {
-      _continueSlots.value = nextSlots.continueAction;
-    }
     if (_powerSlots.value != nextSlots.power) {
       _powerSlots.value = nextSlots.power;
     }
@@ -723,7 +732,6 @@ class GreeterFeature {
     _authPromptSlots.dispose();
     _accountPickerSlots.dispose();
     _sessionPickerSlots.dispose();
-    _continueSlots.dispose();
     _powerSlots.dispose();
     _dormantSlots.dispose();
   }
