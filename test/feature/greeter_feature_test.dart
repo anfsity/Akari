@@ -6,6 +6,7 @@ import 'package:mozais_greeter/feature/greeter/greeter_effect.dart';
 import 'package:mozais_greeter/feature/greeter/greeter_feature.dart';
 import 'package:mozais_greeter/feature/greeter/greeter_state.dart';
 import 'package:mozais_greeter/feature/greeter/ports/greeter_gateway.dart';
+import 'package:mozais_greeter/feature/greeter/ports/session_store.dart';
 
 void main() {
   test('initializes from the backend state snapshot', () async {
@@ -211,17 +212,13 @@ void main() {
       feature.authPromptSlots.addListener(() => authPromptChanges++);
       feature.continueSlots.addListener(() => continueChanges++);
 
+      // The default session is selected while the catalog loads.
+      expect(feature.sessionPickerSlots.value.selected?.id, 'wayland:sway');
+
       await feature.dispatch(SelectUserCommand(gateway.users.first));
 
       expect(accountChanges, 1);
       expect(sessionChanges, 0);
-      expect(authPromptChanges, 0);
-      expect(continueChanges, 0);
-
-      await _selectDefaultSession(feature);
-
-      expect(accountChanges, 1);
-      expect(sessionChanges, 1);
       expect(authPromptChanges, 0);
       expect(continueChanges, 1);
       expect(feature.continueSlots.value.enabled, isTrue);
@@ -361,6 +358,58 @@ void main() {
 
     feature.dispose();
   });
+  test('auto-selects the only available account', () async {
+    final gateway = _FakeGreeterGateway()
+      ..users = const [UserSummary(id: 'alice', displayName: 'Alice')];
+    final feature = GreeterFeature(gateway: gateway);
+    await feature.initialize();
+    await _flushEvents();
+
+    expect(feature.state.selectedUser?.id, 'alice');
+
+    feature.dispose();
+  });
+
+  test('prefers hyprland when no session was stored', () async {
+    final gateway = _FakeGreeterGateway()
+      ..sessionsFuture = Future.value(const [
+        SessionSummary(id: 'wayland:sway', name: 'Sway'),
+        SessionSummary(id: 'wayland:hyprland', name: 'Hyprland'),
+      ]);
+    final feature = GreeterFeature(gateway: gateway);
+    await feature.initialize();
+    await _flushEvents();
+
+    expect(feature.state.selectedSession?.id, 'wayland:hyprland');
+
+    feature.dispose();
+  });
+
+  test('restores and saves the selected session', () async {
+    final store = _FakeSessionStore()..storedId = 'wayland:sway';
+    final gateway = _FakeGreeterGateway()
+      ..sessionsFuture = Future.value(const [
+        SessionSummary(id: 'wayland:sway', name: 'Sway'),
+        SessionSummary(id: 'wayland:hyprland', name: 'Hyprland'),
+      ]);
+    final feature = GreeterFeature(gateway: gateway, sessionStore: store);
+    await feature.initialize();
+    await _flushEvents();
+
+    expect(feature.state.selectedSession?.id, 'wayland:sway');
+
+    await feature.dispatch(
+      const SelectSessionCommand(
+        SessionSummary(id: 'wayland:hyprland', name: 'Hyprland'),
+      ),
+    );
+    await _flushEvents();
+
+    expect(store.savedIds, ['wayland:hyprland']);
+
+    feature.dispose();
+  });
+
   test('starts dormant and toggles on wake and sleep', () async {
     final gateway = _FakeGreeterGateway();
     final feature = GreeterFeature(gateway: gateway);
@@ -422,15 +471,28 @@ Future<void> _flushEvents() async {
   await Future<void>.delayed(Duration.zero);
 }
 
+class _FakeSessionStore implements SessionStore {
+  String? storedId;
+  final List<String> savedIds = [];
+
+  @override
+  Future<String?> readSelectedSessionId() async => storedId;
+
+  @override
+  Future<void> saveSelectedSessionId(String sessionId) async {
+    savedIds.add(sessionId);
+    storedId = sessionId;
+  }
+}
+
 class _FakeGreeterGateway implements GreeterGateway {
   final StreamController<GreeterEvent> _events =
       StreamController<GreeterEvent>.broadcast();
 
-  final users = const <UserSummary>[
+  List<UserSummary> users = const <UserSummary>[
     UserSummary(id: 'alice', displayName: 'Alice'),
     UserSummary(id: 'bob', displayName: 'Bob'),
   ];
-
   int getStateCalls = 0;
   int listSessionsCalls = 0;
   int respondCalls = 0;
