@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mozais_greeter/main.dart';
 
 void main() {
-  testWidgets('starts with account, session, and credential controls', (
-    tester,
-  ) async {
+  testWidgets('starts dormant and reveals controls on wake', (tester) async {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Choose account'), findsNothing);
+
+    await _wake(tester);
 
     expect(find.byTooltip('Choose account'), findsOneWidget);
     expect(find.byTooltip('Choose a session'), findsOneWidget);
@@ -18,11 +21,37 @@ void main() {
     expect(field.enabled, isFalse);
   });
 
+  testWidgets('escape returns to the dormant background', (tester) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+    await _wake(tester);
+    expect(find.byTooltip('Choose account'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Choose account'), findsNothing);
+  });
+
+  testWidgets('cancel action returns to the dormant background', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+    await _wake(tester);
+
+    await tester.tap(find.byTooltip('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Choose account'), findsNothing);
+  });
+
   testWidgets('selects account and session before starting authentication', (
     tester,
   ) async {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
+    await _wake(tester);
 
     await tester.tap(find.byTooltip('Choose account'));
     await tester.pumpAndSettle();
@@ -47,6 +76,7 @@ void main() {
   ) async {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
+    await _wake(tester);
 
     await tester.tap(find.byTooltip('Choose account'));
     await tester.pumpAndSettle();
@@ -80,4 +110,9 @@ void main() {
     await tester.pump();
     expect(tester.takeException(), isNull);
   });
+}
+
+Future<void> _wake(WidgetTester tester) async {
+  await tester.sendKeyEvent(LogicalKeyboardKey.space);
+  await tester.pumpAndSettle();
 }

@@ -15,15 +15,16 @@ const _text = Color(0xffe3e3dc);
 
 ThemeBundle buildDefaultTheme({Color? accent}) {
   final accentColor = accent ?? _fallbackAccent;
-  final colorScheme = ColorScheme.fromSeed(
-    seedColor: accentColor,
-    brightness: Brightness.dark,
-  ).copyWith(
-    primary: accentColor,
-    onPrimary: Colors.white,
-    surface: _base,
-    onSurface: _text,
-  );
+  final colorScheme =
+      ColorScheme.fromSeed(
+        seedColor: accentColor,
+        brightness: Brightness.dark,
+      ).copyWith(
+        primary: accentColor,
+        onPrimary: Colors.white,
+        surface: _base,
+        onSurface: _text,
+      );
   return ThemeBundle(
     id: 'default',
     tokens: ThemeTokens(
@@ -39,10 +40,7 @@ ThemeBundle buildDefaultTheme({Color? accent}) {
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 18),
           border: _fieldBorder(Colors.transparent, 0),
-          enabledBorder: _fieldBorder(
-            Colors.white.withValues(alpha: 0.06),
-            1,
-          ),
+          enabledBorder: _fieldBorder(Colors.white.withValues(alpha: 0.06), 1),
           focusedBorder: _fieldBorder(accentColor, 2),
           isDense: true,
         ),

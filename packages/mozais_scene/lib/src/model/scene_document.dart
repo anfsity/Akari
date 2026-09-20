@@ -44,6 +44,7 @@ enum SceneAction {
   retryPrompt,
   reconnectService,
   retrySessionCatalog,
+  sleepGreeter,
 }
 
 enum SceneMotionPreset {
@@ -143,6 +144,24 @@ class SceneBackground {
   /// legible; the blur is cached with the background repaint boundary.
   final double blurSigma;
   final String? rendererId;
+
+  SceneBackground copyWith({
+    SceneBackgroundKind? kind,
+    String? asset,
+    Color? color,
+    double? scrimOpacity,
+    double? blurSigma,
+    String? rendererId,
+  }) {
+    return SceneBackground(
+      kind: kind ?? this.kind,
+      asset: asset ?? this.asset,
+      color: color ?? this.color,
+      scrimOpacity: scrimOpacity ?? this.scrimOpacity,
+      blurSigma: blurSigma ?? this.blurSigma,
+      rendererId: rendererId ?? this.rendererId,
+    );
+  }
 }
 
 class SceneNode {

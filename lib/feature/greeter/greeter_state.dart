@@ -144,6 +144,7 @@ class GreeterState {
     required this.powerError,
     required this.powerMode,
     required this.backendAuthState,
+    required this.dormant,
   }) : users = List.unmodifiable(users),
        sessions = List.unmodifiable(sessions);
 
@@ -163,6 +164,7 @@ class GreeterState {
       powerError: null,
       powerMode: PowerMode.idle,
       backendAuthState: BackendAuthState.idle,
+      dormant: true,
     );
   }
 
@@ -180,6 +182,10 @@ class GreeterState {
   final GreeterError? powerError;
   final PowerMode powerMode;
   final BackendAuthState backendAuthState;
+
+  /// Whether the greeter shows only the idle background until the user wakes
+  /// it. Service errors force it awake so the failure stays visible.
+  final bool dormant;
 
   GreeterState copyWith({
     ServiceMode? serviceMode,
@@ -203,6 +209,7 @@ class GreeterState {
     bool clearPowerError = false,
     PowerMode? powerMode,
     BackendAuthState? backendAuthState,
+    bool? dormant,
   }) {
     return GreeterState(
       serviceMode: serviceMode ?? this.serviceMode,
@@ -227,6 +234,7 @@ class GreeterState {
       powerError: clearPowerError ? null : powerError ?? this.powerError,
       powerMode: powerMode ?? this.powerMode,
       backendAuthState: backendAuthState ?? this.backendAuthState,
+      dormant: dormant ?? this.dormant,
     );
   }
 }
