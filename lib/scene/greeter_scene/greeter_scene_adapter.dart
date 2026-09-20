@@ -7,6 +7,7 @@ import 'package:mozais_scene/mozais_scene.dart';
 import '../../feature/greeter/greeter_commands.dart';
 import '../../feature/greeter/greeter_effect.dart';
 import '../../feature/greeter/greeter_feature.dart';
+import '../../feature/greeter/greeter_state.dart';
 import 'greeter_widget_catalog.dart';
 
 class GreeterSceneAdapter extends StatefulWidget {
@@ -71,12 +72,18 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter> {
       child: ValueListenableBuilder<bool>(
         valueListenable: widget.feature.dormantSlots,
         builder: (context, dormant, child) {
-          return SceneRuntime(
-            document: widget.theme.document,
-            theme: widget.theme,
-            backgroundBlurSigma: dormant ? 0 : null,
-            nodeBuilder: (context, node) =>
-                _catalog.build(context, node, dormant: dormant),
+          return Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: dormant
+                ? (_) => _dispatch(const WakeGreeterCommand())
+                : null,
+            child: SceneRuntime(
+              document: widget.theme.document,
+              theme: widget.theme,
+              backgroundBlurSigma: dormant ? 0 : null,
+              nodeBuilder: (context, node) =>
+                  _catalog.build(context, node, dormant: dormant),
+            ),
           );
         },
       ),
@@ -95,7 +102,17 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter> {
       _dispatch(const SleepGreeterCommand());
       return KeyEventResult.handled;
     }
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      _beginAuthenticationIfReady();
+    }
     return KeyEventResult.ignored;
+  }
+
+  void _beginAuthenticationIfReady() {
+    if (widget.feature.authPromptSlots.value.mode == AuthMode.userSelection) {
+      _dispatch(const BeginAuthenticationCommand());
+    }
   }
 
   void _respondToPrompt() {
