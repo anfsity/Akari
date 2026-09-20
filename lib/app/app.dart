@@ -18,7 +18,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late final GreeterFeature _feature;
-  late final ThemeBundle _theme;
+  late ThemeBundle _theme;
 
   @override
   void initState() {
@@ -31,13 +31,23 @@ class _MyAppState extends State<MyApp> {
         ? DemoGreeterGateway()
         : DBusGreeterGateway();
     _feature = GreeterFeature(gateway: gateway);
-    _theme = ThemeRegistry.resolve(
-      const String.fromEnvironment(
-        'MOZAIS_THEME',
-        defaultValue: ThemeRegistry.defaultThemeName,
-      ),
+    final themeName = const String.fromEnvironment(
+      'MOZAIS_THEME',
+      defaultValue: ThemeRegistry.defaultThemeName,
     );
+    _theme = ThemeRegistry.resolve(themeName);
+    unawaited(_loadThemeAccent(themeName));
     unawaited(_feature.initialize());
+  }
+
+  Future<void> _loadThemeAccent(String themeName) async {
+    final accent = await ThemeRegistry.findBackgroundAccent(_theme);
+    if (!mounted || accent == null) {
+      return;
+    }
+    setState(() {
+      _theme = ThemeRegistry.resolve(themeName, accent: accent);
+    });
   }
 
   @override
