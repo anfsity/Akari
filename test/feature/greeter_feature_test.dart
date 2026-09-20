@@ -71,11 +71,11 @@ void main() {
     final effectSubscription = feature.effects.listen(effects.add);
     await feature.initialize();
     await _flushEvents();
+    await feature.dispatch(const WakeGreeterCommand());
 
     await _selectDefaultSession(feature);
     await feature.dispatch(SelectUserCommand(gateway.users.first));
-    await feature.dispatch(const BeginAuthenticationCommand());
-    await Future<void>.delayed(Duration.zero);
+    await _flushEvents();
 
     expect(feature.state.authMode, AuthMode.prompting);
     expect(feature.state.prompt?.kind, PromptKind.secret);
@@ -135,11 +135,11 @@ void main() {
     final feature = GreeterFeature(gateway: gateway);
     await feature.initialize();
     await _flushEvents();
+    await feature.dispatch(const WakeGreeterCommand());
 
     await _selectDefaultSession(feature);
     await feature.dispatch(SelectUserCommand(gateway.users.first));
-    await feature.dispatch(const BeginAuthenticationCommand());
-    await Future<void>.delayed(Duration.zero);
+    await _flushEvents();
     await feature.dispatch(const CancelAuthenticationCommand());
     await Future<void>.delayed(Duration.zero);
 
@@ -196,32 +196,28 @@ void main() {
   });
 
   test(
-    'selection changes stay within account, session, and action slots',
+    'selecting an account begins authentication without touching sessions',
     () async {
       final gateway = _FakeGreeterGateway();
       final feature = GreeterFeature(gateway: gateway);
       await feature.initialize();
       await _flushEvents();
+      await feature.dispatch(const WakeGreeterCommand());
 
       var accountChanges = 0;
       var sessionChanges = 0;
-      var authPromptChanges = 0;
-      var continueChanges = 0;
       feature.accountPickerSlots.addListener(() => accountChanges++);
       feature.sessionPickerSlots.addListener(() => sessionChanges++);
-      feature.authPromptSlots.addListener(() => authPromptChanges++);
-      feature.continueSlots.addListener(() => continueChanges++);
 
       // The default session is selected while the catalog loads.
       expect(feature.sessionPickerSlots.value.selected?.id, 'wayland:sway');
 
       await feature.dispatch(SelectUserCommand(gateway.users.first));
+      await _flushEvents();
 
       expect(accountChanges, 1);
       expect(sessionChanges, 0);
-      expect(authPromptChanges, 0);
-      expect(continueChanges, 1);
-      expect(feature.continueSlots.value.enabled, isTrue);
+      expect(feature.state.authMode, AuthMode.prompting);
 
       feature.dispose();
     },
@@ -343,6 +339,7 @@ void main() {
     final feature = GreeterFeature(gateway: gateway);
     await feature.initialize();
     await _flushEvents();
+    await feature.dispatch(const WakeGreeterCommand());
 
     await _selectDefaultSession(feature);
     expect(feature.state.selectedSession?.id, 'wayland:sway');
@@ -350,9 +347,7 @@ void main() {
 
     await feature.dispatch(SelectUserCommand(gateway.users.first));
     expect(feature.state.selectedUser?.id, 'alice');
-    expect(feature.state.authMode, AuthMode.userSelection);
 
-    await feature.dispatch(const BeginAuthenticationCommand());
     await _flushEvents();
     expect(feature.state.authMode, AuthMode.prompting);
 
@@ -453,7 +448,6 @@ Future<GreeterFeature> _createPromptedFeature(
   await feature.dispatch(const WakeGreeterCommand());
   await _selectDefaultSession(feature);
   await feature.dispatch(SelectUserCommand(gateway.users.first));
-  await feature.dispatch(const BeginAuthenticationCommand());
   await _flushEvents();
   return feature;
 }

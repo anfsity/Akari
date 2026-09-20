@@ -18,7 +18,6 @@ class GreeterWidgetCatalog {
     required this.credentialController,
     required this.credentialFocusNode,
     required this.onDispatch,
-    required this.onRespond,
   });
 
   final GreeterFeature feature;
@@ -26,7 +25,6 @@ class GreeterWidgetCatalog {
   final TextEditingController credentialController;
   final FocusNode credentialFocusNode;
   final ValueChanged<GreeterCommand> onDispatch;
-  final VoidCallback onRespond;
 
   Widget build(BuildContext context, SceneNode node, {required bool dormant}) {
     if (dormant && _isForeground(node.kind)) {
@@ -87,40 +85,27 @@ class GreeterWidgetCatalog {
           auth: auth,
           controller: credentialController,
           focusNode: credentialFocusNode,
-          onRespond: onRespond,
         ),
       ),
-      SceneNodeKind.primaryAction => ListenableBuilder(
-        listenable: Listenable.merge([
-          feature.authPromptSlots,
-          feature.continueSlots,
-        ]),
-        builder: (context, child) {
-          final auth = (feature.authPromptSlots).value;
-          final continueAction = (feature.continueSlots).value;
-          return _PrimaryAction(
-            auth: auth,
-            continueAction: continueAction,
-            onBegin: () {
-              onDispatch(const BeginAuthenticationCommand());
-            },
-            onRespond: onRespond,
-            onRetry: (recovery) {
-              switch (recovery) {
-                case GreeterRecovery.retryPrompt:
-                  onDispatch(const RetryPromptCommand());
-                case GreeterRecovery.reconnectService:
-                  onDispatch(const ReconnectServiceCommand());
-                case GreeterRecovery.selectUser:
-                case GreeterRecovery.selectSession:
-                  onDispatch(const CancelAuthenticationCommand());
-                case GreeterRecovery.retryAuthentication:
-                case GreeterRecovery.retrySessionCatalog:
-                  onDispatch(const RetryAuthenticationCommand());
-              }
-            },
-          );
-        },
+      SceneNodeKind.primaryAction => SceneRegion<AuthPromptSlots>(
+        valueListenable: feature.authPromptSlots,
+        builder: (context, auth) => _RetryAction(
+          auth: auth,
+          onRetry: (recovery) {
+            switch (recovery) {
+              case GreeterRecovery.retryPrompt:
+                onDispatch(const RetryPromptCommand());
+              case GreeterRecovery.reconnectService:
+                onDispatch(const ReconnectServiceCommand());
+              case GreeterRecovery.selectUser:
+              case GreeterRecovery.selectSession:
+                onDispatch(const CancelAuthenticationCommand());
+              case GreeterRecovery.retryAuthentication:
+              case GreeterRecovery.retrySessionCatalog:
+                onDispatch(const RetryAuthenticationCommand());
+            }
+          },
+        ),
       ),
       SceneNodeKind.status => ListenableBuilder(
         listenable: Listenable.merge([
@@ -737,13 +722,11 @@ class _CredentialField extends StatelessWidget {
     required this.auth,
     required this.controller,
     required this.focusNode,
-    required this.onRespond,
   });
 
   final AuthPromptSlots auth;
   final TextEditingController controller;
   final FocusNode focusNode;
-  final VoidCallback onRespond;
 
   @override
   Widget build(BuildContext context) {
@@ -755,7 +738,6 @@ class _CredentialField extends StatelessWidget {
       enabled: enabled,
       obscureText: secret,
       textInputAction: TextInputAction.done,
-      onSubmitted: (_) => onRespond(),
       textAlign: TextAlign.center,
       textAlignVertical: TextAlignVertical.center,
       style: const TextStyle(color: Colors.white, fontSize: 18),
@@ -766,64 +748,31 @@ class _CredentialField extends StatelessWidget {
   }
 }
 
-class _PrimaryAction extends StatelessWidget {
-  const _PrimaryAction({
-    required this.auth,
-    required this.continueAction,
-    required this.onBegin,
-    required this.onRespond,
-    required this.onRetry,
-  });
+class _RetryAction extends StatelessWidget {
+  const _RetryAction({required this.auth, required this.onRetry});
 
   final AuthPromptSlots auth;
-  final ContinueSlots continueAction;
-  final VoidCallback onBegin;
-  final VoidCallback onRespond;
   final ValueChanged<GreeterRecovery> onRetry;
 
   @override
   Widget build(BuildContext context) {
+    final error = auth.error;
+    if (auth.mode != AuthMode.error || error == null) {
+      return const SizedBox.shrink();
+    }
     final colorScheme = Theme.of(context).colorScheme;
-    final accent = colorScheme.primary;
-    final enabled = switch (auth.mode) {
-      AuthMode.userSelection => continueAction.enabled,
-      AuthMode.prompting => true,
-      AuthMode.error => auth.error?.recovery != null,
-      _ => false,
-    };
-
-    final onPressed = switch (auth.mode) {
-      AuthMode.userSelection => onBegin,
-      AuthMode.prompting => onRespond,
-      AuthMode.error => () => onRetry(auth.error!.recovery),
-      _ => null,
-    };
-
     return Center(
       child: AspectRatio(
         aspectRatio: 1,
         child: FilledButton(
-          onPressed: enabled ? onPressed : null,
+          onPressed: () => onRetry(error.recovery),
           style: FilledButton.styleFrom(
             shape: const CircleBorder(),
             padding: EdgeInsets.zero,
-            backgroundColor: accent,
+            backgroundColor: colorScheme.primary,
             foregroundColor: colorScheme.onPrimary,
-            disabledBackgroundColor: accent.withValues(alpha: 0.4),
-            disabledForegroundColor: colorScheme.onPrimary.withValues(
-              alpha: 0.5,
-            ),
           ),
-          child: auth.mode == AuthMode.submitting
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: colorScheme.onPrimary,
-                  ),
-                )
-              : const Icon(Icons.arrow_forward, size: 30),
+          child: const Icon(Icons.refresh, size: 30),
         ),
       ),
     );

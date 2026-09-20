@@ -143,7 +143,9 @@ Widget _runtimeWithTheme(
       body: SceneRuntime(
         document: document,
         theme: theme,
-        backgroundBlurSigma: backgroundBlurSigma,
+        backgroundBlurSigma: backgroundBlurSigma == null
+            ? null
+            : AlwaysStoppedAnimation<double>(backgroundBlurSigma),
         nodeBuilder: (context, node) =>
             SizedBox.expand(key: ValueKey(node.id), child: Text(node.id)),
       ),

@@ -9,7 +9,6 @@ class GreeterSceneSlots {
     required this.authPrompt,
     required this.accountPicker,
     required this.sessionPicker,
-    required this.continueAction,
     required this.power,
   });
 
@@ -34,9 +33,6 @@ class GreeterSceneSlots {
         selected: state.selectedSession,
         error: state.catalogError,
       ),
-      continueAction: ContinueSlots(
-        enabled: state.selectedUser != null && state.selectedSession != null,
-      ),
       power: PowerSlots(mode: state.powerMode, error: state.powerError),
     );
   }
@@ -45,7 +41,6 @@ class GreeterSceneSlots {
   final AuthPromptSlots authPrompt;
   final AccountPickerSlots accountPicker;
   final SessionPickerSlots sessionPicker;
-  final ContinueSlots continueAction;
   final PowerSlots power;
 }
 
@@ -133,20 +128,6 @@ class SessionPickerSlots {
   @override
   int get hashCode =>
       Object.hash(mode, Object.hashAll(sessions), selected, error);
-}
-
-class ContinueSlots {
-  const ContinueSlots({required this.enabled});
-
-  final bool enabled;
-
-  @override
-  bool operator ==(Object other) {
-    return other is ContinueSlots && other.enabled == enabled;
-  }
-
-  @override
-  int get hashCode => enabled.hashCode;
 }
 
 class PowerSlots {
