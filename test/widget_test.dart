@@ -44,6 +44,38 @@ void main() {
     expect(clock, findsNothing);
   });
 
+  testWidgets('mouse click wakes the greeter', (tester) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Choose account'), findsNothing);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Choose account'), findsOneWidget);
+  });
+
+  testWidgets('enter begins authentication once a session is ready', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+    await _wake(tester);
+
+    await tester.tap(find.byTooltip('Choose account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.enabled, isTrue);
+    expect(field.focusNode?.hasFocus, isTrue);
+  });
+
   testWidgets('selects account and session before starting authentication', (
     tester,
   ) async {
