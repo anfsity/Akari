@@ -580,27 +580,17 @@ class _AccountName extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = account.selected?.displayName ?? 'Choose account';
-    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              name,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          if (account.users.length > 1)
-            Icon(Icons.arrow_drop_down, size: 22, color: onSurface),
-        ],
+      child: Text(
+        account.selected?.displayName ?? 'Choose account',
+        maxLines: 1,
+        textAlign: TextAlign.center,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
