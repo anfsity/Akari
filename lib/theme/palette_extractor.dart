@@ -32,7 +32,7 @@ const _darkNeutralAccent = Color(0xff404040);
 Future<Color> extractAccent(String asset) async {
   final data = await rootBundle.load(asset);
   final codec = await ui.instantiateImageCodec(
-    data.buffer.asUint8List(),
+    data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
     targetWidth: _sampleSize,
     targetHeight: _sampleSize,
   );
@@ -44,7 +44,9 @@ Future<Color> extractAccent(String asset) async {
   if (rgba == null) {
     return _lightNeutralAccent;
   }
-  return calculateAccentFromRgba(rgba.buffer.asUint8List());
+  return calculateAccentFromRgba(
+    rgba.buffer.asUint8List(rgba.offsetInBytes, rgba.lengthInBytes),
+  );
 }
 
 /// Picks the dominant vibrant hue from tightly packed RGBA bytes.
