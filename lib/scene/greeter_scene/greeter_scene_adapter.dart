@@ -65,11 +65,37 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter> {
 
   @override
   Widget build(BuildContext context) {
-    return SceneRuntime(
-      document: widget.theme.document,
-      theme: widget.theme,
-      nodeBuilder: _catalog.build,
+    return Focus(
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: ValueListenableBuilder<bool>(
+        valueListenable: widget.feature.dormantSlots,
+        builder: (context, dormant, child) {
+          return SceneRuntime(
+            document: widget.theme.document,
+            theme: widget.theme,
+            backgroundBlurSigma: dormant ? 0 : null,
+            nodeBuilder: (context, node) =>
+                _catalog.build(context, node, dormant: dormant),
+          );
+        },
+      ),
     );
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (widget.feature.dormantSlots.value) {
+      _dispatch(const WakeGreeterCommand());
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _dispatch(const SleepGreeterCommand());
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   void _respondToPrompt() {

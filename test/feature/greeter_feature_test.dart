@@ -40,6 +40,7 @@ void main() {
 
       expect(feature.state.serviceMode, ServiceMode.ready);
       expect(feature.state.authMode, AuthMode.error);
+      expect(feature.state.dormant, isFalse);
       expect(feature.state.authError?.kind, GreeterErrorKind.authentication);
       expect(
         feature.state.authError?.recovery,
@@ -360,6 +361,38 @@ void main() {
 
     feature.dispose();
   });
+  test('starts dormant and toggles on wake and sleep', () async {
+    final gateway = _FakeGreeterGateway();
+    final feature = GreeterFeature(gateway: gateway);
+    await feature.initialize();
+    await _flushEvents();
+
+    expect(feature.state.dormant, isTrue);
+
+    await feature.dispatch(const WakeGreeterCommand());
+    expect(feature.state.dormant, isFalse);
+
+    await feature.dispatch(const SleepGreeterCommand());
+    expect(feature.state.dormant, isTrue);
+
+    feature.dispose();
+  });
+
+  test('sleeping cancels the active authentication attempt', () async {
+    final gateway = _FakeGreeterGateway();
+    final feature = await _createPromptedFeature(gateway);
+    expect(feature.state.authMode, AuthMode.prompting);
+
+    await feature.dispatch(const SleepGreeterCommand());
+    await _flushEvents();
+
+    expect(feature.state.dormant, isTrue);
+    expect(feature.state.authMode, AuthMode.userSelection);
+    expect(feature.state.prompt, isNull);
+    expect(gateway.cancelledAttemptId, 'attempt-1');
+
+    feature.dispose();
+  });
 }
 
 Future<GreeterFeature> _createPromptedFeature(
@@ -368,6 +401,7 @@ Future<GreeterFeature> _createPromptedFeature(
   final feature = GreeterFeature(gateway: gateway);
   await feature.initialize();
   await _flushEvents();
+  await feature.dispatch(const WakeGreeterCommand());
   await _selectDefaultSession(feature);
   await feature.dispatch(SelectUserCommand(gateway.users.first));
   await feature.dispatch(const BeginAuthenticationCommand());

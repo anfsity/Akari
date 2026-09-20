@@ -28,7 +28,10 @@ class GreeterWidgetCatalog {
   final ValueChanged<GreeterCommand> onDispatch;
   final VoidCallback onRespond;
 
-  Widget build(BuildContext context, SceneNode node) {
+  Widget build(BuildContext context, SceneNode node, {required bool dormant}) {
+    if (dormant && _isForeground(node.kind)) {
+      return const SizedBox.shrink();
+    }
     return switch (node.kind) {
       SceneNodeKind.dateTime => const _SceneClock(),
       SceneNodeKind.powerActions => SceneRegion<PowerSlots>(
@@ -125,10 +128,37 @@ class GreeterWidgetCatalog {
           return _StatusLine(service: service, auth: auth, session: session);
         },
       ),
+      SceneNodeKind.secondaryAction => SceneRegion<AuthPromptSlots>(
+        valueListenable: feature.authPromptSlots,
+        builder: (context, auth) => _CancelAction(
+          auth: auth,
+          tokens: theme.tokens,
+          onCancel: () {
+            onDispatch(const SleepGreeterCommand());
+          },
+        ),
+      ),
       SceneNodeKind.background ||
       SceneNodeKind.accountPicker ||
-      SceneNodeKind.secondaryAction ||
       SceneNodeKind.decoration => const SizedBox.shrink(),
+    };
+  }
+
+  static bool _isForeground(SceneNodeKind kind) {
+    return switch (kind) {
+      SceneNodeKind.glassPanel ||
+      SceneNodeKind.avatar ||
+      SceneNodeKind.accountName ||
+      SceneNodeKind.sessionPicker ||
+      SceneNodeKind.credentialField ||
+      SceneNodeKind.primaryAction ||
+      SceneNodeKind.secondaryAction ||
+      SceneNodeKind.status => true,
+      SceneNodeKind.background ||
+      SceneNodeKind.accountPicker ||
+      SceneNodeKind.powerActions ||
+      SceneNodeKind.dateTime ||
+      SceneNodeKind.decoration => false,
     };
   }
 }
@@ -358,7 +388,8 @@ class _AccountAvatar extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               customBorder: const CircleBorder(),
-              onTap: () => _showAccountPicker(context, account, tokens, onSelect),
+              onTap: () =>
+                  _showAccountPicker(context, account, tokens, onSelect),
               child: Center(
                 child: selected == null
                     ? Icon(Icons.person_outline, size: 40, color: accent)
@@ -776,6 +807,46 @@ class _PrimaryAction extends StatelessWidget {
                   ),
                 )
               : const Icon(Icons.arrow_forward, size: 30),
+        ),
+      ),
+    );
+  }
+}
+
+class _CancelAction extends StatelessWidget {
+  const _CancelAction({
+    required this.auth,
+    required this.tokens,
+    required this.onCancel,
+  });
+
+  final AuthPromptSlots auth;
+  final ThemeTokens tokens;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    if (auth.mode == AuthMode.handingOff) {
+      return const SizedBox.shrink();
+    }
+    final accent = Theme.of(context).colorScheme.primary;
+    return Tooltip(
+      message: 'Cancel',
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: Material(
+            color: tokens.surfaceColor,
+            shape: CircleBorder(
+              side: BorderSide(color: tokens.surfaceVariantColor),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onCancel,
+              child: Center(child: Icon(Icons.close, size: 26, color: accent)),
+            ),
+          ),
         ),
       ),
     );

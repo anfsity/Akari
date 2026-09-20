@@ -50,6 +50,7 @@ class GreeterFeature {
   final ValueNotifier<PowerSlots> _powerSlots = ValueNotifier(
     const PowerSlots(mode: PowerMode.idle, error: null),
   );
+  final ValueNotifier<bool> _dormantSlots = ValueNotifier(true);
   GreeterState _state = GreeterState.initial();
   String? _attemptId;
   bool _initialized = false;
@@ -75,6 +76,8 @@ class GreeterFeature {
   ValueListenable<ContinueSlots> get continueSlots => _continueSlots;
 
   ValueListenable<PowerSlots> get powerSlots => _powerSlots;
+
+  ValueListenable<bool> get dormantSlots => _dormantSlots;
 
   Stream<FeatureEffect> get effects => _effects.stream;
 
@@ -102,6 +105,10 @@ class GreeterFeature {
         await _reconnectService();
       case RetrySessionCatalogCommand():
         await _retrySessionCatalog();
+      case WakeGreeterCommand():
+        _wakeGreeter();
+      case SleepGreeterCommand():
+        _sleepGreeter();
     }
   }
 
@@ -133,6 +140,7 @@ class GreeterFeature {
                   : snapshot.detail,
               recovery: GreeterRecovery.reconnectService,
             ),
+            dormant: false,
             clearServiceError: true,
           ),
         );
@@ -157,6 +165,7 @@ class GreeterFeature {
         _state.copyWith(
           serviceMode: ServiceMode.unavailable,
           authMode: AuthMode.error,
+          dormant: false,
           serviceError: _getGreeterError(
             error,
             fallbackKind: GreeterErrorKind.transport,
@@ -190,6 +199,44 @@ class GreeterFeature {
       ),
     );
     await _loadService();
+  }
+
+  void _wakeGreeter() {
+    if (!_state.dormant || _state.serviceMode != ServiceMode.ready) {
+      return;
+    }
+    _replace(_state.copyWith(dormant: false, clearAuthError: true));
+  }
+
+  void _sleepGreeter() {
+    if (_state.dormant || _state.authMode == AuthMode.handingOff) {
+      return;
+    }
+    final attemptId = _attemptId;
+    _attemptId = null;
+    _eventsDuringBegin.clear();
+    _replace(
+      _state.copyWith(
+        dormant: true,
+        authMode: AuthMode.userSelection,
+        clearPrompt: true,
+        clearAuthError: true,
+        clearCatalogError: true,
+        backendAuthState: BackendAuthState.idle,
+      ),
+    );
+    if (attemptId != null) {
+      unawaited(_cancelAttempt(attemptId));
+    }
+  }
+
+  Future<void> _cancelAttempt(String attemptId) async {
+    try {
+      await _gateway.cancel(attemptId);
+    } on Object {
+      // Sleeping is best effort: the greeter returns to the background even
+      // when the backend cannot cancel the abandoned attempt.
+    }
   }
 
   void _selectUser(UserSummary user) {
@@ -285,6 +332,7 @@ class GreeterFeature {
         _state.copyWith(
           serviceMode: ServiceMode.unavailable,
           authMode: AuthMode.error,
+          dormant: false,
           serviceError: _getGreeterError(
             error,
             fallbackKind: GreeterErrorKind.transport,
@@ -413,6 +461,7 @@ class GreeterFeature {
           _state.copyWith(
             serviceMode: ServiceMode.unavailable,
             authMode: AuthMode.error,
+            dormant: false,
             serviceError: const GreeterError(
               kind: GreeterErrorKind.transport,
               message: 'The greeter service is unavailable.',
@@ -603,6 +652,9 @@ class GreeterFeature {
     if (_powerSlots.value != nextSlots.power) {
       _powerSlots.value = nextSlots.power;
     }
+    if (_dormantSlots.value != next.dormant) {
+      _dormantSlots.value = next.dormant;
+    }
   }
 
   GreeterError _getGreeterError(
@@ -635,5 +687,6 @@ class GreeterFeature {
     _sessionPickerSlots.dispose();
     _continueSlots.dispose();
     _powerSlots.dispose();
+    _dormantSlots.dispose();
   }
 }

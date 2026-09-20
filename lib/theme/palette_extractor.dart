@@ -61,8 +61,7 @@ Color calculateAccentFromRgba(Uint8List rgba) {
     final red = rgba[i];
     final green = rgba[i + 1];
     final blue = rgba[i + 2];
-    brightnessTotal +=
-        (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
+    brightnessTotal += (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
 
     final hsv = HSVColor.fromColor(Color.fromARGB(255, red, green, blue));
     if (hsv.saturation <= _minSaturation || hsv.value <= _minValue) {
@@ -84,9 +83,7 @@ Color calculateAccentFromRgba(Uint8List rgba) {
     final averageBrightness = pixelCount == 0
         ? 0.0
         : brightnessTotal / pixelCount;
-    return averageBrightness < 0.5
-        ? _lightNeutralAccent
-        : _darkNeutralAccent;
+    return averageBrightness < 0.5 ? _lightNeutralAccent : _darkNeutralAccent;
   }
 
   // Red wraps between the last and first bucket; merge both the weight and

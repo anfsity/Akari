@@ -55,3 +55,11 @@ class ReconnectServiceCommand extends GreeterCommand {
 class RetrySessionCatalogCommand extends GreeterCommand {
   const RetrySessionCatalogCommand();
 }
+
+class WakeGreeterCommand extends GreeterCommand {
+  const WakeGreeterCommand();
+}
+
+class SleepGreeterCommand extends GreeterCommand {
+  const SleepGreeterCommand();
+}

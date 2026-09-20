@@ -94,6 +94,17 @@
       "properties": {"variant": "round-arrow"}
     },
     {
+      "id": "cancel_action",
+      "kind": "secondaryAction",
+      "rect": {"x": 0.40, "y": 0.72, "width": 0.0556, "height": 0.0988},
+      "renderOrder": 40,
+      "focusOrder": 45,
+      "motion": "none",
+      "action": "sleepGreeter",
+      "bindings": ["authMode"],
+      "properties": {"variant": "round-close"}
+    },
+    {
       "id": "status",
       "kind": "status",
       "rect": {"x": 0.34, "y": 0.82, "width": 0.32, "height": 0.06},

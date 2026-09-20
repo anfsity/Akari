@@ -17,12 +17,19 @@ class SceneRuntime extends StatelessWidget {
     required this.document,
     required this.theme,
     required this.nodeBuilder,
+    this.backgroundBlurSigma,
     super.key,
   });
 
   final SceneDocument document;
   final ThemeBundle theme;
   final SceneNodeBuilder nodeBuilder;
+
+  /// Overrides the document background's blur when set.
+  ///
+  /// A host uses this to frost the canvas only while the scene is active;
+  /// null keeps the blur authored in the document.
+  final double? backgroundBlurSigma;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +52,10 @@ class SceneRuntime extends StatelessWidget {
     final renderer =
         theme.backgroundRenderer(document.background.kind) ??
         const SolidBackgroundRenderer();
-    return RepaintBoundary(child: renderer.build(context, document.background));
+    final background = backgroundBlurSigma == null
+        ? document.background
+        : document.background.copyWith(blurSigma: backgroundBlurSigma!);
+    return RepaintBoundary(child: renderer.build(context, background));
   }
 
   Widget _buildNode(BuildContext context, Size size, SceneNode node) {

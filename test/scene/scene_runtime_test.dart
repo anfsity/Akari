@@ -51,16 +51,42 @@ void main() {
     expect(size.height, greaterThanOrEqualTo(44));
   });
 
-  testWidgets('falls back to a solid background when no renderer is registered', (
+  testWidgets(
+    'falls back to a solid background when no renderer is registered',
+    (tester) async {
+      final document = SceneDocument(
+        id: 'fallback',
+        version: 1,
+        canvas: const SceneCanvas(useSafeArea: false),
+        background: const SceneBackground(
+          kind: SceneBackgroundKind.image,
+          asset: 'assets/missing.jpg',
+        ),
+        nodes: const [
+          SceneNode(
+            id: 'content',
+            kind: SceneNodeKind.decoration,
+            rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(_runtime(document));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('overrides the document background blur when provided', (
     tester,
   ) async {
+    final renderer = _RecordingBackgroundRenderer();
     final document = SceneDocument(
-      id: 'fallback',
+      id: 'test',
       version: 1,
       canvas: const SceneCanvas(useSafeArea: false),
       background: const SceneBackground(
         kind: SceneBackgroundKind.image,
-        asset: 'assets/missing.jpg',
+        blurSigma: 12,
       ),
       nodes: const [
         SceneNode(
@@ -70,9 +96,20 @@ void main() {
         ),
       ],
     );
+    final theme = ThemeBundle(
+      id: 'test',
+      tokens: _tokens(),
+      document: document,
+      backgrounds: {SceneBackgroundKind.image: renderer},
+    );
 
-    await tester.pumpWidget(_runtime(document));
-    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(
+      _runtimeWithTheme(document, theme, backgroundBlurSigma: 0),
+    );
+    expect(renderer.background?.blurSigma, 0);
+
+    await tester.pumpWidget(_runtimeWithTheme(document, theme));
+    expect(renderer.background?.blurSigma, 12);
   });
 }
 
@@ -91,22 +128,37 @@ Widget _runtime(SceneDocument document) {
     id: 'test',
     tokens: _tokens(),
     document: document,
-    backgrounds: const {
-      SceneBackgroundKind.solid: SolidBackgroundRenderer(),
-    },
+    backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
   );
+  return _runtimeWithTheme(document, theme);
+}
+
+Widget _runtimeWithTheme(
+  SceneDocument document,
+  ThemeBundle theme, {
+  double? backgroundBlurSigma,
+}) {
   return MaterialApp(
     home: Scaffold(
       body: SceneRuntime(
         document: document,
         theme: theme,
-        nodeBuilder: (context, node) => SizedBox.expand(
-          key: ValueKey(node.id),
-          child: Text(node.id),
-        ),
+        backgroundBlurSigma: backgroundBlurSigma,
+        nodeBuilder: (context, node) =>
+            SizedBox.expand(key: ValueKey(node.id), child: Text(node.id)),
       ),
     ),
   );
+}
+
+class _RecordingBackgroundRenderer extends BackgroundRenderer {
+  SceneBackground? background;
+
+  @override
+  Widget build(BuildContext context, SceneBackground background) {
+    this.background = background;
+    return const SizedBox.shrink();
+  }
 }
 
 ThemeTokens _tokens() {
