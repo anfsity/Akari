@@ -5,12 +5,16 @@ import 'package:mozais_scene/mozais_scene.dart';
 
 import '../feature/greeter/greeter_feature.dart';
 import '../feature/greeter/ports/greeter_gateway.dart';
+import '../feature/greeter/ports/session_store.dart';
 import '../infrastructure/dbus/greeter_dbus_gateway.dart';
 import '../scene/greeter_scene/greeter_scene_adapter.dart';
 import '../theme/theme_registry.dart';
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  const MyApp({this.sessionStore = const NoopSessionStore(), super.key});
+
+  /// Persistence for the selected session; the default keeps tests isolated.
+  final SessionStore sessionStore;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -30,7 +34,10 @@ class _MyAppState extends State<MyApp> {
     final gateway = backendMode == 'demo'
         ? DemoGreeterGateway()
         : DBusGreeterGateway();
-    _feature = GreeterFeature(gateway: gateway);
+    _feature = GreeterFeature(
+      gateway: gateway,
+      sessionStore: widget.sessionStore,
+    );
     final themeName = const String.fromEnvironment(
       'MOZAIS_THEME',
       defaultValue: ThemeRegistry.defaultThemeName,

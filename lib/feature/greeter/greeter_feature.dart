@@ -7,17 +7,25 @@ import 'greeter_effect.dart';
 import 'greeter_slots.dart';
 import 'greeter_state.dart';
 import 'ports/greeter_gateway.dart';
+import 'ports/session_store.dart';
+
+/// Session id or name fragments preferred when the user has no stored choice.
+const _preferredSessionNames = ['hyprland', 'sway'];
 
 /// Application-facing state owner for the greeter flow.
 ///
 /// This is deliberately independent from Scene widgets. D-Bus is represented
 /// by [GreeterGateway] and never accessed directly from this class.
 class GreeterFeature {
-  // The public parameter name cannot use the library-private field name.
-  // ignore: prefer_initializing_formals
-  GreeterFeature({required GreeterGateway gateway}) : _gateway = gateway;
+  // The public parameter names cannot use the library-private field names.
+  GreeterFeature({
+    required GreeterGateway gateway,
+    SessionStore sessionStore = const NoopSessionStore(),
+  }) : _gateway = gateway, // ignore: prefer_initializing_formals
+       _sessionStore = sessionStore; // ignore: prefer_initializing_formals
 
   final GreeterGateway _gateway;
+  final SessionStore _sessionStore;
   final StreamController<FeatureEffect> _effects =
       StreamController<FeatureEffect>.broadcast();
   StreamSubscription<GreeterEvent>? _eventSubscription;
@@ -150,6 +158,7 @@ class GreeterFeature {
         _state.copyWith(
           serviceMode: ServiceMode.ready,
           users: users,
+          selectedUser: users.length == 1 ? users.first : null,
           authMode: AuthMode.userSelection,
           backendAuthState: snapshot.state,
           catalogMode: CatalogMode.loading,
@@ -359,6 +368,7 @@ class GreeterFeature {
         clearAuthError: true,
       ),
     );
+    unawaited(_sessionStore.saveSelectedSessionId(session.id));
   }
 
   Future<void> _startSelectedSession() async {
@@ -567,16 +577,17 @@ class GreeterFeature {
       if (generation != _sessionLoadGeneration) {
         return;
       }
-      final selectedSession = _state.selectedSession;
-      final selectedStillAvailable =
-          selectedSession != null &&
-          sessions.any((candidate) => candidate.id == selectedSession.id);
+      final storedSessionId = await _sessionStore.readSelectedSessionId();
+      if (generation != _sessionLoadGeneration) {
+        return;
+      }
+      final selectedSession = _getSelectedSession(sessions, storedSessionId);
       _replace(
         _state.copyWith(
           catalogMode: CatalogMode.ready,
           sessions: sessions,
-          clearSelectedSession:
-              selectedSession != null && !selectedStillAvailable,
+          selectedSession: selectedSession,
+          clearSelectedSession: selectedSession == null,
           clearCatalogError: true,
         ),
       );
@@ -595,6 +606,33 @@ class GreeterFeature {
         ),
       );
     }
+  }
+
+  SessionSummary? _getSelectedSession(
+    List<SessionSummary> sessions,
+    String? storedSessionId,
+  ) {
+    final current = _state.selectedSession;
+    if (current != null &&
+        sessions.any((candidate) => candidate.id == current.id)) {
+      return current;
+    }
+    if (storedSessionId != null) {
+      for (final session in sessions) {
+        if (session.id == storedSessionId) {
+          return session;
+        }
+      }
+    }
+    for (final preferred in _preferredSessionNames) {
+      for (final session in sessions) {
+        if (session.id.toLowerCase().contains(preferred) ||
+            session.name.toLowerCase().contains(preferred)) {
+          return session;
+        }
+      }
+    }
+    return sessions.isEmpty ? null : sessions.first;
   }
 
   void _resetToUserSelection({bool clearSelectedUser = false}) {
