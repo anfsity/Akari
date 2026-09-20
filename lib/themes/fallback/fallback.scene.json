@@ -14,16 +14,25 @@
     {
       "id": "clock",
       "kind": "dateTime",
-      "rect": {"x": 0.04, "y": 0.05, "width": 0.24, "height": 0.06},
+      "rect": {"x": 0.031, "y": 0.046, "width": 0.22, "height": 0.045},
       "renderOrder": 10,
       "focusOrder": 0,
       "motion": "none",
       "properties": {"variant": "date"}
     },
     {
+      "id": "clock_time",
+      "kind": "dateTime",
+      "rect": {"x": 0.30, "y": 0.42, "width": 0.40, "height": 0.16},
+      "renderOrder": 10,
+      "focusOrder": 0,
+      "motion": "none",
+      "properties": {"variant": "time"}
+    },
+    {
       "id": "power_actions",
       "kind": "powerActions",
-      "rect": {"x": 0.82, "y": 0.04, "width": 0.14, "height": 0.08},
+      "rect": {"x": 0.90, "y": 0.028, "width": 0.08, "height": 0.04},
       "renderOrder": 20,
       "focusOrder": 30,
       "motion": "none",
@@ -34,7 +43,7 @@
     {
       "id": "glass_panel",
       "kind": "glassPanel",
-      "rect": {"x": 0.33, "y": 0.20, "width": 0.34, "height": 0.62},
+      "rect": {"x": 0.34, "y": 0.20, "width": 0.32, "height": 0.60},
       "renderOrder": 30,
       "focusOrder": 0,
       "motion": "none",
@@ -54,7 +63,7 @@
     {
       "id": "account_name",
       "kind": "accountName",
-      "rect": {"x": 0.40, "y": 0.405, "width": 0.20, "height": 0.06},
+      "rect": {"x": 0.38, "y": 0.41, "width": 0.24, "height": 0.05},
       "renderOrder": 40,
       "focusOrder": 0,
       "motion": "none",
@@ -64,7 +73,7 @@
     {
       "id": "session_picker",
       "kind": "sessionPicker",
-      "rect": {"x": 0.435, "y": 0.50, "width": 0.13, "height": 0.075},
+      "rect": {"x": 0.40, "y": 0.485, "width": 0.20, "height": 0.06},
       "renderOrder": 40,
       "focusOrder": 20,
       "motion": "none",
@@ -75,7 +84,7 @@
     {
       "id": "credential_field",
       "kind": "credentialField",
-      "rect": {"x": 0.34, "y": 0.60, "width": 0.32, "height": 0.08},
+      "rect": {"x": 0.37, "y": 0.575, "width": 0.26, "height": 0.07},
       "renderOrder": 40,
       "focusOrder": 40,
       "motion": "none",
@@ -85,7 +94,7 @@
     {
       "id": "primary_action",
       "kind": "primaryAction",
-      "rect": {"x": 0.4722, "y": 0.72, "width": 0.0556, "height": 0.0988},
+      "rect": {"x": 0.478, "y": 0.675, "width": 0.044, "height": 0.078},
       "renderOrder": 40,
       "focusOrder": 50,
       "motion": "none",
@@ -94,20 +103,9 @@
       "properties": {"variant": "round-arrow"}
     },
     {
-      "id": "cancel_action",
-      "kind": "secondaryAction",
-      "rect": {"x": 0.40, "y": 0.72, "width": 0.0556, "height": 0.0988},
-      "renderOrder": 40,
-      "focusOrder": 45,
-      "motion": "none",
-      "action": "sleepGreeter",
-      "bindings": ["authMode"],
-      "properties": {"variant": "round-close"}
-    },
-    {
       "id": "status",
       "kind": "status",
-      "rect": {"x": 0.34, "y": 0.82, "width": 0.32, "height": 0.06},
+      "rect": {"x": 0.37, "y": 0.765, "width": 0.26, "height": 0.03},
       "renderOrder": 40,
       "focusOrder": 0,
       "motion": "none",

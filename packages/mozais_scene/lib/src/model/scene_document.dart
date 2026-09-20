@@ -44,7 +44,6 @@ enum SceneAction {
   retryPrompt,
   reconnectService,
   retrySessionCatalog,
-  sleepGreeter,
 }
 
 enum SceneMotionPreset {

@@ -32,8 +32,15 @@ class GreeterWidgetCatalog {
     if (dormant && _isForeground(node.kind)) {
       return const SizedBox.shrink();
     }
+    if (!dormant && node.properties['variant'] == 'time') {
+      return const SizedBox.shrink();
+    }
     return switch (node.kind) {
-      SceneNodeKind.dateTime => const _SceneClock(),
+      SceneNodeKind.dateTime => _SceneClock(
+        variant: node.properties['variant'] == 'time'
+            ? _ClockVariant.time
+            : _ClockVariant.date,
+      ),
       SceneNodeKind.powerActions => SceneRegion<PowerSlots>(
         valueListenable: feature.powerSlots,
         builder: (context, power) => _PowerActions(
@@ -128,18 +135,9 @@ class GreeterWidgetCatalog {
           return _StatusLine(service: service, auth: auth, session: session);
         },
       ),
-      SceneNodeKind.secondaryAction => SceneRegion<AuthPromptSlots>(
-        valueListenable: feature.authPromptSlots,
-        builder: (context, auth) => _CancelAction(
-          auth: auth,
-          tokens: theme.tokens,
-          onCancel: () {
-            onDispatch(const SleepGreeterCommand());
-          },
-        ),
-      ),
       SceneNodeKind.background ||
       SceneNodeKind.accountPicker ||
+      SceneNodeKind.secondaryAction ||
       SceneNodeKind.decoration => const SizedBox.shrink(),
     };
   }
@@ -152,10 +150,10 @@ class GreeterWidgetCatalog {
       SceneNodeKind.sessionPicker ||
       SceneNodeKind.credentialField ||
       SceneNodeKind.primaryAction ||
-      SceneNodeKind.secondaryAction ||
       SceneNodeKind.status => true,
       SceneNodeKind.background ||
       SceneNodeKind.accountPicker ||
+      SceneNodeKind.secondaryAction ||
       SceneNodeKind.powerActions ||
       SceneNodeKind.dateTime ||
       SceneNodeKind.decoration => false,
@@ -163,8 +161,12 @@ class GreeterWidgetCatalog {
   }
 }
 
+enum _ClockVariant { date, time }
+
 class _SceneClock extends StatefulWidget {
-  const _SceneClock();
+  const _SceneClock({required this.variant});
+
+  final _ClockVariant variant;
 
   @override
   State<_SceneClock> createState() => _SceneClockState();
@@ -193,48 +195,70 @@ class _SceneClockState extends State<_SceneClock> {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Text(
-        _formatDate(_now),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.primary,
-          fontSize: 22,
-          fontWeight: FontWeight.w500,
-          shadows: const [Shadow(color: Color(0x66000000), blurRadius: 12)],
+    return switch (widget.variant) {
+      _ClockVariant.date => Align(
+        alignment: Alignment.centerLeft,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _formatDate(_now),
+            maxLines: 1,
+            style: _clockStyle(context, fontSize: 20, weight: FontWeight.w500),
+          ),
         ),
       ),
-    );
+      _ClockVariant.time => Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            _formatTime(_now),
+            maxLines: 1,
+            style: _clockStyle(context, fontSize: 120, weight: FontWeight.w300),
+          ),
+        ),
+      ),
+    };
   }
 }
 
+TextStyle _clockStyle(
+  BuildContext context, {
+  required double fontSize,
+  required FontWeight weight,
+}) {
+  return TextStyle(
+    color: Theme.of(context).colorScheme.primary,
+    fontSize: fontSize,
+    fontWeight: weight,
+    height: 1.05,
+    shadows: const [Shadow(color: Color(0x66000000), blurRadius: 12)],
+  );
+}
+
 String _formatDate(DateTime value) {
-  const weekdays = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ];
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const months = [
-    'January',
-    'February',
-    'March',
-    'April',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
     'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${weekdays[value.weekday - 1]}, ${months[value.month - 1]} ${value.day}';
+}
+
+String _formatTime(DateTime value) {
+  final hour = value.hour.toString().padLeft(2, '0');
+  final minute = value.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
 }
 
 class _PowerActions extends StatelessWidget {
@@ -569,7 +593,7 @@ class _AccountName extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: onSurface,
-                fontSize: 24,
+                fontSize: 20,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -599,7 +623,7 @@ class _SessionPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: SizedBox(
-        height: 36,
+        height: 48,
         width: double.infinity,
         child: switch (session.mode) {
           CatalogMode.loading => const Center(
@@ -810,46 +834,6 @@ class _PrimaryAction extends StatelessWidget {
                   ),
                 )
               : const Icon(Icons.arrow_forward, size: 30),
-        ),
-      ),
-    );
-  }
-}
-
-class _CancelAction extends StatelessWidget {
-  const _CancelAction({
-    required this.auth,
-    required this.tokens,
-    required this.onCancel,
-  });
-
-  final AuthPromptSlots auth;
-  final ThemeTokens tokens;
-  final VoidCallback onCancel;
-
-  @override
-  Widget build(BuildContext context) {
-    if (auth.mode == AuthMode.handingOff) {
-      return const SizedBox.shrink();
-    }
-    final accent = Theme.of(context).colorScheme.primary;
-    return Tooltip(
-      message: 'Cancel',
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: Material(
-            color: tokens.surfaceColor,
-            shape: CircleBorder(
-              side: BorderSide(color: tokens.surfaceVariantColor),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onCancel,
-              child: Center(child: Icon(Icons.close, size: 26, color: accent)),
-            ),
-          ),
         ),
       ),
     );

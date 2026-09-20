@@ -33,17 +33,15 @@ void main() {
     expect(find.byTooltip('Choose account'), findsNothing);
   });
 
-  testWidgets('cancel action returns to the dormant background', (
-    tester,
-  ) async {
+  testWidgets('shows a digital clock only while dormant', (tester) async {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
+
+    final clock = find.textContaining(RegExp(r'^\d{2}:\d{2}$'));
+    expect(clock, findsOneWidget);
+
     await _wake(tester);
-
-    await tester.tap(find.byTooltip('Cancel'));
-    await tester.pumpAndSettle();
-
-    expect(find.byTooltip('Choose account'), findsNothing);
+    expect(clock, findsNothing);
   });
 
   testWidgets('selects account and session before starting authentication', (
