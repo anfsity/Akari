@@ -11,29 +11,29 @@ class ThemeRegistry {
   static const defaultThemeName = 'default';
   static const fallbackThemeName = 'fallback';
 
-  static ThemeBundle resolve(String name, {Color? accent}) {
+  static ThemeBundle resolve(String name, {Color? seed}) {
     assert(
       name == defaultThemeName || name == fallbackThemeName,
       'Unknown MOZAIS_THEME "$name"; falling back to $fallbackThemeName.',
     );
     return switch (name) {
-      defaultThemeName => buildDefaultTheme(accent: accent),
+      defaultThemeName => buildDefaultTheme(seed: seed),
       fallbackThemeName => buildFallbackTheme(),
       _ => buildFallbackTheme(),
     };
   }
 
-  /// Samples the theme background for a dynamic accent.
+  /// Samples the theme background for a dynamic palette seed.
   ///
   /// Returns null when the theme has no image background or the asset cannot
-  /// be decoded, in which case the caller keeps the built-in accent.
-  static Future<Color?> findBackgroundAccent(ThemeBundle theme) async {
+  /// be decoded, in which case the caller keeps the built-in seed.
+  static Future<Color?> findBackgroundSeed(ThemeBundle theme) async {
     final asset = theme.document.background.asset;
     if (asset == null) {
       return null;
     }
     try {
-      return await extractAccent(asset);
+      return await extractSeed(asset);
     } on Object {
       return null;
     }

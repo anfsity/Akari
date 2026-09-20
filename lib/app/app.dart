@@ -36,17 +36,17 @@ class _MyAppState extends State<MyApp> {
       defaultValue: ThemeRegistry.defaultThemeName,
     );
     _theme = ThemeRegistry.resolve(themeName);
-    unawaited(_loadThemeAccent(themeName));
+    unawaited(_loadThemeSeed(themeName));
     unawaited(_feature.initialize());
   }
 
-  Future<void> _loadThemeAccent(String themeName) async {
-    final accent = await ThemeRegistry.findBackgroundAccent(_theme);
-    if (!mounted || accent == null) {
+  Future<void> _loadThemeSeed(String themeName) async {
+    final seed = await ThemeRegistry.findBackgroundSeed(_theme);
+    if (!mounted || seed == null) {
       return;
     }
     setState(() {
-      _theme = ThemeRegistry.resolve(themeName, accent: accent);
+      _theme = ThemeRegistry.resolve(themeName, seed: seed);
     });
   }
 
