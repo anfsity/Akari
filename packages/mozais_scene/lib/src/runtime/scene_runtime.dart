@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../model/scene_document.dart';
 import '../model/theme_bundle.dart';
 import 'builtin_backgrounds.dart';
+import 'motion.dart';
 
 typedef SceneNodeBuilder = Widget Function(
   BuildContext context,
@@ -77,10 +78,11 @@ class SceneRuntime extends StatelessWidget {
 
   Widget _buildNode(BuildContext context, Size size, SceneNode node) {
     final visibleWhen = node.visibleWhen;
-    if (visibleWhen != null &&
-        !evaluateSceneCondition(visibleWhen, activePredicates)) {
-      return const SizedBox.shrink();
-    }
+    final visible =
+        visibleWhen == null ||
+        evaluateSceneCondition(visibleWhen, activePredicates);
+    final reducedMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     final safeArea = document.canvas.useSafeArea
         ? MediaQuery.paddingOf(context)
@@ -98,9 +100,17 @@ class SceneRuntime extends StatelessWidget {
       height = math.max(height, theme.tokens.minHitTarget);
     }
 
-    Widget child = nodeBuilder(context, node);
-    child = _applyTransform(node, child);
-    child = _applyMotion(context, node, child);
+    Widget child = _SceneNodeHost(
+      visible: visible,
+      motionBuilder: theme.motionBuilder(node.motion),
+      spec: (
+        preset: node.motion,
+        duration: reducedMotion ? Duration.zero : theme.tokens.mediumMotion,
+        curve: theme.tokens.standardCurve,
+        reducedMotion: reducedMotion,
+      ),
+      builder: (context) => _applyTransform(node, nodeBuilder(context, node)),
+    );
     if (node.motion != SceneMotionPreset.none) {
       child = RepaintBoundary(child: child);
     }
@@ -156,22 +166,114 @@ class SceneRuntime extends StatelessWidget {
     );
   }
 
-  Widget _applyMotion(BuildContext context, SceneNode node, Widget child) {
-    final builder = theme.motionBuilder(node.motion);
-    if (builder == null) {
-      return child;
-    }
-    final reducedMotion =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    return builder.build(
-      context,
-      (
-        preset: node.motion,
-        duration: reducedMotion ? Duration.zero : theme.tokens.mediumMotion,
-        curve: theme.tokens.standardCurve,
-        reducedMotion: reducedMotion,
-      ),
-      child,
+}
+
+/// Owns one node's presence lifecycle.
+///
+/// The controller runs from 0 (hidden) to 1 (shown) and follows [visible].
+/// When the node leaves the scene the runtime keeps it mounted until the exit
+/// transition settles, then unmounts it so stateful content such as the clock
+/// timer stops.
+class _SceneNodeHost extends StatefulWidget {
+  const _SceneNodeHost({
+    required this.visible,
+    required this.motionBuilder,
+    required this.spec,
+    required this.builder,
+  });
+
+  final bool visible;
+  final SceneMotionBuilder? motionBuilder;
+  final SceneMotionSpec spec;
+  final WidgetBuilder builder;
+
+  @override
+  State<_SceneNodeHost> createState() => _SceneNodeHostState();
+}
+
+class _SceneNodeHostState extends State<_SceneNodeHost>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late Animation<double> _progress;
+
+  bool get _animates =>
+      widget.motionBuilder != null &&
+      widget.motionBuilder!.animatesPresence &&
+      widget.spec.preset != SceneMotionPreset.none &&
+      !widget.spec.reducedMotion;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: widget.spec.duration,
     );
+    _progress = _controller.drive(CurveTween(curve: widget.spec.curve));
+    _controller.addStatusListener(_handleStatus);
+    if (widget.visible) {
+      if (_animates) {
+        _controller.forward();
+      } else {
+        _controller.value = 1;
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(_SceneNodeHost oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.spec.curve != oldWidget.spec.curve) {
+      _progress = _controller.drive(CurveTween(curve: widget.spec.curve));
+    }
+    if (widget.spec.duration != oldWidget.spec.duration) {
+      _controller.duration = widget.spec.duration;
+    }
+    if (widget.visible != oldWidget.visible) {
+      if (!_animates) {
+        _controller.value = widget.visible ? 1 : 0;
+      } else if (widget.visible) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    }
+  }
+
+  void _handleStatus(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed && !widget.visible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {});
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.removeStatusListener(_handleStatus);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_animates) {
+      return widget.visible ? widget.builder(context) : const SizedBox.shrink();
+    }
+    if (!widget.visible && _controller.status == AnimationStatus.dismissed) {
+      return const SizedBox.shrink();
+    }
+    final animated = widget.motionBuilder!.build(
+      context,
+      widget.spec,
+      _progress,
+      widget.builder(context),
+    );
+    if (widget.visible) {
+      return animated;
+    }
+    return IgnorePointer(child: ExcludeFocus(child: animated));
   }
 }

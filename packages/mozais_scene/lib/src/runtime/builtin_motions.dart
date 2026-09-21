@@ -7,17 +7,16 @@ class FadeMotionBuilder extends SceneMotionBuilder {
   const FadeMotionBuilder();
 
   @override
-  Widget build(BuildContext context, SceneMotionSpec spec, Widget child) {
+  Widget build(
+    BuildContext context,
+    SceneMotionSpec spec,
+    Animation<double> progress,
+    Widget child,
+  ) {
     if (spec.reducedMotion || spec.preset == SceneMotionPreset.none) {
       return child;
     }
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: spec.duration,
-      curve: spec.curve,
-      builder: (context, value, child) => Opacity(opacity: value, child: child),
-      child: child,
-    );
+    return FadeTransition(opacity: progress, child: child);
   }
 }
 
@@ -25,18 +24,21 @@ class FadeSlideMotionBuilder extends SceneMotionBuilder {
   const FadeSlideMotionBuilder();
 
   @override
-  Widget build(BuildContext context, SceneMotionSpec spec, Widget child) {
+  Widget build(
+    BuildContext context,
+    SceneMotionSpec spec,
+    Animation<double> progress,
+    Widget child,
+  ) {
     if (spec.reducedMotion || spec.preset == SceneMotionPreset.none) {
       return child;
     }
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: spec.duration,
-      curve: spec.curve,
-      builder: (context, value, child) => Opacity(
-        opacity: value,
+    return AnimatedBuilder(
+      animation: progress,
+      builder: (context, child) => Opacity(
+        opacity: progress.value,
         child: Transform.translate(
-          offset: Offset(0, (1 - value) * 16),
+          offset: Offset(0, (1 - progress.value) * 16),
           child: child,
         ),
       ),
@@ -49,19 +51,21 @@ class FadeScaleMotionBuilder extends SceneMotionBuilder {
   const FadeScaleMotionBuilder();
 
   @override
-  Widget build(BuildContext context, SceneMotionSpec spec, Widget child) {
+  Widget build(
+    BuildContext context,
+    SceneMotionSpec spec,
+    Animation<double> progress,
+    Widget child,
+  ) {
     if (spec.reducedMotion || spec.preset == SceneMotionPreset.none) {
       return child;
     }
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.96, end: 1),
-      duration: spec.duration,
-      curve: spec.curve,
-      builder: (context, value, child) => Opacity(
-        opacity: value,
-        child: Transform.scale(scale: value, child: child),
+    return FadeTransition(
+      opacity: progress,
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.96, end: 1).animate(progress),
+        child: child,
       ),
-      child: child,
     );
   }
 }
@@ -70,7 +74,15 @@ class HoverLiftMotionBuilder extends SceneMotionBuilder {
   const HoverLiftMotionBuilder();
 
   @override
-  Widget build(BuildContext context, SceneMotionSpec spec, Widget child) {
+  bool get animatesPresence => false;
+
+  @override
+  Widget build(
+    BuildContext context,
+    SceneMotionSpec spec,
+    Animation<double> progress,
+    Widget child,
+  ) {
     if (spec.reducedMotion) {
       return child;
     }
@@ -82,7 +94,15 @@ class FocusGlowMotionBuilder extends SceneMotionBuilder {
   const FocusGlowMotionBuilder();
 
   @override
-  Widget build(BuildContext context, SceneMotionSpec spec, Widget child) {
+  bool get animatesPresence => false;
+
+  @override
+  Widget build(
+    BuildContext context,
+    SceneMotionSpec spec,
+    Animation<double> progress,
+    Widget child,
+  ) {
     if (spec.reducedMotion) {
       return child;
     }
