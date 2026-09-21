@@ -132,6 +132,48 @@ void main() {
     );
     expect(find.text('gated'), findsOneWidget);
   });
+
+  testWidgets('keeps a node mounted through its exit transition', (
+    tester,
+  ) async {
+    final document = _document(
+      nodes: const [
+        SceneNode(
+          id: 'gated',
+          kind: SceneNodeKind.decoration,
+          rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
+          motion: SceneMotionPreset.fade,
+          visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
+        ),
+      ],
+    );
+    final theme = ThemeBundle(
+      id: 'test',
+      tokens: _tokens(),
+      document: document,
+      backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
+      motions: const {SceneMotionPreset.fade: FadeMotionBuilder()},
+    );
+
+    await tester.pumpWidget(
+      _runtimeWithTheme(
+        document,
+        theme,
+        activePredicates: const {ScenePredicate.isDormant},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('gated'), findsOneWidget);
+
+    await tester.pumpWidget(
+      _runtimeWithTheme(document, theme, activePredicates: const {}),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('gated'), findsOneWidget);
+
+    await tester.pumpAndSettle();
+    expect(find.text('gated'), findsNothing);
+  });
 }
 
 SceneDocument _document({required List<SceneNode> nodes}) {
