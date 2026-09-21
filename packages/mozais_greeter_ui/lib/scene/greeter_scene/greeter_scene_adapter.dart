@@ -51,11 +51,18 @@ class GreeterSceneAdapter extends StatefulWidget {
   const GreeterSceneAdapter({
     required this.feature,
     required this.theme,
+    this.handleKeyboard = true,
     super.key,
   });
 
   final GreeterFeature feature;
   final ThemeBundle theme;
+
+  /// Whether the adapter installs the greeter's global key handling.
+  ///
+  /// A host that embeds the greeter beside its own text fields, such as the
+  /// scene editor, sets this false so keystrokes are not captured.
+  final bool handleKeyboard;
 
   @override
   State<GreeterSceneAdapter> createState() => _GreeterSceneAdapterState();
@@ -85,12 +92,21 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     widget.feature.dormantSlots.addListener(_handleDormantChanged);
     // Key handling must not depend on the focus chain: the credential field
     // is disabled between attempts, which drops focus to the root scope.
-    FocusManager.instance.addEarlyKeyEventHandler(_handleKeyEvent);
+    if (widget.handleKeyboard) {
+      FocusManager.instance.addEarlyKeyEventHandler(_handleKeyEvent);
+    }
   }
 
   @override
   void didUpdateWidget(GreeterSceneAdapter oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.handleKeyboard != oldWidget.handleKeyboard) {
+      if (widget.handleKeyboard) {
+        FocusManager.instance.addEarlyKeyEventHandler(_handleKeyEvent);
+      } else {
+        FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
+      }
+    }
     if (widget.theme != oldWidget.theme) {
       _catalog = _createCatalog();
       _blurAnimation = _createBlurAnimation();
@@ -121,7 +137,9 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
 
   @override
   void dispose() {
-    FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
+    if (widget.handleKeyboard) {
+      FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
+    }
     widget.feature.dormantSlots.removeListener(_handleDormantChanged);
     unawaited(_effectSubscription.cancel());
     _blurController.dispose();
@@ -133,7 +151,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   @override
   Widget build(BuildContext context) {
     return Focus(
-      autofocus: true,
+      autofocus: widget.handleKeyboard,
       child: ListenableBuilder(
         listenable: Listenable.merge([
           widget.feature.serviceSlots,
