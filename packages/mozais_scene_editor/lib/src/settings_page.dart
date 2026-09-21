@@ -313,10 +313,11 @@ class _LivePreview extends StatelessWidget {
             const SizedBox(height: 8),
             Slider(value: 0.5, onChanged: (_) {}),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 Chip(label: Text(strings.visibility)),
-                const SizedBox(width: 8),
                 FilterChip(
                   label: Text(strings.rule),
                   selected: true,
