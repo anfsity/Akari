@@ -1,11 +1,10 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 import '../model/theme_bundle.dart';
 import 'builtin_backgrounds.dart';
 import 'motion.dart';
+import 'node_transform.dart';
 
 typedef SceneNodeBuilder = Widget Function(
   BuildContext context,
@@ -87,18 +86,12 @@ class SceneRuntime extends StatelessWidget {
     final safeArea = document.canvas.useSafeArea
         ? MediaQuery.paddingOf(context)
         : EdgeInsets.zero;
-    final availableWidth = math.max(0, size.width - safeArea.horizontal);
-    final availableHeight = math.max(0, size.height - safeArea.vertical);
-
-    var width = availableWidth * node.rect.width;
-    var height = availableHeight * node.rect.height;
-    final left = safeArea.left + availableWidth * node.rect.x;
-    final top = safeArea.top + availableHeight * node.rect.y;
-
-    if (node.isInteractive) {
-      width = math.max(width, theme.tokens.minHitTarget);
-      height = math.max(height, theme.tokens.minHitTarget);
-    }
+    final rect = sceneNodeRect(
+      node: node,
+      sceneSize: size,
+      safeArea: safeArea,
+      minHitTarget: theme.tokens.minHitTarget,
+    );
 
     Widget child = _SceneNodeHost(
       visible: visible,
@@ -109,7 +102,8 @@ class SceneRuntime extends StatelessWidget {
         curve: theme.tokens.standardCurve,
         reducedMotion: reducedMotion,
       ),
-      builder: (context) => _applyTransform(node, nodeBuilder(context, node)),
+      builder: (context) =>
+          _applyTransform(node, rect.size, nodeBuilder(context, node)),
     );
     if (node.motion != SceneMotionPreset.none) {
       child = RepaintBoundary(child: child);
@@ -123,38 +117,23 @@ class SceneRuntime extends StatelessWidget {
     }
 
     return Positioned(
-      left: left,
-      top: top,
-      width: width,
-      height: height,
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
       child: child,
     );
   }
 
-  Widget _applyTransform(SceneNode node, Widget child) {
+  Widget _applyTransform(SceneNode node, Size size, Widget child) {
     if (node.transform.isIdentity) {
       return child;
     }
-
-    final transform = node.transform;
-    final matrix = Matrix4.identity()
-      ..translateByDouble(transform.translateX, transform.translateY, 0, 1)
-      ..scaleByDouble(transform.scaleX, transform.scaleY, 1, 1)
-      ..rotateX(transform.rotationX * math.pi / 180)
-      ..rotateY(transform.rotationY * math.pi / 180)
-      ..rotateZ(transform.rotationZ * math.pi / 180);
-
-    if (transform.perspective != 0) {
-      matrix.setEntry(3, 2, transform.perspective);
-    }
-
     return Transform(
-      transform: matrix,
-      alignment: Alignment(transform.pivotX * 2 - 1, transform.pivotY * 2 - 1),
+      transform: sceneNodeTransformMatrix(node.transform, size),
       child: child,
     );
   }
-
 }
 
 /// Owns one node's presence lifecycle.
