@@ -39,6 +39,7 @@ class GreeterFeature {
     selectedUser: null,
     prompt: null,
     error: null,
+    promptError: null,
   ));
   final ValueNotifier<AccountPickerSlots> _accountPickerSlots = ValueNotifier(
     AccountPickerSlots(users: const [], selected: null),
@@ -143,6 +144,7 @@ class GreeterFeature {
                   : snapshot.detail,
               recovery: GreeterRecovery.reconnectService,
             ),
+            clearPromptError: true,
             dormant: false,
             clearServiceError: true,
           ),
@@ -161,6 +163,7 @@ class GreeterFeature {
           clearSelectedSession: true,
           clearServiceError: true,
           clearAuthError: true,
+          clearPromptError: true,
         ),
       );
       unawaited(_loadSessionCatalog());
@@ -199,6 +202,7 @@ class GreeterFeature {
         clearSelectedUser: true,
         clearSelectedSession: true,
         clearPrompt: true,
+        clearPromptError: true,
         backendAuthState: BackendAuthState.idle,
       ),
     );
@@ -209,7 +213,13 @@ class GreeterFeature {
     if (!_state.dormant || _state.serviceMode != ServiceMode.ready) {
       return;
     }
-    _replace(_state.copyWith(dormant: false, clearAuthError: true));
+    _replace(
+      _state.copyWith(
+        dormant: false,
+        clearAuthError: true,
+        clearPromptError: true,
+      ),
+    );
     _beginAuthenticationIfReady();
   }
 
@@ -226,6 +236,7 @@ class GreeterFeature {
         authMode: AuthMode.userSelection,
         clearPrompt: true,
         clearAuthError: true,
+        clearPromptError: true,
         clearCatalogError: true,
         backendAuthState: BackendAuthState.idle,
       ),
@@ -249,7 +260,13 @@ class GreeterFeature {
         !_state.users.any((candidate) => candidate.id == user.id)) {
       return;
     }
-    _replace(_state.copyWith(selectedUser: user, clearAuthError: true));
+    _replace(
+      _state.copyWith(
+        selectedUser: user,
+        clearAuthError: true,
+        clearPromptError: true,
+      ),
+    );
     _beginAuthenticationIfReady();
   }
 
@@ -274,7 +291,11 @@ class GreeterFeature {
     }
 
     _replace(
-      _state.copyWith(authMode: AuthMode.submitting, clearAuthError: true),
+      _state.copyWith(
+        authMode: AuthMode.submitting,
+        clearAuthError: true,
+        clearPromptError: true,
+      ),
     );
 
     _beginInFlight = true;
@@ -316,7 +337,11 @@ class GreeterFeature {
     }
 
     _replace(
-      _state.copyWith(authMode: AuthMode.submitting, clearAuthError: true),
+      _state.copyWith(
+        authMode: AuthMode.submitting,
+        clearAuthError: true,
+        clearPromptError: true,
+      ),
     );
     try {
       await _gateway.respond(attemptId, response);
@@ -355,6 +380,7 @@ class GreeterFeature {
             recovery: GreeterRecovery.reconnectService,
           ),
           clearAuthError: true,
+          clearPromptError: true,
         ),
       );
       return;
@@ -373,6 +399,7 @@ class GreeterFeature {
         selectedSession: session,
         clearCatalogError: true,
         clearAuthError: true,
+        clearPromptError: true,
       ),
     );
     unawaited(_sessionStore.saveSelectedSessionId(session.id));
@@ -444,6 +471,7 @@ class GreeterFeature {
         authMode: AuthMode.userSelection,
         clearPrompt: true,
         clearAuthError: true,
+        clearPromptError: true,
         clearCatalogError: _state.sessions.isNotEmpty,
         catalogMode: _state.sessions.isNotEmpty
             ? CatalogMode.ready
@@ -460,7 +488,11 @@ class GreeterFeature {
       return;
     }
     _replace(
-      _state.copyWith(authMode: AuthMode.prompting, clearAuthError: true),
+      _state.copyWith(
+        authMode: AuthMode.prompting,
+        clearAuthError: true,
+        clearPromptError: true,
+      ),
     );
     _effects.add(const RequestFocusEffect('credential'));
   }
@@ -507,10 +539,10 @@ class GreeterFeature {
             ),
           );
           _effects.add(const RequestFocusEffect('credential'));
+        } else if (kind == PromptKind.error) {
+          _replace(_state.copyWith(promptError: text));
         } else {
-          _effects.add(
-            ShowNoticeEffect(text, isError: kind == PromptKind.error),
-          );
+          _effects.add(ShowNoticeEffect(text));
         }
     }
   }
@@ -551,6 +583,9 @@ class GreeterFeature {
               )
             : null,
         clearAuthError: state != BackendAuthState.failed,
+        clearPromptError:
+            state == BackendAuthState.authenticated ||
+            state == BackendAuthState.failed,
         clearPrompt:
             state == BackendAuthState.authenticated ||
             state == BackendAuthState.failed,
@@ -652,6 +687,7 @@ class GreeterFeature {
         clearSelectedUser: clearSelectedUser,
         clearPrompt: true,
         clearAuthError: true,
+        clearPromptError: true,
         clearCatalogError: _state.sessions.isNotEmpty,
         catalogMode: _state.sessions.isNotEmpty
             ? CatalogMode.ready
@@ -662,7 +698,13 @@ class GreeterFeature {
   }
 
   void _showAuthError(GreeterError error) {
-    _replace(_state.copyWith(authMode: AuthMode.error, authError: error));
+    _replace(
+      _state.copyWith(
+        authMode: AuthMode.error,
+        authError: error,
+        clearPromptError: true,
+      ),
+    );
   }
 
   void _showSessionError(GreeterError error) {

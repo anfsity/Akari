@@ -818,6 +818,7 @@ class _StatusLine extends StatelessWidget {
         service.error?.message ?? 'Greeter service unavailable.',
       ServiceMode.ready => switch (auth.mode) {
         AuthMode.error => auth.error?.message ?? 'Authentication failed.',
+        AuthMode.prompting => auth.promptError ?? session.error?.message ?? '',
         AuthMode.submitting => 'Working...',
         AuthMode.handingOff => 'Starting session...',
         _ => session.error?.message ?? '',

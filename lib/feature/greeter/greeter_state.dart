@@ -95,6 +95,7 @@ class GreeterState {
     required this.selectedUser,
     required this.selectedSession,
     required this.prompt,
+    required this.promptError,
     required this.serviceError,
     required this.authError,
     required this.catalogError,
@@ -115,6 +116,7 @@ class GreeterState {
       selectedUser: null,
       selectedSession: null,
       prompt: null,
+      promptError: null,
       serviceError: null,
       authError: null,
       catalogError: null,
@@ -133,6 +135,10 @@ class GreeterState {
   final UserSummary? selectedUser;
   final SessionSummary? selectedSession;
   final PromptState? prompt;
+
+  /// Display-safe rejection shown beside an active prompt until the user
+  /// answers it again. Unlike [authError], it does not end the attempt.
+  final String? promptError;
   final GreeterError? serviceError;
   final GreeterError? authError;
   final GreeterError? catalogError;
@@ -156,6 +162,8 @@ class GreeterState {
     bool clearSelectedSession = false,
     PromptState? prompt,
     bool clearPrompt = false,
+    String? promptError,
+    bool clearPromptError = false,
     GreeterError? serviceError,
     bool clearServiceError = false,
     GreeterError? authError,
@@ -181,6 +189,7 @@ class GreeterState {
           ? null
           : selectedSession ?? this.selectedSession,
       prompt: clearPrompt ? null : prompt ?? this.prompt,
+      promptError: clearPromptError ? null : promptError ?? this.promptError,
       serviceError: clearServiceError
           ? null
           : serviceError ?? this.serviceError,

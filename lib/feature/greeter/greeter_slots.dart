@@ -22,6 +22,7 @@ class GreeterSceneSlots {
             : state.selectedUser,
         prompt: state.prompt,
         error: state.authError,
+        promptError: state.promptError,
       ),
       accountPicker: AccountPickerSlots(
         users: state.users,
@@ -51,6 +52,7 @@ typedef AuthPromptSlots = ({
   UserSummary? selectedUser,
   PromptState? prompt,
   GreeterError? error,
+  String? promptError,
 });
 
 class AccountPickerSlots {

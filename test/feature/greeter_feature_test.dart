@@ -109,12 +109,9 @@ void main() {
 
     expect(
       effects.whereType<ShowNoticeEffect>().map((effect) => effect.message),
-      containsAll(<String>[
-        'Authentication is continuing.',
-        'The provider is unavailable.',
-      ]),
+      contains('Authentication is continuing.'),
     );
-    expect(effects.whereType<ShowNoticeEffect>().last.isError, isTrue);
+    expect(feature.state.promptError, 'The provider is unavailable.');
 
     gateway.emit(
       BackendPromptReceived(
@@ -125,6 +122,7 @@ void main() {
     );
     await Future<void>.delayed(Duration.zero);
     expect(feature.state.prompt?.text, 'One-time code');
+    expect(feature.state.promptError, 'The provider is unavailable.');
 
     await effectSubscription.cancel();
     feature.dispose();
@@ -238,6 +236,30 @@ void main() {
 
     expect(feature.state.authMode, AuthMode.prompting);
     expect(feature.state.authError, isNull);
+
+    feature.dispose();
+  });
+
+  test('keeps a rejected credential message until the next response', () async {
+    final gateway = _FakeGreeterGateway();
+    final feature = await _createPromptedFeature(gateway);
+
+    gateway.emit(
+      BackendPromptReceived(
+        attemptId: gateway.attemptId!,
+        kind: PromptKind.error,
+        text: 'authentication failed',
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(feature.state.authMode, AuthMode.prompting);
+    expect(feature.state.promptError, 'authentication failed');
+
+    await feature.dispatch(const RespondToPromptCommand('second-try'));
+
+    expect(gateway.respondCalls, 1);
+    expect(feature.state.promptError, isNull);
 
     feature.dispose();
   });
