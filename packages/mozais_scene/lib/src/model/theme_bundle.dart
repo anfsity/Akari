@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 import '../runtime/background_renderer.dart';
 import '../runtime/motion.dart';
-import 'scene_document.dart';
 import 'theme_tokens.dart';
 
 class ThemeBundle {

@@ -1,6 +1,7 @@
 library;
 
-export 'src/model/scene_document.dart';
+export 'package:mozais_scene_schema/mozais_scene_schema.dart';
+
 export 'src/model/theme_bundle.dart';
 export 'src/model/theme_tokens.dart';
 export 'src/runtime/background_renderer.dart';

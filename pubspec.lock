@@ -360,6 +360,13 @@ packages:
       relative: true
     source: path
     version: "0.0.0"
+  mozais_scene_schema:
+    dependency: transitive
+    description:
+      path: "packages/mozais_scene_schema"
+      relative: true
+    source: path
+    version: "0.0.0"
   package_config:
     dependency: transitive
     description:

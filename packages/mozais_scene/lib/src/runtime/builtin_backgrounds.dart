@@ -1,8 +1,8 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
-import '../model/scene_document.dart';
 import 'background_renderer.dart';
 
 class ImageBackgroundRenderer extends BackgroundRenderer {
@@ -40,7 +40,7 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
       children: [
         image,
         ColoredBox(
-          color: background.color.withValues(
+          color: Color(background.color).withValues(
             alpha: background.scrimOpacity.clamp(0, 1),
           ),
         ),
@@ -54,6 +54,6 @@ class SolidBackgroundRenderer extends BackgroundRenderer {
 
   @override
   Widget build(BuildContext context, SceneBackground background) {
-    return ColoredBox(color: background.color);
+    return ColoredBox(color: Color(background.color));
   }
 }
