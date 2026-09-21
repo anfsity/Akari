@@ -46,6 +46,10 @@ and needs no source tree or app install.
   the right sidebar defaults narrower than before.
 - Unsaved-change prompt on Open and window close, controlled by
   `confirmUnsavedChanges` and using `AppLifecycleListener.onExitRequested`.
+- The selection overlay follows the node's transform through the shared
+  `sceneNodeRect` and `sceneNodeTransformMatrix` helpers: a dashed box with a
+  corner resize handle, a dot above the box for in-plane rotation, and a
+  translucent trackball for X/Y rotation. The cursor changes per region.
 
 ## 4. Agreed design
 
@@ -131,12 +135,10 @@ When the document is dirty, Open, window close, and switching documents prompt
 
 ## 5. Roadmap
 
-1. **Mouse rework**: public transform matrix, transform-following selection box,
-   Z rotation dot, trackball sphere.
-2. **Real preview**: extract `mozais_greeter_ui`, add the document-injection
+1. **Real preview**: extract `mozais_greeter_ui`, add the document-injection
    seam, embed the greeter, add the Outline/Real toggle.
-3. **Document panel and background import**.
-4. **Visibility UI rework**: labels, presets, Advanced, inspector tabs.
+2. **Document panel and background import**.
+3. **Visibility UI rework**: labels, presets, Advanced, inspector tabs.
 
 ## 6. Deferred
 
