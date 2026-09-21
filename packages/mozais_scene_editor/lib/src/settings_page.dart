@@ -1,17 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'editor_locale.dart';
+import 'editor_settings.dart';
 import 'editor_settings_controller.dart';
 import 'editor_strings.dart';
 import 'editor_theme.dart';
-
-/// The aspect ratios offered in settings. The value is width / height.
-const editorAspectRatios = <String, double>{
-  '16:9': 16 / 9,
-  '16:10': 16 / 10,
-  '4:3': 4 / 3,
-  '21:9': 21 / 9,
-};
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({required this.controller, super.key});

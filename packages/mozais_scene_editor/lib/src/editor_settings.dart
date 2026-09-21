@@ -1,6 +1,14 @@
 import 'editor_locale.dart';
 import 'editor_theme.dart';
 
+/// The aspect ratios offered in settings. The value is width / height.
+const editorAspectRatios = <String, double>{
+  '16:9': 16 / 9,
+  '16:10': 16 / 10,
+  '4:3': 4 / 3,
+  '21:9': 21 / 9,
+};
+
 /// Persisted editor preferences. These never affect the greeter's document or
 /// theme; they only configure the authoring tool.
 class EditorSettings {
@@ -63,9 +71,8 @@ class EditorSettings {
       gridSnap: json['gridSnap'] is bool
           ? json['gridSnap']! as bool
           : defaults.gridSnap,
-      previewAspectRatio: json['previewAspectRatio'] is num
-          ? (json['previewAspectRatio']! as num).toDouble()
-          : defaults.previewAspectRatio,
+      previewAspectRatio: _aspectRatio(json['previewAspectRatio']) ??
+          defaults.previewAspectRatio,
       defaultScenePath: json['defaultScenePath'] is String
           ? json['defaultScenePath']! as String
           : defaults.defaultScenePath,
@@ -104,4 +111,12 @@ EditorThemeId? _themeId(Object? value) {
     }
   }
   return null;
+}
+
+double? _aspectRatio(Object? value) {
+  if (value is! num) {
+    return null;
+  }
+  final ratio = value.toDouble();
+  return editorAspectRatios.containsValue(ratio) ? ratio : null;
 }
