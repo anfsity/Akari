@@ -72,7 +72,7 @@ class DBusGreeterGateway implements GreeterGateway {
     );
     return response.returnValues.single.asArray().map((value) {
       final [id, name, ...] = value.asStruct();
-      return SessionSummary(id: id.asString(), name: name.asString());
+      return (id: id.asString(), name: name.asString());
     }).toList();
   }
 

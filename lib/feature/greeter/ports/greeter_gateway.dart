@@ -110,8 +110,8 @@ class DemoGreeterGateway implements GreeterGateway {
   @override
   Future<List<SessionSummary>> listSessions() async {
     return const [
-      SessionSummary(id: 'wayland:sway', name: 'Sway'),
-      SessionSummary(id: 'wayland:hyprland', name: 'Hyprland'),
+      (id: 'wayland:sway', name: 'Sway'),
+      (id: 'wayland:hyprland', name: 'Hyprland'),
     ];
   }
 

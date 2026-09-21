@@ -6,9 +6,7 @@ void main() {
     final users = <UserSummary>[
       const UserSummary(id: 'alice', displayName: 'Alice'),
     ];
-    final sessions = <SessionSummary>[
-      const SessionSummary(id: 'sway', name: 'Sway'),
-    ];
+    final sessions = <SessionSummary>[const (id: 'sway', name: 'Sway')];
 
     final state = GreeterState.initial().copyWith(
       users: users,
@@ -24,9 +22,7 @@ void main() {
       throwsUnsupportedError,
     );
     expect(
-      () => state.sessions.add(
-        const SessionSummary(id: 'hyprland', name: 'Hyprland'),
-      ),
+      () => state.sessions.add(const (id: 'hyprland', name: 'Hyprland')),
       throwsUnsupportedError,
     );
   });

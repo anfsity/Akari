@@ -196,7 +196,7 @@ class _SingleUserGateway implements GreeterGateway {
 
   @override
   Future<List<SessionSummary>> listSessions() async => const [
-    SessionSummary(id: 'wayland:hyprland', name: 'Hyprland'),
+    (id: 'wayland:hyprland', name: 'Hyprland'),
   ];
 
   @override

@@ -136,7 +136,7 @@ class GreeterFeature {
             users: users,
             authMode: AuthMode.error,
             backendAuthState: snapshot.state,
-            authError: GreeterError(
+            authError: (
               kind: GreeterErrorKind.authentication,
               message: snapshot.detail.isEmpty
                   ? 'The greeter service has an active authentication transaction.'
@@ -307,13 +307,11 @@ class GreeterFeature {
       return;
     }
     if (response.trim().isEmpty) {
-      _showAuthError(
-        const GreeterError(
-          kind: GreeterErrorKind.input,
-          message: 'A response is required.',
-          recovery: GreeterRecovery.retryPrompt,
-        ),
-      );
+      _showAuthError(const (
+        kind: GreeterErrorKind.input,
+        message: 'A response is required.',
+        recovery: GreeterRecovery.retryPrompt,
+      ));
       return;
     }
 
@@ -483,7 +481,7 @@ class GreeterFeature {
             serviceMode: ServiceMode.unavailable,
             authMode: AuthMode.error,
             dormant: false,
-            serviceError: const GreeterError(
+            serviceError: const (
               kind: GreeterErrorKind.transport,
               message: 'The greeter service is unavailable.',
               recovery: GreeterRecovery.reconnectService,
@@ -503,7 +501,7 @@ class GreeterFeature {
           _replace(
             _state.copyWith(
               authMode: AuthMode.prompting,
-              prompt: PromptState(kind: kind, text: text),
+              prompt: (kind: kind, text: text),
               backendAuthState: BackendAuthState.waitingForInput,
               clearAuthError: true,
             ),
@@ -546,7 +544,7 @@ class GreeterFeature {
         authMode: nextMode,
         backendAuthState: state,
         authError: state == BackendAuthState.failed
-            ? GreeterError(
+            ? (
                 kind: GreeterErrorKind.authentication,
                 message: detail,
                 recovery: GreeterRecovery.retryAuthentication,
@@ -710,13 +708,9 @@ class GreeterFeature {
     required GreeterRecovery recovery,
   }) {
     if (error is GreeterGatewayException) {
-      return GreeterError(
-        kind: error.kind,
-        message: error.message,
-        recovery: recovery,
-      );
+      return (kind: error.kind, message: error.message, recovery: recovery);
     }
-    return GreeterError(
+    return (
       kind: fallbackKind,
       message: 'The greeter service is unavailable.',
       recovery: recovery,
