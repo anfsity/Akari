@@ -62,9 +62,7 @@ class EditorSettings {
   factory EditorSettings.fromJson(Map<String, Object?> json) {
     return EditorSettings(
       themeId: _themeId(json['themeId']) ?? defaults.themeId,
-      locale: json['locale'] is String
-          ? json['locale']! as String
-          : defaults.locale,
+      locale: _locale(json['locale']) ?? defaults.locale,
       confirmUnsavedChanges: json['confirmUnsavedChanges'] is bool
           ? json['confirmUnsavedChanges']! as bool
           : defaults.confirmUnsavedChanges,
@@ -119,4 +117,16 @@ double? _aspectRatio(Object? value) {
   }
   final ratio = value.toDouble();
   return editorAspectRatios.containsValue(ratio) ? ratio : null;
+}
+
+String? _locale(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+  for (final locale in editorLocales) {
+    if (locale.code == value) {
+      return value;
+    }
+  }
+  return null;
 }

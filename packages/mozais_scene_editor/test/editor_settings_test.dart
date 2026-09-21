@@ -48,6 +48,7 @@ void main() {
     file.writeAsStringSync('''
 {
   "themeId": "solarized",
+  "locale": "xx",
   "previewAspectRatio": 2.5
 }
 ''');
@@ -55,6 +56,7 @@ void main() {
     final settings = store.load();
 
     expect(settings.themeId, EditorSettings.defaults.themeId);
+    expect(settings.locale, EditorSettings.defaults.locale);
     expect(settings.previewAspectRatio, EditorSettings.defaults.previewAspectRatio);
   });
 
