@@ -1,0 +1,132 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mozais_scene/mozais_scene.dart';
+import 'package:mozais_scene_editor/src/editor_controller.dart';
+import 'package:mozais_scene_editor/src/editor_settings.dart';
+import 'package:mozais_scene_editor/src/editor_settings_controller.dart';
+import 'package:mozais_scene_editor/src/editor_settings_scope.dart';
+import 'package:mozais_scene_editor/src/editor_settings_store.dart';
+import 'package:mozais_scene_editor/src/editor_strings.dart';
+import 'package:mozais_scene_editor/src/english_strings.dart';
+import 'package:mozais_scene_editor/src/scene_preview.dart';
+
+const _scene = '''
+{
+  "id": "test",
+  "version": 1,
+  "canvas": {"fit": "cover", "useSafeArea": false},
+  "background": {"kind": "solid"},
+  "nodes": [
+    {
+      "id": "panel",
+      "kind": "glassPanel",
+      "rect": {"x": 0.5, "y": 0.5, "width": 0.2, "height": 0.2}
+    }
+  ]
+}
+''';
+
+void main() {
+  late Directory directory;
+  late SceneEditorController controller;
+  late EditorSettingsController settings;
+
+  setUp(() async {
+    directory = Directory.systemTemp.createTempSync('mozais_preview');
+    final file = File('${directory.path}/test.scene.json')
+      ..writeAsStringSync(_scene);
+    controller = SceneEditorController()..setPath(file.path);
+    await controller.open();
+    settings = EditorSettingsController(
+      EditorSettingsStore(File('${directory.path}/settings.json')),
+      initial: EditorSettings.defaults,
+    );
+  });
+
+  tearDown(() {
+    settings.dispose();
+    directory.deleteSync(recursive: true);
+  });
+
+  Future<void> pumpPreview(WidgetTester tester) async {
+    await tester.pumpWidget(
+      EditorStringsScope(
+        strings: const EnglishStrings(),
+        child: EditorSettingsScope(
+          controller: settings,
+          child: MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 450,
+                child: ScenePreview(controller: controller),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Rect previewRect(WidgetTester tester) {
+    final origin = tester.getTopLeft(find.byType(SceneRuntime));
+    final size = tester.getSize(find.byType(SceneRuntime));
+    return origin & size;
+  }
+
+  testWidgets('dragging inside the node moves it', (tester) async {
+    await pumpPreview(tester);
+    final preview = previewRect(tester);
+
+    final center = preview.topLeft +
+        Offset(preview.width * 0.6, preview.height * 0.6);
+    await tester.dragFrom(center, const Offset(40, 20));
+    await tester.pump();
+
+    final rect = controller.selectedNode!.rect;
+    expect(rect.x, greaterThan(0.5));
+    expect(rect.y, greaterThan(0.5));
+  });
+
+  testWidgets('dragging the corner handle resizes the node', (tester) async {
+    await pumpPreview(tester);
+    final preview = previewRect(tester);
+
+    final handle = preview.topLeft +
+        Offset(preview.width * 0.7 + 4, preview.height * 0.7 + 4);
+    await tester.dragFrom(handle, const Offset(40, 20));
+    await tester.pump();
+
+    final rect = controller.selectedNode!.rect;
+    expect(rect.width, greaterThan(0.2));
+    expect(rect.height, greaterThan(0.2));
+  });
+
+  testWidgets('dragging the dot rotates in plane', (tester) async {
+    await pumpPreview(tester);
+    final preview = previewRect(tester);
+
+    final dot = preview.topLeft +
+        Offset(preview.width * 0.6, preview.height * 0.5 - 30);
+    await tester.dragFrom(dot, const Offset(30, 0));
+    await tester.pump();
+
+    expect(controller.selectedNode!.transform.rotationZ, greaterThan(0));
+  });
+
+  testWidgets('dragging the trackball rotates in 3D', (tester) async {
+    await pumpPreview(tester);
+    final preview = previewRect(tester);
+
+    final trackball = preview.topLeft +
+        Offset(preview.width * 0.6, preview.height * 0.7 + 44);
+    await tester.dragFrom(trackball, const Offset(40, 20));
+    await tester.pump();
+
+    final transform = controller.selectedNode!.transform;
+    expect(transform.rotationY, greaterThan(0));
+    expect(transform.rotationX, lessThan(0));
+  });
+}
