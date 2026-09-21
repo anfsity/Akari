@@ -89,18 +89,7 @@ class GreeterWidgetCatalog {
           auth: auth,
           onRespond: onRespond,
           onRetry: (recovery) {
-            switch (recovery) {
-              case GreeterRecovery.retryPrompt:
-                onDispatch(const RetryPromptCommand());
-              case GreeterRecovery.reconnectService:
-                onDispatch(const ReconnectServiceCommand());
-              case GreeterRecovery.selectUser:
-              case GreeterRecovery.selectSession:
-                onDispatch(const CancelAuthenticationCommand());
-              case GreeterRecovery.retryAuthentication:
-              case GreeterRecovery.retrySessionCatalog:
-                onDispatch(const RetryAuthenticationCommand());
-            }
+            onDispatch(recoveryCommand(recovery));
           },
         ),
       ),

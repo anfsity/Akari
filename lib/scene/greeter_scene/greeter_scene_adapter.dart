@@ -83,6 +83,9 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     );
     _blurAnimation = _createBlurAnimation();
     widget.feature.dormantSlots.addListener(_handleDormantChanged);
+    // Key handling must not depend on the focus chain: the credential field
+    // is disabled between attempts, which drops focus to the root scope.
+    FocusManager.instance.addEarlyKeyEventHandler(_handleKeyEvent);
   }
 
   @override
@@ -118,6 +121,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
 
   @override
   void dispose() {
+    FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
     widget.feature.dormantSlots.removeListener(_handleDormantChanged);
     unawaited(_effectSubscription.cancel());
     _blurController.dispose();
@@ -130,7 +134,6 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   Widget build(BuildContext context) {
     return Focus(
       autofocus: true,
-      onKeyEvent: _handleKeyEvent,
       child: ListenableBuilder(
         listenable: Listenable.merge([
           widget.feature.serviceSlots,
@@ -183,11 +186,18 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     }
   }
 
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+  KeyEventResult _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) {
       return KeyEventResult.ignored;
     }
+    // A pushed dialog or menu owns the keyboard until it is dismissed.
+    if (ModalRoute.of(context)?.isCurrent != true) {
+      return KeyEventResult.ignored;
+    }
     if (widget.feature.dormantSlots.value) {
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        return KeyEventResult.ignored;
+      }
       _dispatch(const WakeGreeterCommand());
       _bufferKey(event);
       return KeyEventResult.handled;
@@ -205,29 +215,45 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       }
       return KeyEventResult.ignored;
     }
-    if (_isCapturingTypeahead() && !_credentialFocusNode.hasFocus) {
-      if (!_bufferKey(event)) {
-        return KeyEventResult.ignored;
-      }
-      if (widget.feature.authPromptSlots.value.mode == AuthMode.prompting) {
-        _scheduleFlushAndFocus();
-      }
-      return KeyEventResult.handled;
+    if (_credentialFocusNode.hasFocus || !_capturesTypeahead()) {
+      return KeyEventResult.ignored;
     }
-    return KeyEventResult.ignored;
+    if (!_bufferKey(event)) {
+      return KeyEventResult.ignored;
+    }
+    _recoverPromptForTyping();
+    return KeyEventResult.handled;
   }
 
-  /// Buffers keystrokes typed before the credential field can take focus so
-  /// the first characters of a password are not dropped during the wake.
-  bool _isCapturingTypeahead() {
+  /// Whether a keystroke typed outside the credential field should be held
+  /// until a prompt can accept it. A rejected response keeps the same attempt,
+  /// so typing resumes it instead of waiting for the retry action.
+  bool _capturesTypeahead() {
     final auth = widget.feature.authPromptSlots.value;
-    if (auth.mode == AuthMode.prompting) {
-      return !_credentialFocusNode.hasFocus;
-    }
-    // While the first prompt is still on its way the field is disabled, so
-    // keep collecting; once a prompt exists the response is already in flight.
-    return auth.mode == AuthMode.userSelection ||
+    return auth.mode == AuthMode.prompting ||
+        auth.mode == AuthMode.userSelection ||
+        auth.mode == AuthMode.error ||
         (auth.mode == AuthMode.submitting && auth.prompt == null);
+  }
+
+  /// Makes the buffered keystroke land in the credential field, restarting a
+  /// rejected prompt when the field is not currently accepting input.
+  void _recoverPromptForTyping() {
+    final auth = widget.feature.authPromptSlots.value;
+    switch (auth.mode) {
+      case AuthMode.prompting:
+        _scheduleFlushAndFocus();
+      case AuthMode.error:
+        final error = auth.error;
+        if (error != null) {
+          _dispatch(recoveryCommand(error.recovery));
+        }
+      case AuthMode.userSelection:
+      case AuthMode.submitting:
+      case AuthMode.sessionSelection:
+      case AuthMode.handingOff:
+        break;
+    }
   }
 
   bool _bufferKey(KeyEvent event) {
