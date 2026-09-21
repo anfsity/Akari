@@ -33,6 +33,10 @@ class EnglishStrings extends EditorStrings {
   String get previewEmpty => 'Open a scene to preview it.';
   @override
   String get selectANode => 'Select a node.';
+  @override
+  String get outline => 'Outline';
+  @override
+  String get real => 'Real';
 
   @override
   String get addNode => 'Add node';

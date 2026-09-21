@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 import 'package:mozais_scene/mozais_scene.dart';
 import 'package:mozais_scene_editor/src/editor_controller.dart';
 import 'package:mozais_scene_editor/src/editor_settings.dart';
@@ -32,6 +33,7 @@ void main() {
   late Directory directory;
   late SceneEditorController controller;
   late EditorSettingsController settings;
+  late GreeterFeature feature;
 
   setUp(() async {
     directory = Directory.systemTemp.createTempSync('mozais_preview');
@@ -43,14 +45,19 @@ void main() {
       EditorSettingsStore(File('${directory.path}/settings.json')),
       initial: EditorSettings.defaults,
     );
+    feature = GreeterFeature(gateway: DemoGreeterGateway());
   });
 
   tearDown(() {
+    feature.dispose();
     settings.dispose();
     directory.deleteSync(recursive: true);
   });
 
-  Future<void> pumpPreview(WidgetTester tester) async {
+  Future<void> pumpPreview(
+    WidgetTester tester, {
+    PreviewMode mode = PreviewMode.outline,
+  }) async {
     await tester.pumpWidget(
       EditorStringsScope(
         strings: const EnglishStrings(),
@@ -61,7 +68,11 @@ void main() {
               body: SizedBox(
                 width: 800,
                 height: 450,
-                child: ScenePreview(controller: controller),
+                child: ScenePreview(
+                  controller: controller,
+                  feature: feature,
+                  mode: mode,
+                ),
               ),
             ),
           ),
@@ -128,5 +139,11 @@ void main() {
     final transform = controller.selectedNode!.transform;
     expect(transform.rotationY, greaterThan(0));
     expect(transform.rotationX, lessThan(0));
+  });
+
+  testWidgets('real mode embeds the greeter adapter', (tester) async {
+    await pumpPreview(tester, mode: PreviewMode.real);
+
+    expect(find.byType(GreeterSceneAdapter), findsOneWidget);
   });
 }

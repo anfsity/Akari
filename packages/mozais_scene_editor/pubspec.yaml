@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  mozais_greeter_ui:
+    path: ../mozais_greeter_ui
   mozais_scene:
     path: ../mozais_scene
   mozais_scene_schema:

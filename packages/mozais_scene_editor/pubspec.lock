@@ -123,6 +123,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.18.3"
+  mozais_greeter_ui:
+    dependency: "direct main"
+    description:
+      path: "../mozais_greeter_ui"
+      relative: true
+    source: path
+    version: "0.0.0"
   mozais_scene:
     dependency: "direct main"
     description:
