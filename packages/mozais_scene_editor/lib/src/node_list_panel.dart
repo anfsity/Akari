@@ -19,10 +19,10 @@ class NodeListPanel extends StatefulWidget {
 }
 
 class _NodeListPanelState extends State<NodeListPanel> {
-  double _predicatesHeight = 180;
+  double _predicatesHeight = 240;
 
   static const _minPredicatesHeight = 72.0;
-  static const _maxPredicatesHeight = 360.0;
+  static const _maxPredicatesHeight = 420.0;
 
   void _resizePredicates(double delta) {
     setState(() {
