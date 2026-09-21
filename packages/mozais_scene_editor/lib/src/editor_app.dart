@@ -72,7 +72,6 @@ class _EditorScreenState extends State<EditorScreen> {
   late final SceneEditorController _controller;
   late final TextEditingController _pathController;
   late final AppLifecycleListener _lifecycleListener;
-  bool _initialized = false;
   double _leftWidth = 240;
   double _rightWidth = 300;
 
@@ -89,15 +88,6 @@ class _EditorScreenState extends State<EditorScreen> {
     _lifecycleListener = AppLifecycleListener(
       onExitRequested: _handleExitRequest,
     );
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_initialized) {
-      return;
-    }
-    _initialized = true;
     final configured = widget.settings.settings.defaultScenePath;
     final path = configured.isNotEmpty ? configured : defaultScenePath() ?? '';
     _controller.setPath(path);
