@@ -99,6 +99,20 @@ paths are not allowed.
 Production code consumes generated Dart. Runtime JSON parsing is not part of
 the application path.
 
+The scene code is split so tooling can reuse the schema without pulling in
+Flutter:
+
+```text
+packages/mozais_scene_schema   Flutter-free model, condition evaluator, JSON codec
+packages/mozais_scene          runtime, theme bundle, background and motion registries
+packages/mozais_scene_codegen  build_runner generator that decodes JSON and emits Dart
+packages/mozais_scene_editor   desktop editor over the same model and runtime
+```
+
+`mozais_scene` re-exports the schema, so application code keeps a single
+import. The generator and the editor share the schema's codec and validation
+instead of each parsing the document format.
+
 ## 4. ThemeBundle and Theme Selection
 
 `ThemeBundle` combines:
@@ -228,4 +242,5 @@ beyond the documented threshold fail the performance suite.
 4. Add the default and fallback themes.
 5. Replace layout assertions with interaction coverage.
 6. Add the separate profile performance suite.
-7. Build the scene editor as a later tool on the same model and runtime.
+7. Build the scene editor as a tool on the same model and runtime
+   (`packages/mozais_scene_editor`).
