@@ -242,7 +242,6 @@ ThemeTokens _tokens() {
     mediumMotion: const Duration(milliseconds: 200),
     standardCurve: Curves.easeOut,
     minHitTarget: 44,
-    maxInteractiveRotationDegrees: 15,
     allowBlur: false,
     blurSigma: 0,
     glassColor: Colors.black,

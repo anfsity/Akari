@@ -157,10 +157,9 @@ Interactive nodes may be transformed, but runtime invariants still apply:
 
 - minimum hit target size.
 - safe-area fallback.
-- bounded interactive rotation.
 - deterministic keyboard traversal.
 
-Decorative nodes may use the full supported transform range. Full 3D meshes,
+Nodes may use the full supported transform range. Full 3D meshes,
 lighting, and arbitrary cameras are out of scope.
 
 ## 6. Background and Motion
@@ -222,8 +221,8 @@ Interaction tests cover:
 
 Runtime tests cover:
 
-- transform clamping, safe-area fallback, render/focus order, reduced motion,
-  and background failure fallback.
+- safe-area fallback, render/focus order, reduced motion, and background
+  failure fallback.
 
 Tests must not assert pixel coordinates or exact visual placement. A small
 number of usability invariants may assert reachability, focus order, hit target

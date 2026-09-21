@@ -32,7 +32,6 @@ ThemeBundle buildFallbackTheme() {
       mediumMotion: Duration.zero,
       standardCurve: Curves.linear,
       minHitTarget: 44,
-      maxInteractiveRotationDegrees: 0,
       allowBlur: false,
       blurSigma: 0,
       glassColor: _base.withValues(alpha: 0.86),
