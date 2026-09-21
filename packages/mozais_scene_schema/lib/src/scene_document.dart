@@ -132,6 +132,20 @@ class SceneRect {
       height > 0 &&
       x + width <= 1 &&
       y + height <= 1;
+
+  SceneRect copyWith({
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+  }) {
+    return SceneRect(
+      x: x ?? this.x,
+      y: y ?? this.y,
+      width: width ?? this.width,
+      height: height ?? this.height,
+    );
+  }
 }
 
 class SceneTransform {
@@ -168,6 +182,32 @@ class SceneTransform {
       rotationY == 0 &&
       rotationZ == 0 &&
       perspective == 0;
+
+  SceneTransform copyWith({
+    double? translateX,
+    double? translateY,
+    double? scaleX,
+    double? scaleY,
+    double? rotationX,
+    double? rotationY,
+    double? rotationZ,
+    double? pivotX,
+    double? pivotY,
+    double? perspective,
+  }) {
+    return SceneTransform(
+      translateX: translateX ?? this.translateX,
+      translateY: translateY ?? this.translateY,
+      scaleX: scaleX ?? this.scaleX,
+      scaleY: scaleY ?? this.scaleY,
+      rotationX: rotationX ?? this.rotationX,
+      rotationY: rotationY ?? this.rotationY,
+      rotationZ: rotationZ ?? this.rotationZ,
+      pivotX: pivotX ?? this.pivotX,
+      pivotY: pivotY ?? this.pivotY,
+      perspective: perspective ?? this.perspective,
+    );
+  }
 }
 
 class SceneCanvas {
@@ -175,6 +215,13 @@ class SceneCanvas {
 
   final SceneCanvasFit fit;
   final bool useSafeArea;
+
+  SceneCanvas copyWith({SceneCanvasFit? fit, bool? useSafeArea}) {
+    return SceneCanvas(
+      fit: fit ?? this.fit,
+      useSafeArea: useSafeArea ?? this.useSafeArea,
+    );
+  }
 }
 
 class SceneBackground {
@@ -259,6 +306,38 @@ class SceneNode {
       kind == SceneNodeKind.primaryAction ||
       kind == SceneNodeKind.secondaryAction ||
       kind == SceneNodeKind.powerActions;
+
+  SceneNode copyWith({
+    String? id,
+    SceneNodeKind? kind,
+    SceneRect? rect,
+    SceneTransform? transform,
+    int? z,
+    int? renderOrder,
+    int? focusOrder,
+    SceneMotionPreset? motion,
+    Object? visibleWhen = _unset,
+    Object? action = _unset,
+    Map<String, String>? properties,
+  }) {
+    return SceneNode(
+      id: id ?? this.id,
+      kind: kind ?? this.kind,
+      rect: rect ?? this.rect,
+      transform: transform ?? this.transform,
+      z: z ?? this.z,
+      renderOrder: renderOrder ?? this.renderOrder,
+      focusOrder: focusOrder ?? this.focusOrder,
+      motion: motion ?? this.motion,
+      visibleWhen: identical(visibleWhen, _unset)
+          ? this.visibleWhen
+          : visibleWhen as SceneCondition?,
+      action: identical(action, _unset)
+          ? this.action
+          : action as SceneAction?,
+      properties: properties ?? this.properties,
+    );
+  }
 }
 
 class SceneDocument {
@@ -287,4 +366,23 @@ class SceneDocument {
       });
     return ordered;
   }
+
+  SceneDocument copyWith({
+    String? id,
+    int? version,
+    SceneCanvas? canvas,
+    SceneBackground? background,
+    List<SceneNode>? nodes,
+  }) {
+    return SceneDocument(
+      id: id ?? this.id,
+      version: version ?? this.version,
+      canvas: canvas ?? this.canvas,
+      background: background ?? this.background,
+      nodes: nodes ?? this.nodes,
+    );
+  }
 }
+
+/// Sentinel for [SceneNode.copyWith] nullable fields that may be cleared.
+const Object _unset = Object();
