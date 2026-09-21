@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
+import 'editor_strings.dart';
+
 /// Edits a node's `visibleWhen` condition as a flat ANY/ALL rule list.
 ///
 /// Conditions that nest deeper than one combinator level are shown read-only;
@@ -18,13 +20,14 @@ class ConditionEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final condition = this.condition;
+    final strings = EditorStringsScope.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(value: false, label: Text('Always')),
-            ButtonSegment(value: true, label: Text('Rule')),
+          segments: [
+            ButtonSegment(value: false, label: Text(strings.always)),
+            ButtonSegment(value: true, label: Text(strings.rule)),
           ],
           selected: {condition != null},
           onSelectionChanged: (selection) {
@@ -55,16 +58,17 @@ class _RuleBuilder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
     final draft = _flatten(condition);
     if (draft == null) {
       return Row(
         children: [
-          const Expanded(
-            child: Text('Nested condition. Edit it in the JSON file.'),
+          Expanded(
+            child: Text(strings.nestedCondition),
           ),
           TextButton(
             onPressed: () => onChanged(null),
-            child: const Text('Clear'),
+            child: Text(strings.clear),
           ),
         ],
       );
@@ -74,31 +78,31 @@ class _RuleBuilder extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Text('Match'),
+            Text(strings.match),
             const SizedBox(width: 8),
             DropdownButton<bool>(
               value: draft.any,
               onChanged: (value) =>
                   onChanged(_build(draft.copyWith(any: value ?? false))),
-              items: const [
-                DropdownMenuItem(value: false, child: Text('all of')),
-                DropdownMenuItem(value: true, child: Text('any of')),
+              items: [
+                DropdownMenuItem(value: false, child: Text(strings.allOf)),
+                DropdownMenuItem(value: true, child: Text(strings.anyOf)),
               ],
             ),
           ],
         ),
         for (var index = 0; index < draft.clauses.length; index++)
-          _clauseRow(draft, index),
+          _clauseRow(strings, draft, index),
         TextButton.icon(
           onPressed: () => onChanged(_build(draft.withClause())),
           icon: const Icon(Icons.add),
-          label: const Text('Add clause'),
+          label: Text(strings.addClause),
         ),
       ],
     );
   }
 
-  Widget _clauseRow(_RuleDraft draft, int index) {
+  Widget _clauseRow(EditorStrings strings, _RuleDraft draft, int index) {
     final clause = draft.clauses[index];
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -125,13 +129,13 @@ class _RuleBuilder extends StatelessWidget {
                 draft.withClauseAt(index, clause.copyWith(negated: value ?? false)),
               ),
             ),
-            items: const [
-              DropdownMenuItem(value: false, child: Text('is')),
-              DropdownMenuItem(value: true, child: Text('is not')),
+            items: [
+              DropdownMenuItem(value: false, child: Text(strings.isOperator)),
+              DropdownMenuItem(value: true, child: Text(strings.isNotOperator)),
             ],
           ),
           IconButton(
-            tooltip: 'Remove clause',
+            tooltip: strings.removeClause,
             onPressed: draft.clauses.length == 1
                 ? null
                 : () => onChanged(_build(draft.withoutClause(index))),

@@ -3,6 +3,7 @@ import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 import 'condition_editor.dart';
 import 'editor_controller.dart';
+import 'editor_strings.dart';
 
 /// Property panel for the selected node.
 class InspectorPanel extends StatelessWidget {
@@ -13,19 +14,20 @@ class InspectorPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final node = controller.selectedNode;
+    final strings = EditorStringsScope.of(context);
     if (node == null) {
-      return const Center(child: Text('Select a node.'));
+      return Center(child: Text(strings.selectANode));
     }
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
         _Section(
-          title: 'Identity',
+          title: strings.identity,
           children: [
             _IdField(controller: controller, node: node),
             const SizedBox(height: 8),
             _EnumDropdown<SceneNodeKind>(
-              label: 'kind',
+              label: strings.kind,
               value: node.kind,
               values: SceneNodeKind.values,
               onChanged: (value) =>
@@ -33,7 +35,7 @@ class InspectorPanel extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _NullableEnumDropdown<SceneAction>(
-              label: 'action',
+              label: strings.action,
               value: node.action,
               values: SceneAction.values,
               onChanged: (value) => controller.updateSelected(
@@ -42,7 +44,7 @@ class InspectorPanel extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _EnumDropdown<SceneMotionPreset>(
-              label: 'motion',
+              label: strings.motion,
               value: node.motion,
               values: SceneMotionPreset.values,
               onChanged: (value) => controller.updateSelected(
@@ -52,10 +54,10 @@ class InspectorPanel extends StatelessWidget {
           ],
         ),
         _Section(
-          title: 'Rect (normalized)',
+          title: strings.rectNormalized,
           children: [
             _SliderRow(
-              label: 'x',
+              label: strings.x,
               value: node.rect.x,
               min: 0,
               max: 1,
@@ -64,7 +66,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'y',
+              label: strings.y,
               value: node.rect.y,
               min: 0,
               max: 1,
@@ -73,7 +75,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'width',
+              label: strings.width,
               value: node.rect.width,
               min: 0.01,
               max: 1,
@@ -83,7 +85,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'height',
+              label: strings.height,
               value: node.rect.height,
               min: 0.01,
               max: 1,
@@ -95,10 +97,10 @@ class InspectorPanel extends StatelessWidget {
           ],
         ),
         _Section(
-          title: 'Transform',
+          title: strings.transform,
           children: [
             _SliderRow(
-              label: 'rotate Z',
+              label: strings.rotateZ,
               value: node.transform.rotationZ,
               min: -180,
               max: 180,
@@ -108,7 +110,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'rotate X',
+              label: strings.rotateX,
               value: node.transform.rotationX,
               min: -180,
               max: 180,
@@ -118,7 +120,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'rotate Y',
+              label: strings.rotateY,
               value: node.transform.rotationY,
               min: -180,
               max: 180,
@@ -128,7 +130,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'perspective',
+              label: strings.perspective,
               value: node.transform.perspective,
               min: -0.01,
               max: 0.01,
@@ -138,7 +140,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'scale X',
+              label: strings.scaleX,
               value: node.transform.scaleX,
               min: 0.1,
               max: 3,
@@ -148,7 +150,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'scale Y',
+              label: strings.scaleY,
               value: node.transform.scaleY,
               min: 0.1,
               max: 3,
@@ -158,7 +160,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'move X',
+              label: strings.moveX,
               value: node.transform.translateX,
               min: -0.5,
               max: 0.5,
@@ -168,7 +170,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'move Y',
+              label: strings.moveY,
               value: node.transform.translateY,
               min: -0.5,
               max: 0.5,
@@ -178,7 +180,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'pivot X',
+              label: strings.pivotX,
               value: node.transform.pivotX,
               min: 0,
               max: 1,
@@ -188,7 +190,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             _SliderRow(
-              label: 'pivot Y',
+              label: strings.pivotY,
               value: node.transform.pivotY,
               min: 0,
               max: 1,
@@ -200,17 +202,17 @@ class InspectorPanel extends StatelessWidget {
           ],
         ),
         _Section(
-          title: 'Layout',
+          title: strings.layout,
           children: [
             _IntField(
-              label: 'z',
+              label: strings.z,
               value: node.z,
               onChanged: (value) =>
                   controller.updateSelected((node) => node.copyWith(z: value)),
             ),
             const SizedBox(height: 8),
             _IntField(
-              label: 'renderOrder',
+              label: strings.renderOrder,
               value: node.renderOrder,
               onChanged: (value) => controller.updateSelected(
                 (node) => node.copyWith(renderOrder: value),
@@ -218,7 +220,7 @@ class InspectorPanel extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _IntField(
-              label: 'focusOrder',
+              label: strings.focusOrder,
               value: node.focusOrder,
               onChanged: (value) => controller.updateSelected(
                 (node) => node.copyWith(focusOrder: value),
@@ -227,7 +229,7 @@ class InspectorPanel extends StatelessWidget {
           ],
         ),
         _Section(
-          title: 'Visibility',
+          title: strings.visibility,
           children: [
             ConditionEditor(
               condition: node.visibleWhen,
@@ -238,7 +240,7 @@ class InspectorPanel extends StatelessWidget {
           ],
         ),
         _Section(
-          title: 'Properties',
+          title: strings.properties,
           children: [
             _PropertiesEditor(controller: controller, node: node),
           ],
@@ -370,6 +372,7 @@ class _NullableEnumDropdown<T extends Enum> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
     return Row(
       children: [
         SizedBox(width: 80, child: Text(label)),
@@ -379,7 +382,7 @@ class _NullableEnumDropdown<T extends Enum> extends StatelessWidget {
             value: value,
             onChanged: onChanged,
             items: [
-              const DropdownMenuItem(value: null, child: Text('none')),
+              DropdownMenuItem(value: null, child: Text(strings.none)),
               for (final option in values)
                 DropdownMenuItem(value: option, child: Text(option.name)),
             ],
@@ -401,7 +404,10 @@ class _IdField extends StatelessWidget {
     return TextFormField(
       key: ValueKey(node.id),
       initialValue: node.id,
-      decoration: const InputDecoration(labelText: 'id', isDense: true),
+      decoration: InputDecoration(
+        labelText: EditorStringsScope.of(context).id,
+        isDense: true,
+      ),
       onFieldSubmitted: (value) {
         final id = value.trim();
         final document = controller.document;
@@ -456,6 +462,7 @@ class _PropertiesEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -483,7 +490,7 @@ class _PropertiesEditor extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Remove property',
+                  tooltip: strings.removeProperty,
                   onPressed: () => controller.updateSelected(
                     (node) => node.copyWith(
                       properties: {
@@ -508,7 +515,7 @@ class _PropertiesEditor extends StatelessWidget {
             ),
           ),
           icon: const Icon(Icons.add),
-          label: const Text('Add property'),
+          label: Text(strings.addProperty),
         ),
       ],
     );

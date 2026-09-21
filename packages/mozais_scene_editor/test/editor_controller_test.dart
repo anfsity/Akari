@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mozais_scene_editor/src/editor_controller.dart';
+import 'package:mozais_scene_editor/src/editor_status.dart';
 import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 const _scene = '''
@@ -69,7 +70,7 @@ void main() {
 
     controller.deleteSelected();
     expect(controller.document!.nodes, hasLength(1));
-    expect(controller.status, 'A scene must keep at least one node.');
+    expect(controller.status.kind, EditorStatusKind.keepOneNode);
   });
 
   test('reports an open failure without dropping the document', () async {
@@ -79,6 +80,6 @@ void main() {
     await controller.open();
 
     expect(controller.document, isNull);
-    expect(controller.status, startsWith('Open failed:'));
+    expect(controller.status.kind, EditorStatusKind.openFailed);
   });
 }
