@@ -209,6 +209,8 @@ This discovery step identifies available session candidates; it does not guarant
   * `prompt_kind`: Enum string indicating input type (`visible` for plain text, `secret` for passwords, `info` for informational notices, `error` for PAM errors).
   * `text`: The prompt string provided by PAM (e.g., `"Password: "`).
 
+After a retryable `auth_error`, the backend emits a display-only `error` prompt and then a new `visible` or `secret` prompt for the same `attempt_id`; the UI answers the new prompt instead of starting a new attempt.
+
 ##### `StateChanged(String attempt_id, String state, String detail)`
 * **Description**: Emitted when the authentication engine transitions between internal states.
 * **Parameters**:
@@ -328,7 +330,8 @@ stateDiagram-v2
 
         SubmittingResponse --> PromptPending : auth_message (Multi-step PAM)
         SubmittingResponse --> Authenticated : success
-        SubmittingResponse --> Failed : auth_error / error
+        SubmittingResponse --> CreatingSession : auth_error (Retryable)
+        SubmittingResponse --> Failed : error
 
         Authenticated --> ResolvingSession : StartSession(attempt_id, session_id)
 
@@ -349,6 +352,8 @@ stateDiagram-v2
 
 `PromptPending` messages of type `info` or `error` trigger a `Prompt` signal and automatically submit an empty response back to `greetd`. Messages of type `visible` and `secret` transition to `WaitingForInput`. The protocol loop may cycle through `PromptPending` multiple times during multi-factor or multi-step PAM challenges before reaching a terminal state.
 
+A retryable `auth_error` is not terminal. The backend keeps the same `attempt_id`, emits a display-only `error` prompt with the failure, reconnects to `greetd`, and sends a fresh `create_session` so the user can answer the prompt again. The attempt only reaches `Failed` on a non-retryable `error` or on a transport, protocol, or session failure.
+
 ---
 
 ### 5.2 Authentication Transition Rules
@@ -365,7 +370,8 @@ stateDiagram-v2
 | `WaitingForInput` | Stale token or invalid phase | *Unchanged* | Return a D-Bus error to caller; do not send data over `greetd` socket. |
 | `SubmittingResponse`| Receives `auth_message` | `PromptPending` | Continue authentication loop for subsequent PAM challenges. |
 | `SubmittingResponse`| Receives `success` | `Authenticated` | Transition to authenticated state; await `StartSession()`. |
-| `SubmittingResponse`| Receives `auth_error` | `Failed` | Treat as retryable authentication failure; allow user to initiate new attempt. |
+| `SubmittingResponse`| Receives `auth_error` | `CreatingSession` | Emit a display-only `error` prompt; reconnect to `GREETD_SOCK` and send `create_session` for the same `attempt_id`; keep the attempt alive so the user can retry. |
+| `SubmittingResponse`| Receives `error` | `Failed` | Record display-safe error description; close socket; invalidate transaction token. |
 | `Authenticated` | Valid `StartSession(attempt_id, id)`| `ResolvingSession` | Resolve `session_id` against backend-owned session catalog. |
 | `ResolvingSession` | Invalid or unavailable `session_id`| `Authenticated` | Reject call with D-Bus error; preserve `Authenticated` state to allow re-selection. |
 | `ResolvingSession` | Valid `session_id` | `StartingSession` | Build sanitized `cmd` and `env` arrays from verified `.desktop` file. |
@@ -385,7 +391,7 @@ stateDiagram-v2
 2. **Preemptive Cancellation**: Invoking `BeginAuthentication` automatically revokes and cancels any in-flight `attempt_id` before processing the new request.
 3. **Signal Isolation**: Asynchronous signals carry generation tokens; signals matching expired tokens are discarded by the UI.
 4. **Client Disconnect Handling**: Loss of the D-Bus client connection immediately triggers cancellation of the active transaction. A PAM prompt must never remain attached to a dead UI process.
-5. **Failure Classification**: PAM `auth_error` responses represent retryable credential failures. Protocol, socket, or session execution failures require complete state cleanup before a new attempt can begin.
+5. **Failure Classification**: PAM `auth_error` responses represent retryable credential failures. The backend restarts the `greetd` session under the same `attempt_id` and surfaces the rejection as an `error` prompt, so the UI can retry without a new attempt. Non-retryable `error` responses, and protocol, socket, or session execution failures, require complete state cleanup before a new attempt can begin.
 6. **Power Action Isolation**: `PowerAction` maintains an independent state domain. If an authentication transaction is active when a power request is received, the backend must either reject the power action as busy or explicitly cancel the authentication attempt prior to executing the system call.
 
 ---
