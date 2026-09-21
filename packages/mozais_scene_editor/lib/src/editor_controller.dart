@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mozais_scene/mozais_scene.dart';
 
+import 'editor_status.dart';
+
 /// Locates the bundled default scene by walking up from the working directory.
 ///
 /// The editor is run from inside its package, so the repository root is a few
@@ -31,14 +33,14 @@ class SceneEditorController extends ChangeNotifier {
   SceneDocument? _document;
   String _path = '';
   String? _selectedNodeId;
-  String _status = '';
+  EditorStatus _status = EditorStatus.idle;
   bool _dirty = false;
   final Set<ScenePredicate> _activePredicates = <ScenePredicate>{};
 
   SceneDocument? get document => _document;
   String get path => _path;
   String? get selectedNodeId => _selectedNodeId;
-  String get status => _status;
+  EditorStatus get status => _status;
   bool get dirty => _dirty;
   Set<ScenePredicate> get activePredicates => _activePredicates;
 
@@ -61,11 +63,11 @@ class SceneEditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> open() async {
+  Future<bool> open() async {
     if (_path.isEmpty) {
-      _status = 'Enter a scene path first.';
+      _status = const EditorStatus(EditorStatusKind.enterPathFirst);
       notifyListeners();
-      return;
+      return false;
     }
     try {
       final source = await File(_path).readAsString();
@@ -73,26 +75,32 @@ class SceneEditorController extends ChangeNotifier {
       _document = document;
       _selectedNodeId = document.nodes.first.id;
       _dirty = false;
-      _status = 'Opened $_path';
+      _status = EditorStatus(EditorStatusKind.opened, _path);
+      notifyListeners();
+      return true;
     } on Object catch (error) {
-      _status = 'Open failed: $error';
+      _status = EditorStatus(EditorStatusKind.openFailed, error);
+      notifyListeners();
+      return false;
     }
-    notifyListeners();
   }
 
-  Future<void> save() async {
+  Future<bool> save() async {
     final document = _document;
     if (document == null || _path.isEmpty) {
-      return;
+      return false;
     }
     try {
       await File(_path).writeAsString(encodeSceneDocument(document));
       _dirty = false;
-      _status = 'Saved $_path';
+      _status = EditorStatus(EditorStatusKind.saved, _path);
+      notifyListeners();
+      return true;
     } on Object catch (error) {
-      _status = 'Save failed: $error';
+      _status = EditorStatus(EditorStatusKind.saveFailed, error);
+      notifyListeners();
+      return false;
     }
-    notifyListeners();
   }
 
   void select(String id) {
@@ -166,7 +174,7 @@ class SceneEditorController extends ChangeNotifier {
         if (candidate.id != node.id) candidate,
     ];
     if (nodes.isEmpty) {
-      _status = 'A scene must keep at least one node.';
+      _status = const EditorStatus(EditorStatusKind.keepOneNode);
       notifyListeners();
       return;
     }

@@ -1,26 +1,65 @@
 import 'package:flutter/material.dart';
 
 import 'editor_controller.dart';
+import 'editor_settings_controller.dart';
+import 'editor_settings_scope.dart';
+import 'editor_status.dart';
+import 'editor_strings.dart';
+import 'editor_theme.dart';
 import 'inspector_panel.dart';
 import 'node_list_panel.dart';
 import 'scene_preview.dart';
+import 'settings_page.dart';
 
-class SceneEditorApp extends StatelessWidget {
+class SceneEditorApp extends StatefulWidget {
   const SceneEditorApp({super.key});
 
   @override
+  State<SceneEditorApp> createState() => _SceneEditorAppState();
+}
+
+class _SceneEditorAppState extends State<SceneEditorApp> {
+  late final EditorSettingsController _settings;
+
+  @override
+  void initState() {
+    super.initState();
+    _settings = EditorSettingsController.load();
+  }
+
+  @override
+  void dispose() {
+    _settings.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Mozais Scene Editor',
-      theme: ThemeData.dark(useMaterial3: true),
-      debugShowCheckedModeBanner: false,
-      home: const EditorScreen(),
+    return ListenableBuilder(
+      listenable: _settings,
+      builder: (context, _) {
+        final strings = _settings.strings;
+        return EditorSettingsScope(
+          controller: _settings,
+          child: EditorStringsScope(
+            strings: strings,
+            child: MaterialApp(
+              title: strings.appTitle,
+              debugShowCheckedModeBanner: false,
+              theme: editorThemeFor(_settings.settings.themeId).toThemeData(),
+              home: EditorScreen(settings: _settings),
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
 class EditorScreen extends StatefulWidget {
-  const EditorScreen({super.key});
+  const EditorScreen({required this.settings, super.key});
+
+  final EditorSettingsController settings;
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
@@ -29,14 +68,26 @@ class EditorScreen extends StatefulWidget {
 class _EditorScreenState extends State<EditorScreen> {
   late final SceneEditorController _controller;
   late final TextEditingController _pathController;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
     _controller = SceneEditorController();
-    final path = defaultScenePath() ?? '';
+    _pathController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) {
+      return;
+    }
+    _initialized = true;
+    final configured = widget.settings.settings.defaultScenePath;
+    final path = configured.isNotEmpty ? configured : defaultScenePath() ?? '';
     _controller.setPath(path);
-    _pathController = TextEditingController(text: path);
+    _pathController.text = path;
     if (path.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _controller.open());
     }
@@ -49,31 +100,58 @@ class _EditorScreenState extends State<EditorScreen> {
     super.dispose();
   }
 
+  Future<void> _open() async {
+    if (await _controller.open()) {
+      _rememberPath();
+    }
+  }
+
+  Future<void> _save() async {
+    if (await _controller.save()) {
+      _rememberPath();
+    }
+  }
+
+  void _rememberPath() {
+    final settings = widget.settings.settings;
+    widget.settings.update(
+      settings.copyWith(defaultScenePath: _controller.path),
+    );
+  }
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => SettingsPage(controller: widget.settings),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mozais Scene Editor'),
+        title: Text(strings.appTitle),
         actions: [
           SizedBox(
             width: 420,
             child: TextField(
               controller: _pathController,
-              decoration: const InputDecoration(
-                hintText: 'path/to/scene.json',
+              decoration: InputDecoration(
+                hintText: strings.pathHint,
                 isDense: true,
               ),
               onChanged: _controller.setPath,
             ),
           ),
           const SizedBox(width: 8),
-          TextButton(
-            onPressed: _controller.open,
-            child: const Text('Open'),
-          ),
-          TextButton(
-            onPressed: _controller.save,
-            child: const Text('Save'),
+          TextButton(onPressed: _open, child: Text(strings.open)),
+          TextButton(onPressed: _save, child: Text(strings.save)),
+          IconButton(
+            tooltip: strings.settings,
+            onPressed: _openSettings,
+            icon: const Icon(Icons.settings_outlined),
           ),
           const SizedBox(width: 8),
         ],
@@ -111,6 +189,7 @@ class _StatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
     return Container(
       height: 28,
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -118,11 +197,14 @@ class _StatusBar extends StatelessWidget {
       child: Row(
         children: [
           if (controller.dirty)
-            const Text('unsaved changes', style: TextStyle(color: Colors.orange)),
+            Text(
+              strings.unsavedChanges,
+              style: TextStyle(color: Theme.of(context).colorScheme.tertiary),
+            ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              controller.status,
+              describeEditorStatus(strings, controller.status),
               overflow: TextOverflow.ellipsis,
             ),
           ),

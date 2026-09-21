@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 import 'editor_controller.dart';
+import 'editor_strings.dart';
 
 /// Lists nodes topmost first and hosts the add, duplicate, and delete actions.
 class NodeListPanel extends StatelessWidget {
@@ -16,22 +17,23 @@ class NodeListPanel extends StatelessWidget {
       return const SizedBox.shrink();
     }
     final nodes = document.paintOrder.reversed.toList();
+    final strings = EditorStringsScope.of(context);
     return Column(
       children: [
         Row(
           children: [
             IconButton(
-              tooltip: 'Add node',
+              tooltip: strings.addNode,
               onPressed: controller.addNode,
               icon: const Icon(Icons.add),
             ),
             IconButton(
-              tooltip: 'Duplicate node',
+              tooltip: strings.duplicateNode,
               onPressed: controller.duplicateSelected,
               icon: const Icon(Icons.copy),
             ),
             IconButton(
-              tooltip: 'Delete node',
+              tooltip: strings.deleteNode,
               onPressed: controller.deleteSelected,
               icon: const Icon(Icons.delete_outline),
             ),
@@ -66,13 +68,14 @@ class _PredicateToggles extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
     return Padding(
       padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Active predicates',
+            strings.activePredicates,
             style: Theme.of(context).textTheme.labelLarge,
           ),
           const SizedBox(height: 4),

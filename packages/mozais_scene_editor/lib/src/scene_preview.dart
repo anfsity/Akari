@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:mozais_scene/mozais_scene.dart';
 
 import 'editor_controller.dart';
-
-const double _previewAspectRatio = 16 / 9;
+import 'editor_settings_scope.dart';
+import 'editor_strings.dart';
 
 /// Renders the document with the real runtime and overlays an editing box for
 /// the selected node.
@@ -16,11 +16,12 @@ class ScenePreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final document = controller.document;
     if (document == null) {
-      return const Center(child: Text('Open a scene to preview it.'));
+      return Center(child: Text(EditorStringsScope.of(context).previewEmpty));
     }
+    final aspectRatio = EditorSettingsScope.of(context).settings.previewAspectRatio;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final size = _fit(constraints.biggest);
+        final size = _fit(constraints.biggest, aspectRatio);
         final selected = controller.selectedNode;
         return Center(
           child: SizedBox(
@@ -62,16 +63,16 @@ class ScenePreview extends StatelessWidget {
   }
 }
 
-Size _fit(Size available) {
+Size _fit(Size available, double aspectRatio) {
   if (available.width <= 0 || available.height <= 0) {
     return const Size(160, 90);
   }
   final width = available.width;
-  final height = width / _previewAspectRatio;
+  final height = width / aspectRatio;
   if (height <= available.height) {
     return Size(width, height);
   }
-  return Size(available.height * _previewAspectRatio, available.height);
+  return Size(available.height * aspectRatio, available.height);
 }
 
 /// Draws a labelled placeholder for a node so the editor preview shows layout
