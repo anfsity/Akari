@@ -13,6 +13,7 @@ void main() {
         selectedUser: null,
         prompt: null,
         error: null,
+        promptError: null,
       ),
       account: AccountPickerSlots(users: const [], selected: null),
       session: SessionPickerSlots(
@@ -43,6 +44,7 @@ void main() {
         selectedUser: null,
         prompt: null,
         error: null,
+        promptError: null,
       ),
       account: AccountPickerSlots(
         users: const [UserSummary(id: 'alice', displayName: 'Alice')],
