@@ -10,6 +10,7 @@ import 'editor_strings.dart';
 import 'editor_theme.dart';
 import 'inspector_panel.dart';
 import 'node_list_panel.dart';
+import 'pane_divider.dart';
 import 'scene_preview.dart';
 import 'settings_page.dart';
 
@@ -72,6 +73,13 @@ class _EditorScreenState extends State<EditorScreen> {
   late final TextEditingController _pathController;
   late final AppLifecycleListener _lifecycleListener;
   bool _initialized = false;
+  double _leftWidth = 240;
+  double _rightWidth = 300;
+
+  static const _leftMinWidth = 160.0;
+  static const _leftMaxWidth = 420.0;
+  static const _rightMinWidth = 240.0;
+  static const _rightMaxWidth = 640.0;
 
   @override
   void initState() {
@@ -178,6 +186,18 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
+  void _resizeLeft(double delta) {
+    setState(() {
+      _leftWidth = (_leftWidth + delta).clamp(_leftMinWidth, _leftMaxWidth);
+    });
+  }
+
+  void _resizeRight(double delta) {
+    setState(() {
+      _rightWidth = (_rightWidth - delta).clamp(_rightMinWidth, _rightMaxWidth);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = EditorStringsScope.of(context);
@@ -212,14 +232,14 @@ class _EditorScreenState extends State<EditorScreen> {
         builder: (context, _) => Row(
           children: [
             SizedBox(
-              width: 240,
+              width: _leftWidth,
               child: NodeListPanel(controller: _controller),
             ),
-            const VerticalDivider(width: 1),
+            PaneDivider(onDrag: _resizeLeft),
             Expanded(child: ScenePreview(controller: _controller)),
-            const VerticalDivider(width: 1),
+            PaneDivider(onDrag: _resizeRight),
             SizedBox(
-              width: 360,
+              width: _rightWidth,
               child: InspectorPanel(controller: _controller),
             ),
           ],
