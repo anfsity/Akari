@@ -648,52 +648,57 @@ class _SessionMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
-    return PopupMenuButton<SessionSummary>(
-      tooltip: 'Choose a session',
-      onSelected: onSelect,
-      position: PopupMenuPosition.under,
-      itemBuilder: (context) => [
-        for (final item in session.sessions)
-          PopupMenuItem(
-            value: item,
-            child: Row(
-              children: [
-                Icon(
-                  session.selected?.id == item.id
-                      ? Icons.check_circle
-                      : Icons.desktop_windows_outlined,
-                  size: 18,
-                  color: session.selected?.id == item.id ? accent : null,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return PopupMenuButton<SessionSummary>(
+          tooltip: 'Choose a session',
+          onSelected: onSelect,
+          position: PopupMenuPosition.under,
+          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+          itemBuilder: (context) => [
+            for (final item in session.sessions)
+              PopupMenuItem(
+                value: item,
+                child: Row(
+                  children: [
+                    Icon(
+                      session.selected?.id == item.id
+                          ? Icons.check_circle
+                          : Icons.desktop_windows_outlined,
+                      size: 18,
+                      color: session.selected?.id == item.id ? accent : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(item.name),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text(item.name),
+              ),
+          ],
+          child: _PillSurface(
+            tokens: tokens,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.desktop_windows_outlined, size: 16, color: accent),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    session.selected?.name ?? 'Choose session',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (session.sessions.length > 1)
+                  Icon(Icons.arrow_drop_down, size: 18, color: accent),
               ],
             ),
           ),
-      ],
-      child: _PillSurface(
-        tokens: tokens,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.desktop_windows_outlined, size: 16, color: accent),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                session.selected?.name ?? 'Choose session',
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            if (session.sessions.length > 1)
-              Icon(Icons.arrow_drop_down, size: 18, color: accent),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
