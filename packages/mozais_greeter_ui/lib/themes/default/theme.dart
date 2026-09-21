@@ -11,7 +11,7 @@ const _surface = Color(0xff2a2d28);
 const _surfaceVariant = Color(0xff3a3e36);
 const _text = Color(0xffe3e3dc);
 
-ThemeBundle buildDefaultTheme({Color? seed}) {
+ThemeBundle buildDefaultTheme({Color? seed, SceneDocument? document}) {
   final colorScheme = ColorScheme.fromSeed(
     seedColor: seed ?? _fallbackSeed,
     brightness: Brightness.dark,
@@ -47,7 +47,7 @@ ThemeBundle buildDefaultTheme({Color? seed}) {
       surfaceColor: _surface,
       surfaceVariantColor: _surfaceVariant,
     ),
-    document: defaultSceneDocument,
+    document: document ?? defaultSceneDocument,
     backgrounds: const {
       SceneBackgroundKind.image: ImageBackgroundRenderer(),
       SceneBackgroundKind.solid: SolidBackgroundRenderer(),
