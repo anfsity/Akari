@@ -85,109 +85,53 @@ String generateScene(String input) {
   return _generate(document);
 }
 
-class _SceneData {
-  const _SceneData({
-    required this.id,
-    required this.version,
-    required this.canvas,
-    required this.background,
-    required this.nodes,
-  });
+typedef _SceneData = ({
+  String id,
+  int version,
+  _CanvasData canvas,
+  _BackgroundData background,
+  List<_NodeData> nodes,
+});
 
-  final String id;
-  final int version;
-  final _CanvasData canvas;
-  final _BackgroundData background;
-  final List<_NodeData> nodes;
-}
+typedef _CanvasData = ({SceneCanvasFit fit, bool useSafeArea});
 
-class _CanvasData {
-  const _CanvasData({required this.fit, required this.useSafeArea});
+typedef _BackgroundData = ({
+  SceneBackgroundKind kind,
+  String? asset,
+  String color,
+  double scrimOpacity,
+  double blurSigma,
+  String? rendererId,
+});
 
-  final SceneCanvasFit fit;
-  final bool useSafeArea;
-}
+typedef _NodeData = ({
+  String id,
+  SceneNodeKind kind,
+  _RectData rect,
+  _TransformData transform,
+  int z,
+  int renderOrder,
+  int focusOrder,
+  SceneMotionPreset motion,
+  List<SceneBinding> bindings,
+  SceneAction? action,
+  Map<String, String> properties,
+});
 
-class _BackgroundData {
-  const _BackgroundData({
-    required this.kind,
-    required this.asset,
-    required this.color,
-    required this.scrimOpacity,
-    required this.blurSigma,
-    required this.rendererId,
-  });
+typedef _RectData = ({double x, double y, double width, double height});
 
-  final SceneBackgroundKind kind;
-  final String? asset;
-  final String color;
-  final double scrimOpacity;
-  final double blurSigma;
-  final String? rendererId;
-}
-
-class _NodeData {
-  const _NodeData({
-    required this.id,
-    required this.kind,
-    required this.rect,
-    required this.transform,
-    required this.z,
-    required this.renderOrder,
-    required this.focusOrder,
-    required this.motion,
-    required this.bindings,
-    required this.action,
-    required this.properties,
-  });
-
-  final String id;
-  final SceneNodeKind kind;
-  final _RectData rect;
-  final _TransformData transform;
-  final int z;
-  final int renderOrder;
-  final int focusOrder;
-  final SceneMotionPreset motion;
-  final List<SceneBinding> bindings;
-  final SceneAction? action;
-  final Map<String, String> properties;
-}
-
-class _RectData {
-  const _RectData(this.x, this.y, this.width, this.height);
-
-  final double x;
-  final double y;
-  final double width;
-  final double height;
-}
-
-class _TransformData {
-  const _TransformData({
-    required this.translateX,
-    required this.translateY,
-    required this.scaleX,
-    required this.scaleY,
-    required this.rotationX,
-    required this.rotationY,
-    required this.rotationZ,
-    required this.pivotX,
-    required this.pivotY,
-    required this.perspective,
-  });
-
-  final double translateX;
-  final double translateY;
-  final double scaleX;
-  final double scaleY;
-  final double rotationX;
-  final double rotationY;
-  final double rotationZ;
-  final double pivotX;
-  final double pivotY;
-  final double perspective;
-}
+typedef _TransformData = ({
+  double translateX,
+  double translateY,
+  double scaleX,
+  double scaleY,
+  double rotationX,
+  double rotationY,
+  double rotationZ,
+  double pivotX,
+  double pivotY,
+  double perspective,
+});
 
 _SceneData _parseDocument(Map<String, dynamic> json) {
   final version = _int(json, 'version');
@@ -212,10 +156,10 @@ _SceneData _parseDocument(Map<String, dynamic> json) {
     );
   }
 
-  return _SceneData(
+  return (
     id: id,
     version: version,
-    canvas: _CanvasData(
+    canvas: (
       fit: _enumValue(
         SceneCanvasFit.values,
         _string(canvasJson, 'fit'),
@@ -251,7 +195,7 @@ _BackgroundData _parseBackground(Map<String, dynamic> json) {
   if (blurSigma < 0) {
     throw FormatException('background.blurSigma must be >= 0.');
   }
-  return _BackgroundData(
+  return (
     kind: kind,
     asset: asset,
     color: color,
@@ -268,11 +212,11 @@ _NodeData _parseNode(Map<String, dynamic> json, Set<String> nodeIds) {
   }
 
   final rectJson = _map(json, 'rect');
-  final rect = _RectData(
-    _double(rectJson, 'x'),
-    _double(rectJson, 'y'),
-    _double(rectJson, 'width'),
-    _double(rectJson, 'height'),
+  final _RectData rect = (
+    x: _double(rectJson, 'x'),
+    y: _double(rectJson, 'y'),
+    width: _double(rectJson, 'width'),
+    height: _double(rectJson, 'height'),
   );
   if (rect.x < 0 ||
       rect.y < 0 ||
@@ -284,7 +228,7 @@ _NodeData _parseNode(Map<String, dynamic> json, Set<String> nodeIds) {
   }
 
   final transformJson = _map(json, 'transform', fallback: const {});
-  final transform = _TransformData(
+  final _TransformData transform = (
     translateX: _double(transformJson, 'translateX', fallback: 0),
     translateY: _double(transformJson, 'translateY', fallback: 0),
     scaleX: _double(transformJson, 'scaleX', fallback: 1),
@@ -307,7 +251,7 @@ _NodeData _parseNode(Map<String, dynamic> json, Set<String> nodeIds) {
       entry.key: _asString(entry.value, 'node.properties.${entry.key}'),
   };
 
-  return _NodeData(
+  return (
     id: id,
     kind: _enumValue(SceneNodeKind.values, _string(json, 'kind'), 'node.kind'),
     rect: rect,
