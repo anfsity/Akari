@@ -57,7 +57,7 @@ a `SceneDocument`, `ThemeBundle`, visual context, or log.
 
 A theme is a directory under `lib/themes/<name>/` containing:
 
-- `*.scene.json`: authoring layout and bindings.
+- `*.scene.json`: authoring layout and visibility conditions.
 - generated `*.scene.g.dart`: typed Dart emitted by build_runner.
 - `theme.dart`: compile-time assembly of tokens and optional Dart extensions.
 
@@ -81,7 +81,7 @@ SceneNode
   renderOrder
   focusOrder
   motion preset
-  bindings
+  visibleWhen: boolean condition over semantic predicates
   style
 ```
 
@@ -89,7 +89,10 @@ SceneNode
 traversal order. They are separate fields and must not be inferred from widget
 insertion order.
 
-Bindings and actions are enumerations over semantic greeter state. Arbitrary
+`visibleWhen` is a small boolean condition (`all`, `any`, `not`) over a
+closed vocabulary of semantic predicates such as `isDormant` or
+`isAuthPrompting`. A null condition means the node is always present. The
+vocabulary and actions are enumerations over semantic greeter state; arbitrary
 expressions, scripts, runtime-loaded Dart, backend types, and untrusted asset
 paths are not allowed.
 
@@ -129,8 +132,12 @@ or scripts.
 - layer ordering and 2.5D transforms.
 - focus-order metadata.
 - background renderer selection and fallback.
-- motion component lifecycle.
+- motion component lifecycle, including enter and exit transitions.
 - repaint boundaries only where an animated or complex layer needs one.
+
+A node whose `visibleWhen` becomes false stays mounted until its exit
+transition settles and is then unmounted, so stateful content such as the
+clock timer stops. Exiting nodes do not receive pointer or focus input.
 
 Interactive nodes may be transformed, but runtime invariants still apply:
 
@@ -158,9 +165,12 @@ renderers remain extension points until a real implementation exists.
 
 Motion is theme-selected and runtime-executed. A theme declares presets such
 as `none`, `fade`, `fadeSlide`, `fadeScale`, `hoverLift`, and `focusGlow`.
-Runtime components own animation controllers, interruption, reduced-motion
-behavior, and disposal. A motion component animates only its node; global
-`AnimatedSwitcher` or full-screen animated overlays are not allowed.
+Each `SceneMotionBuilder` wraps a child with an externally driven
+`Animation<double>` and never owns a controller. Runtime components own
+controllers, interruption, reduced-motion behavior, and disposal, driving the
+same animation forward on mount and in reverse on exit. A motion component
+animates only its node; global `AnimatedSwitcher` or full-screen animated
+overlays are not allowed.
 
 Blur is a static background treatment or a local surface effect. A background
 may declare a `blurSigma` that frosts the whole canvas once, cached with the
