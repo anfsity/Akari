@@ -16,6 +16,7 @@ class SceneRuntime extends StatelessWidget {
     required this.document,
     required this.theme,
     required this.nodeBuilder,
+    this.activePredicates = const <ScenePredicate>{},
     this.backgroundBlurSigma,
     super.key,
   });
@@ -23,6 +24,12 @@ class SceneRuntime extends StatelessWidget {
   final SceneDocument document;
   final ThemeBundle theme;
   final SceneNodeBuilder nodeBuilder;
+
+  /// Predicates currently true for the scene.
+  ///
+  /// A node with a non-null [SceneNode.visibleWhen] is present only while its
+  /// condition evaluates true against this set.
+  final Set<ScenePredicate> activePredicates;
 
   /// Drives an override of the document background's blur when set.
   ///
@@ -69,6 +76,12 @@ class SceneRuntime extends StatelessWidget {
   }
 
   Widget _buildNode(BuildContext context, Size size, SceneNode node) {
+    final visibleWhen = node.visibleWhen;
+    if (visibleWhen != null &&
+        !evaluateSceneCondition(visibleWhen, activePredicates)) {
+      return const SizedBox.shrink();
+    }
+
     final safeArea = document.canvas.useSafeArea
         ? MediaQuery.paddingOf(context)
         : EdgeInsets.zero;

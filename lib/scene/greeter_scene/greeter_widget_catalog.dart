@@ -28,13 +28,7 @@ class GreeterWidgetCatalog {
   final ValueChanged<GreeterCommand> onDispatch;
   final VoidCallback onRespond;
 
-  Widget build(BuildContext context, SceneNode node, {required bool dormant}) {
-    if (dormant && _isForeground(node.kind)) {
-      return const SizedBox.shrink();
-    }
-    if (!dormant && node.properties['variant'] == 'time') {
-      return const SizedBox.shrink();
-    }
+  Widget build(BuildContext context, SceneNode node) {
     return switch (node.kind) {
       SceneNodeKind.dateTime => _SceneClock(
         variant: node.properties['variant'] == 'time'
@@ -127,24 +121,6 @@ class GreeterWidgetCatalog {
       SceneNodeKind.accountPicker ||
       SceneNodeKind.secondaryAction ||
       SceneNodeKind.decoration => const SizedBox.shrink(),
-    };
-  }
-
-  static bool _isForeground(SceneNodeKind kind) {
-    return switch (kind) {
-      SceneNodeKind.glassPanel ||
-      SceneNodeKind.avatar ||
-      SceneNodeKind.accountName ||
-      SceneNodeKind.sessionPicker ||
-      SceneNodeKind.credentialField ||
-      SceneNodeKind.primaryAction ||
-      SceneNodeKind.status => true,
-      SceneNodeKind.background ||
-      SceneNodeKind.accountPicker ||
-      SceneNodeKind.secondaryAction ||
-      SceneNodeKind.powerActions ||
-      SceneNodeKind.dateTime ||
-      SceneNodeKind.decoration => false,
     };
   }
 }

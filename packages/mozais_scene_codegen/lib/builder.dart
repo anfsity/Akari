@@ -22,19 +22,24 @@ enum SceneNodeKind {
   decoration,
 }
 
-enum SceneBinding {
-  serviceMode,
-  authMode,
-  authPrompt,
-  authError,
-  accountUsers,
-  accountSelected,
-  sessionMode,
-  sessionSessions,
-  sessionSelected,
-  continueEnabled,
-  powerMode,
-  powerError,
+enum ScenePredicate {
+  isDormant,
+  isServiceStarting,
+  isServiceReady,
+  isServiceUnavailable,
+  isUserSelection,
+  isAuthPrompting,
+  isAuthSubmitting,
+  isSessionSelection,
+  isHandingOff,
+  isAuthError,
+  hasSelectedUser,
+  isSessionLoading,
+  isSessionReady,
+  isSessionEmpty,
+  isSessionFailed,
+  isPowerExecuting,
+  hasPowerError,
 }
 
 enum SceneAction {
@@ -113,12 +118,40 @@ typedef _NodeData = ({
   int renderOrder,
   int focusOrder,
   SceneMotionPreset motion,
-  List<SceneBinding> bindings,
+  _ConditionData? visibleWhen,
   SceneAction? action,
   Map<String, String> properties,
 });
 
 typedef _RectData = ({double x, double y, double width, double height});
+
+sealed class _ConditionData {
+  const _ConditionData();
+}
+
+final class _PredicateData extends _ConditionData {
+  const _PredicateData(this.predicate);
+
+  final ScenePredicate predicate;
+}
+
+final class _AllData extends _ConditionData {
+  const _AllData(this.conditions);
+
+  final List<_ConditionData> conditions;
+}
+
+final class _AnyData extends _ConditionData {
+  const _AnyData(this.conditions);
+
+  final List<_ConditionData> conditions;
+}
+
+final class _NotData extends _ConditionData {
+  const _NotData(this.condition);
+
+  final _ConditionData condition;
+}
 
 typedef _TransformData = ({
   double translateX,
@@ -241,10 +274,7 @@ _NodeData _parseNode(Map<String, dynamic> json, Set<String> nodeIds) {
     perspective: _double(transformJson, 'perspective', fallback: 0),
   );
 
-  final bindings = <SceneBinding>[
-    for (final value in _stringList(json, 'bindings', fallback: const []))
-      _enumValue(SceneBinding.values, value, 'node.bindings'),
-  ];
+  final visibleWhen = _parseCondition(json['visibleWhen'], 'node.visibleWhen');
   final actionName = _nullableString(json, 'action');
   final properties = <String, String>{
     for (final entry in _map(json, 'properties', fallback: const {}).entries)
@@ -264,7 +294,7 @@ _NodeData _parseNode(Map<String, dynamic> json, Set<String> nodeIds) {
       _string(json, 'motion', fallback: 'none'),
       'node.motion',
     ),
-    bindings: bindings,
+    visibleWhen: visibleWhen,
     action: actionName == null
         ? null
         : _enumValue(SceneAction.values, actionName, 'node.action'),
@@ -327,12 +357,9 @@ String _generate(_SceneData document) {
       ..writeln('      renderOrder: ${node.renderOrder},')
       ..writeln('      focusOrder: ${node.focusOrder},')
       ..writeln('      motion: SceneMotionPreset.${node.motion.name},')
-      ..writeln('      bindings: <SceneBinding>{');
-    for (final binding in node.bindings) {
-      buffer.writeln('        SceneBinding.${binding.name},');
-    }
-    buffer
-      ..writeln('      },')
+      ..writeln(
+        '      visibleWhen: ${node.visibleWhen == null ? 'null' : 'const ${_conditionLiteral(node.visibleWhen!)}'},',
+      )
       ..writeln(
         '      action: ${node.action == null ? 'null' : 'SceneAction.${node.action!.name}'},',
       )
@@ -352,6 +379,48 @@ String _generate(_SceneData document) {
     ..writeln(');')
     ..writeln();
   return buffer.toString();
+}
+
+String _conditionLiteral(_ConditionData condition) {
+  return switch (condition) {
+    _PredicateData(:final predicate) =>
+      'ScenePredicateCondition(ScenePredicate.${predicate.name})',
+    _AllData(:final conditions) =>
+      'SceneAll(<SceneCondition>[${conditions.map(_conditionLiteral).join(', ')}])',
+    _AnyData(:final conditions) =>
+      'SceneAny(<SceneCondition>[${conditions.map(_conditionLiteral).join(', ')}])',
+    _NotData(:final condition) =>
+      'SceneNot(${_conditionLiteral(condition)})',
+  };
+}
+
+_ConditionData? _parseCondition(Object? value, String field) {
+  if (value == null) {
+    return null;
+  }
+  if (value is String) {
+    return _PredicateData(_enumValue(ScenePredicate.values, value, field));
+  }
+  final map = _asMap(value, field);
+  if (map.length != 1) {
+    throw FormatException('$field must use exactly one of all, any, or not.');
+  }
+  final entry = map.entries.single;
+  return switch (entry.key) {
+    'all' => _AllData(_parseConditionList(entry.value, '$field.all')),
+    'any' => _AnyData(_parseConditionList(entry.value, '$field.any')),
+    'not' => _NotData(_parseCondition(entry.value, '$field.not')!),
+    _ => throw FormatException('Invalid $field operator: ${entry.key}'),
+  };
+}
+
+List<_ConditionData> _parseConditionList(Object? value, String field) {
+  if (value is! List || value.isEmpty) {
+    throw FormatException('$field must be a non-empty list.');
+  }
+  return [
+    for (final item in value) _parseCondition(item, field)!,
+  ];
 }
 
 String _variableName(String id) {
@@ -430,21 +499,6 @@ List<dynamic> _list(Map<String, dynamic> json, String key) {
     return value;
   }
   throw FormatException('$key must be a list.');
-}
-
-List<String> _stringList(
-  Map<String, dynamic> json,
-  String key, {
-  required List<String> fallback,
-}) {
-  final value = json[key];
-  if (value == null) {
-    return fallback;
-  }
-  if (value is! List) {
-    throw FormatException('$key must be a list.');
-  }
-  return [for (final item in value) _asString(item, key)];
 }
 
 String _string(Map<String, dynamic> json, String key, {String? fallback}) {
