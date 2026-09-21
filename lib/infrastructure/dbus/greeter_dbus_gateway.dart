@@ -142,33 +142,33 @@ class DBusGreeterGateway implements GreeterGateway {
   }
 
   void _listenToSignals() {
-    final promptStream = DBusRemoteObjectSignalStream(
-      object: _object,
+    // One stream keeps Prompt and StateChanged in the order the backend emitted
+    // them. Per-signal streams can interleave, letting a stale PromptPending
+    // arrive after the Prompt and reset the credential field to a waiting state.
+    final signalStream = DBusSignalStream(
+      _client,
+      sender: _busName,
+      path: DBusObjectPath(_objectPath),
       interface: _interfaceName,
-      name: 'Prompt',
-      signature: DBusSignature('sss'),
-    );
-    final stateStream = DBusRemoteObjectSignalStream(
-      object: _object,
-      interface: _interfaceName,
-      name: 'StateChanged',
       signature: DBusSignature('sss'),
     );
 
     _signalSubscriptions.add(
-      promptStream.listen(
-        _onPrompt,
+      signalStream.listen(
+        _onSignal,
         onError: _onTransportError,
         onDone: _onTransportDone,
       ),
     );
-    _signalSubscriptions.add(
-      stateStream.listen(
-        _onStateChanged,
-        onError: _onTransportError,
-        onDone: _onTransportDone,
-      ),
-    );
+  }
+
+  void _onSignal(DBusSignal signal) {
+    switch (signal.name) {
+      case 'Prompt':
+        _onPrompt(signal);
+      case 'StateChanged':
+        _onStateChanged(signal);
+    }
   }
 
   void _onPrompt(DBusSignal signal) {
