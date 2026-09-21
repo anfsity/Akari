@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../model/scene_document.dart';
 import '../model/theme_bundle.dart';
 import 'builtin_backgrounds.dart';
-import 'motion.dart';
 
 typedef SceneNodeBuilder = Widget Function(
   BuildContext context,
@@ -153,7 +152,7 @@ class SceneRuntime extends StatelessWidget {
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     return builder.build(
       context,
-      SceneMotionSpec(
+      (
         preset: node.motion,
         duration: reducedMotion ? Duration.zero : theme.tokens.mediumMotion,
         curve: theme.tokens.standardCurve,
