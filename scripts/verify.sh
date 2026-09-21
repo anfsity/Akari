@@ -30,6 +30,14 @@ cd -- "$repo_root/packages/mozais_scene_codegen"
 fvm dart analyze
 fvm dart test
 
+cd -- "$repo_root/packages/mozais_scene"
+fvm flutter analyze
+fvm flutter test
+
+cd -- "$repo_root/packages/mozais_greeter_ui"
+fvm flutter analyze
+fvm flutter test
+
 cd -- "$repo_root/packages/mozais_scene_editor"
 fvm flutter analyze
 fvm flutter test

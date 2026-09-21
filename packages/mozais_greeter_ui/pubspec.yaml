@@ -1,0 +1,23 @@
+name: mozais_greeter_ui
+description: Reusable greeter UI for Mozais, free of any backend dependency.
+publish_to: none
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  mozais_scene:
+    path: ../mozais_scene
+
+dev_dependencies:
+  build_runner: ^2.4.13
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  mozais_scene_codegen:
+    path: ../mozais_scene_codegen
+
+flutter:
+  uses-material-design: true

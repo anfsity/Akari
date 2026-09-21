@@ -1,9 +1,7 @@
 import 'dart:async';
 
 import 'package:dbus/dbus.dart';
-
-import '../../feature/greeter/greeter_state.dart';
-import '../../feature/greeter/ports/greeter_gateway.dart';
+import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 
 const _busName = 'io.mozais.Greeter';
 const _objectPath = '/io/mozais/Greeter';

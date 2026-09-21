@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mozais_scene/mozais_scene.dart';
-import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 void main() {
   group('sceneNodeRect', () {
