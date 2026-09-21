@@ -819,6 +819,86 @@ async fn consume_response(
                 description,
             } => {
                 let detail = display_detail(&format!("{error_type}: {description}"));
+                // A rejected credential is retryable: keep the attempt alive,
+                // surface the failure, and restart the greetd session so the
+                // user can answer the prompt again without a new attempt.
+                if error_type == "auth_error"
+                    && actor.auth.state() == AuthState::SubmittingResponse
+                {
+                    let username = actor
+                        .auth
+                        .active_username()
+                        .ok_or_else(|| {
+                            fdo::Error::Failed(
+                                "authentication attempt is unavailable".to_owned(),
+                            )
+                        })?
+                        .to_owned();
+                    actor
+                        .auth
+                        .transition(StateEvent::CredentialRejected {
+                            detail: detail.clone(),
+                        })
+                        .map_err(map_transition_error)?;
+                    publish_state(&actor.auth, attempt_id, snapshots);
+                    emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id))
+                        .await;
+                    emit_prompt_best_effort(&emitter, attempt_id, "error", detail).await;
+
+                    actor.transport.take();
+                    let transport = match GreetdTransport::connect(cancellation).await {
+                        Ok(transport) => transport,
+                        Err(GreetdError::Cancelled) => {
+                            return Err(finish_cancellation(
+                                actor,
+                                attempt_id,
+                                Some(&emitter),
+                                snapshots,
+                                controls,
+                            )
+                            .await);
+                        }
+                        Err(error) => {
+                            return Err(fail_transaction(
+                                actor,
+                                attempt_id,
+                                error,
+                                &emitter,
+                                snapshots,
+                                controls,
+                            )
+                            .await);
+                        }
+                    };
+                    actor.transport = Some(transport);
+                    response = match request_create_session(actor, &username, cancellation).await {
+                        Ok(response) => response,
+                        Err(GreetdError::Cancelled) => {
+                            return Err(finish_cancellation(
+                                actor,
+                                attempt_id,
+                                Some(&emitter),
+                                snapshots,
+                                controls,
+                            )
+                            .await);
+                        }
+                        Err(error) => {
+                            actor.transport.take();
+                            return Err(fail_transaction(
+                                actor,
+                                attempt_id,
+                                error,
+                                &emitter,
+                                snapshots,
+                                controls,
+                            )
+                            .await);
+                        }
+                    };
+                    continue;
+                }
+
                 actor
                     .auth
                     .transition(StateEvent::AuthenticationFailed {

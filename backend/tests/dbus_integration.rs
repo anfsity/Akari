@@ -74,11 +74,11 @@ async fn blank_username_is_rejected() {
 }
 
 #[tokio::test]
-async fn wrong_password_sets_failed_state() {
+async fn wrong_password_prompts_again() {
     let _guard = lock().lock().await;
     let socket = socket_path();
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
-    let server = tokio::spawn(fake_bad_password(listener));
+    let server = tokio::spawn(fake_bad_password_then_prompt(listener));
     let mut backend = start_backend(&socket);
     let connection = connect_backend().await;
     let proxy = make_proxy(&connection).await;
@@ -93,20 +93,16 @@ async fn wrong_password_sets_failed_state() {
         .expect("state query should succeed");
     assert_eq!(state.0, "WaitingForInput");
 
-    let result: zbus::Result<()> = proxy.call("Respond", &(attempt_id, "wrong")).await;
-    assert!(result.is_err());
+    proxy
+        .call::<_, _, ()>("Respond", &(attempt_id.clone(), "wrong"))
+        .await
+        .expect("rejected credential should restart the prompt");
 
     let state: (String, String) = proxy
         .call("GetState", &())
         .await
-        .expect("failed state query should succeed");
-    assert_eq!(
-        state,
-        (
-            "Failed".to_owned(),
-            "auth_error: authentication failed".to_owned(),
-        )
-    );
+        .expect("state query should succeed");
+    assert_eq!(state.0, "WaitingForInput");
 
     server.await.expect("fake greetd should finish");
     stop_backend(&mut backend);
@@ -334,9 +330,39 @@ async fn fake_auth(listener: UnixListener) {
     write_response(&mut stream, serde_json::json!({ "type": "success" })).await;
 }
 
-async fn fake_bad_password(listener: UnixListener) {
-    let (mut stream, _) = listener.accept().await.expect("backend should connect");
+async fn fake_bad_password_then_prompt(listener: UnixListener) {
+    {
+        let (mut stream, _) = listener.accept().await.expect("backend should connect");
+        let create = read_request(&mut stream).await;
+        assert_eq!(create["type"], "create_session");
+        write_response(
+            &mut stream,
+            serde_json::json!({
+                "type": "auth_message",
+                "auth_message_type": "secret",
+                "auth_message": "Password: "
+            }),
+        )
+        .await;
 
+        let password = read_request(&mut stream).await;
+        assert_eq!(password["type"], "post_auth_message_response");
+        assert_eq!(password["response"], "wrong");
+        write_response(
+            &mut stream,
+            serde_json::json!({
+                "type": "error",
+                "error_type": "auth_error",
+                "description": "authentication failed"
+            }),
+        )
+        .await;
+    }
+
+    let (mut stream, _) = listener
+        .accept()
+        .await
+        .expect("backend should reconnect after a rejected credential");
     let create = read_request(&mut stream).await;
     assert_eq!(create["type"], "create_session");
     write_response(
@@ -345,19 +371,6 @@ async fn fake_bad_password(listener: UnixListener) {
             "type": "auth_message",
             "auth_message_type": "secret",
             "auth_message": "Password: "
-        }),
-    )
-    .await;
-
-    let password = read_request(&mut stream).await;
-    assert_eq!(password["type"], "post_auth_message_response");
-    assert_eq!(password["response"], "wrong");
-    write_response(
-        &mut stream,
-        serde_json::json!({
-            "type": "error",
-            "error_type": "auth_error",
-            "description": "authentication failed"
         }),
     )
     .await;

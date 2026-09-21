@@ -93,6 +93,8 @@ pub enum StateEvent {
     AuthenticationSucceeded,
     /// Records a display-safe authentication failure.
     AuthenticationFailed { detail: String },
+    /// Records a retryable credential rejection that restarts the greetd session.
+    CredentialRejected { detail: String },
     /// Begins resolution of the session selected by the UI.
     StartSessionRequested,
     /// Keeps authentication available when the selected session is unavailable.
@@ -134,6 +136,7 @@ impl StateEvent {
             Self::ResponseSubmitted => "ResponseSubmitted",
             Self::AuthenticationSucceeded => "AuthenticationSucceeded",
             Self::AuthenticationFailed { .. } => "AuthenticationFailed",
+            Self::CredentialRejected { .. } => "CredentialRejected",
             Self::StartSessionRequested => "StartSessionRequested",
             Self::SessionUnavailable { .. } => "SessionUnavailable",
             Self::SessionResolved => "SessionResolved",
@@ -195,7 +198,6 @@ impl AuthStateMachine {
         self.active_attempt_id() == Some(attempt_id)
     }
 
-    #[cfg(test)]
     pub fn active_username(&self) -> Option<&str> {
         self.active_attempt
             .as_ref()
@@ -296,6 +298,11 @@ impl AuthStateMachine {
             }
             (CreatingSession | SubmittingResponse, AuthenticationFailed { detail }) => {
                 (Failed, Some(detail))
+            }
+            // A rejected credential keeps the attempt alive: the backend
+            // restarts the greetd session so the user can try again.
+            (SubmittingResponse, CredentialRejected { detail }) => {
+                (CreatingSession, Some(detail))
             }
 
             (Authenticated, StartSessionRequested) => (ResolvingSession, None),
@@ -528,6 +535,41 @@ mod tests {
         assert_eq!(machine.state(), AuthState::Failed);
         assert!(!machine.is_current_attempt(&attempt_id));
         assert_eq!(machine.active_attempt_id(), None);
+    }
+
+    #[test]
+    fn credential_rejection_retains_attempt() {
+        let mut machine = AuthStateMachine::default();
+        let attempt_id = machine.begin_authentication("alice".to_owned()).unwrap();
+        machine.transition(StateEvent::AuthMessage).unwrap();
+        machine.transition(StateEvent::PromptNeedsInput).unwrap();
+        machine.transition(StateEvent::ResponseSubmitted).unwrap();
+
+        machine
+            .transition(StateEvent::CredentialRejected {
+                detail: "auth_error: authentication failed".to_owned(),
+            })
+            .unwrap();
+
+        assert_eq!(machine.state(), AuthState::CreatingSession);
+        assert_eq!(machine.detail(), "auth_error: authentication failed");
+        assert!(machine.is_current_attempt(&attempt_id));
+        assert_eq!(machine.active_username(), Some("alice"));
+    }
+
+    #[test]
+    fn credential_rejection_requires_submitted_response() {
+        let mut machine = AuthStateMachine::default();
+        machine.begin_authentication("alice".to_owned()).unwrap();
+
+        assert!(
+            machine
+                .transition(StateEvent::CredentialRejected {
+                    detail: "auth_error".to_owned(),
+                })
+                .is_err()
+        );
+        assert_eq!(machine.state(), AuthState::CreatingSession);
     }
 
     #[test]
