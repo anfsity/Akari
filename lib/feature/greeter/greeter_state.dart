@@ -35,28 +35,11 @@ enum GreeterRecovery {
   selectSession,
 }
 
-class GreeterError {
-  const GreeterError({
-    required this.kind,
-    required this.message,
-    required this.recovery,
-  });
-
-  final GreeterErrorKind kind;
-  final String message;
-  final GreeterRecovery recovery;
-
-  @override
-  bool operator ==(Object other) {
-    return other is GreeterError &&
-        other.kind == kind &&
-        other.message == message &&
-        other.recovery == recovery;
-  }
-
-  @override
-  int get hashCode => Object.hash(kind, message, recovery);
-}
+typedef GreeterError = ({
+  GreeterErrorKind kind,
+  String message,
+  GreeterRecovery recovery,
+});
 
 class UserSummary {
   const UserSummary({
@@ -83,35 +66,9 @@ class UserSummary {
   int get hashCode => Object.hash(id, displayName, iconPath);
 }
 
-class SessionSummary {
-  const SessionSummary({required this.id, required this.name});
+typedef SessionSummary = ({String id, String name});
 
-  final String id;
-  final String name;
-
-  @override
-  bool operator ==(Object other) {
-    return other is SessionSummary && other.id == id && other.name == name;
-  }
-
-  @override
-  int get hashCode => Object.hash(id, name);
-}
-
-class PromptState {
-  const PromptState({required this.kind, required this.text});
-
-  final PromptKind kind;
-  final String text;
-
-  @override
-  bool operator ==(Object other) {
-    return other is PromptState && other.kind == kind && other.text == text;
-  }
-
-  @override
-  int get hashCode => Object.hash(kind, text);
-}
+typedef PromptState = ({PromptKind kind, String text});
 
 enum BackendAuthState {
   idle,

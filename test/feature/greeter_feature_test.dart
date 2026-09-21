@@ -259,9 +259,7 @@ void main() {
       expect(feature.state.selectedUser?.id, 'alice');
       expect(feature.state.authMode, AuthMode.userSelection);
 
-      sessions.complete(const [
-        SessionSummary(id: 'wayland:sway', name: 'Sway'),
-      ]);
+      sessions.complete(const [(id: 'wayland:sway', name: 'Sway')]);
       await _flushEvents();
 
       expect(feature.state.catalogMode, CatalogMode.ready);
@@ -368,8 +366,8 @@ void main() {
   test('prefers hyprland when no session was stored', () async {
     final gateway = _FakeGreeterGateway()
       ..sessionsFuture = Future.value(const [
-        SessionSummary(id: 'wayland:sway', name: 'Sway'),
-        SessionSummary(id: 'wayland:hyprland', name: 'Hyprland'),
+        (id: 'wayland:sway', name: 'Sway'),
+        (id: 'wayland:hyprland', name: 'Hyprland'),
       ]);
     final feature = GreeterFeature(gateway: gateway);
     await feature.initialize();
@@ -384,8 +382,8 @@ void main() {
     final store = _FakeSessionStore()..storedId = 'wayland:sway';
     final gateway = _FakeGreeterGateway()
       ..sessionsFuture = Future.value(const [
-        SessionSummary(id: 'wayland:sway', name: 'Sway'),
-        SessionSummary(id: 'wayland:hyprland', name: 'Hyprland'),
+        (id: 'wayland:sway', name: 'Sway'),
+        (id: 'wayland:hyprland', name: 'Hyprland'),
       ]);
     final feature = GreeterFeature(gateway: gateway, sessionStore: store);
     await feature.initialize();
@@ -394,9 +392,7 @@ void main() {
     expect(feature.state.selectedSession?.id, 'wayland:sway');
 
     await feature.dispatch(
-      const SelectSessionCommand(
-        SessionSummary(id: 'wayland:hyprland', name: 'Hyprland'),
-      ),
+      const SelectSessionCommand((id: 'wayland:hyprland', name: 'Hyprland')),
     );
     await _flushEvents();
 
@@ -454,9 +450,7 @@ Future<GreeterFeature> _createPromptedFeature(
 
 Future<void> _selectDefaultSession(GreeterFeature feature) async {
   await feature.dispatch(
-    const SelectSessionCommand(
-      SessionSummary(id: 'wayland:sway', name: 'Sway'),
-    ),
+    const SelectSessionCommand((id: 'wayland:sway', name: 'Sway')),
   );
 }
 
@@ -526,7 +520,7 @@ class _FakeGreeterGateway implements GreeterGateway {
     if (error != null) {
       throw error;
     }
-    return const [SessionSummary(id: 'wayland:sway', name: 'Sway')];
+    return const [(id: 'wayland:sway', name: 'Sway')];
   }
 
   @override
