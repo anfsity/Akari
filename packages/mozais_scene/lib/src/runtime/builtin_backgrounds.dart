@@ -5,8 +5,18 @@ import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 import 'background_renderer.dart';
 
+/// Resolves a document asset path to an [ImageProvider].
+///
+/// The default reads from the Flutter asset bundle; a host without the assets
+/// in its bundle can supply a file-based resolver instead.
+typedef SceneImageProviderResolver = ImageProvider Function(String asset);
+
+ImageProvider _assetImageProvider(String asset) => AssetImage(asset);
+
 class ImageBackgroundRenderer extends BackgroundRenderer {
-  const ImageBackgroundRenderer();
+  const ImageBackgroundRenderer({this.resolveImage = _assetImageProvider});
+
+  final SceneImageProviderResolver resolveImage;
 
   @override
   Widget build(BuildContext context, SceneBackground background) {
@@ -15,8 +25,8 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
       return SolidBackgroundRenderer().build(context, background);
     }
 
-    Widget image = Image.asset(
-      asset,
+    Widget image = Image(
+      image: resolveImage(asset),
       fit: BoxFit.cover,
       filterQuality: FilterQuality.high,
       gaplessPlayback: true,
