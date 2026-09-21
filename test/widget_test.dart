@@ -141,6 +141,97 @@ void main() {
     feature.dispose();
   });
 
+  testWidgets('escape works from the retry error state', (tester) async {
+    final feature = GreeterFeature(gateway: _SingleUserGateway());
+    await feature.initialize();
+    final theme = ThemeRegistry.resolve(ThemeRegistry.defaultThemeName);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme.materialTheme,
+        home: Scaffold(
+          body: GreeterSceneAdapter(feature: feature, theme: theme),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(feature.state.authMode, AuthMode.error);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(feature.state.dormant, isTrue);
+    feature.dispose();
+  });
+
+  testWidgets('escape works when no control holds focus', (tester) async {
+    final feature = GreeterFeature(gateway: _SingleUserGateway());
+    await feature.initialize();
+    final theme = ThemeRegistry.resolve(ThemeRegistry.defaultThemeName);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme.materialTheme,
+        home: Scaffold(
+          body: GreeterSceneAdapter(feature: feature, theme: theme),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+
+    // Focus can fall back to the enclosing scope while the field is disabled.
+    tester.binding.focusManager.primaryFocus?.unfocus(
+      disposition: UnfocusDisposition.scope,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(feature.state.dormant, isTrue);
+    feature.dispose();
+  });
+
+  testWidgets('typing recovers into the prompt from the error state', (
+    tester,
+  ) async {
+    final feature = GreeterFeature(gateway: _SingleUserGateway());
+    await feature.initialize();
+    final theme = ThemeRegistry.resolve(ThemeRegistry.defaultThemeName);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme.materialTheme,
+        home: Scaffold(
+          body: GreeterSceneAdapter(feature: feature, theme: theme),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(feature.state.authMode, AuthMode.error);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    await tester.pumpAndSettle();
+
+    expect(feature.state.authMode, AuthMode.prompting);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller?.text, 'a');
+    feature.dispose();
+  });
+
   testWidgets('submits a response and starts the selected session', (
     tester,
   ) async {
