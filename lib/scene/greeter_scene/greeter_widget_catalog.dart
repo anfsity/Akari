@@ -18,6 +18,7 @@ class GreeterWidgetCatalog {
     required this.credentialController,
     required this.credentialFocusNode,
     required this.onDispatch,
+    required this.onRespond,
   });
 
   final GreeterFeature feature;
@@ -25,6 +26,7 @@ class GreeterWidgetCatalog {
   final TextEditingController credentialController;
   final FocusNode credentialFocusNode;
   final ValueChanged<GreeterCommand> onDispatch;
+  final VoidCallback onRespond;
 
   Widget build(BuildContext context, SceneNode node, {required bool dormant}) {
     if (dormant && _isForeground(node.kind)) {
@@ -89,8 +91,9 @@ class GreeterWidgetCatalog {
       ),
       SceneNodeKind.primaryAction => SceneRegion<AuthPromptSlots>(
         valueListenable: feature.authPromptSlots,
-        builder: (context, auth) => _RetryAction(
+        builder: (context, auth) => _PrimaryAction(
           auth: auth,
+          onRespond: onRespond,
           onRetry: (recovery) {
             switch (recovery) {
               case GreeterRecovery.retryPrompt:
@@ -748,31 +751,67 @@ class _CredentialField extends StatelessWidget {
   }
 }
 
-class _RetryAction extends StatelessWidget {
-  const _RetryAction({required this.auth, required this.onRetry});
+class _PrimaryAction extends StatelessWidget {
+  const _PrimaryAction({
+    required this.auth,
+    required this.onRespond,
+    required this.onRetry,
+  });
 
   final AuthPromptSlots auth;
+  final VoidCallback onRespond;
   final ValueChanged<GreeterRecovery> onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final error = auth.error;
-    if (auth.mode != AuthMode.error || error == null) {
-      return const SizedBox.shrink();
-    }
     final colorScheme = Theme.of(context).colorScheme;
+    final error = auth.error;
+    final VoidCallback? onPressed;
+    final Widget icon;
+    switch (auth.mode) {
+      case AuthMode.prompting:
+        onPressed = onRespond;
+        icon = const Icon(Icons.arrow_forward, size: 30);
+      case AuthMode.submitting:
+        onPressed = null;
+        icon = SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: colorScheme.onPrimary,
+          ),
+        );
+      case AuthMode.error:
+        if (error == null) {
+          return const SizedBox.shrink();
+        }
+        onPressed = () => onRetry(error.recovery);
+        icon = const Icon(Icons.refresh, size: 30);
+      case AuthMode.userSelection:
+      case AuthMode.sessionSelection:
+      case AuthMode.handingOff:
+        return const SizedBox.shrink();
+    }
+
     return Center(
       child: AspectRatio(
         aspectRatio: 1,
         child: FilledButton(
-          onPressed: () => onRetry(error.recovery),
+          onPressed: onPressed,
           style: FilledButton.styleFrom(
             shape: const CircleBorder(),
             padding: EdgeInsets.zero,
             backgroundColor: colorScheme.primary,
             foregroundColor: colorScheme.onPrimary,
+            disabledBackgroundColor: colorScheme.primary.withValues(
+              alpha: 0.4,
+            ),
+            disabledForegroundColor: colorScheme.onPrimary.withValues(
+              alpha: 0.5,
+            ),
           ),
-          child: const Icon(Icons.refresh, size: 30),
+          child: icon,
         ),
       ),
     );
