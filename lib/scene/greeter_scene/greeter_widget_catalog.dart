@@ -720,7 +720,9 @@ class _CredentialField extends StatelessWidget {
       controller: controller,
       focusNode: focusNode,
       enabled: enabled,
-      obscureText: secret,
+      // The node stays mounted through its exit transition after the prompt is
+      // cleared, so never reveal a response once the field stops accepting it.
+      obscureText: secret || !enabled,
       textInputAction: TextInputAction.done,
       textAlign: TextAlign.center,
       textAlignVertical: TextAlignVertical.center,

@@ -106,6 +106,41 @@ void main() {
     feature.dispose();
   });
 
+  testWidgets('keeps a typed credential obscured while the field exits', (
+    tester,
+  ) async {
+    final feature = GreeterFeature(gateway: _SingleUserGateway());
+    await feature.initialize();
+    final theme = ThemeRegistry.resolve(ThemeRegistry.defaultThemeName);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme.materialTheme,
+        home: Scaffold(
+          body: GreeterSceneAdapter(feature: feature, theme: theme),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'secret');
+    await tester.pump();
+
+    // Escape starts the exit transition while the field still holds the
+    // secret, so the field must stay obscured until it unmounts.
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.obscureText, isTrue);
+    expect(field.controller?.text, isEmpty);
+
+    feature.dispose();
+  });
+
   testWidgets('submits a response and starts the selected session', (
     tester,
   ) async {

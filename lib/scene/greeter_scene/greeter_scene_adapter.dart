@@ -173,6 +173,10 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
 
   void _handleDormantChanged() {
     if (widget.feature.dormantSlots.value) {
+      // The attempt is cancelled when the greeter sleeps, so discard the
+      // response instead of retaining it in the field during the exit.
+      _credentialController.clear();
+      _typeahead.clear();
       _blurController.reverse();
     } else {
       _blurController.forward();
