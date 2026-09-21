@@ -64,6 +64,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       credentialController: _credentialController,
       credentialFocusNode: _credentialFocusNode,
       onDispatch: _dispatch,
+      onRespond: _respondToPrompt,
     );
   }
 

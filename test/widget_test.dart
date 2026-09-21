@@ -130,6 +130,32 @@ void main() {
     expect(find.text('Starting session...'), findsOneWidget);
   });
 
+  testWidgets('the confirm arrow submits the same response as enter', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+    await _wake(tester);
+
+    await tester.tap(find.byTooltip('Choose a session'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sway'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Choose account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'secret');
+    await tester.tap(find.byIcon(Icons.arrow_forward));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Starting session...'), findsOneWidget);
+  });
+
   testWidgets('power actions remain independently reachable', (tester) async {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
