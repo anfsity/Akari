@@ -44,6 +44,20 @@ void main() {
     expect(store.load(), EditorSettings.defaults);
   });
 
+  test('ignores unknown enum and aspect-ratio values', () {
+    file.writeAsStringSync('''
+{
+  "themeId": "solarized",
+  "previewAspectRatio": 2.5
+}
+''');
+
+    final settings = store.load();
+
+    expect(settings.themeId, EditorSettings.defaults.themeId);
+    expect(settings.previewAspectRatio, EditorSettings.defaults.previewAspectRatio);
+  });
+
   test('resolves the requested locale and falls back for unknown codes', () {
     expect(editorStringsFor('en').appTitle, 'Mozais Scene Editor');
     expect(editorStringsFor('xx').appTitle, 'Mozais Scene Editor');
