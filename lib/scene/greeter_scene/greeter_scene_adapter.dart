@@ -7,8 +7,45 @@ import 'package:mozais_scene/mozais_scene.dart';
 import '../../feature/greeter/greeter_commands.dart';
 import '../../feature/greeter/greeter_effect.dart';
 import '../../feature/greeter/greeter_feature.dart';
+import '../../feature/greeter/greeter_slots.dart';
 import '../../feature/greeter/greeter_state.dart';
 import 'greeter_widget_catalog.dart';
+
+/// Maps the current greeter slots onto the scene predicate vocabulary.
+Set<ScenePredicate> activeScenePredicates({
+  required ServiceSlots service,
+  required AuthPromptSlots auth,
+  required AccountPickerSlots account,
+  required SessionPickerSlots session,
+  required PowerSlots power,
+  required bool dormant,
+}) {
+  return <ScenePredicate>{
+    if (dormant) ScenePredicate.isDormant,
+    switch (service.mode) {
+      ServiceMode.starting => ScenePredicate.isServiceStarting,
+      ServiceMode.ready => ScenePredicate.isServiceReady,
+      ServiceMode.unavailable => ScenePredicate.isServiceUnavailable,
+    },
+    switch (auth.mode) {
+      AuthMode.userSelection => ScenePredicate.isUserSelection,
+      AuthMode.prompting => ScenePredicate.isAuthPrompting,
+      AuthMode.submitting => ScenePredicate.isAuthSubmitting,
+      AuthMode.sessionSelection => ScenePredicate.isSessionSelection,
+      AuthMode.handingOff => ScenePredicate.isHandingOff,
+      AuthMode.error => ScenePredicate.isAuthError,
+    },
+    if (account.selected != null) ScenePredicate.hasSelectedUser,
+    switch (session.mode) {
+      CatalogMode.empty => ScenePredicate.isSessionEmpty,
+      CatalogMode.loading => ScenePredicate.isSessionLoading,
+      CatalogMode.ready => ScenePredicate.isSessionReady,
+      CatalogMode.failed => ScenePredicate.isSessionFailed,
+    },
+    if (power.mode == PowerMode.executing) ScenePredicate.isPowerExecuting,
+    if (power.error != null) ScenePredicate.hasPowerError,
+  };
+}
 
 class GreeterSceneAdapter extends StatefulWidget {
   const GreeterSceneAdapter({
@@ -94,9 +131,17 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     return Focus(
       autofocus: true,
       onKeyEvent: _handleKeyEvent,
-      child: ValueListenableBuilder<bool>(
-        valueListenable: widget.feature.dormantSlots,
-        builder: (context, dormant, child) {
+      child: ListenableBuilder(
+        listenable: Listenable.merge([
+          widget.feature.serviceSlots,
+          widget.feature.authPromptSlots,
+          widget.feature.accountPickerSlots,
+          widget.feature.sessionPickerSlots,
+          widget.feature.powerSlots,
+          widget.feature.dormantSlots,
+        ]),
+        builder: (context, child) {
+          final dormant = widget.feature.dormantSlots.value;
           return Listener(
             behavior: HitTestBehavior.translucent,
             onPointerDown: dormant
@@ -105,13 +150,24 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
             child: SceneRuntime(
               document: widget.theme.document,
               theme: widget.theme,
+              activePredicates: _activePredicates(),
               backgroundBlurSigma: _blurAnimation,
-              nodeBuilder: (context, node) =>
-                  _catalog.build(context, node, dormant: dormant),
+              nodeBuilder: _catalog.build,
             ),
           );
         },
       ),
+    );
+  }
+
+  Set<ScenePredicate> _activePredicates() {
+    return activeScenePredicates(
+      service: widget.feature.serviceSlots.value,
+      auth: widget.feature.authPromptSlots.value,
+      account: widget.feature.accountPickerSlots.value,
+      session: widget.feature.sessionPickerSlots.value,
+      power: widget.feature.powerSlots.value,
+      dormant: widget.feature.dormantSlots.value,
     );
   }
 

@@ -27,6 +27,7 @@
       "renderOrder": 10,
       "focusOrder": 0,
       "motion": "none",
+      "visibleWhen": "isDormant",
       "properties": {"variant": "time"}
     },
     {
@@ -37,7 +38,6 @@
       "focusOrder": 30,
       "motion": "none",
       "action": "requestPowerAction",
-      "bindings": ["powerMode", "powerError"],
       "properties": {"variant": "icon-row"}
     },
     {
@@ -47,6 +47,7 @@
       "renderOrder": 30,
       "focusOrder": 0,
       "motion": "none",
+      "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "solid-panel"}
     },
     {
@@ -57,7 +58,7 @@
       "focusOrder": 10,
       "motion": "none",
       "action": "selectUser",
-      "bindings": ["accountSelected"],
+      "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "circle"}
     },
     {
@@ -67,7 +68,7 @@
       "renderOrder": 40,
       "focusOrder": 0,
       "motion": "none",
-      "bindings": ["accountSelected"],
+      "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "center"}
     },
     {
@@ -78,7 +79,7 @@
       "focusOrder": 20,
       "motion": "none",
       "action": "selectSession",
-      "bindings": ["sessionMode", "sessionSessions", "sessionSelected"],
+      "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "pill"}
     },
     {
@@ -88,7 +89,7 @@
       "renderOrder": 40,
       "focusOrder": 40,
       "motion": "none",
-      "bindings": ["authMode", "authPrompt"],
+      "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "outline"}
     },
     {
@@ -99,7 +100,7 @@
       "focusOrder": 50,
       "motion": "none",
       "action": "beginAuthentication",
-      "bindings": ["authMode", "continueEnabled"],
+      "visibleWhen": {"any": ["isAuthPrompting", "isAuthSubmitting", "isAuthError"]},
       "properties": {"variant": "round-arrow"}
     },
     {
@@ -109,7 +110,6 @@
       "renderOrder": 40,
       "focusOrder": 0,
       "motion": "none",
-      "bindings": ["serviceMode", "authError", "sessionMode"],
       "properties": {"variant": "inline"}
     }
   ]

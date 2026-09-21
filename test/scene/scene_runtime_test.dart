@@ -111,6 +111,27 @@ void main() {
     await tester.pumpWidget(_runtimeWithTheme(document, theme));
     expect(renderer.background?.blurSigma, 12);
   });
+
+  testWidgets('gates a node on its visibleWhen condition', (tester) async {
+    final document = _document(
+      nodes: const [
+        SceneNode(
+          id: 'gated',
+          kind: SceneNodeKind.decoration,
+          rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
+          visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_runtime(document));
+    expect(find.text('gated'), findsNothing);
+
+    await tester.pumpWidget(
+      _runtime(document, activePredicates: const {ScenePredicate.isDormant}),
+    );
+    expect(find.text('gated'), findsOneWidget);
+  });
 }
 
 SceneDocument _document({required List<SceneNode> nodes}) {
@@ -123,19 +144,27 @@ SceneDocument _document({required List<SceneNode> nodes}) {
   );
 }
 
-Widget _runtime(SceneDocument document) {
+Widget _runtime(
+  SceneDocument document, {
+  Set<ScenePredicate> activePredicates = const <ScenePredicate>{},
+}) {
   final theme = ThemeBundle(
     id: 'test',
     tokens: _tokens(),
     document: document,
     backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
   );
-  return _runtimeWithTheme(document, theme);
+  return _runtimeWithTheme(
+    document,
+    theme,
+    activePredicates: activePredicates,
+  );
 }
 
 Widget _runtimeWithTheme(
   SceneDocument document,
   ThemeBundle theme, {
+  Set<ScenePredicate> activePredicates = const <ScenePredicate>{},
   double? backgroundBlurSigma,
 }) {
   return MaterialApp(
@@ -143,6 +172,7 @@ Widget _runtimeWithTheme(
       body: SceneRuntime(
         document: document,
         theme: theme,
+        activePredicates: activePredicates,
         backgroundBlurSigma: backgroundBlurSigma == null
             ? null
             : AlwaysStoppedAnimation<double>(backgroundBlurSigma),

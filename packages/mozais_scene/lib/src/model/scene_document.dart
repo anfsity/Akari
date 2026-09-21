@@ -18,19 +18,76 @@ enum SceneNodeKind {
   decoration,
 }
 
-enum SceneBinding {
-  serviceMode,
-  authMode,
-  authPrompt,
-  authError,
-  accountUsers,
-  accountSelected,
-  sessionMode,
-  sessionSessions,
-  sessionSelected,
-  continueEnabled,
-  powerMode,
-  powerError,
+/// Boolean questions about semantic greeter state used by [SceneCondition].
+///
+/// The vocabulary is closed so a theme or editor can only reference known
+/// predicates; it never evaluates arbitrary expressions or backend values.
+enum ScenePredicate {
+  isDormant,
+  isServiceStarting,
+  isServiceReady,
+  isServiceUnavailable,
+  isUserSelection,
+  isAuthPrompting,
+  isAuthSubmitting,
+  isSessionSelection,
+  isHandingOff,
+  isAuthError,
+  hasSelectedUser,
+  isSessionLoading,
+  isSessionReady,
+  isSessionEmpty,
+  isSessionFailed,
+  isPowerExecuting,
+  hasPowerError,
+}
+
+/// Declarative presence condition over [ScenePredicate] values.
+sealed class SceneCondition {
+  const SceneCondition();
+}
+
+final class ScenePredicateCondition extends SceneCondition {
+  const ScenePredicateCondition(this.predicate);
+
+  final ScenePredicate predicate;
+}
+
+final class SceneAll extends SceneCondition {
+  const SceneAll(this.conditions);
+
+  final List<SceneCondition> conditions;
+}
+
+final class SceneAny extends SceneCondition {
+  const SceneAny(this.conditions);
+
+  final List<SceneCondition> conditions;
+}
+
+final class SceneNot extends SceneCondition {
+  const SceneNot(this.condition);
+
+  final SceneCondition condition;
+}
+
+/// Evaluates [condition] against the predicates currently true for the scene.
+bool evaluateSceneCondition(
+  SceneCondition condition,
+  Set<ScenePredicate> activePredicates,
+) {
+  return switch (condition) {
+    ScenePredicateCondition(:final predicate) =>
+      activePredicates.contains(predicate),
+    SceneAll(:final conditions) => conditions.every(
+      (condition) => evaluateSceneCondition(condition, activePredicates),
+    ),
+    SceneAny(:final conditions) => conditions.any(
+      (condition) => evaluateSceneCondition(condition, activePredicates),
+    ),
+    SceneNot(:final condition) =>
+      !evaluateSceneCondition(condition, activePredicates),
+  };
 }
 
 enum SceneAction {
@@ -173,7 +230,7 @@ class SceneNode {
     this.renderOrder = 0,
     this.focusOrder = 0,
     this.motion = SceneMotionPreset.none,
-    this.bindings = const <SceneBinding>{},
+    this.visibleWhen,
     this.action,
     this.properties = const <String, String>{},
   });
@@ -186,7 +243,10 @@ class SceneNode {
   final int renderOrder;
   final int focusOrder;
   final SceneMotionPreset motion;
-  final Set<SceneBinding> bindings;
+
+  /// Condition controlling whether the node is present; null means always.
+  final SceneCondition? visibleWhen;
+
   final SceneAction? action;
   final Map<String, String> properties;
 

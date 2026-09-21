@@ -29,6 +29,7 @@
       "renderOrder": 10,
       "focusOrder": 0,
       "motion": "fade",
+      "visibleWhen": "isDormant",
       "properties": {"variant": "time"}
     },
     {
@@ -39,7 +40,6 @@
       "focusOrder": 30,
       "motion": "fade",
       "action": "requestPowerAction",
-      "bindings": ["powerMode", "powerError"],
       "properties": {"variant": "icon-row"}
     },
     {
@@ -49,6 +49,7 @@
       "renderOrder": 30,
       "focusOrder": 0,
       "motion": "fadeScale",
+      "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "soft-glass"}
     },
     {
@@ -59,7 +60,7 @@
       "focusOrder": 10,
       "motion": "fadeScale",
       "action": "selectUser",
-      "bindings": ["accountSelected"],
+      "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "circle"}
     },
     {
@@ -69,7 +70,7 @@
       "renderOrder": 40,
       "focusOrder": 0,
       "motion": "fade",
-      "bindings": ["accountSelected"],
+      "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "center"}
     },
     {
@@ -80,7 +81,7 @@
       "focusOrder": 20,
       "motion": "fade",
       "action": "selectSession",
-      "bindings": ["sessionMode", "sessionSessions", "sessionSelected"],
+      "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "pill"}
     },
     {
@@ -90,7 +91,7 @@
       "renderOrder": 40,
       "focusOrder": 40,
       "motion": "fade",
-      "bindings": ["authMode", "authPrompt"],
+      "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "outline"}
     },
     {
@@ -101,7 +102,7 @@
       "focusOrder": 50,
       "motion": "hoverLift",
       "action": "beginAuthentication",
-      "bindings": ["authMode", "continueEnabled"],
+      "visibleWhen": {"any": ["isAuthPrompting", "isAuthSubmitting", "isAuthError"]},
       "properties": {"variant": "round-arrow"}
     },
     {
@@ -111,7 +112,6 @@
       "renderOrder": 40,
       "focusOrder": 0,
       "motion": "fade",
-      "bindings": ["serviceMode", "authError", "sessionMode"],
       "properties": {"variant": "inline"}
     }
   ]
