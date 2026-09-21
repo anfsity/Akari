@@ -1,3 +1,5 @@
+import 'dart:ui' show AppExitResponse;
+
 import 'package:flutter/material.dart';
 
 import 'editor_controller.dart';
@@ -68,6 +70,7 @@ class EditorScreen extends StatefulWidget {
 class _EditorScreenState extends State<EditorScreen> {
   late final SceneEditorController _controller;
   late final TextEditingController _pathController;
+  late final AppLifecycleListener _lifecycleListener;
   bool _initialized = false;
 
   @override
@@ -75,6 +78,9 @@ class _EditorScreenState extends State<EditorScreen> {
     super.initState();
     _controller = SceneEditorController();
     _pathController = TextEditingController();
+    _lifecycleListener = AppLifecycleListener(
+      onExitRequested: _handleExitRequest,
+    );
   }
 
   @override
@@ -95,12 +101,57 @@ class _EditorScreenState extends State<EditorScreen> {
 
   @override
   void dispose() {
+    _lifecycleListener.dispose();
     _controller.dispose();
     _pathController.dispose();
     super.dispose();
   }
 
+  Future<AppExitResponse> _handleExitRequest() async {
+    if (await _confirmDiscard()) {
+      return AppExitResponse.exit;
+    }
+    return AppExitResponse.cancel;
+  }
+
+  /// Returns true when it is safe to drop the current document.
+  Future<bool> _confirmDiscard() async {
+    if (!_controller.dirty || !widget.settings.settings.confirmUnsavedChanges) {
+      return true;
+    }
+    final strings = EditorStringsScope.of(context);
+    final choice = await showDialog<_UnsavedChoice>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(strings.unsavedDialogTitle),
+        content: Text(strings.unsavedDialogBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(_UnsavedChoice.cancel),
+            child: Text(strings.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(_UnsavedChoice.discard),
+            child: Text(strings.discard),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(_UnsavedChoice.save),
+            child: Text(strings.save),
+          ),
+        ],
+      ),
+    );
+    return switch (choice) {
+      _UnsavedChoice.save => await _controller.save(),
+      _UnsavedChoice.discard => true,
+      _UnsavedChoice.cancel || null => false,
+    };
+  }
+
   Future<void> _open() async {
+    if (!await _confirmDiscard()) {
+      return;
+    }
     if (await _controller.open()) {
       _rememberPath();
     }
@@ -181,6 +232,8 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 }
+
+enum _UnsavedChoice { save, discard, cancel }
 
 class _StatusBar extends StatelessWidget {
   const _StatusBar({required this.controller});
