@@ -7,7 +7,6 @@ class ThemeTokens {
     required this.mediumMotion,
     required this.standardCurve,
     required this.minHitTarget,
-    required this.maxInteractiveRotationDegrees,
     required this.allowBlur,
     required this.blurSigma,
     required this.glassColor,
@@ -28,10 +27,6 @@ class ThemeTokens {
 
   /// Minimum touch target enforced for interactive scene nodes.
   final double minHitTarget;
-
-  /// Maximum rotation applied to interactive nodes; decorative nodes are not
-  /// clamped.
-  final double maxInteractiveRotationDegrees;
 
   /// Whether panel surfaces may blur the content behind them.
   final bool allowBlur;

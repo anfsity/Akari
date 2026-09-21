@@ -137,23 +137,12 @@ class SceneRuntime extends StatelessWidget {
     }
 
     final transform = node.transform;
-    final maxRotation = theme.tokens.maxInteractiveRotationDegrees;
-    final rotationX = node.isInteractive
-        ? transform.rotationX.clamp(-maxRotation, maxRotation)
-        : transform.rotationX;
-    final rotationY = node.isInteractive
-        ? transform.rotationY.clamp(-maxRotation, maxRotation)
-        : transform.rotationY;
-    final rotationZ = node.isInteractive
-        ? transform.rotationZ.clamp(-maxRotation, maxRotation)
-        : transform.rotationZ;
-
     final matrix = Matrix4.identity()
       ..translateByDouble(transform.translateX, transform.translateY, 0, 1)
       ..scaleByDouble(transform.scaleX, transform.scaleY, 1, 1)
-      ..rotateX(rotationX * math.pi / 180)
-      ..rotateY(rotationY * math.pi / 180)
-      ..rotateZ(rotationZ * math.pi / 180);
+      ..rotateX(transform.rotationX * math.pi / 180)
+      ..rotateY(transform.rotationY * math.pi / 180)
+      ..rotateZ(transform.rotationZ * math.pi / 180);
 
     if (transform.perspective != 0) {
       matrix.setEntry(3, 2, transform.perspective);

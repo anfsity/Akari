@@ -41,7 +41,6 @@ ThemeBundle buildDefaultTheme({Color? seed}) {
       mediumMotion: const Duration(milliseconds: 260),
       standardCurve: Curves.easeOutCubic,
       minHitTarget: 44,
-      maxInteractiveRotationDegrees: 15,
       allowBlur: false,
       blurSigma: 0,
       glassColor: _base.withValues(alpha: 0.72),

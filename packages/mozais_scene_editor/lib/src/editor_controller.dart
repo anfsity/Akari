@@ -204,7 +204,6 @@ ThemeBundle editorTheme(SceneDocument document) {
       mediumMotion: const Duration(milliseconds: 260),
       standardCurve: Curves.easeOutCubic,
       minHitTarget: 44,
-      maxInteractiveRotationDegrees: 180,
       allowBlur: false,
       blurSigma: 0,
       glassColor: surface.withValues(alpha: 0.72),
