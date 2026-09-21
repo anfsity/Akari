@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
+import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 
 import 'editor_controller.dart';
 import 'editor_settings_controller.dart';
@@ -11,6 +13,7 @@ import 'editor_theme.dart';
 import 'inspector_panel.dart';
 import 'node_list_panel.dart';
 import 'pane_divider.dart';
+import 'repo_root.dart';
 import 'scene_preview.dart';
 import 'settings_page.dart';
 
@@ -72,6 +75,8 @@ class _EditorScreenState extends State<EditorScreen> {
   late final SceneEditorController _controller;
   late final TextEditingController _pathController;
   late final AppLifecycleListener _lifecycleListener;
+  late final GreeterFeature _greeterFeature;
+  PreviewMode _previewMode = PreviewMode.outline;
   double _leftWidth = 240;
   double _rightWidth = 300;
 
@@ -88,6 +93,8 @@ class _EditorScreenState extends State<EditorScreen> {
     _lifecycleListener = AppLifecycleListener(
       onExitRequested: _handleExitRequest,
     );
+    _greeterFeature = GreeterFeature(gateway: DemoGreeterGateway());
+    unawaited(_greeterFeature.initialize());
     final configured = widget.settings.settings.defaultScenePath;
     final path = configured.isNotEmpty ? configured : defaultScenePath() ?? '';
     _controller.setPath(path);
@@ -100,6 +107,7 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   void dispose() {
     _lifecycleListener.dispose();
+    _greeterFeature.dispose();
     _controller.dispose();
     _pathController.dispose();
     super.dispose();
@@ -226,7 +234,23 @@ class _EditorScreenState extends State<EditorScreen> {
               child: NodeListPanel(controller: _controller),
             ),
             PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeLeft),
-            Expanded(child: ScenePreview(controller: _controller)),
+            Expanded(
+              child: Column(
+                children: [
+                  _PreviewToolbar(
+                    mode: _previewMode,
+                    onChanged: (mode) => setState(() => _previewMode = mode),
+                  ),
+                  Expanded(
+                    child: ScenePreview(
+                      controller: _controller,
+                      feature: _greeterFeature,
+                      mode: _previewMode,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeRight),
             SizedBox(
               width: _rightWidth,
@@ -244,6 +268,32 @@ class _EditorScreenState extends State<EditorScreen> {
 }
 
 enum _UnsavedChoice { save, discard, cancel }
+
+class _PreviewToolbar extends StatelessWidget {
+  const _PreviewToolbar({required this.mode, required this.onChanged});
+
+  final PreviewMode mode;
+  final ValueChanged<PreviewMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: SegmentedButton<PreviewMode>(
+          segments: [
+            ButtonSegment(value: PreviewMode.outline, label: Text(strings.outline)),
+            ButtonSegment(value: PreviewMode.real, label: Text(strings.real)),
+          ],
+          selected: {mode},
+          onSelectionChanged: (selection) => onChanged(selection.first),
+        ),
+      ),
+    );
+  }
+}
 
 class _StatusBar extends StatelessWidget {
   const _StatusBar({required this.controller});

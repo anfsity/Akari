@@ -22,6 +22,8 @@ abstract class EditorStrings {
 
   String get previewEmpty;
   String get selectANode;
+  String get outline;
+  String get real;
 
   String get addNode;
   String get duplicateNode;

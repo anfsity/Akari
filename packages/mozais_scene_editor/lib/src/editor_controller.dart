@@ -2,31 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 import 'package:mozais_scene/mozais_scene.dart';
 
 import 'editor_status.dart';
-
-/// Locates the bundled default scene by walking up from the working directory.
-///
-/// The editor is run from inside its package, so the repository root is a few
-/// levels above it rather than a fixed relative path.
-String? defaultScenePath() {
-  var directory = Directory.current;
-  for (var depth = 0; depth < 8; depth++) {
-    final candidate = File(
-      '${directory.path}/lib/themes/default/default.scene.json',
-    );
-    if (candidate.existsSync()) {
-      return candidate.path;
-    }
-    final parent = directory.parent;
-    if (parent.path == directory.path) {
-      break;
-    }
-    directory = parent;
-  }
-  return null;
-}
+import 'repo_root.dart';
 
 /// Holds the document under edit and the editor's selection and preview state.
 class SceneEditorController extends ChangeNotifier {
@@ -202,32 +182,20 @@ String _uniqueNodeId(SceneDocument document, String base) {
 }
 
 /// Theme used only to drive the editor preview.
+///
+/// Reuses the real default theme so the preview matches the greeter, but
+/// resolves background assets from the repository root because the editor does
+/// not bundle them.
 ThemeBundle editorTheme(SceneDocument document) {
-  const surface = Color(0xff2a2d28);
-  return ThemeBundle(
-    id: 'editor',
-    tokens: ThemeTokens(
-      materialTheme: ThemeData.dark(),
-      panelRadius: 16,
-      mediumMotion: const Duration(milliseconds: 260),
-      standardCurve: Curves.easeOutCubic,
-      minHitTarget: 44,
-      allowBlur: false,
-      blurSigma: 0,
-      glassColor: surface.withValues(alpha: 0.72),
-      surfaceColor: surface,
-      surfaceVariantColor: const Color(0xff3a3e36),
-    ),
-    document: document,
-    backgrounds: const {
-      SceneBackgroundKind.solid: SolidBackgroundRenderer(),
-    },
-    motions: const {
-      SceneMotionPreset.fade: FadeMotionBuilder(),
-      SceneMotionPreset.fadeSlide: FadeSlideMotionBuilder(),
-      SceneMotionPreset.fadeScale: FadeScaleMotionBuilder(),
-      SceneMotionPreset.hoverLift: HoverLiftMotionBuilder(),
-      SceneMotionPreset.focusGlow: FocusGlowMotionBuilder(),
+  return buildDefaultTheme(document: document).copyWith(
+    backgrounds: {
+      SceneBackgroundKind.solid: const SolidBackgroundRenderer(),
+      SceneBackgroundKind.image: ImageBackgroundRenderer(
+        resolveImage: (asset) {
+          final file = repoAssetFile(asset);
+          return file == null ? AssetImage(asset) : FileImage(file);
+        },
+      ),
     },
   );
 }

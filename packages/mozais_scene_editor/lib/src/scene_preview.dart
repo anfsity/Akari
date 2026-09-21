@@ -1,11 +1,15 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 import 'package:mozais_scene/mozais_scene.dart';
 
 import 'editor_controller.dart';
 import 'editor_settings_scope.dart';
 import 'editor_strings.dart';
+
+/// Whether the preview shows placeholder boxes or the real greeter widgets.
+enum PreviewMode { outline, real }
 
 const _accent = Color(0xff4fc3f7);
 const _boxPadding = 4.0;
@@ -19,9 +23,16 @@ const _dragSensitivity = 0.5;
 /// Renders the document with the real runtime and overlays an editing box for
 /// the selected node.
 class ScenePreview extends StatelessWidget {
-  const ScenePreview({required this.controller, super.key});
+  const ScenePreview({
+    required this.controller,
+    required this.feature,
+    required this.mode,
+    super.key,
+  });
 
   final SceneEditorController controller;
+  final GreeterFeature feature;
+  final PreviewMode mode;
 
   @override
   Widget build(BuildContext context) {
@@ -46,14 +57,7 @@ class ScenePreview extends StatelessWidget {
             height: size.height,
             child: Stack(
               children: [
-                Positioned.fill(
-                  child: SceneRuntime(
-                    document: document,
-                    theme: theme,
-                    nodeBuilder: buildPlaceholderNode,
-                    activePredicates: controller.activePredicates,
-                  ),
-                ),
+                Positioned.fill(child: _buildScene(document, theme)),
                 Positioned.fill(
                   child: IgnorePointer(
                     child: DecoratedBox(
@@ -85,6 +89,22 @@ class ScenePreview extends StatelessWidget {
         );
       },
     );
+  }
+
+  Widget _buildScene(SceneDocument document, ThemeBundle theme) {
+    return switch (mode) {
+      PreviewMode.outline => SceneRuntime(
+        document: document,
+        theme: theme,
+        nodeBuilder: buildPlaceholderNode,
+        activePredicates: controller.activePredicates,
+      ),
+      PreviewMode.real => GreeterSceneAdapter(
+        feature: feature,
+        theme: theme,
+        handleKeyboard: false,
+      ),
+    };
   }
 }
 
