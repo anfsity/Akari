@@ -30,17 +30,16 @@ class GreeterFeature {
       StreamController<FeatureEffect>.broadcast();
   StreamSubscription<GreeterEvent>? _eventSubscription;
   final List<GreeterEvent> _eventsDuringBegin = <GreeterEvent>[];
-  final ValueNotifier<ServiceSlots> _serviceSlots = ValueNotifier(
-    const ServiceSlots(mode: ServiceMode.starting, error: null),
-  );
-  final ValueNotifier<AuthPromptSlots> _authPromptSlots = ValueNotifier(
-    AuthPromptSlots(
-      mode: AuthMode.userSelection,
-      selectedUser: null,
-      prompt: null,
-      error: null,
-    ),
-  );
+  final ValueNotifier<ServiceSlots> _serviceSlots = ValueNotifier(const (
+    mode: ServiceMode.starting,
+    error: null,
+  ));
+  final ValueNotifier<AuthPromptSlots> _authPromptSlots = ValueNotifier((
+    mode: AuthMode.userSelection,
+    selectedUser: null,
+    prompt: null,
+    error: null,
+  ));
   final ValueNotifier<AccountPickerSlots> _accountPickerSlots = ValueNotifier(
     AccountPickerSlots(users: const [], selected: null),
   );
@@ -52,9 +51,10 @@ class GreeterFeature {
       error: null,
     ),
   );
-  final ValueNotifier<PowerSlots> _powerSlots = ValueNotifier(
-    const PowerSlots(mode: PowerMode.idle, error: null),
-  );
+  final ValueNotifier<PowerSlots> _powerSlots = ValueNotifier(const (
+    mode: PowerMode.idle,
+    error: null,
+  ));
   final ValueNotifier<bool> _dormantSlots = ValueNotifier(true);
   GreeterState _state = GreeterState.initial();
   String? _attemptId;

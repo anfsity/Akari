@@ -14,8 +14,8 @@ class GreeterSceneSlots {
 
   factory GreeterSceneSlots.fromState(GreeterState state) {
     return GreeterSceneSlots(
-      service: ServiceSlots(mode: state.serviceMode, error: state.serviceError),
-      authPrompt: AuthPromptSlots(
+      service: (mode: state.serviceMode, error: state.serviceError),
+      authPrompt: (
         mode: state.authMode,
         selectedUser: state.authMode == AuthMode.userSelection
             ? null
@@ -33,7 +33,7 @@ class GreeterSceneSlots {
         selected: state.selectedSession,
         error: state.catalogError,
       ),
-      power: PowerSlots(mode: state.powerMode, error: state.powerError),
+      power: (mode: state.powerMode, error: state.powerError),
     );
   }
 
@@ -44,46 +44,14 @@ class GreeterSceneSlots {
   final PowerSlots power;
 }
 
-class ServiceSlots {
-  const ServiceSlots({required this.mode, required this.error});
+typedef ServiceSlots = ({ServiceMode mode, GreeterError? error});
 
-  final ServiceMode mode;
-  final GreeterError? error;
-
-  @override
-  bool operator ==(Object other) {
-    return other is ServiceSlots && other.mode == mode && other.error == error;
-  }
-
-  @override
-  int get hashCode => Object.hash(mode, error);
-}
-
-class AuthPromptSlots {
-  const AuthPromptSlots({
-    required this.mode,
-    required this.selectedUser,
-    required this.prompt,
-    required this.error,
-  });
-
-  final AuthMode mode;
-  final UserSummary? selectedUser;
-  final PromptState? prompt;
-  final GreeterError? error;
-
-  @override
-  bool operator ==(Object other) {
-    return other is AuthPromptSlots &&
-        other.mode == mode &&
-        other.selectedUser == selectedUser &&
-        other.prompt == prompt &&
-        other.error == error;
-  }
-
-  @override
-  int get hashCode => Object.hash(mode, selectedUser, prompt, error);
-}
+typedef AuthPromptSlots = ({
+  AuthMode mode,
+  UserSummary? selectedUser,
+  PromptState? prompt,
+  GreeterError? error,
+});
 
 class AccountPickerSlots {
   AccountPickerSlots({required List<UserSummary> users, required this.selected})
@@ -130,17 +98,4 @@ class SessionPickerSlots {
       Object.hash(mode, Object.hashAll(sessions), selected, error);
 }
 
-class PowerSlots {
-  const PowerSlots({required this.mode, required this.error});
-
-  final PowerMode mode;
-  final GreeterError? error;
-
-  @override
-  bool operator ==(Object other) {
-    return other is PowerSlots && other.mode == mode && other.error == error;
-  }
-
-  @override
-  int get hashCode => Object.hash(mode, error);
-}
+typedef PowerSlots = ({PowerMode mode, GreeterError? error});
