@@ -99,10 +99,13 @@ class ScenePreview extends StatelessWidget {
         nodeBuilder: buildPlaceholderNode,
         activePredicates: controller.activePredicates,
       ),
-      PreviewMode.real => GreeterSceneAdapter(
-        feature: feature,
-        theme: theme,
-        handleKeyboard: false,
+      PreviewMode.real => Theme(
+        data: theme.materialTheme,
+        child: GreeterSceneAdapter(
+          feature: feature,
+          theme: theme,
+          handleKeyboard: false,
+        ),
       ),
     };
   }
