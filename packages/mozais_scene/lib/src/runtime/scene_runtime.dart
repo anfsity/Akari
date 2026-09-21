@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
-import '../model/scene_document.dart';
 import '../model/theme_bundle.dart';
 import 'builtin_backgrounds.dart';
 import 'motion.dart';

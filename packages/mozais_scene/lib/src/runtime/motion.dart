@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
-
-import '../model/scene_document.dart';
+import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 typedef SceneMotionSpec = ({
   SceneMotionPreset preset,
