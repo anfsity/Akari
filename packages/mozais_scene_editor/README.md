@@ -12,9 +12,10 @@ cd packages/mozais_scene_editor
 fvm flutter run -d linux
 ```
 
-The editor starts by opening `lib/themes/default/default.scene.json` from the
-repository root. Use the path field and **Open** / **Save** to work on a
-different document.
+The editor starts by opening the configured default scene path, or
+`lib/themes/default/default.scene.json` from the repository root when none is
+set. Use the path field and **Open** / **Save** to work on a different
+document.
 
 ## Features
 
@@ -24,3 +25,9 @@ different document.
   properties.
 - `visibleWhen` rule builder over the semantic predicate vocabulary.
 - Active-predicate toggles to preview conditional nodes.
+- Draggable pane dividers with min/max widths.
+- Settings page with named editor themes, a language seam, unsaved-change
+  confirmation, grid-snap and preview-aspect-ratio options, and a default scene
+  path. Settings persist to `~/.config/mozais/scene_editor.json`.
+- Save / Discard / Cancel prompt when opening a document or closing the window
+  with unsaved changes.

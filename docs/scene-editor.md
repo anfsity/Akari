@@ -36,6 +36,16 @@ and needs no source tree or app install.
   a flat `visibleWhen` rule builder, and active-predicate toggles.
 - Interactive rotation is no longer clamped; `maxInteractiveRotationDegrees`
   was removed from `ThemeTokens`.
+- Localized UI copy behind `EditorStrings`, with `EnglishStrings` and a locale
+  registry; transient status messages are structured, not baked strings.
+- Settings page: named editor themes, language, unsaved-change confirmation,
+  grid-snap and preview-aspect-ratio options, and a default scene path. The
+  page persists to `~/.config/mozais/scene_editor.json` and previews the theme
+  live. Grid-snap behavior itself is still deferred.
+- Draggable pane dividers with min/max widths and a `resizeLeftRight` cursor;
+  the right sidebar defaults narrower than before.
+- Unsaved-change prompt on Open and window close, controlled by
+  `confirmUnsavedChanges` and using `AppLifecycleListener.onExitRequested`.
 
 ## 4. Agreed design
 
@@ -121,14 +131,12 @@ When the document is dirty, Open, window close, and switching documents prompt
 
 ## 5. Roadmap
 
-1. **Quick wins**: draggable dividers, unsaved-change prompt, settings page with
-   named themes, language seam, and persistence.
-2. **Mouse rework**: public transform matrix, transform-following selection box,
+1. **Mouse rework**: public transform matrix, transform-following selection box,
    Z rotation dot, trackball sphere.
-3. **Real preview**: extract `mozais_greeter_ui`, add the document-injection
+2. **Real preview**: extract `mozais_greeter_ui`, add the document-injection
    seam, embed the greeter, add the Outline/Real toggle.
-4. **Document panel and background import**.
-5. **Visibility UI rework**: labels, presets, Advanced, inspector tabs.
+3. **Document panel and background import**.
+4. **Visibility UI rework**: labels, presets, Advanced, inspector tabs.
 
 ## 6. Deferred
 
