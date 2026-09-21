@@ -4,5 +4,5 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$script_dir/.." && pwd)"
 
-cd -- "$repo_root"
+cd -- "$repo_root/packages/mozais_greeter_ui"
 fvm dart run build_runner build

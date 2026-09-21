@@ -1,14 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 import 'package:mozais_scene/mozais_scene.dart';
 
-import '../feature/greeter/greeter_feature.dart';
-import '../feature/greeter/ports/greeter_gateway.dart';
-import '../feature/greeter/ports/session_store.dart';
 import '../infrastructure/dbus/greeter_dbus_gateway.dart';
-import '../scene/greeter_scene/greeter_scene_adapter.dart';
-import '../theme/theme_registry.dart';
 
 class MyApp extends StatefulWidget {
   const MyApp({this.sessionStore = const NoopSessionStore(), super.key});

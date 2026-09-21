@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mozais_greeter/theme/palette_extractor.dart';
+import 'package:mozais_greeter_ui/theme/palette_extractor.dart';
 
 void main() {
   test('averages the sampled pixels into a seed color', () {

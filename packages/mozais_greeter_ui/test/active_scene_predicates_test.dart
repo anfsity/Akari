@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mozais_greeter/feature/greeter/greeter_slots.dart';
-import 'package:mozais_greeter/feature/greeter/greeter_state.dart';
-import 'package:mozais_greeter/scene/greeter_scene/greeter_scene_adapter.dart';
+import 'package:mozais_greeter_ui/feature/greeter/greeter_slots.dart';
+import 'package:mozais_greeter_ui/feature/greeter/greeter_state.dart';
+import 'package:mozais_greeter_ui/scene/greeter_scene/greeter_scene_adapter.dart';
 import 'package:mozais_scene/mozais_scene.dart';
 
 void main() {
