@@ -55,7 +55,8 @@ a `SceneDocument`, `ThemeBundle`, visual context, or log.
 
 ## 3. Theme and Scene Document
 
-A theme is a directory under `lib/themes/<name>/` containing:
+A theme is a directory under `packages/mozais_greeter_ui/lib/themes/<name>/`
+containing:
 
 - `*.scene.json`: authoring layout and visibility conditions.
 - generated `*.scene.g.dart`: typed Dart emitted by build_runner.

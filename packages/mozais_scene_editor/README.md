@@ -13,9 +13,9 @@ fvm flutter run -d linux
 ```
 
 The editor starts by opening the configured default scene path, or
-`lib/themes/default/default.scene.json` from the repository root when none is
-set. Use the path field and **Open** / **Save** to work on a different
-document.
+`packages/mozais_greeter_ui/lib/themes/default/default.scene.json` from the
+repository root when none is set. Use the path field and **Open** / **Save** to
+work on a different document.
 
 ## Features
 
@@ -29,6 +29,9 @@ document.
 - `visibleWhen` rule builder over the semantic predicate vocabulary.
 - Active-predicate toggles to preview conditional nodes.
 - Draggable pane dividers with min/max widths.
+- **Outline / Real** preview toggle. Real embeds the actual greeter widgets and
+theme, rendering the edited document live; background assets are read from the
+repository root.
 - Settings page with named editor themes, a language seam, unsaved-change
   confirmation, grid-snap and preview-aspect-ratio options, and a default scene
   path. Settings persist to `~/.config/mozais/scene_editor.json`.

@@ -21,11 +21,11 @@ packages/mozais_scene_editor   desktop editor
 <root>  mozais_greeter (app)   main, app wiring, infrastructure/dbus (thin shell)
 ```
 
-`mozais_greeter_ui` is the planned extraction: the reusable greeter UI, free of
-any backend dependency. The app becomes a thin shell that adds the D-Bus
-gateway; the editor depends on the library, never on the app. Because Flutter
-compiles dependencies into the binary, a distributed editor bundles the real UI
-and needs no source tree or app install.
+`mozais_greeter_ui` is the reusable greeter UI, free of any backend
+dependency. The app is a thin shell that adds the D-Bus gateway; the editor
+depends on the library, never on the app. Because Flutter compiles dependencies
+into the binary, a distributed editor bundles the real UI and needs no source
+tree or app install.
 
 ## 3. Implemented
 
@@ -50,6 +50,12 @@ and needs no source tree or app install.
   `sceneNodeRect` and `sceneNodeTransformMatrix` helpers: a dashed box with a
   corner resize handle, a dot above the box for in-plane rotation, and a
   translucent trackball for X/Y rotation. The cursor changes per region.
+- The reusable UI is extracted into `mozais_greeter_ui`; the app is a thin
+  shell over it. `buildDefaultTheme` accepts a `SceneDocument`, so the editor
+  previews the edited document with the real theme. The editor embeds
+  `GreeterFeature(DemoGreeterGateway())` and `GreeterSceneAdapter` behind an
+  **Outline / Real** toggle, and resolves background assets from the repository
+  root with a file-based image provider.
 
 ## 4. Agreed design
 
@@ -135,10 +141,8 @@ When the document is dirty, Open, window close, and switching documents prompt
 
 ## 5. Roadmap
 
-1. **Real preview**: extract `mozais_greeter_ui`, add the document-injection
-   seam, embed the greeter, add the Outline/Real toggle.
-2. **Document panel and background import**.
-3. **Visibility UI rework**: labels, presets, Advanced, inspector tabs.
+1. **Document panel and background import**.
+2. **Visibility UI rework**: labels, presets, Advanced, inspector tabs.
 
 ## 6. Deferred
 
