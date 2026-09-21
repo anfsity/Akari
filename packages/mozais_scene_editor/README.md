@@ -20,7 +20,10 @@ document.
 ## Features
 
 - Node list in paint order with add, duplicate, and delete.
-- Drag to move and drag the corner handle to resize.
+- Drag inside the selection box to move; drag the corner handle to resize.
+- A dashed selection box follows the node's transform (including rotation and
+  perspective), with a dot for in-plane rotation and a trackball for X/Y
+  rotation. The cursor changes per region.
 - Inspector for rect, transform (including X/Y/Z rotation), layout, and
   properties.
 - `visibleWhen` rule builder over the semantic predicate vocabulary.
