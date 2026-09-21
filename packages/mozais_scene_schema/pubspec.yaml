@@ -1,0 +1,9 @@
+name: mozais_scene_schema
+description: Flutter-free scene model and JSON codec for Mozais scene documents.
+publish_to: none
+
+environment:
+  sdk: ^3.13.2
+
+dev_dependencies:
+  test: ^1.25.0
