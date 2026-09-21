@@ -225,9 +225,9 @@ class _EditorScreenState extends State<EditorScreen> {
               width: _leftWidth,
               child: NodeListPanel(controller: _controller),
             ),
-            PaneDivider(onDrag: _resizeLeft),
+            PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeLeft),
             Expanded(child: ScenePreview(controller: _controller)),
-            PaneDivider(onDrag: _resizeRight),
+            PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeRight),
             SizedBox(
               width: _rightWidth,
               child: InspectorPanel(controller: _controller),

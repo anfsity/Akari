@@ -3,16 +3,39 @@ import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 import 'editor_controller.dart';
 import 'editor_strings.dart';
+import 'pane_divider.dart';
 
 /// Lists nodes topmost first and hosts the add, duplicate, and delete actions.
-class NodeListPanel extends StatelessWidget {
+///
+/// The active-predicate toggles sit below a draggable divider so the two
+/// sections can be resized vertically.
+class NodeListPanel extends StatefulWidget {
   const NodeListPanel({required this.controller, super.key});
 
   final SceneEditorController controller;
 
   @override
+  State<NodeListPanel> createState() => _NodeListPanelState();
+}
+
+class _NodeListPanelState extends State<NodeListPanel> {
+  double _predicatesHeight = 180;
+
+  static const _minPredicatesHeight = 72.0;
+  static const _maxPredicatesHeight = 360.0;
+
+  void _resizePredicates(double delta) {
+    setState(() {
+      _predicatesHeight = (_predicatesHeight - delta).clamp(
+        _minPredicatesHeight,
+        _maxPredicatesHeight,
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final document = controller.document;
+    final document = widget.controller.document;
     if (document == null) {
       return const SizedBox.shrink();
     }
@@ -24,17 +47,17 @@ class NodeListPanel extends StatelessWidget {
           children: [
             IconButton(
               tooltip: strings.addNode,
-              onPressed: controller.addNode,
+              onPressed: widget.controller.addNode,
               icon: const Icon(Icons.add),
             ),
             IconButton(
               tooltip: strings.duplicateNode,
-              onPressed: controller.duplicateSelected,
+              onPressed: widget.controller.duplicateSelected,
               icon: const Icon(Icons.copy),
             ),
             IconButton(
               tooltip: strings.deleteNode,
-              onPressed: controller.deleteSelected,
+              onPressed: widget.controller.deleteSelected,
               icon: const Icon(Icons.delete_outline),
             ),
           ],
@@ -46,16 +69,22 @@ class NodeListPanel extends StatelessWidget {
               for (final node in nodes)
                 ListTile(
                   dense: true,
-                  selected: node.id == controller.selectedNodeId,
+                  selected: node.id == widget.controller.selectedNodeId,
                   title: Text(node.id),
                   subtitle: Text(node.kind.name),
-                  onTap: () => controller.select(node.id),
+                  onTap: () => widget.controller.select(node.id),
                 ),
             ],
           ),
         ),
-        const Divider(height: 1),
-        _PredicateToggles(controller: controller),
+        PaneDivider(dragAxis: Axis.vertical, onDrag: _resizePredicates),
+        SizedBox(
+          key: const ValueKey('activePredicatesPane'),
+          height: _predicatesHeight,
+          child: SingleChildScrollView(
+            child: _PredicateToggles(controller: widget.controller),
+          ),
+        ),
       ],
     );
   }
