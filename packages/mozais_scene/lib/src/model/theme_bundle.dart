@@ -25,6 +25,22 @@ class ThemeBundle {
     return backgrounds[kind];
   }
 
+  ThemeBundle copyWith({
+    String? id,
+    ThemeTokens? tokens,
+    SceneDocument? document,
+    Map<SceneBackgroundKind, BackgroundRenderer>? backgrounds,
+    Map<SceneMotionPreset, SceneMotionBuilder>? motions,
+  }) {
+    return ThemeBundle(
+      id: id ?? this.id,
+      tokens: tokens ?? this.tokens,
+      document: document ?? this.document,
+      backgrounds: backgrounds ?? this.backgrounds,
+      motions: motions ?? this.motions,
+    );
+  }
+
   SceneMotionBuilder? motionBuilder(SceneMotionPreset preset) {
     return motions[preset];
   }
