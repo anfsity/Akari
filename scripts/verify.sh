@@ -21,6 +21,20 @@ cd -- "$repo_root"
 "$repo_root/scripts/generate-scenes.sh"
 fvm flutter analyze
 fvm flutter test
+
+cd -- "$repo_root/packages/mozais_scene_schema"
+fvm dart analyze
+fvm dart test
+
+cd -- "$repo_root/packages/mozais_scene_codegen"
+fvm dart analyze
+fvm dart test
+
+cd -- "$repo_root/packages/mozais_scene_editor"
+fvm flutter analyze
+fvm flutter test
+
+cd -- "$repo_root"
 "$repo_root/scripts/debug-dbus.sh" fvm dart run tool/dbus_gateway_smoke.dart
 
 printf '%s\n' 'Mozais verification passed.'
