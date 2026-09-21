@@ -255,8 +255,10 @@ class _SelectionOverlay extends StatefulWidget {
 
 class _SelectionOverlayState extends State<_SelectionOverlay> {
   _DragRegion _hoverRegion = _DragRegion.none;
+  _DragRegion _pressRegion = _DragRegion.none;
   _DragRegion _activeRegion = _DragRegion.none;
 
+  Offset _pressPointer = Offset.zero;
   _OverlayGeometry? _startGeometry;
   Offset _startPointer = Offset.zero;
   SceneRect _startRect = const SceneRect(x: 0, y: 0, width: 1, height: 1);
@@ -278,16 +280,23 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
       cursor: _cursorFor(_hoverRegion),
       onHover: (event) => _updateHover(event.localPosition, geometry),
       onExit: (_) => _setHover(_DragRegion.none),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onPanStart: (details) =>
-            _handlePanStart(details.localPosition, geometry),
-        onPanUpdate: (details) => _handlePanUpdate(details.localPosition),
-        onPanEnd: (_) => _handlePanEnd(),
-        onPanCancel: _handlePanEnd,
-        child: CustomPaint(
-          painter: _SelectionPainter(geometry: geometry),
-          child: const SizedBox.expand(),
+      child: Listener(
+        onPointerDown: (event) {
+          _pressRegion = _regionAt(event.localPosition, geometry);
+          _pressPointer = event.localPosition;
+        },
+        onPointerUp: (_) => _pressRegion = _DragRegion.none,
+        onPointerCancel: (_) => _pressRegion = _DragRegion.none,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: (_) => _handlePanStart(geometry),
+          onPanUpdate: (details) => _handlePanUpdate(details.localPosition),
+          onPanEnd: (_) => _handlePanEnd(),
+          onPanCancel: _handlePanEnd,
+          child: CustomPaint(
+            painter: _SelectionPainter(geometry: geometry),
+            child: const SizedBox.expand(),
+          ),
         ),
       ),
     );
@@ -324,18 +333,17 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     setState(() => _hoverRegion = region);
   }
 
-  void _handlePanStart(Offset position, _OverlayGeometry geometry) {
-    final region = _regionAt(position, geometry);
-    if (region == _DragRegion.none) {
+  void _handlePanStart(_OverlayGeometry geometry) {
+    if (_pressRegion == _DragRegion.none) {
       return;
     }
-    _activeRegion = region;
+    _activeRegion = _pressRegion;
     _startGeometry = geometry;
-    _startPointer = position;
+    _startPointer = _pressPointer;
     _startRect = widget.node.rect;
     _startTransform = widget.node.transform;
     _startCenter = geometry.center;
-    final delta = position - geometry.center;
+    final delta = _pressPointer - geometry.center;
     _startAngle = math.atan2(delta.dy, delta.dx);
   }
 
@@ -360,6 +368,7 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
 
   void _handlePanEnd() {
     _activeRegion = _DragRegion.none;
+    _pressRegion = _DragRegion.none;
     _startGeometry = null;
   }
 
