@@ -23,7 +23,11 @@ class InspectorPanel extends StatefulWidget {
 
 class _InspectorPanelState extends State<InspectorPanel>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 6, vsync: this);
+  late final TabController _tabs = TabController(
+    length: 6,
+    vsync: this,
+    animationDuration: Duration.zero,
+  );
   final TabBarScrollController _tabScroll = TabBarScrollController();
   bool _middleDragActive = false;
   double _lastMiddleX = 0;
@@ -70,11 +74,25 @@ class _InspectorPanelState extends State<InspectorPanel>
                 builder: (context, _) =>
                     DocumentPanel(controller: widget.controller),
               ),
-              _nodeTab((node) => _IdentityTab(controller: widget.controller, node: node)),
-              _nodeTab((node) => _LayoutTab(controller: widget.controller, node: node)),
-              _nodeTab((node) => _TransformTab(controller: widget.controller, node: node)),
-              _nodeTab((node) => _VisibilityTab(controller: widget.controller, node: node)),
-              _nodeTab((node) => _PropertiesTab(controller: widget.controller, node: node)),
+              _nodeTab(
+                (node) =>
+                    _IdentityTab(controller: widget.controller, node: node),
+              ),
+              _nodeTab(
+                (node) => _LayoutTab(controller: widget.controller, node: node),
+              ),
+              _nodeTab(
+                (node) =>
+                    _TransformTab(controller: widget.controller, node: node),
+              ),
+              _nodeTab(
+                (node) =>
+                    _VisibilityTab(controller: widget.controller, node: node),
+              ),
+              _nodeTab(
+                (node) =>
+                    _PropertiesTab(controller: widget.controller, node: node),
+              ),
             ],
           ),
         ),
@@ -159,8 +177,9 @@ class _IdentityTab extends StatelessWidget {
               label: strings.kind,
               value: node.kind,
               values: SceneNodeKind.values,
-              onChanged: (value) =>
-                  controller.updateSelected((node) => node.copyWith(kind: value)),
+              onChanged: (value) => controller.updateSelected(
+                (node) => node.copyWith(kind: value),
+              ),
             ),
             const SizedBox(height: 8),
             NullableEnumDropdown<SceneAction>(
@@ -227,8 +246,7 @@ class _LayoutTab extends StatelessWidget {
               min: node.rect.width < 0.01 ? node.rect.width : 0.01,
               max: 1.0 - node.rect.x,
               onChanged: (value) => controller.updateSelected(
-                (node) =>
-                    node.copyWith(rect: node.rect.copyWith(width: value)),
+                (node) => node.copyWith(rect: node.rect.copyWith(width: value)),
               ),
             ),
             LabeledSlider(
@@ -423,9 +441,7 @@ class _PropertiesTab extends StatelessWidget {
       children: [
         SectionCard(
           title: strings.properties,
-          children: [
-            _PropertiesEditor(controller: controller, node: node),
-          ],
+          children: [_PropertiesEditor(controller: controller, node: node)],
         ),
       ],
     );
