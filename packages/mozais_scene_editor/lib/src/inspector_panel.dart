@@ -66,46 +66,43 @@ class _InspectorPanelState extends State<InspectorPanel>
           ),
         ),
         Expanded(
-          child: TabBarView(
-            controller: _tabs,
-            children: [
-              ListenableBuilder(
-                listenable: widget.controller.documentListenable,
-                builder: (context, _) =>
-                    DocumentPanel(controller: widget.controller),
-              ),
-              _nodeTab(
-                (node) =>
-                    _IdentityTab(controller: widget.controller, node: node),
-              ),
-              _nodeTab(
-                (node) => _LayoutTab(controller: widget.controller, node: node),
-              ),
-              _nodeTab(
-                (node) =>
-                    _TransformTab(controller: widget.controller, node: node),
-              ),
-              _nodeTab(
-                (node) =>
-                    _VisibilityTab(controller: widget.controller, node: node),
-              ),
-              _nodeTab(
-                (node) =>
-                    _PropertiesTab(controller: widget.controller, node: node),
-              ),
-            ],
+          child: ListenableBuilder(
+            listenable: Listenable.merge([
+              _tabs,
+              widget.controller.documentListenable,
+            ]),
+            builder: (context, _) => _activeTab(),
           ),
         ),
       ],
     );
   }
 
-  Widget _nodeTab(Widget Function(SceneNode node) builder) {
+  Widget _activeTab() {
+    return switch (_tabs.index) {
+      0 => DocumentPanel(controller: widget.controller),
+      1 => _selectedNodeTab(
+        (node) => _IdentityTab(controller: widget.controller, node: node),
+      ),
+      2 => _selectedNodeTab(
+        (node) => _LayoutTab(controller: widget.controller, node: node),
+      ),
+      3 => _selectedNodeTab(
+        (node) => _TransformTab(controller: widget.controller, node: node),
+      ),
+      4 => _selectedNodeTab(
+        (node) => _VisibilityTab(controller: widget.controller, node: node),
+      ),
+      5 => _selectedNodeTab(
+        (node) => _PropertiesTab(controller: widget.controller, node: node),
+      ),
+      _ => const SizedBox.shrink(),
+    };
+  }
+
+  Widget _selectedNodeTab(Widget Function(SceneNode node) builder) {
     return ListenableBuilder(
-      listenable: Listenable.merge([
-        widget.controller.documentListenable,
-        widget.controller.selectionListenable,
-      ]),
+      listenable: widget.controller.selectionListenable,
       builder: (context, _) {
         final node = widget.controller.selectedNode;
         if (node == null) {

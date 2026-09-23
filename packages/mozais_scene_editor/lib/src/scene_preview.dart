@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -50,9 +51,25 @@ class _ScenePreviewState extends State<ScenePreview> {
   ThemeBundle? _cachedTheme;
   Widget? _cachedOutlineScene;
   Widget? _cachedRealScene;
+  SceneDocument? _outlineDocument;
+  SceneDocument? _realDocument;
+  Timer? _prewarmTimer;
+
+  @override
+  void dispose() {
+    _prewarmTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.controller.selectionListenable,
+      builder: (context, _) => _buildPreview(context),
+    );
+  }
+
+  Widget _buildPreview(BuildContext context) {
     final document = widget.controller.document;
     if (document == null) {
       return Center(child: Text(EditorStringsScope.of(context).previewEmpty));
@@ -181,22 +198,13 @@ class _ScenePreviewState extends State<ScenePreview> {
     final predicates = widget.controller.activePredicates;
     if (_cachedTheme == null || !identical(_cachedDocument, document)) {
       _cachedDocument = document;
-      _cachedPredicates = {...predicates};
       _cachedTheme = editorTheme(document);
-      _cachedOutlineScene = _buildScene(
-        context,
-        document,
-        _cachedTheme!,
-        PreviewMode.outline,
-      );
-      _cachedRealScene = _buildScene(
-        context,
-        document,
-        _cachedTheme!,
-        PreviewMode.real,
-      );
-    } else if (!setEquals(_cachedPredicates, predicates)) {
+    }
+    if (widget.mode == PreviewMode.outline &&
+        (!identical(_outlineDocument, document) ||
+            !setEquals(_cachedPredicates, predicates))) {
       _cachedPredicates = {...predicates};
+      _outlineDocument = document;
       _cachedOutlineScene = _buildScene(
         context,
         document,
@@ -204,8 +212,19 @@ class _ScenePreviewState extends State<ScenePreview> {
         PreviewMode.outline,
       );
     }
-    final outline = _cachedOutlineScene!;
-    final real = _cachedRealScene!;
+    if (widget.mode == PreviewMode.real &&
+        !identical(_realDocument, document)) {
+      _realDocument = document;
+      _cachedRealScene = _buildScene(
+        context,
+        document,
+        _cachedTheme!,
+        PreviewMode.real,
+      );
+    }
+    _schedulePrewarm(context, document, predicates);
+    final outline = _cachedOutlineScene ?? const SizedBox.shrink();
+    final real = _cachedRealScene ?? const SizedBox.shrink();
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -225,6 +244,47 @@ class _ScenePreviewState extends State<ScenePreview> {
         ),
       ],
     );
+  }
+
+  void _schedulePrewarm(
+    BuildContext context,
+    SceneDocument document,
+    Set<ScenePredicate> predicates,
+  ) {
+    final needsOutline =
+        _cachedOutlineScene == null || !identical(_outlineDocument, document);
+    final needsReal =
+        _cachedRealScene == null || !identical(_realDocument, document);
+    if (!needsOutline && !needsReal) {
+      return;
+    }
+    _prewarmTimer?.cancel();
+    _prewarmTimer = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted || !identical(_cachedDocument, document)) {
+        return;
+      }
+      if (_cachedOutlineScene == null ||
+          !identical(_outlineDocument, document)) {
+        _cachedPredicates = {...predicates};
+        _outlineDocument = document;
+        _cachedOutlineScene = _buildScene(
+          context,
+          document,
+          _cachedTheme!,
+          PreviewMode.outline,
+        );
+      }
+      if (_cachedRealScene == null || !identical(_realDocument, document)) {
+        _realDocument = document;
+        _cachedRealScene = _buildScene(
+          context,
+          document,
+          _cachedTheme!,
+          PreviewMode.real,
+        );
+      }
+      setState(() {});
+    });
   }
 
   Widget _buildScene(
