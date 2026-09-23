@@ -35,57 +35,42 @@ class SettingsPage extends StatelessWidget {
         listenable: controller,
         builder: (context, _) {
           final settings = controller.settings;
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          return ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    SectionCard(
-                      title: strings.appearance,
-                      children: [
-                        _ThemePicker(controller: controller),
-                        const SizedBox(height: 12),
-                        _LanguagePicker(controller: controller),
-                      ],
-                    ),
-                    SectionCard(
-                      title: strings.editing,
-                      children: [
-                        SwitchRow(
-                          label: strings.confirmUnsavedChanges,
-                          value: settings.confirmUnsavedChanges,
-                          onChanged: (value) => controller.update(
-                            settings.copyWith(confirmUnsavedChanges: value),
-                          ),
-                        ),
-                        SwitchRow(
-                          label: strings.gridSnap,
-                          value: settings.gridSnap,
-                          onChanged: (value) => controller.update(
-                            settings.copyWith(gridSnap: value),
-                          ),
-                        ),
-                        _AspectRatioPicker(controller: controller),
-                      ],
-                    ),
-                    SectionCard(
-                      title: strings.files,
-                      children: [
-                        _DefaultPathField(controller: controller),
-                      ],
-                    ),
-                  ],
-                ),
+              SectionCard(
+                title: strings.appearance,
+                children: [
+                  _ThemePicker(controller: controller),
+                  const SizedBox(height: 12),
+                  _LanguagePicker(controller: controller),
+                ],
               ),
-              const VerticalDivider(width: 1),
-              SizedBox(
-                width: 320,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: _LivePreview(strings: strings),
-                ),
+              SectionCard(
+                title: strings.editing,
+                children: [
+                  SwitchRow(
+                    label: strings.confirmUnsavedChanges,
+                    value: settings.confirmUnsavedChanges,
+                    onChanged: (value) => controller.update(
+                      settings.copyWith(confirmUnsavedChanges: value),
+                    ),
+                  ),
+                  SwitchRow(
+                    label: strings.gridSnap,
+                    value: settings.gridSnap,
+                    onChanged: (value) => controller.update(
+                      settings.copyWith(gridSnap: value),
+                    ),
+                  ),
+                  _AspectRatioPicker(controller: controller),
+                ],
+              ),
+              SectionCard(
+                title: strings.files,
+                children: [
+                  _DefaultPathField(controller: controller),
+                ],
               ),
             ],
           );
@@ -209,75 +194,6 @@ class _DefaultPathField extends StatelessWidget {
       ),
       onFieldSubmitted: (value) => controller.update(
         settings.copyWith(defaultScenePath: value.trim()),
-      ),
-    );
-  }
-}
-
-class _LivePreview extends StatelessWidget {
-  const _LivePreview({required this.strings});
-
-  final EditorStrings strings;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(strings.settingsLivePreview,
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                for (final color in [
-                  scheme.primary,
-                  scheme.secondary,
-                  scheme.tertiary,
-                  scheme.surfaceContainerHighest,
-                  scheme.outline,
-                ])
-                  Expanded(
-                    child: Container(
-                      height: 28,
-                      margin: const EdgeInsets.only(right: 6),
-                      decoration: BoxDecoration(
-                        color: color,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: () {},
-              child: Text(strings.save),
-            ),
-            const SizedBox(height: 12),
-            const TextField(
-              decoration: InputDecoration(isDense: true),
-            ),
-            const SizedBox(height: 8),
-            Slider(value: 0.5, onChanged: (_) {}),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(label: Text(strings.visibility)),
-                FilterChip(
-                  label: Text(strings.rule),
-                  selected: true,
-                  onSelected: (_) {},
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

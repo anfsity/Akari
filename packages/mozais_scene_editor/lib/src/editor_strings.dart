@@ -27,6 +27,8 @@ abstract class EditorStrings {
   String get real;
   String get collapseInspector;
   String get expandInspector;
+  String get useLightTheme;
+  String get useDarkTheme;
 
   String get addNode;
   String get duplicateNode;
@@ -113,7 +115,6 @@ abstract class EditorStrings {
   String get previewAspectRatio;
   String get files;
   String get defaultScenePath;
-  String get settingsLivePreview;
   String get resetToDefaults;
   String get close;
 

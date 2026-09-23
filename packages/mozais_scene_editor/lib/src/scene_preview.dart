@@ -64,6 +64,8 @@ class _ScenePreviewState extends State<ScenePreview> {
       builder: (context, constraints) {
         final size = _fit(constraints.biggest, aspectRatio);
         final selected = widget.controller.selectedNode;
+        final selectedVisible =
+            selected != null && _isNodeVisible(selected);
         return Center(
           child: SizedBox(
             width: size.width,
@@ -80,9 +82,10 @@ class _ScenePreviewState extends State<ScenePreview> {
                     ),
                   ),
                 ),
-                if (selected != null)
+                if (selected != null && selectedVisible)
                   Positioned.fill(
                     child: _SelectionOverlay(
+                      key: const ValueKey('selectionOverlay'),
                       node: selected,
                       previewSize: size,
                       safeArea: safeArea,
@@ -102,6 +105,22 @@ class _ScenePreviewState extends State<ScenePreview> {
                             (node) => node.copyWith(transform: transform),
                           ),
                     ),
+                  )
+                else
+                  // No visible selection to drag, but a click can still pick
+                  // the topmost node under the pointer.
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp: (details) => _selectNodeAt(
+                        position: details.localPosition,
+                        document: document,
+                        previewSize: size,
+                        safeArea: safeArea,
+                        minHitTarget: theme.tokens.minHitTarget,
+                      ),
+                      child: const SizedBox.expand(),
+                    ),
                   ),
               ],
             ),
@@ -109,6 +128,12 @@ class _ScenePreviewState extends State<ScenePreview> {
         );
       },
     );
+  }
+
+  bool _isNodeVisible(SceneNode node) {
+    final condition = node.visibleWhen;
+    return condition == null ||
+        evaluateSceneCondition(condition, widget.controller.activePredicates);
   }
 
   void _selectNodeAt({
@@ -356,6 +381,7 @@ class _SelectionOverlay extends StatefulWidget {
     required this.onSelectAt,
     required this.onRectChanged,
     required this.onTransformChanged,
+    super.key,
   });
 
   final SceneNode node;
