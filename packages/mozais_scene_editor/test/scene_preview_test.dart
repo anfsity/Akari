@@ -282,6 +282,17 @@ void main() {
     expect(find.byType(GreeterSceneAdapter), findsOneWidget);
   });
 
+  testWidgets('real mode matches the current display aspect ratio', (
+    tester,
+  ) async {
+    tester.view.display.size = const Size(1600, 1000);
+    addTearDown(tester.view.display.reset);
+    await pumpPreview(tester, mode: PreviewMode.real);
+
+    final preview = previewRect(tester);
+    expect(preview.width / preview.height, closeTo(1.6, 0.001));
+  });
+
   testWidgets('keeps the embedded scene when only the selection changes', (
     tester,
   ) async {
@@ -309,6 +320,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     final before = tester.widget<SceneRuntime>(find.byType(SceneRuntime));
     controller.select('panel');

@@ -28,6 +28,15 @@ class ThemeRegistry {
     };
   }
 
+  static ThemeBundle resolveDocument(SceneDocument document, {Color? seed}) {
+    final name = switch (document.id) {
+      fallbackThemeName => fallbackThemeName,
+      nocturneThemeName => nocturneThemeName,
+      _ => defaultThemeName,
+    };
+    return resolve(name, seed: seed).copyWith(document: document);
+  }
+
   /// Samples the theme background for a dynamic palette seed.
   ///
   /// Returns null when the theme has no image background or the asset cannot

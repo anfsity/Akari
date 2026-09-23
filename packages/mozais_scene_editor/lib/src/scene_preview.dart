@@ -22,6 +22,20 @@ const _trackballRadius = 24.0;
 const _trackballDistance = 44.0;
 const _dragSensitivity = 0.5;
 
+typedef _ThemeSignature = ({
+  String id,
+  SceneBackgroundKind kind,
+  String? asset,
+  int color,
+});
+
+_ThemeSignature _sceneThemeSignature(SceneDocument document) => (
+  id: document.id,
+  kind: document.background.kind,
+  asset: document.background.asset,
+  color: document.background.color,
+);
+
 /// Renders the document with the real runtime and overlays an editing box for
 /// the selected node.
 class ScenePreview extends StatefulWidget {
@@ -47,6 +61,10 @@ class ScenePreview extends StatefulWidget {
 
 class _ScenePreviewState extends State<ScenePreview> {
   SceneDocument? _cachedDocument;
+  _ThemeSignature? _themeSignature;
+  int _themeRevision = 0;
+  ThemeBundle? _builtTheme;
+  GreeterFeature? _builtFeature;
   Set<ScenePredicate>? _cachedPredicates;
   ThemeBundle? _cachedTheme;
   Widget? _cachedOutlineScene;
@@ -63,8 +81,21 @@ class _ScenePreviewState extends State<ScenePreview> {
 
   @override
   Widget build(BuildContext context) {
+    final listenables = <Listenable>[widget.controller.selectionListenable];
+    if (widget.mode == PreviewMode.outline) {
+      listenables.add(widget.controller.predicatesListenable);
+    } else {
+      listenables.addAll([
+        widget.feature.serviceSlots,
+        widget.feature.authPromptSlots,
+        widget.feature.accountPickerSlots,
+        widget.feature.sessionPickerSlots,
+        widget.feature.powerSlots,
+        widget.feature.dormantSlots,
+      ]);
+    }
     return ListenableBuilder(
-      listenable: widget.controller.selectionListenable,
+      listenable: Listenable.merge(listenables),
       builder: (context, _) => _buildPreview(context),
     );
   }
@@ -74,11 +105,15 @@ class _ScenePreviewState extends State<ScenePreview> {
     if (document == null) {
       return Center(child: Text(EditorStringsScope.of(context).previewEmpty));
     }
-    final aspectRatio = EditorSettingsScope.of(context)
-        .settings
-        .previewAspectRatio;
+    final aspectRatio = switch (widget.mode) {
+      PreviewMode.outline => EditorSettingsScope.of(
+        context,
+      ).settings.previewAspectRatio,
+      PreviewMode.real => View.of(context).display.size.aspectRatio,
+    };
     final scene = _sceneFor(context, document);
     final theme = _cachedTheme!;
+    final activePredicates = _activePredicates;
     final safeArea = document.canvas.useSafeArea
         ? MediaQuery.paddingOf(context)
         : EdgeInsets.zero;
@@ -90,7 +125,8 @@ class _ScenePreviewState extends State<ScenePreview> {
           (constraints.maxHeight - size.height) / 2,
         );
         final selected = widget.controller.selectedNode;
-        final selectedVisible = selected != null && _isNodeVisible(selected);
+        final selectedVisible =
+            selected != null && _isNodeVisible(selected, activePredicates);
         return Stack(
           children: [
             Positioned(
@@ -131,6 +167,7 @@ class _ScenePreviewState extends State<ScenePreview> {
                       previewSize: size,
                       safeArea: safeArea,
                       minHitTarget: theme.tokens.minHitTarget,
+                      activePredicates: activePredicates,
                     ),
                     onRectChanged: (rect) => widget.controller.updateSelected(
                       (node) => node.copyWith(rect: rect),
@@ -153,6 +190,7 @@ class _ScenePreviewState extends State<ScenePreview> {
                       previewSize: size,
                       safeArea: safeArea,
                       minHitTarget: theme.tokens.minHitTarget,
+                      activePredicates: activePredicates,
                     ),
                     child: const SizedBox.expand(),
                   ),
@@ -164,10 +202,22 @@ class _ScenePreviewState extends State<ScenePreview> {
     );
   }
 
-  bool _isNodeVisible(SceneNode node) {
+  Set<ScenePredicate> get _activePredicates => switch (widget.mode) {
+    PreviewMode.outline => widget.controller.activePredicates,
+    PreviewMode.real => activeScenePredicates(
+      service: widget.feature.serviceSlots.value,
+      auth: widget.feature.authPromptSlots.value,
+      account: widget.feature.accountPickerSlots.value,
+      session: widget.feature.sessionPickerSlots.value,
+      power: widget.feature.powerSlots.value,
+      dormant: widget.feature.dormantSlots.value,
+    ),
+  };
+
+  bool _isNodeVisible(SceneNode node, Set<ScenePredicate> activePredicates) {
     final condition = node.visibleWhen;
     return condition == null ||
-        evaluateSceneCondition(condition, widget.controller.activePredicates);
+        evaluateSceneCondition(condition, activePredicates);
   }
 
   void _selectNodeAt({
@@ -176,6 +226,7 @@ class _ScenePreviewState extends State<ScenePreview> {
     required Size previewSize,
     required EdgeInsets safeArea,
     required double minHitTarget,
+    required Set<ScenePredicate> activePredicates,
   }) {
     final id = hitTestSceneNode(
       document: document,
@@ -183,7 +234,7 @@ class _ScenePreviewState extends State<ScenePreview> {
       previewSize: previewSize,
       safeArea: safeArea,
       minHitTarget: minHitTarget,
-      activePredicates: widget.controller.activePredicates,
+      activePredicates: activePredicates,
     );
     if (id != null) {
       widget.controller.select(id);
@@ -195,11 +246,30 @@ class _ScenePreviewState extends State<ScenePreview> {
   /// A selection change leaves the scene untouched so the background, blur,
   /// and greeter widgets are not re-created while the overlay moves.
   Widget _sceneFor(BuildContext context, SceneDocument document) {
-    final predicates = widget.controller.activePredicates;
-    if (_cachedTheme == null || !identical(_cachedDocument, document)) {
+    final signature = _sceneThemeSignature(document);
+    if (!identical(_cachedDocument, document)) {
       _cachedDocument = document;
-      _cachedTheme = editorTheme(document);
+      if (_cachedTheme == null || signature != _themeSignature) {
+        _themeSignature = signature;
+        _cachedTheme = editorTheme(document);
+        unawaited(_loadTheme(document, signature, ++_themeRevision));
+      } else {
+        _cachedTheme = _cachedTheme!.copyWith(document: document);
+      }
     }
+    if (!identical(_builtTheme, _cachedTheme)) {
+      _builtTheme = _cachedTheme;
+      _outlineDocument = null;
+      _realDocument = null;
+      _cachedOutlineScene = null;
+      _cachedRealScene = null;
+    }
+    if (!identical(_builtFeature, widget.feature)) {
+      _builtFeature = widget.feature;
+      _realDocument = null;
+      _cachedRealScene = null;
+    }
+    final predicates = _activePredicates;
     if (widget.mode == PreviewMode.outline &&
         (!identical(_outlineDocument, document) ||
             !setEquals(_cachedPredicates, predicates))) {
@@ -244,6 +314,29 @@ class _ScenePreviewState extends State<ScenePreview> {
         ),
       ],
     );
+  }
+
+  Future<void> _loadTheme(
+    SceneDocument document,
+    _ThemeSignature signature,
+    int revision,
+  ) async {
+    final seed = await editorBackgroundSeed(document);
+    if (!mounted || revision != _themeRevision) {
+      return;
+    }
+    final currentDocument = widget.controller.document;
+    if (currentDocument == null ||
+        _sceneThemeSignature(currentDocument) != signature) {
+      return;
+    }
+    setState(() {
+      _cachedTheme = editorTheme(currentDocument, seed: seed);
+      _outlineDocument = null;
+      _realDocument = null;
+      _cachedOutlineScene = null;
+      _cachedRealScene = null;
+    });
   }
 
   void _schedulePrewarm(
@@ -303,9 +396,11 @@ class _ScenePreviewState extends State<ScenePreview> {
       PreviewMode.real => Theme(
         data: theme.materialTheme,
         child: GreeterSceneAdapter(
+          key: ObjectKey(widget.feature),
           feature: widget.feature,
           theme: theme,
           handleKeyboard: false,
+          exitOnHandoff: false,
         ),
       ),
     };
