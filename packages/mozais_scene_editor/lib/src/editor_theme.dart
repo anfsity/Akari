@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 /// Editor-only palettes. These style the authoring UI and never touch the
 /// greeter's compile-time `ThemeTokens`.
 enum EditorThemeId {
+  aurora,
+  auroraDawn,
   catppuccinLatte,
   catppuccinMocha,
   tokyoNight,
@@ -45,16 +47,76 @@ class EditorTheme {
 
   ThemeData toThemeData() {
     final scheme = colorScheme;
+    final radius = BorderRadius.circular(10);
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: palette.background,
       canvasColor: palette.background,
       dividerColor: palette.outline.withValues(alpha: 0.6),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: palette.background,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 11,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: palette.outline.withValues(alpha: 0.7)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(
+            color: palette.outline.withValues(alpha: 0.45),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: palette.accent, width: 2),
+        ),
+        isDense: true,
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: palette.surface,
         foregroundColor: palette.foreground,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+      ),
+      tabBarTheme: TabBarThemeData(
+        labelColor: scheme.primary,
+        unselectedLabelColor: scheme.onSurfaceVariant,
+        indicatorColor: scheme.primary,
+        dividerColor: palette.outline.withValues(alpha: 0.35),
+        tabAlignment: TabAlignment.start,
+      ),
+      listTileTheme: ListTileThemeData(
+        dense: true,
+        shape: RoundedRectangleBorder(borderRadius: radius),
+        selectedColor: scheme.primary,
+        selectedTileColor: scheme.primary.withValues(alpha: 0.12),
+        iconColor: scheme.onSurfaceVariant,
+      ),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        side: BorderSide(color: palette.outline.withValues(alpha: 0.5)),
+        selectedColor: scheme.primary.withValues(alpha: 0.22),
+        secondarySelectedColor: scheme.primary.withValues(alpha: 0.22),
+        labelStyle: TextStyle(color: scheme.onSurface),
+      ),
+      sliderTheme: SliderThemeData(
+        activeTrackColor: scheme.primary,
+        inactiveTrackColor: scheme.primary.withValues(alpha: 0.22),
+        thumbColor: scheme.primary,
+        overlayColor: scheme.primary.withValues(alpha: 0.12),
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: palette.surfaceVariant,
+          borderRadius: BorderRadius.circular(7),
+        ),
+        textStyle: TextStyle(color: scheme.onSurface),
       ),
       cardTheme: CardThemeData(
         color: palette.surface,
@@ -97,6 +159,26 @@ const _catppuccinLatte = EditorPalette(
   outline: Color(0xff9ca0b0),
   foreground: Color(0xff4c4f69),
   accent: Color(0xff1e66f5),
+);
+
+const _aurora = EditorPalette(
+  brightness: Brightness.dark,
+  background: Color(0xff0c1020),
+  surface: Color(0xff131b30),
+  surfaceVariant: Color(0xff233455),
+  outline: Color(0xff42618a),
+  foreground: Color(0xffe6f0ff),
+  accent: Color(0xff7de2d1),
+);
+
+const _auroraDawn = EditorPalette(
+  brightness: Brightness.light,
+  background: Color(0xfff4f8ff),
+  surface: Color(0xffe8eff8),
+  surfaceVariant: Color(0xffd5e4f2),
+  outline: Color(0xff9ab1c7),
+  foreground: Color(0xff183047),
+  accent: Color(0xff0a8f84),
 );
 
 const _catppuccinMocha = EditorPalette(
@@ -160,6 +242,16 @@ const _dracula = EditorPalette(
 );
 
 const editorThemes = <EditorThemeId, EditorTheme>{
+  EditorThemeId.aurora: EditorTheme(
+    id: EditorThemeId.aurora,
+    name: 'Aurora',
+    palette: _aurora,
+  ),
+  EditorThemeId.auroraDawn: EditorTheme(
+    id: EditorThemeId.auroraDawn,
+    name: 'Aurora Dawn',
+    palette: _auroraDawn,
+  ),
   EditorThemeId.catppuccinLatte: EditorTheme(
     id: EditorThemeId.catppuccinLatte,
     name: 'Catppuccin Latte',
@@ -200,6 +292,8 @@ const editorThemes = <EditorThemeId, EditorTheme>{
 EditorTheme editorThemeFor(EditorThemeId id) => editorThemes[id]!;
 
 const _brightnessPairs = <EditorThemeId, EditorThemeId>{
+  EditorThemeId.aurora: EditorThemeId.auroraDawn,
+  EditorThemeId.auroraDawn: EditorThemeId.aurora,
   EditorThemeId.catppuccinLatte: EditorThemeId.catppuccinMocha,
   EditorThemeId.catppuccinMocha: EditorThemeId.catppuccinLatte,
   EditorThemeId.githubLight: EditorThemeId.githubDark,

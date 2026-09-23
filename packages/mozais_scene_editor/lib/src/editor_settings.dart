@@ -13,7 +13,7 @@ const editorAspectRatios = <String, double>{
 /// theme; they only configure the authoring tool.
 class EditorSettings {
   const EditorSettings({
-    this.themeId = EditorThemeId.catppuccinMocha,
+    this.themeId = EditorThemeId.aurora,
     this.locale = defaultEditorLocaleCode,
     this.confirmUnsavedChanges = true,
     this.gridSnap = false,
@@ -41,7 +41,8 @@ class EditorSettings {
     return EditorSettings(
       themeId: themeId ?? this.themeId,
       locale: locale ?? this.locale,
-      confirmUnsavedChanges: confirmUnsavedChanges ?? this.confirmUnsavedChanges,
+      confirmUnsavedChanges:
+          confirmUnsavedChanges ?? this.confirmUnsavedChanges,
       gridSnap: gridSnap ?? this.gridSnap,
       previewAspectRatio: previewAspectRatio ?? this.previewAspectRatio,
       defaultScenePath: defaultScenePath ?? this.defaultScenePath,
@@ -69,7 +70,8 @@ class EditorSettings {
       gridSnap: json['gridSnap'] is bool
           ? json['gridSnap']! as bool
           : defaults.gridSnap,
-      previewAspectRatio: _aspectRatio(json['previewAspectRatio']) ??
+      previewAspectRatio:
+          _aspectRatio(json['previewAspectRatio']) ??
           defaults.previewAspectRatio,
       defaultScenePath: json['defaultScenePath'] is String
           ? json['defaultScenePath']! as String
@@ -90,13 +92,13 @@ class EditorSettings {
 
   @override
   int get hashCode => Object.hash(
-        themeId,
-        locale,
-        confirmUnsavedChanges,
-        gridSnap,
-        previewAspectRatio,
-        defaultScenePath,
-      );
+    themeId,
+    locale,
+    confirmUnsavedChanges,
+    gridSnap,
+    previewAspectRatio,
+    defaultScenePath,
+  );
 }
 
 EditorThemeId? _themeId(Object? value) {
