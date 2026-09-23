@@ -35,13 +35,17 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
       },
     );
     if (background.blurSigma > 0) {
-      image = ImageFiltered(
-        imageFilter: ui.ImageFilter.blur(
-          sigmaX: background.blurSigma,
-          sigmaY: background.blurSigma,
-          tileMode: TileMode.clamp,
+      // ImageFiltered paints outside the child's bounds; clip it so a larger
+      // sigma does not grow the background beyond the scene rectangle.
+      image = ClipRect(
+        child: ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(
+            sigmaX: background.blurSigma,
+            sigmaY: background.blurSigma,
+            tileMode: TileMode.clamp,
+          ),
+          child: image,
         ),
-        child: image,
       );
     }
 

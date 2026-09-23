@@ -126,9 +126,7 @@ class SceneEditorController extends ChangeNotifier {
         directory,
         source.path.split(Platform.pathSeparator).last,
       );
-      File('${directory.path}/$name').writeAsBytesSync(
-        await source.readAsBytes(),
-      );
+      await source.copy('${directory.path}/$name');
       final asset = 'assets/$name';
       _status = EditorStatus(EditorStatusKind.backgroundImported, asset);
       updateDocument(
@@ -267,19 +265,20 @@ String _uniqueAssetName(Directory directory, String name) {
 
 /// Theme used only to drive the editor preview.
 ///
-/// Reuses the real default theme so the preview matches the greeter, but
-/// resolves background assets from the repository root because the editor does
-/// not bundle them.
-ThemeBundle editorTheme(SceneDocument document) {
-  return buildDefaultTheme(document: document).copyWith(
-    backgrounds: {
-      SceneBackgroundKind.solid: const SolidBackgroundRenderer(),
-      SceneBackgroundKind.image: ImageBackgroundRenderer(
-        resolveImage: (asset) {
-          final file = repoAssetFile(asset);
-          return file == null ? AssetImage(asset) : FileImage(file);
-        },
-      ),
-    },
-  );
-}
+/// The palette is document-independent, so it is built once; each call only
+/// swaps in the document under edit. Resolves background assets from the
+/// repository root because the editor does not bundle them.
+final ThemeBundle _editorThemeBase = buildDefaultTheme().copyWith(
+  backgrounds: {
+    SceneBackgroundKind.solid: const SolidBackgroundRenderer(),
+    SceneBackgroundKind.image: ImageBackgroundRenderer(
+      resolveImage: (asset) {
+        final file = repoAssetFile(asset);
+        return file == null ? AssetImage(asset) : FileImage(file);
+      },
+    ),
+  },
+);
+
+ThemeBundle editorTheme(SceneDocument document) =>
+    _editorThemeBase.copyWith(document: document);
