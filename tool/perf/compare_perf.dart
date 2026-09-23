@@ -8,6 +8,7 @@ const _maximumUnmatchedFrameRatio = 0.20;
 const _maximumOverBudgetCycleRatio = 0.20;
 const _minimumSamplesPerPhase = 5;
 const _minimumMeasurementCycles = 3;
+const _maximumActionResponseBuildMs = 5.0;
 
 Future<void> main(List<String> arguments) async {
   final options = _parseArguments(arguments);
@@ -130,6 +131,39 @@ Future<void> main(List<String> arguments) async {
     _printPhaseSummary(phases);
   }
 
+  final actionResponseFrames = candidate['action_response_frames'];
+  if (actionResponseFrames is! Map<String, dynamic>) {
+    failures.add('candidate is missing action response frame data');
+  } else {
+    for (final phaseName in measuredInteractionPhases) {
+      final phase = actionResponseFrames[phaseName];
+      if (phase is! Map<String, dynamic>) {
+        failures.add('$phaseName is missing action response frame data');
+        continue;
+      }
+      final actionFrameCount = _readNumber(phase, 'sample_count');
+      if (actionFrameCount == null ||
+          measurementCycles == null ||
+          actionFrameCount < measurementCycles) {
+        failures.add(
+          '$phaseName has fewer action response frames than measurement cycles',
+        );
+        continue;
+      }
+      final maxBuildMs = _readNumber(phase, 'max_build_ms');
+      if (maxBuildMs == null) {
+        failures.add('$phaseName is missing action response build timing');
+      } else if (maxBuildMs >= _maximumActionResponseBuildMs) {
+        failures.add(
+          '$phaseName action response frame build reached '
+          '${maxBuildMs.toStringAsFixed(2)} ms; limit is below '
+          '$_maximumActionResponseBuildMs ms',
+        );
+      }
+    }
+    _printActionResponseSummary(actionResponseFrames);
+  }
+
   final observedFrameCount = _readNumber(candidate, 'observed_frame_count');
   final phaseMatch = candidate['phase_match'];
   if (observedFrameCount == null ||
@@ -209,6 +243,23 @@ Future<void> main(List<String> arguments) async {
       stderr.writeln('- $failure');
     }
     exitCode = 1;
+  }
+}
+
+void _printActionResponseSummary(Map<String, dynamic> phases) {
+  stdout.writeln(
+    'Action response frame build max (limit < '
+    '$_maximumActionResponseBuildMs ms):',
+  );
+  for (final phase in measuredInteractionPhases) {
+    final metrics = phases[phase];
+    if (metrics is! Map<String, dynamic>) {
+      continue;
+    }
+    stdout.writeln(
+      '  $phase: n=${_readNumber(metrics, 'sample_count') ?? 0}, '
+      'max=${_readNumber(metrics, 'max_build_ms') ?? 0} ms',
+    );
   }
 }
 

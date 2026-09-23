@@ -240,6 +240,10 @@ aggregate interaction p95 total spans over two 16.67 ms frame budgets, and
 build or raster p50/p95 regressions above 20% from baseline. It also rejects
 results when a majority of independent cycles have more than 20% of interaction
 frames beyond the 16.67 ms budget.
+Each interaction also records the first response frame separately from its
+later animation frames. Its UI-thread build/layout/paint work must stay below
+5 ms in every measured cycle; raster, vsync scheduling, and normal transitions
+remain covered by the frame metrics above.
 Run `bash scripts/trace-perf-builds.sh` to capture widget build, layout, and
 paint events during startup and first wake in a separate profile run; its
 timings are diagnostic and are not used by the performance gate. Set
