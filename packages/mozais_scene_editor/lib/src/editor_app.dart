@@ -209,8 +209,11 @@ class _EditorScreenState extends State<EditorScreen> {
 
   void _openSettings() {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => SettingsPage(controller: widget.settings),
+      PageRouteBuilder<void>(
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            SettingsPage(controller: widget.settings),
       ),
     );
   }
@@ -327,23 +330,25 @@ class _EditorScreenState extends State<EditorScreen> {
         ),
         body: Row(
           children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
-                border: Border(
-                  right: BorderSide(color: Theme.of(context).dividerColor),
+            Material(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border(
+                    right: BorderSide(color: Theme.of(context).dividerColor),
+                  ),
                 ),
-              ),
-              child: SizedBox(
-                width: _leftWidth,
-                child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    _controller.nodesListenable,
-                    _controller.selectionListenable,
-                    _controller.documentListenable,
-                  ]),
-                  builder: (context, _) =>
-                      NodeListPanel(controller: _controller),
+                child: SizedBox(
+                  width: _leftWidth,
+                  child: ListenableBuilder(
+                    listenable: Listenable.merge([
+                      _controller.nodesListenable,
+                      _controller.selectionListenable,
+                      _controller.documentListenable,
+                    ]),
+                    builder: (context, _) =>
+                        NodeListPanel(controller: _controller),
+                  ),
                 ),
               ),
             ),

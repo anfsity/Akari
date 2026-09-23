@@ -46,10 +46,10 @@ class ScenePreview extends StatefulWidget {
 
 class _ScenePreviewState extends State<ScenePreview> {
   SceneDocument? _cachedDocument;
-  PreviewMode? _cachedMode;
   Set<ScenePredicate>? _cachedPredicates;
   ThemeBundle? _cachedTheme;
-  Widget? _cachedScene;
+  Widget? _cachedOutlineScene;
+  Widget? _cachedRealScene;
 
   @override
   Widget build(BuildContext context) {
@@ -179,25 +179,61 @@ class _ScenePreviewState extends State<ScenePreview> {
   /// and greeter widgets are not re-created while the overlay moves.
   Widget _sceneFor(BuildContext context, SceneDocument document) {
     final predicates = widget.controller.activePredicates;
-    if (_cachedScene == null ||
-        !identical(_cachedDocument, document) ||
-        _cachedMode != widget.mode ||
-        !setEquals(_cachedPredicates, predicates)) {
+    if (_cachedTheme == null || !identical(_cachedDocument, document)) {
       _cachedDocument = document;
-      _cachedMode = widget.mode;
       _cachedPredicates = {...predicates};
       _cachedTheme = editorTheme(document);
-      _cachedScene = _buildScene(context, document, _cachedTheme!);
+      _cachedOutlineScene = _buildScene(
+        context,
+        document,
+        _cachedTheme!,
+        PreviewMode.outline,
+      );
+      _cachedRealScene = _buildScene(
+        context,
+        document,
+        _cachedTheme!,
+        PreviewMode.real,
+      );
+    } else if (!setEquals(_cachedPredicates, predicates)) {
+      _cachedPredicates = {...predicates};
+      _cachedOutlineScene = _buildScene(
+        context,
+        document,
+        _cachedTheme!,
+        PreviewMode.outline,
+      );
     }
-    return _cachedScene!;
+    final outline = _cachedOutlineScene!;
+    final real = _cachedRealScene!;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Offstage(
+          offstage: widget.mode != PreviewMode.outline,
+          child: TickerMode(
+            enabled: widget.mode == PreviewMode.outline,
+            child: outline,
+          ),
+        ),
+        Offstage(
+          offstage: widget.mode != PreviewMode.real,
+          child: TickerMode(
+            enabled: widget.mode == PreviewMode.real,
+            child: real,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildScene(
     BuildContext context,
     SceneDocument document,
     ThemeBundle theme,
+    PreviewMode mode,
   ) {
-    return switch (widget.mode) {
+    return switch (mode) {
       PreviewMode.outline => SceneRuntime(
         document: document,
         theme: theme,
@@ -428,9 +464,11 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
   SceneTransform _startTransform = const SceneTransform();
   Offset _startCenter = Offset.zero;
   double _startAngle = 0;
+  SceneRect? _liveRect;
+  SceneTransform? _liveTransform;
 
   _OverlayGeometry get _geometry => _OverlayGeometry(
-    node: widget.node,
+    node: widget.node.copyWith(rect: _liveRect, transform: _liveTransform),
     previewSize: widget.previewSize,
     safeArea: widget.safeArea,
     minHitTarget: widget.minHitTarget,
@@ -514,6 +552,8 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     _startPointer = _pressPointer;
     _startRect = widget.node.rect;
     _startTransform = widget.node.transform;
+    _liveRect = _startRect;
+    _liveTransform = _startTransform;
     _startCenter = geometry.center;
     final delta = _pressPointer - geometry.center;
     _startAngle = math.atan2(delta.dy, delta.dx);
@@ -539,9 +579,24 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
   }
 
   void _handlePanEnd() {
+    if (_activeRegion == _DragRegion.none) {
+      return;
+    }
+    final rect = _liveRect;
+    final transform = _liveTransform;
+    if (rect != null && rect != _startRect) {
+      widget.onRectChanged(rect);
+    }
+    if (transform != null && transform != _startTransform) {
+      widget.onTransformChanged(transform);
+    }
     _activeRegion = _DragRegion.none;
     _pressRegion = _DragRegion.none;
     _startGeometry = null;
+    setState(() {
+      _liveRect = null;
+      _liveTransform = null;
+    });
   }
 
   void _applyMove(_OverlayGeometry geometry, Offset delta) {
@@ -550,7 +605,7 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     }
     final dx = delta.dx / geometry.availableWidth;
     final dy = delta.dy / geometry.availableHeight;
-    widget.onRectChanged(
+    _setLiveRect(
       _startRect.copyWith(
         x: (_startRect.x + dx).clamp(0.0, 1.0 - _startRect.width),
         y: (_startRect.y + dy).clamp(0.0, 1.0 - _startRect.height),
@@ -568,7 +623,7 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     final startHeight = geometry.availableHeight * _startRect.height;
     final maxWidth = 1.0 - _startRect.x;
     final maxHeight = 1.0 - _startRect.y;
-    widget.onRectChanged(
+    _setLiveRect(
       _startRect.copyWith(
         width: ((startWidth + localDelta.dx) / geometry.availableWidth)
             .clamp(math.min(0.02, maxWidth), maxWidth)
@@ -584,7 +639,7 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     final delta = position - _startCenter;
     final angle = math.atan2(delta.dy, delta.dx);
     final degrees = (angle - _startAngle) * 180 / math.pi;
-    widget.onTransformChanged(
+    _setLiveTransform(
       _startTransform.copyWith(
         rotationZ: _normalizeAngle(_startTransform.rotationZ + degrees),
       ),
@@ -592,7 +647,7 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
   }
 
   void _applyRotate3d(Offset delta) {
-    widget.onTransformChanged(
+    _setLiveTransform(
       _startTransform.copyWith(
         rotationY: _normalizeAngle(
           _startTransform.rotationY + delta.dx * _dragSensitivity,
@@ -602,6 +657,20 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
         ),
       ),
     );
+  }
+
+  void _setLiveRect(SceneRect rect) {
+    if (rect == _liveRect) {
+      return;
+    }
+    setState(() => _liveRect = rect);
+  }
+
+  void _setLiveTransform(SceneTransform transform) {
+    if (transform == _liveTransform) {
+      return;
+    }
+    setState(() => _liveTransform = transform);
   }
 }
 
