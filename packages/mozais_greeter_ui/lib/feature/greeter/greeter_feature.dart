@@ -42,7 +42,7 @@ class GreeterFeature {
     promptError: null,
   ));
   final ValueNotifier<AccountPickerSlots> _accountPickerSlots = ValueNotifier(
-    AccountPickerSlots(users: const [], selected: null),
+    AccountPickerSlots(users: const [], selected: null, canSelect: false),
   );
   final ValueNotifier<SessionPickerSlots> _sessionPickerSlots = ValueNotifier(
     SessionPickerSlots(
@@ -67,7 +67,8 @@ class GreeterFeature {
 
   GreeterState get state => _state;
 
-  GreeterSceneSlots get slots => GreeterSceneSlots.fromState(_state);
+  GreeterSceneSlots get slots =>
+      GreeterSceneSlots.fromState(_state, canSelectUser: _canSelectUser);
 
   ValueListenable<ServiceSlots> get serviceSlots => _serviceSlots;
 
@@ -255,16 +256,33 @@ class GreeterFeature {
     }
   }
 
+  bool get _canSelectUser {
+    if (_state.serviceMode != ServiceMode.ready || _state.dormant) {
+      return false;
+    }
+    if (_state.authMode == AuthMode.userSelection) {
+      return !_beginInFlight;
+    }
+    return _state.authMode == AuthMode.error &&
+        _state.authError?.recovery == GreeterRecovery.retryAuthentication &&
+        _attemptId == null &&
+        !_beginInFlight &&
+        !_sessionStartInFlight;
+  }
+
   void _selectUser(UserSummary user) {
-    if (_state.serviceMode != ServiceMode.ready ||
+    if (!_canSelectUser ||
         !_state.users.any((candidate) => candidate.id == user.id)) {
       return;
     }
     _replace(
       _state.copyWith(
+        authMode: AuthMode.userSelection,
         selectedUser: user,
+        clearPrompt: true,
         clearAuthError: true,
         clearPromptError: true,
+        backendAuthState: BackendAuthState.idle,
       ),
     );
     _beginAuthenticationIfReady();
@@ -556,6 +574,9 @@ class GreeterFeature {
   }
 
   void _applyBackendState(BackendAuthState state, String detail) {
+    if (state == BackendAuthState.failed) {
+      _attemptId = null;
+    }
     final nextMode = switch (state) {
       BackendAuthState.creatingSession ||
       BackendAuthState.promptPending ||
@@ -602,9 +623,6 @@ class GreeterFeature {
       } else {
         unawaited(_startSelectedSession());
       }
-    }
-    if (state == BackendAuthState.failed) {
-      _attemptId = null;
     }
   }
 
@@ -723,7 +741,10 @@ class GreeterFeature {
       return;
     }
     _state = next;
-    final nextSlots = GreeterSceneSlots.fromState(next);
+    final nextSlots = GreeterSceneSlots.fromState(
+      next,
+      canSelectUser: _canSelectUser,
+    );
     if (_serviceSlots.value != nextSlots.service) {
       _serviceSlots.value = nextSlots.service;
     }
