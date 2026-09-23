@@ -305,13 +305,23 @@ class _GlassPanel extends StatelessWidget {
     final panel = DecoratedBox(
       decoration: BoxDecoration(
         color: theme.tokens.glassColor,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.055),
+            Colors.transparent,
+            Colors.black.withValues(alpha: 0.08),
+          ],
+          stops: const [0, 0.42, 1],
+        ),
         borderRadius: radius,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 40,
-            offset: const Offset(0, 24),
+            color: Colors.black.withValues(alpha: 0.42),
+            blurRadius: 34,
+            offset: const Offset(0, 18),
           ),
         ],
       ),
@@ -395,7 +405,7 @@ void _showAccountPicker(
     showDialog<void>(
       context: context,
       builder: (context) {
-        final accent = Theme.of(context).colorScheme.primary;
+        final scheme = Theme.of(context).colorScheme;
         return Dialog(
           backgroundColor: tokens.surfaceColor,
           shape: RoundedRectangleBorder(
@@ -412,7 +422,7 @@ void _showAccountPicker(
                   _UserTile(
                     user: user,
                     selected: account.selected?.id == user.id,
-                    accent: accent,
+                    accent: scheme.primary,
                     tokens: tokens,
                     onTap: () {
                       onSelect(user);
@@ -480,6 +490,7 @@ class _UserTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Material(
       color: selected ? tokens.surfaceVariantColor : Colors.transparent,
       borderRadius: BorderRadius.circular(14),
@@ -502,7 +513,7 @@ class _UserTile extends StatelessWidget {
                 child: Text(
                   user.displayName.characters.first.toUpperCase(),
                   style: TextStyle(
-                    color: selected ? Colors.white : accent,
+                    color: selected ? scheme.onPrimary : accent,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -513,8 +524,8 @@ class _UserTile extends StatelessWidget {
                 child: Text(
                   user.displayName,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: scheme.onSurface,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
@@ -536,6 +547,7 @@ class _AccountName extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Text(
         account.selected?.displayName ?? 'Choose account',
@@ -543,7 +555,7 @@ class _AccountName extends StatelessWidget {
         textAlign: TextAlign.center,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: Theme.of(context).colorScheme.onSurface,
+          color: scheme.onSurface,
           fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
@@ -567,6 +579,7 @@ class _SessionPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: SizedBox(
         height: 48,
@@ -588,7 +601,7 @@ class _SessionPill extends StatelessWidget {
           CatalogMode.empty when session.sessions.isEmpty => Center(
             child: Text(
               'No desktop sessions available.',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+              style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.7)),
             ),
           ),
           CatalogMode.ready || CatalogMode.empty => _SessionMenu(
@@ -615,7 +628,7 @@ class _SessionMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
     final menuItems = [
       for (final item in session.sessions)
         PopupMenuItem<SessionSummary>(
@@ -628,7 +641,9 @@ class _SessionMenu extends StatelessWidget {
                     ? Icons.check_circle
                     : Icons.desktop_windows_outlined,
                 size: 18,
-                color: session.selected?.id == item.id ? accent : null,
+                color: session.selected?.id == item.id
+                    ? scheme.primary
+                    : scheme.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Text(item.name),
@@ -648,21 +663,25 @@ class _SessionMenu extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.desktop_windows_outlined, size: 16, color: accent),
+                Icon(
+                  Icons.desktop_windows_outlined,
+                  size: 16,
+                  color: scheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
                     session.selected?.name ?? 'Choose session',
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: scheme.onSurface,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
                 if (session.sessions.length > 1)
-                  Icon(Icons.arrow_drop_down, size: 18, color: accent),
+                  Icon(Icons.arrow_drop_down, size: 18, color: scheme.primary),
               ],
             ),
           ),
@@ -683,8 +702,16 @@ class _PillSurface extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: tokens.surfaceColor,
+        gradient: LinearGradient(
+          colors: [
+            tokens.surfaceVariantColor.withValues(alpha: 0.6),
+            tokens.surfaceColor,
+          ],
+        ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: tokens.surfaceVariantColor),
+        border: Border.all(
+          color: tokens.surfaceVariantColor.withValues(alpha: 0.9),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -707,6 +734,7 @@ class _CredentialField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final enabled = auth.mode == AuthMode.prompting;
     final hintText = auth.mode == AuthMode.prompting
         ? auth.prompt?.text ?? 'Password'
@@ -743,10 +771,18 @@ class _CredentialField extends StatelessWidget {
         textInputAction: TextInputAction.done,
         textAlign: TextAlign.center,
         textAlignVertical: TextAlignVertical.center,
-        style: const TextStyle(color: Colors.white, fontSize: 18),
+        style: TextStyle(
+          color: scheme.onSurface,
+          fontSize: 18,
+          fontWeight: FontWeight.w500,
+        ),
         decoration: InputDecoration(
           hintText: hintText,
           border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
           filled: false,
           contentPadding: inputTheme.contentPadding,
           isDense: inputTheme.isDense,
