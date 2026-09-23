@@ -56,6 +56,14 @@ tree or app install.
   `GreeterFeature(DemoGreeterGateway())` and `GreeterSceneAdapter` behind an
   **Outline / Real** toggle, and resolves background assets from the repository
   root with a file-based image provider.
+- The inspector is tabbed (Document / Identity / Layout / Transform /
+  Visibility / Properties). The Document tab edits `canvas` and `background`;
+  background import copies a file into the repository `assets/` directory and
+  picks `image` or `video` from the extension. A video background renders solid
+  until a video renderer exists.
+- The Visibility tab uses human-labeled predicates, common presets, the
+  ALL/ANY rule builder, and an Advanced view for nested conditions. The
+  sidebar's active-predicate toggles share the same labels.
 
 ## 4. Agreed design
 
@@ -141,8 +149,7 @@ When the document is dirty, Open, window close, and switching documents prompt
 
 ## 5. Roadmap
 
-1. **Document panel and background import**.
-2. **Visibility UI rework**: labels, presets, Advanced, inspector tabs.
+All planned batches are implemented. Remaining work is listed under Deferred.
 
 ## 6. Deferred
 

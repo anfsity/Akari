@@ -82,4 +82,67 @@ void main() {
     expect(controller.document, isNull);
     expect(controller.status.kind, EditorStatusKind.openFailed);
   });
+
+  test('updates the document canvas and marks it dirty', () async {
+    final controller = SceneEditorController()..setPath(file.path);
+    await controller.open();
+
+    controller.updateDocument(
+      (document) => document.copyWith(
+        canvas: document.canvas.copyWith(fit: SceneCanvasFit.contain),
+      ),
+    );
+
+    expect(controller.document!.canvas.fit, SceneCanvasFit.contain);
+    expect(controller.dirty, isTrue);
+  });
+
+  test('imports an image background into the assets directory', () async {
+    final assets = Directory('${directory.path}/assets');
+    final source = File('${directory.path}/wallpaper.png')
+      ..writeAsBytesSync([1, 2, 3]);
+    final controller = SceneEditorController(assets)
+      ..setPath(file.path);
+    await controller.open();
+
+    expect(await controller.importBackgroundAsset(source), isTrue);
+
+    expect(controller.document!.background.kind, SceneBackgroundKind.image);
+    expect(controller.document!.background.asset, 'assets/wallpaper.png');
+    expect(File('${assets.path}/wallpaper.png').readAsBytesSync(), [1, 2, 3]);
+    expect(controller.dirty, isTrue);
+    expect(
+      controller.status.kind,
+      EditorStatusKind.backgroundImported,
+    );
+  });
+
+  test('imports a video background as the video kind', () async {
+    final assets = Directory('${directory.path}/assets');
+    final source = File('${directory.path}/clip.mp4')..writeAsBytesSync([1]);
+    final controller = SceneEditorController(assets)
+      ..setPath(file.path);
+    await controller.open();
+
+    await controller.importBackgroundAsset(source);
+
+    expect(controller.document!.background.kind, SceneBackgroundKind.video);
+    expect(controller.document!.background.asset, 'assets/clip.mp4');
+  });
+
+  test('does not overwrite an existing asset on import', () async {
+    final assets = Directory('${directory.path}/assets')..createSync();
+    File('${assets.path}/wallpaper.png').writeAsBytesSync([9]);
+    final source = File('${directory.path}/wallpaper.png')
+      ..writeAsBytesSync([1]);
+    final controller = SceneEditorController(assets)
+      ..setPath(file.path);
+    await controller.open();
+
+    await controller.importBackgroundAsset(source);
+
+    expect(controller.document!.background.asset, 'assets/wallpaper-2.png');
+    expect(File('${assets.path}/wallpaper.png').readAsBytesSync(), [9]);
+    expect(File('${assets.path}/wallpaper-2.png').readAsBytesSync(), [1]);
+  });
 }

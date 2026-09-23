@@ -10,6 +10,9 @@ import 'repo_root.dart';
 
 /// Holds the document under edit and the editor's selection and preview state.
 class SceneEditorController extends ChangeNotifier {
+  SceneEditorController([this._assetsDirectory]);
+
+  final Directory? _assetsDirectory;
   SceneDocument? _document;
   String _path = '';
   String? _selectedNodeId;
@@ -86,6 +89,62 @@ class SceneEditorController extends ChangeNotifier {
   void select(String id) {
     _selectedNodeId = id;
     notifyListeners();
+  }
+
+  /// Applies a document-level edit such as the canvas or background.
+  void updateDocument(SceneDocument Function(SceneDocument document) update) {
+    final document = _document;
+    if (document == null) {
+      return;
+    }
+    _document = update(document);
+    _dirty = true;
+    notifyListeners();
+  }
+
+  /// Copies [source] into the repository assets and points the background at it.
+  ///
+  /// Image and video files become their matching [SceneBackgroundKind]; the
+  /// runtime has no video renderer yet, so a video background falls back to
+  /// solid until one exists.
+  Future<bool> importBackgroundAsset(File source) async {
+    if (_document == null) {
+      return false;
+    }
+    final directory = _assetsDirectory ?? repoAssetsDirectory();
+    if (directory == null) {
+      _status = EditorStatus(
+        EditorStatusKind.backgroundImportFailed,
+        const FileSystemException('Repository assets directory not found.'),
+      );
+      notifyListeners();
+      return false;
+    }
+    try {
+      directory.createSync(recursive: true);
+      final name = _uniqueAssetName(
+        directory,
+        source.path.split(Platform.pathSeparator).last,
+      );
+      File('${directory.path}/$name').writeAsBytesSync(
+        await source.readAsBytes(),
+      );
+      final asset = 'assets/$name';
+      _status = EditorStatus(EditorStatusKind.backgroundImported, asset);
+      updateDocument(
+        (document) => document.copyWith(
+          background: document.background.copyWith(
+            kind: _backgroundKindFor(name),
+            asset: asset,
+          ),
+        ),
+      );
+      return true;
+    } on Object catch (error) {
+      _status = EditorStatus(EditorStatusKind.backgroundImportFailed, error);
+      notifyListeners();
+      return false;
+    }
   }
 
   void updateSelected(SceneNode Function(SceneNode node) update) {
@@ -179,6 +238,31 @@ String _uniqueNodeId(SceneDocument document, String base) {
     index++;
   }
   return '$base$index';
+}
+
+const _videoExtensions = {'mp4', 'webm', 'mkv', 'mov', 'avi', 'm4v'};
+
+SceneBackgroundKind _backgroundKindFor(String name) {
+  final dot = name.lastIndexOf('.');
+  final extension = dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
+  return _videoExtensions.contains(extension)
+      ? SceneBackgroundKind.video
+      : SceneBackgroundKind.image;
+}
+
+/// Keeps an imported file from overwriting an existing asset of the same name.
+String _uniqueAssetName(Directory directory, String name) {
+  if (!File('${directory.path}/$name').existsSync()) {
+    return name;
+  }
+  final dot = name.lastIndexOf('.');
+  final base = dot > 0 ? name.substring(0, dot) : name;
+  final extension = dot > 0 ? name.substring(dot) : '';
+  var index = 2;
+  while (File('${directory.path}/$base-$index$extension').existsSync()) {
+    index++;
+  }
+  return '$base-$index$extension';
 }
 
 /// Theme used only to drive the editor preview.

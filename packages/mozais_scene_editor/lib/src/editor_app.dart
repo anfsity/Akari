@@ -96,11 +96,11 @@ class _EditorScreenState extends State<EditorScreen> {
     _greeterFeature = GreeterFeature(gateway: DemoGreeterGateway());
     unawaited(_greeterFeature.initialize());
     final configured = widget.settings.settings.defaultScenePath;
-    final path = configured.isNotEmpty ? configured : defaultScenePath() ?? '';
+    final path = resolveStartupScenePath(configured);
     _controller.setPath(path);
     _pathController.text = path;
     if (path.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _controller.open());
+      WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_open()));
     }
   }
 

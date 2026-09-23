@@ -2,31 +2,96 @@ import 'package:flutter/material.dart';
 import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 import 'condition_editor.dart';
+import 'document_panel.dart';
 import 'editor_controller.dart';
 import 'editor_strings.dart';
+import 'editor_widgets.dart';
 
-/// Property panel for the selected node.
-class InspectorPanel extends StatelessWidget {
+/// Property panel for the document and the selected node.
+///
+/// The document-level canvas and background live in their own tab so the node
+/// inspector is not a crowded wall of controls.
+class InspectorPanel extends StatefulWidget {
   const InspectorPanel({required this.controller, super.key});
 
   final SceneEditorController controller;
 
   @override
+  State<InspectorPanel> createState() => _InspectorPanelState();
+}
+
+class _InspectorPanelState extends State<InspectorPanel>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs = TabController(length: 6, vsync: this);
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final node = controller.selectedNode;
     final strings = EditorStringsScope.of(context);
+    return Column(
+      children: [
+        TabBar(
+          controller: _tabs,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          tabs: [
+            Tab(text: strings.document),
+            Tab(text: strings.identity),
+            Tab(text: strings.layout),
+            Tab(text: strings.transform),
+            Tab(text: strings.visibility),
+            Tab(text: strings.properties),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabs,
+            children: [
+              DocumentPanel(controller: widget.controller),
+              _nodeTab((node) => _IdentityTab(controller: widget.controller, node: node)),
+              _nodeTab((node) => _LayoutTab(controller: widget.controller, node: node)),
+              _nodeTab((node) => _TransformTab(controller: widget.controller, node: node)),
+              _nodeTab((node) => _VisibilityTab(controller: widget.controller, node: node)),
+              _nodeTab((node) => _PropertiesTab(controller: widget.controller, node: node)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _nodeTab(Widget Function(SceneNode node) builder) {
+    final node = widget.controller.selectedNode;
     if (node == null) {
-      return Center(child: Text(strings.selectANode));
+      return Center(child: Text(EditorStringsScope.of(context).selectANode));
     }
+    return builder(node);
+  }
+}
+
+class _IdentityTab extends StatelessWidget {
+  const _IdentityTab({required this.controller, required this.node});
+
+  final SceneEditorController controller;
+  final SceneNode node;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        _Section(
+        SectionCard(
           title: strings.identity,
           children: [
             _IdField(controller: controller, node: node),
             const SizedBox(height: 8),
-            _EnumDropdown<SceneNodeKind>(
+            EnumDropdown<SceneNodeKind>(
               label: strings.kind,
               value: node.kind,
               values: SceneNodeKind.values,
@@ -34,8 +99,9 @@ class InspectorPanel extends StatelessWidget {
                   controller.updateSelected((node) => node.copyWith(kind: value)),
             ),
             const SizedBox(height: 8),
-            _NullableEnumDropdown<SceneAction>(
+            NullableEnumDropdown<SceneAction>(
               label: strings.action,
+              noneLabel: strings.none,
               value: node.action,
               values: SceneAction.values,
               onChanged: (value) => controller.updateSelected(
@@ -43,7 +109,7 @@ class InspectorPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            _EnumDropdown<SceneMotionPreset>(
+            EnumDropdown<SceneMotionPreset>(
               label: strings.motion,
               value: node.motion,
               values: SceneMotionPreset.values,
@@ -53,10 +119,27 @@ class InspectorPanel extends StatelessWidget {
             ),
           ],
         ),
-        _Section(
+      ],
+    );
+  }
+}
+
+class _LayoutTab extends StatelessWidget {
+  const _LayoutTab({required this.controller, required this.node});
+
+  final SceneEditorController controller;
+  final SceneNode node;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        SectionCard(
           title: strings.rectNormalized,
           children: [
-            _SliderRow(
+            LabeledSlider(
               label: strings.x,
               value: node.rect.x,
               min: 0,
@@ -65,7 +148,7 @@ class InspectorPanel extends StatelessWidget {
                 (node) => node.copyWith(rect: node.rect.copyWith(x: value)),
               ),
             ),
-            _SliderRow(
+            LabeledSlider(
               label: strings.y,
               value: node.rect.y,
               min: 0,
@@ -74,7 +157,7 @@ class InspectorPanel extends StatelessWidget {
                 (node) => node.copyWith(rect: node.rect.copyWith(y: value)),
               ),
             ),
-            _SliderRow(
+            LabeledSlider(
               label: strings.width,
               value: node.rect.width,
               min: 0.01,
@@ -84,7 +167,7 @@ class InspectorPanel extends StatelessWidget {
                     node.copyWith(rect: node.rect.copyWith(width: value)),
               ),
             ),
-            _SliderRow(
+            LabeledSlider(
               label: strings.height,
               value: node.rect.height,
               min: 0.01,
@@ -96,112 +179,7 @@ class InspectorPanel extends StatelessWidget {
             ),
           ],
         ),
-        _Section(
-          title: strings.transform,
-          children: [
-            _SliderRow(
-              label: strings.rotateZ,
-              value: node.transform.rotationZ,
-              min: -180,
-              max: 180,
-              onChanged: (value) => _updateTransform(
-                controller,
-                node.transform.copyWith(rotationZ: value),
-              ),
-            ),
-            _SliderRow(
-              label: strings.rotateX,
-              value: node.transform.rotationX,
-              min: -180,
-              max: 180,
-              onChanged: (value) => _updateTransform(
-                controller,
-                node.transform.copyWith(rotationX: value),
-              ),
-            ),
-            _SliderRow(
-              label: strings.rotateY,
-              value: node.transform.rotationY,
-              min: -180,
-              max: 180,
-              onChanged: (value) => _updateTransform(
-                controller,
-                node.transform.copyWith(rotationY: value),
-              ),
-            ),
-            _SliderRow(
-              label: strings.perspective,
-              value: node.transform.perspective,
-              min: -0.01,
-              max: 0.01,
-              onChanged: (value) => _updateTransform(
-                controller,
-                node.transform.copyWith(perspective: value),
-              ),
-            ),
-            _SliderRow(
-              label: strings.scaleX,
-              value: node.transform.scaleX,
-              min: 0.1,
-              max: 3,
-              onChanged: (value) => _updateTransform(
-                controller,
-                node.transform.copyWith(scaleX: value),
-              ),
-            ),
-            _SliderRow(
-              label: strings.scaleY,
-              value: node.transform.scaleY,
-              min: 0.1,
-              max: 3,
-              onChanged: (value) => _updateTransform(
-                controller,
-                node.transform.copyWith(scaleY: value),
-              ),
-            ),
-            _SliderRow(
-              label: strings.moveX,
-              value: node.transform.translateX,
-              min: -0.5,
-              max: 0.5,
-              onChanged: (value) => _updateTransform(
-                controller,
-                node.transform.copyWith(translateX: value),
-              ),
-            ),
-            _SliderRow(
-              label: strings.moveY,
-              value: node.transform.translateY,
-              min: -0.5,
-              max: 0.5,
-              onChanged: (value) => _updateTransform(
-                controller,
-                node.transform.copyWith(translateY: value),
-              ),
-            ),
-            _SliderRow(
-              label: strings.pivotX,
-              value: node.transform.pivotX,
-              min: 0,
-              max: 1,
-              onChanged: (value) => _updateTransform(
-                controller,
-                node.transform.copyWith(pivotX: value),
-              ),
-            ),
-            _SliderRow(
-              label: strings.pivotY,
-              value: node.transform.pivotY,
-              min: 0,
-              max: 1,
-              onChanged: (value) => _updateTransform(
-                controller,
-                node.transform.copyWith(pivotY: value),
-              ),
-            ),
-          ],
-        ),
-        _Section(
+        SectionCard(
           title: strings.layout,
           children: [
             _IntField(
@@ -228,7 +206,130 @@ class InspectorPanel extends StatelessWidget {
             ),
           ],
         ),
-        _Section(
+      ],
+    );
+  }
+}
+
+class _TransformTab extends StatelessWidget {
+  const _TransformTab({required this.controller, required this.node});
+
+  final SceneEditorController controller;
+  final SceneNode node;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
+    void update(SceneTransform transform) {
+      controller.updateSelected((node) => node.copyWith(transform: transform));
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        SectionCard(
+          title: strings.transform,
+          children: [
+            LabeledSlider(
+              label: strings.rotateZ,
+              value: node.transform.rotationZ,
+              min: -180,
+              max: 180,
+              onChanged: (value) =>
+                  update(node.transform.copyWith(rotationZ: value)),
+            ),
+            LabeledSlider(
+              label: strings.rotateX,
+              value: node.transform.rotationX,
+              min: -180,
+              max: 180,
+              onChanged: (value) =>
+                  update(node.transform.copyWith(rotationX: value)),
+            ),
+            LabeledSlider(
+              label: strings.rotateY,
+              value: node.transform.rotationY,
+              min: -180,
+              max: 180,
+              onChanged: (value) =>
+                  update(node.transform.copyWith(rotationY: value)),
+            ),
+            LabeledSlider(
+              label: strings.perspective,
+              value: node.transform.perspective,
+              min: -0.01,
+              max: 0.01,
+              onChanged: (value) =>
+                  update(node.transform.copyWith(perspective: value)),
+            ),
+            LabeledSlider(
+              label: strings.scaleX,
+              value: node.transform.scaleX,
+              min: 0.1,
+              max: 3,
+              onChanged: (value) =>
+                  update(node.transform.copyWith(scaleX: value)),
+            ),
+            LabeledSlider(
+              label: strings.scaleY,
+              value: node.transform.scaleY,
+              min: 0.1,
+              max: 3,
+              onChanged: (value) =>
+                  update(node.transform.copyWith(scaleY: value)),
+            ),
+            LabeledSlider(
+              label: strings.moveX,
+              value: node.transform.translateX,
+              min: -0.5,
+              max: 0.5,
+              onChanged: (value) =>
+                  update(node.transform.copyWith(translateX: value)),
+            ),
+            LabeledSlider(
+              label: strings.moveY,
+              value: node.transform.translateY,
+              min: -0.5,
+              max: 0.5,
+              onChanged: (value) =>
+                  update(node.transform.copyWith(translateY: value)),
+            ),
+            LabeledSlider(
+              label: strings.pivotX,
+              value: node.transform.pivotX,
+              min: 0,
+              max: 1,
+              onChanged: (value) =>
+                  update(node.transform.copyWith(pivotX: value)),
+            ),
+            LabeledSlider(
+              label: strings.pivotY,
+              value: node.transform.pivotY,
+              min: 0,
+              max: 1,
+              onChanged: (value) =>
+                  update(node.transform.copyWith(pivotY: value)),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _VisibilityTab extends StatelessWidget {
+  const _VisibilityTab({required this.controller, required this.node});
+
+  final SceneEditorController controller;
+  final SceneNode node;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        SectionCard(
           title: strings.visibility,
           children: [
             ConditionEditor(
@@ -239,154 +340,28 @@ class InspectorPanel extends StatelessWidget {
             ),
           ],
         ),
-        _Section(
-          title: strings.properties,
-          children: [
-            _PropertiesEditor(controller: controller, node: node),
-          ],
-        ),
       ],
     );
   }
 }
 
-void _updateTransform(SceneEditorController controller, SceneTransform transform) {
-  controller.updateSelected((node) => node.copyWith(transform: transform));
-}
+class _PropertiesTab extends StatelessWidget {
+  const _PropertiesTab({required this.controller, required this.node});
 
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SliderRow extends StatelessWidget {
-  const _SliderRow({
-    required this.label,
-    required this.value,
-    required this.min,
-    required this.max,
-    required this.onChanged,
-  });
-
-  final String label;
-  final double value;
-  final double min;
-  final double max;
-  final ValueChanged<double> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(width: 80, child: Text(label)),
-        Expanded(
-          child: Slider(
-            value: value.clamp(min, max),
-            min: min,
-            max: max,
-            onChanged: onChanged,
-          ),
-        ),
-        SizedBox(
-          width: 52,
-          child: Text(
-            value.toStringAsFixed(2),
-            textAlign: TextAlign.right,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EnumDropdown<T extends Enum> extends StatelessWidget {
-  const _EnumDropdown({
-    required this.label,
-    required this.value,
-    required this.values,
-    required this.onChanged,
-  });
-
-  final String label;
-  final T value;
-  final List<T> values;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(width: 80, child: Text(label)),
-        Expanded(
-          child: DropdownButton<T>(
-            isExpanded: true,
-            value: value,
-            onChanged: (selected) {
-              if (selected != null) {
-                onChanged(selected);
-              }
-            },
-            items: [
-              for (final option in values)
-                DropdownMenuItem(value: option, child: Text(option.name)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _NullableEnumDropdown<T extends Enum> extends StatelessWidget {
-  const _NullableEnumDropdown({
-    required this.label,
-    required this.value,
-    required this.values,
-    required this.onChanged,
-  });
-
-  final String label;
-  final T? value;
-  final List<T> values;
-  final ValueChanged<T?> onChanged;
+  final SceneEditorController controller;
+  final SceneNode node;
 
   @override
   Widget build(BuildContext context) {
     final strings = EditorStringsScope.of(context);
-    return Row(
+    return ListView(
+      padding: const EdgeInsets.all(12),
       children: [
-        SizedBox(width: 80, child: Text(label)),
-        Expanded(
-          child: DropdownButton<T?>(
-            isExpanded: true,
-            value: value,
-            onChanged: onChanged,
-            items: [
-              DropdownMenuItem(value: null, child: Text(strings.none)),
-              for (final option in values)
-                DropdownMenuItem(value: option, child: Text(option.name)),
-            ],
-          ),
+        SectionCard(
+          title: strings.properties,
+          children: [
+            _PropertiesEditor(controller: controller, node: node),
+          ],
         ),
       ],
     );
