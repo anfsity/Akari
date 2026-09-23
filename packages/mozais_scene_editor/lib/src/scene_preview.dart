@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 import 'package:mozais_scene/mozais_scene.dart';
@@ -22,7 +23,7 @@ const _dragSensitivity = 0.5;
 
 /// Renders the document with the real runtime and overlays an editing box for
 /// the selected node.
-class ScenePreview extends StatelessWidget {
+class ScenePreview extends StatefulWidget {
   const ScenePreview({
     required this.controller,
     required this.feature,
@@ -35,29 +36,41 @@ class ScenePreview extends StatelessWidget {
   final PreviewMode mode;
 
   @override
+  State<ScenePreview> createState() => _ScenePreviewState();
+}
+
+class _ScenePreviewState extends State<ScenePreview> {
+  SceneDocument? _cachedDocument;
+  PreviewMode? _cachedMode;
+  Set<ScenePredicate>? _cachedPredicates;
+  ThemeBundle? _cachedTheme;
+  Widget? _cachedScene;
+
+  @override
   Widget build(BuildContext context) {
-    final document = controller.document;
+    final document = widget.controller.document;
     if (document == null) {
       return Center(child: Text(EditorStringsScope.of(context).previewEmpty));
     }
     final aspectRatio = EditorSettingsScope.of(
       context,
     ).settings.previewAspectRatio;
-    final theme = editorTheme(document);
+    final scene = _sceneFor(context, document);
+    final theme = _cachedTheme!;
     final safeArea = document.canvas.useSafeArea
         ? MediaQuery.paddingOf(context)
         : EdgeInsets.zero;
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = _fit(constraints.biggest, aspectRatio);
-        final selected = controller.selectedNode;
+        final selected = widget.controller.selectedNode;
         return Center(
           child: SizedBox(
             width: size.width,
             height: size.height,
             child: Stack(
               children: [
-                Positioned.fill(child: _buildScene(document, theme)),
+                Positioned.fill(child: scene),
                 Positioned.fill(
                   child: IgnorePointer(
                     child: DecoratedBox(
@@ -74,11 +87,18 @@ class ScenePreview extends StatelessWidget {
                       previewSize: size,
                       safeArea: safeArea,
                       minHitTarget: theme.tokens.minHitTarget,
-                      onRectChanged: (rect) => controller.updateSelected(
+                      onSelectAt: (position) => _selectNodeAt(
+                        position: position,
+                        document: document,
+                        previewSize: size,
+                        safeArea: safeArea,
+                        minHitTarget: theme.tokens.minHitTarget,
+                      ),
+                      onRectChanged: (rect) => widget.controller.updateSelected(
                         (node) => node.copyWith(rect: rect),
                       ),
                       onTransformChanged: (transform) =>
-                          controller.updateSelected(
+                          widget.controller.updateSelected(
                             (node) => node.copyWith(transform: transform),
                           ),
                     ),
@@ -91,24 +111,96 @@ class ScenePreview extends StatelessWidget {
     );
   }
 
-  Widget _buildScene(SceneDocument document, ThemeBundle theme) {
-    return switch (mode) {
+  void _selectNodeAt({
+    required Offset position,
+    required SceneDocument document,
+    required Size previewSize,
+    required EdgeInsets safeArea,
+    required double minHitTarget,
+  }) {
+    final id = hitTestSceneNode(
+      document: document,
+      position: position,
+      previewSize: previewSize,
+      safeArea: safeArea,
+      minHitTarget: minHitTarget,
+      activePredicates: widget.controller.activePredicates,
+    );
+    if (id != null) {
+      widget.controller.select(id);
+    }
+  }
+
+  /// Rebuilds the embedded scene only when its inputs change.
+  ///
+  /// A selection change leaves the scene untouched so the background, blur,
+  /// and greeter widgets are not re-created while the overlay moves.
+  Widget _sceneFor(BuildContext context, SceneDocument document) {
+    final predicates = widget.controller.activePredicates;
+    if (_cachedScene == null ||
+        !identical(_cachedDocument, document) ||
+        _cachedMode != widget.mode ||
+        !setEquals(_cachedPredicates, predicates)) {
+      _cachedDocument = document;
+      _cachedMode = widget.mode;
+      _cachedPredicates = {...predicates};
+      _cachedTheme = editorTheme(document);
+      _cachedScene = _buildScene(context, document, _cachedTheme!);
+    }
+    return _cachedScene!;
+  }
+
+  Widget _buildScene(
+    BuildContext context,
+    SceneDocument document,
+    ThemeBundle theme,
+  ) {
+    return switch (widget.mode) {
       PreviewMode.outline => SceneRuntime(
         document: document,
         theme: theme,
         nodeBuilder: buildPlaceholderNode,
-        activePredicates: controller.activePredicates,
+        activePredicates: widget.controller.activePredicates,
       ),
       PreviewMode.real => Theme(
         data: theme.materialTheme,
         child: GreeterSceneAdapter(
-          feature: feature,
+          feature: widget.feature,
           theme: theme,
           handleKeyboard: false,
         ),
       ),
     };
   }
+}
+
+/// Returns the topmost visible node whose transformed rectangle contains
+/// [position], or null when the point is over empty scene.
+String? hitTestSceneNode({
+  required SceneDocument document,
+  required Offset position,
+  required Size previewSize,
+  required EdgeInsets safeArea,
+  required double minHitTarget,
+  required Set<ScenePredicate> activePredicates,
+}) {
+  for (final node in document.paintOrder.reversed) {
+    final visibleWhen = node.visibleWhen;
+    if (visibleWhen != null &&
+        !evaluateSceneCondition(visibleWhen, activePredicates)) {
+      continue;
+    }
+    final geometry = _OverlayGeometry(
+      node: node,
+      previewSize: previewSize,
+      safeArea: safeArea,
+      minHitTarget: minHitTarget,
+    );
+    if (geometry.contains(position)) {
+      return node.id;
+    }
+  }
+  return null;
 }
 
 Size _fit(Size available, double aspectRatio) {
@@ -261,6 +353,7 @@ class _SelectionOverlay extends StatefulWidget {
     required this.previewSize,
     required this.safeArea,
     required this.minHitTarget,
+    required this.onSelectAt,
     required this.onRectChanged,
     required this.onTransformChanged,
   });
@@ -269,6 +362,7 @@ class _SelectionOverlay extends StatefulWidget {
   final Size previewSize;
   final EdgeInsets safeArea;
   final double minHitTarget;
+  final ValueChanged<Offset> onSelectAt;
   final ValueChanged<SceneRect> onRectChanged;
   final ValueChanged<SceneTransform> onTransformChanged;
 
@@ -312,6 +406,7 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
         onPointerCancel: (_) => _pressRegion = _DragRegion.none,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
+          onTapUp: (details) => widget.onSelectAt(details.localPosition),
           onPanStart: (_) => _handlePanStart(geometry),
           onPanUpdate: (details) => _handlePanUpdate(details.localPosition),
           onPanEnd: (_) => _handlePanEnd(),

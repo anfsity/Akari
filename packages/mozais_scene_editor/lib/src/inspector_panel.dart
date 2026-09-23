@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
@@ -23,9 +24,13 @@ class InspectorPanel extends StatefulWidget {
 class _InspectorPanelState extends State<InspectorPanel>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs = TabController(length: 6, vsync: this);
+  final TabBarScrollController _tabScroll = TabBarScrollController();
+  bool _middleDragActive = false;
+  double _lastMiddleX = 0;
 
   @override
   void dispose() {
+    _tabScroll.dispose();
     _tabs.dispose();
     super.dispose();
   }
@@ -35,18 +40,26 @@ class _InspectorPanelState extends State<InspectorPanel>
     final strings = EditorStringsScope.of(context);
     return Column(
       children: [
-        TabBar(
-          controller: _tabs,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          tabs: [
-            Tab(text: strings.document),
-            Tab(text: strings.identity),
-            Tab(text: strings.layout),
-            Tab(text: strings.transform),
-            Tab(text: strings.visibility),
-            Tab(text: strings.properties),
-          ],
+        Listener(
+          onPointerSignal: _handlePointerSignal,
+          onPointerDown: _handlePointerDown,
+          onPointerMove: _handlePointerMove,
+          onPointerUp: (_) => _middleDragActive = false,
+          onPointerCancel: (_) => _middleDragActive = false,
+          child: TabBar(
+            controller: _tabs,
+            scrollController: _tabScroll,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            tabs: [
+              Tab(text: strings.document),
+              Tab(text: strings.identity),
+              Tab(text: strings.layout),
+              Tab(text: strings.transform),
+              Tab(text: strings.visibility),
+              Tab(text: strings.properties),
+            ],
+          ),
         ),
         Expanded(
           child: TabBarView(
@@ -71,6 +84,43 @@ class _InspectorPanelState extends State<InspectorPanel>
       return Center(child: Text(EditorStringsScope.of(context).selectANode));
     }
     return builder(node);
+  }
+
+  /// Scrolls the tab strip with the wheel and with a middle-button drag.
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) {
+      return;
+    }
+    _scrollTabsBy(event.scrollDelta.dy);
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    if (event.buttons == kMiddleMouseButton) {
+      _middleDragActive = true;
+      _lastMiddleX = event.position.dx;
+    }
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (!_middleDragActive || event.buttons != kMiddleMouseButton) {
+      return;
+    }
+    final delta = event.position.dx - _lastMiddleX;
+    _lastMiddleX = event.position.dx;
+    _scrollTabsBy(-delta);
+  }
+
+  void _scrollTabsBy(double delta) {
+    if (!_tabScroll.hasClients) {
+      return;
+    }
+    final position = _tabScroll.position;
+    _tabScroll.jumpTo(
+      (position.pixels + delta).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      ),
+    );
   }
 }
 
