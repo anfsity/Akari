@@ -198,3 +198,24 @@ const editorThemes = <EditorThemeId, EditorTheme>{
 };
 
 EditorTheme editorThemeFor(EditorThemeId id) => editorThemes[id]!;
+
+const _brightnessPairs = <EditorThemeId, EditorThemeId>{
+  EditorThemeId.catppuccinLatte: EditorThemeId.catppuccinMocha,
+  EditorThemeId.catppuccinMocha: EditorThemeId.catppuccinLatte,
+  EditorThemeId.githubLight: EditorThemeId.githubDark,
+  EditorThemeId.githubDark: EditorThemeId.githubLight,
+};
+
+/// The same theme family in the opposite brightness.
+///
+/// Palettes without an explicit partner fall back to a default of the target
+/// brightness so the light/dark toggle always has a destination.
+EditorThemeId toggledThemeBrightness(EditorThemeId id) {
+  final paired = _brightnessPairs[id];
+  if (paired != null) {
+    return paired;
+  }
+  return editorThemeFor(id).palette.brightness == Brightness.dark
+      ? EditorThemeId.catppuccinLatte
+      : EditorThemeId.catppuccinMocha;
+}

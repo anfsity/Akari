@@ -40,16 +40,22 @@ tree or app install.
   registry; transient status messages are structured, not baked strings.
 - Settings page: named editor themes, language, unsaved-change confirmation,
   grid-snap and preview-aspect-ratio options, and a default scene path. The
-  page persists to `~/.config/mozais/scene_editor.json` and previews the theme
-  live. Grid-snap behavior itself is still deferred.
+  page persists to `~/.config/mozais/scene_editor.json`. A light/dark toggle
+  in the app bar switches a theme to its partner in the opposite brightness.
+  Grid-snap behavior itself is still deferred.
 - Draggable pane dividers with min/max widths and a `resizeLeftRight` cursor;
-  the right sidebar defaults narrower than before.
+  the line thickens on hover and the right sidebar can be collapsed to a rail.
 - Unsaved-change prompt on Open and window close, controlled by
   `confirmUnsavedChanges` and using `AppLifecycleListener.onExitRequested`.
 - The selection overlay follows the node's transform through the shared
   `sceneNodeRect` and `sceneNodeTransformMatrix` helpers: a dashed box with a
   corner resize handle, a dot above the box for in-plane rotation, and a
-  translucent trackball for X/Y rotation. The cursor changes per region.
+  translucent trackball for X/Y rotation. The cursor changes per region. The
+  overlay is hidden while the node is not visible under the active predicates,
+  so a gated node cannot leave a phantom box over the scene.
+- Clicking a node in the preview selects the topmost visible node under the
+  pointer. The embedded scene is cached so moving the selection does not
+  rebuild the background, blur, or greeter widgets.
 - The reusable UI is extracted into `mozais_greeter_ui`; the app is a thin
   shell over it. `buildDefaultTheme` accepts a `SceneDocument`, so the editor
   previews the edited document with the real theme. The editor embeds
@@ -57,10 +63,14 @@ tree or app install.
   **Outline / Real** toggle, and resolves background assets from the repository
   root with a file-based image provider.
 - The inspector is tabbed (Document / Identity / Layout / Transform /
-  Visibility / Properties). The Document tab edits `canvas` and `background`;
+  Visibility / Properties); its tab strip scrolls with the wheel or a
+  middle-button drag. The Document tab edits `canvas` and `background`;
   background import copies a file into the repository `assets/` directory and
   picks `image` or `video` from the extension. A video background renders solid
   until a video renderer exists.
+- Scenes open through the same file picker as background import. The picker's
+  address bar accepts a typed folder or file path and can filter the listing by
+  extension.
 - The Visibility tab uses human-labeled predicates, common presets, the
   ALL/ANY rule builder, and an Advanced view for nested conditions. The
   sidebar's active-predicate toggles share the same labels.
@@ -109,8 +119,9 @@ A settings route with grouped options:
 Editor themes are well-known palettes mapped to a `ColorScheme`: Catppuccin
 (Latte/Mocha), Tokyo Night, GitHub (Light/Dark), Nord, Dracula. They affect the
 editor UI only, never the greeter's compile-time `ThemeTokens`. Settings persist
-to `~/.config/mozais/scene_editor.json` with `dart:io`. The settings page shows
-a live preview of the selected theme.
+to `~/.config/mozais/scene_editor.json` with `dart:io`. The app restyles
+immediately, so the page has no separate preview card; a light/dark toggle in
+the app bar switches to the opposite brightness of the current theme.
 
 Language is English only for now, behind an `EditorStrings` abstraction with an
 `EnglishStrings` implementation and a locale registry, so adding a locale is a
@@ -125,17 +136,21 @@ When the document is dirty, Open, window close, and switching documents prompt
 ### 4.5 Layout
 
 - Draggable dividers between panes, with a `resizeLeftRight` cursor and
-  min/max widths.
-- The right sidebar defaults narrower, is resizable, and groups the inspector
-  into tabs (Identity / Layout / Transform / Visibility / Properties) so it is
-  not a crowded wall of controls.
+  min/max widths. The line thickens on hover so it is easy to find.
+- The right sidebar defaults narrower, is resizable, collapses to a rail, and
+  groups the inspector into tabs (Identity / Layout / Transform / Visibility /
+  Properties) so it is not a crowded wall of controls. The tab strip scrolls
+  with the wheel or a middle-button drag.
 
 ### 4.6 Document panel and background import
 
 - A Document panel edits `canvas` and `background`, which the inspector does not
-  currently expose.
+  currently expose. The background asset is a read-only path field with an
+  import button; color, scrim, and blur live in a separate Backdrop card.
 - Import picks a file, copies it into the asset directory, and sets
   `background.kind` + `asset`.
+- The same picker opens scene documents: its address bar accepts a typed folder
+  or file path, and an extension filter narrows the listing.
 - `SceneBackgroundKind.video` has no renderer yet, so a video import would fall
   back to solid until a `video_player`-based renderer exists.
 
@@ -156,5 +171,4 @@ All planned batches are implemented. Remaining work is listed under Deferred.
 - Trackball: orbit first, arcball only if needed.
 - Video background renderer.
 - Grid-snap behavior details.
-- A better right-sidebar arrangement if one emerges.
 - Languages beyond English.

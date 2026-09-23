@@ -163,6 +163,9 @@ class _EditorScreenState extends State<EditorScreen> {
     if (!await _confirmDiscard()) {
       return;
     }
+    if (!mounted) {
+      return;
+    }
     final current = _controller.path;
     final file = await pickFile(
       context,
@@ -204,6 +207,17 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
+  bool get _settingsAreDark =>
+      editorThemeFor(widget.settings.settings.themeId).palette.brightness ==
+      Brightness.dark;
+
+  void _toggleThemeBrightness() {
+    final settings = widget.settings.settings;
+    widget.settings.update(
+      settings.copyWith(themeId: toggledThemeBrightness(settings.themeId)),
+    );
+  }
+
   void _resizeLeft(double delta) {
     setState(() {
       _leftWidth = (_leftWidth + delta).clamp(_leftMinWidth, _leftMaxWidth);
@@ -241,6 +255,17 @@ class _EditorScreenState extends State<EditorScreen> {
           const SizedBox(width: 8),
           TextButton(onPressed: _open, child: Text(strings.open)),
           TextButton(onPressed: _save, child: Text(strings.save)),
+          IconButton(
+            tooltip: _settingsAreDark
+                ? strings.useLightTheme
+                : strings.useDarkTheme,
+            onPressed: _toggleThemeBrightness,
+            icon: Icon(
+              _settingsAreDark
+                  ? Icons.light_mode_outlined
+                  : Icons.dark_mode_outlined,
+            ),
+          ),
           if (!_rightCollapsed)
             IconButton(
               tooltip: strings.collapseInspector,

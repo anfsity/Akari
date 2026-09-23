@@ -43,6 +43,10 @@ class EnglishStrings extends EditorStrings {
   String get collapseInspector => 'Collapse inspector';
   @override
   String get expandInspector => 'Expand inspector';
+  @override
+  String get useLightTheme => 'Use light theme';
+  @override
+  String get useDarkTheme => 'Use dark theme';
 
   @override
   String get addNode => 'Add node';
@@ -231,8 +235,6 @@ class EnglishStrings extends EditorStrings {
   String get files => 'Files';
   @override
   String get defaultScenePath => 'Default scene path';
-  @override
-  String get settingsLivePreview => 'Live preview';
   @override
   String get resetToDefaults => 'Reset to defaults';
   @override

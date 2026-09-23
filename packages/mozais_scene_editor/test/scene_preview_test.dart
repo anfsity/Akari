@@ -29,6 +29,12 @@ const _scene = '''
       "id": "backdrop",
       "kind": "glassPanel",
       "rect": {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2}
+    },
+    {
+      "id": "hidden",
+      "kind": "glassPanel",
+      "rect": {"x": 0.6, "y": 0.1, "width": 0.2, "height": 0.2},
+      "visibleWhen": "isDormant"
     }
   ]
 }
@@ -92,6 +98,33 @@ void main() {
     return origin & size;
   }
 
+  Future<void> pumpInteractivePreview(WidgetTester tester) async {
+    await tester.pumpWidget(
+      EditorStringsScope(
+        strings: const EnglishStrings(),
+        child: EditorSettingsScope(
+          controller: settings,
+          child: MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 450,
+                child: ListenableBuilder(
+                  listenable: controller,
+                  builder: (context, _) => ScenePreview(
+                    controller: controller,
+                    feature: feature,
+                    mode: PreviewMode.outline,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   testWidgets('dragging inside the node moves it', (tester) async {
     await pumpPreview(tester);
     final preview = previewRect(tester);
@@ -150,6 +183,36 @@ void main() {
     await pumpPreview(tester);
     final preview = previewRect(tester);
 
+    await tester.tapAt(
+      preview.topLeft + Offset(preview.width * 0.2, preview.height * 0.2),
+    );
+    await tester.pump();
+
+    expect(controller.selectedNodeId, 'backdrop');
+  });
+
+  testWidgets('hides the selection overlay for an invisible node', (
+    tester,
+  ) async {
+    await pumpInteractivePreview(tester);
+
+    controller.select('hidden');
+    await tester.pump();
+    expect(find.byKey(const ValueKey('selectionOverlay')), findsNothing);
+
+    controller.select('panel');
+    await tester.pump();
+    expect(find.byKey(const ValueKey('selectionOverlay')), findsOneWidget);
+  });
+
+  testWidgets('clicking picks a visible node while a hidden one is selected', (
+    tester,
+  ) async {
+    await pumpInteractivePreview(tester);
+    final preview = previewRect(tester);
+
+    controller.select('hidden');
+    await tester.pump();
     await tester.tapAt(
       preview.topLeft + Offset(preview.width * 0.2, preview.height * 0.2),
     );

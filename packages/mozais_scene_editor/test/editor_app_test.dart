@@ -8,6 +8,7 @@ import 'package:mozais_scene_editor/src/editor_settings_controller.dart';
 import 'package:mozais_scene_editor/src/editor_settings_scope.dart';
 import 'package:mozais_scene_editor/src/editor_settings_store.dart';
 import 'package:mozais_scene_editor/src/editor_strings.dart';
+import 'package:mozais_scene_editor/src/editor_theme.dart';
 import 'package:mozais_scene_editor/src/english_strings.dart';
 import 'package:mozais_scene_editor/src/inspector_panel.dart';
 
@@ -47,17 +48,26 @@ void main() {
     directory.deleteSync(recursive: true);
   });
 
-  testWidgets('collapses and expands the inspector', (tester) async {
+  Future<void> pumpEditor(WidgetTester tester) async {
     await tester.pumpWidget(
       EditorSettingsScope(
         controller: settings,
         child: EditorStringsScope(
           strings: const EnglishStrings(),
-          child: MaterialApp(home: EditorScreen(settings: settings)),
+          child: MaterialApp(
+            home: ListenableBuilder(
+              listenable: settings,
+              builder: (context, _) => EditorScreen(settings: settings),
+            ),
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('collapses and expands the inspector', (tester) async {
+    await pumpEditor(tester);
 
     expect(find.byType(InspectorPanel), findsOneWidget);
 
@@ -68,5 +78,25 @@ void main() {
     await tester.tap(find.byTooltip('Expand inspector'));
     await tester.pumpAndSettle();
     expect(find.byType(InspectorPanel), findsOneWidget);
+  });
+
+  testWidgets('toggles between light and dark themes', (tester) async {
+    await pumpEditor(tester);
+
+    await tester.tap(find.byTooltip('Use light theme'));
+    await tester.pumpAndSettle();
+
+    expect(
+      editorThemeFor(settings.settings.themeId).palette.brightness,
+      Brightness.light,
+    );
+
+    await tester.tap(find.byTooltip('Use dark theme'));
+    await tester.pumpAndSettle();
+
+    expect(
+      editorThemeFor(settings.settings.themeId).palette.brightness,
+      Brightness.dark,
+    );
   });
 }
