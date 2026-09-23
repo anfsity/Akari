@@ -68,13 +68,7 @@ class _NodeListPanelState extends State<NodeListPanel> {
             itemCount: nodes.length,
             itemBuilder: (context, index) {
               final node = nodes[index];
-              return ListTile(
-                dense: true,
-                selected: node.id == widget.controller.selectedNodeId,
-                title: Text(node.id),
-                subtitle: Text(node.kind.name),
-                onTap: () => widget.controller.select(node.id),
-              );
+              return _NodeTile(controller: widget.controller, node: node);
             },
           ),
         ),
@@ -91,6 +85,73 @@ class _NodeListPanelState extends State<NodeListPanel> {
   }
 }
 
+class _NodeTile extends StatefulWidget {
+  const _NodeTile({required this.controller, required this.node});
+
+  final SceneEditorController controller;
+  final SceneNode node;
+
+  @override
+  State<_NodeTile> createState() => _NodeTileState();
+}
+
+class _NodeTileState extends State<_NodeTile> {
+  late bool _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = _isSelected;
+    widget.controller.selectionListenable.addListener(_handleSelectionChanged);
+  }
+
+  @override
+  void didUpdateWidget(_NodeTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.selectionListenable.removeListener(
+        _handleSelectionChanged,
+      );
+      widget.controller.selectionListenable.addListener(
+        _handleSelectionChanged,
+      );
+    }
+    final selected = _isSelected;
+    if (selected != _selected) {
+      _selected = selected;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.selectionListenable.removeListener(
+      _handleSelectionChanged,
+    );
+    super.dispose();
+  }
+
+  bool get _isSelected => widget.node.id == widget.controller.selectedNodeId;
+
+  void _handleSelectionChanged() {
+    final selected = _isSelected;
+    if (selected == _selected) {
+      return;
+    }
+    setState(() => _selected = selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      dense: true,
+      selected: _selected,
+      title: Text(widget.node.id),
+      subtitle: Text(widget.node.kind.name),
+      onTap: () => widget.controller.select(widget.node.id),
+    );
+  }
+}
+
 class _PredicateToggles extends StatelessWidget {
   const _PredicateToggles({required this.controller});
 
@@ -98,31 +159,36 @@ class _PredicateToggles extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final strings = EditorStringsScope.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            strings.activePredicates,
-            style: Theme.of(context).textTheme.labelLarge,
-          ),
-          const SizedBox(height: 4),
-          Wrap(
-            spacing: 4,
-            runSpacing: 4,
+    return ListenableBuilder(
+      listenable: controller.predicatesListenable,
+      builder: (context, _) {
+        final strings = EditorStringsScope.of(context);
+        return Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final predicate in ScenePredicate.values)
-                FilterChip(
-                  label: Text(strings.predicateLabel(predicate)),
-                  selected: controller.activePredicates.contains(predicate),
-                  onSelected: (_) => controller.togglePredicate(predicate),
-                ),
+              Text(
+                strings.activePredicates,
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  for (final predicate in ScenePredicate.values)
+                    FilterChip(
+                      label: Text(strings.predicateLabel(predicate)),
+                      selected: controller.activePredicates.contains(predicate),
+                      onSelected: (_) => controller.togglePredicate(predicate),
+                    ),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

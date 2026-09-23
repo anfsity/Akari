@@ -343,7 +343,6 @@ class _EditorScreenState extends State<EditorScreen> {
                   child: ListenableBuilder(
                     listenable: Listenable.merge([
                       _controller.nodesListenable,
-                      _controller.selectionListenable,
                       _controller.documentListenable,
                     ]),
                     builder: (context, _) =>
@@ -371,7 +370,6 @@ class _EditorScreenState extends State<EditorScreen> {
                       child: ListenableBuilder(
                         listenable: Listenable.merge([
                           _controller.documentListenable,
-                          _controller.selectionListenable,
                           _controller.predicatesListenable,
                         ]),
                         builder: (context, _) => ScenePreview(
