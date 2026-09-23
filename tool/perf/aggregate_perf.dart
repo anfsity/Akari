@@ -17,6 +17,9 @@ Future<void> main(List<String> arguments) async {
   final phaseSamples = {
     for (final phase in reportedPhases) phase: <FrameMetricSample>[],
   };
+  final actionResponseSamples = {
+    for (final phase in measuredInteractionPhases) phase: <FrameMetricSample>[],
+  };
   var observedFrameCount = 0;
   var unmatchedFrameCount = 0;
   var maxPhaseMatchDeltaMs = 0.0;
@@ -39,6 +42,23 @@ Future<void> main(List<String> arguments) async {
       }
       phaseSamples[phase]!.addAll(
         _readFrameSamples(phaseReport, 'frame_samples', phase),
+      );
+    }
+    final actionResponseFrames = report['action_response_frames'];
+    if (actionResponseFrames is! Map<String, dynamic>) {
+      throw const FormatException(
+        'A report is missing action response frame data.',
+      );
+    }
+    for (final phase in measuredInteractionPhases) {
+      final phaseReport = actionResponseFrames[phase];
+      if (phaseReport is! Map<String, dynamic>) {
+        throw FormatException(
+          'A report is missing $phase action response frame data.',
+        );
+      }
+      actionResponseSamples[phase]!.addAll(
+        _readFrameSamples(phaseReport, 'frame_samples', '$phase action'),
       );
     }
 
@@ -88,6 +108,13 @@ Future<void> main(List<String> arguments) async {
     ),
     'phases': {
       for (final entry in phaseSamples.entries)
+        entry.key: summarizeFrameSamples(
+          entry.value,
+          frameBudgetMs: frameBudget.toDouble(),
+        ),
+    },
+    'action_response_frames': {
+      for (final entry in actionResponseSamples.entries)
         entry.key: summarizeFrameSamples(
           entry.value,
           frameBudgetMs: frameBudget.toDouble(),

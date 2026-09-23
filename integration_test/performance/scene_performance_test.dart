@@ -25,13 +25,17 @@ void main() {
   testWidgets('captures scene interaction frame timings', (tester) async {
     final interactionTimings = <FrameTiming>[];
     final phaseTimings = <String, List<FrameTiming>>{'startup': []};
-    final phaseAtFrameStart = <int, String>{};
+    final phaseAtFrameStart = <int, ({String phase, bool actionResponse})>{};
+    final actionResponseTimings = {
+      for (final phase in measuredInteractionPhases) phase: <FrameTiming>[],
+    };
     var engineEpochOffset = 0;
     var unmatchedFrameCount = 0;
     var timingFrameCount = 0;
     var maxPhaseMatchDeltaMicros = 0;
     var activePhase = 'startup';
     var captureFramePhases = true;
+    var captureActionResponseFrame = false;
     void onFrame(Duration timestamp) {
       if (captureFramePhases) {
         final engineTimestamp =
@@ -39,7 +43,11 @@ void main() {
         // Scheduler frame times are epoch-adjusted; FrameTiming keeps engine time.
         engineEpochOffset =
             engineTimestamp.inMicroseconds - timestamp.inMicroseconds;
-        phaseAtFrameStart[timestamp.inMicroseconds] = activePhase;
+        phaseAtFrameStart[timestamp.inMicroseconds] = (
+          phase: activePhase,
+          actionResponse: captureActionResponseFrame,
+        );
+        captureActionResponseFrame = false;
       }
     }
 
@@ -51,13 +59,15 @@ void main() {
         );
         final adjustedVsyncStart = vsyncStart - engineEpochOffset;
         String? phase;
+        var actionResponseFrame = false;
         var matchDeltaMicros = _maxPhaseMatchDeltaMicros + 1;
         // Linux timestamps can differ by about one display interval.
         for (final entry in phaseAtFrameStart.entries) {
           final delta = (entry.key - adjustedVsyncStart).abs();
           if (delta < matchDeltaMicros) {
             matchDeltaMicros = delta;
-            phase = entry.value;
+            phase = entry.value.phase;
+            actionResponseFrame = entry.value.actionResponse;
           }
         }
         if (phase == null) {
@@ -68,8 +78,11 @@ void main() {
           maxPhaseMatchDeltaMicros = matchDeltaMicros;
         }
         phaseTimings.putIfAbsent(phase, () => []).add(timing);
-        if (phase != 'startup' && phase != 'settled_idle') {
+        if (measuredInteractionPhases.contains(phase)) {
           interactionTimings.add(timing);
+        }
+        if (actionResponseFrame) {
+          actionResponseTimings[phase]?.add(timing);
         }
       }
     }
@@ -80,6 +93,9 @@ void main() {
     ) async {
       activePhase = phase;
       await interaction();
+      captureActionResponseFrame = true;
+      await tester.pump(_frameInterval);
+      captureActionResponseFrame = false;
       await tester.pumpAndSettle(_frameInterval);
       await Future<void>.delayed(const Duration(milliseconds: 150));
     }
@@ -166,6 +182,10 @@ void main() {
       'phases': {
         for (final phase in reportedPhases)
           phase: _summarize(phaseTimings[phase] ?? const <FrameTiming>[]),
+      },
+      'action_response_frames': {
+        for (final phase in measuredInteractionPhases)
+          phase: _summarize(actionResponseTimings[phase]!),
       },
       'phase_match': {
         'unmatched_frame_count': unmatchedFrameCount,
