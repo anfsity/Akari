@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 
 import 'editor_controller.dart';
@@ -244,127 +245,176 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   Widget build(BuildContext context) {
     final strings = EditorStringsScope.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(strings.appTitle),
-        actions: [
-          ListenableBuilder(
-            listenable: _controller.operationListenable,
-            builder: (context, _) {
-              final enabled = !_controller.opening && !_controller.saving;
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 420,
-                    child: TextField(
-                      controller: _pathController,
-                      enabled: enabled,
-                      decoration: InputDecoration(
-                        hintText: strings.pathHint,
-                        isDense: true,
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyS, control: true): _save,
+        const SingleActivator(LogicalKeyboardKey.keyS, meta: true): _save,
+        const SingleActivator(LogicalKeyboardKey.keyO, control: true): _open,
+        const SingleActivator(LogicalKeyboardKey.keyO, meta: true): _open,
+        const SingleActivator(LogicalKeyboardKey.delete): _deleteSelectedNode,
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          titleSpacing: 16,
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 10),
+              Text(strings.appTitle),
+            ],
+          ),
+          actions: [
+            ListenableBuilder(
+              listenable: _controller.operationListenable,
+              builder: (context, _) {
+                final enabled = !_controller.opening && !_controller.saving;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 420,
+                      child: TextField(
+                        controller: _pathController,
+                        enabled: enabled,
+                        decoration: InputDecoration(
+                          hintText: strings.pathHint,
+                          isDense: true,
+                        ),
+                        onChanged: _controller.setPath,
                       ),
-                      onChanged: _controller.setPath,
                     ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: enabled ? _open : null,
+                      child: Text(strings.open),
+                    ),
+                    TextButton(
+                      onPressed: enabled ? _save : null,
+                      child: Text(strings.save),
+                    ),
+                  ],
+                );
+              },
+            ),
+            IconButton(
+              tooltip: _settingsAreDark
+                  ? strings.useLightTheme
+                  : strings.useDarkTheme,
+              onPressed: _toggleThemeBrightness,
+              icon: Icon(
+                _settingsAreDark
+                    ? Icons.light_mode_outlined
+                    : Icons.dark_mode_outlined,
+              ),
+            ),
+            if (!_rightCollapsed)
+              IconButton(
+                tooltip: strings.collapseInspector,
+                onPressed: _toggleRight,
+                icon: const Icon(Icons.chevron_right),
+              ),
+            IconButton(
+              tooltip: strings.settings,
+              onPressed: _openSettings,
+              icon: const Icon(Icons.settings_outlined),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: Row(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                border: Border(
+                  right: BorderSide(color: Theme.of(context).dividerColor),
+                ),
+              ),
+              child: SizedBox(
+                width: _leftWidth,
+                child: ListenableBuilder(
+                  listenable: Listenable.merge([
+                    _controller.nodesListenable,
+                    _controller.selectionListenable,
+                    _controller.documentListenable,
+                  ]),
+                  builder: (context, _) =>
+                      NodeListPanel(controller: _controller),
+                ),
+              ),
+            ),
+            PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeLeft),
+            Expanded(
+              child: Column(
+                children: [
+                  _PreviewToolbar(
+                    mode: _previewMode,
+                    onChanged: (mode) => setState(() => _previewMode = mode),
+                    interacting: _interacting,
+                    onInteractingChanged: (value) =>
+                        setState(() => _interacting = value),
                   ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: enabled ? _open : null,
-                    child: Text(strings.open),
-                  ),
-                  TextButton(
-                    onPressed: enabled ? _save : null,
-                    child: Text(strings.save),
+                  Expanded(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                      ),
+                      child: ListenableBuilder(
+                        listenable: Listenable.merge([
+                          _controller.documentListenable,
+                          _controller.selectionListenable,
+                          _controller.predicatesListenable,
+                        ]),
+                        builder: (context, _) => ScenePreview(
+                          controller: _controller,
+                          feature: _greeterFeature,
+                          mode: _previewMode,
+                          interacting: _interacting,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
-              );
-            },
-          ),
-          IconButton(
-            tooltip: _settingsAreDark
-                ? strings.useLightTheme
-                : strings.useDarkTheme,
-            onPressed: _toggleThemeBrightness,
-            icon: Icon(
-              _settingsAreDark
-                  ? Icons.light_mode_outlined
-                  : Icons.dark_mode_outlined,
+              ),
             ),
-          ),
-          if (!_rightCollapsed)
-            IconButton(
-              tooltip: strings.collapseInspector,
-              onPressed: _toggleRight,
-              icon: const Icon(Icons.chevron_right),
-            ),
-          IconButton(
-            tooltip: strings.settings,
-            onPressed: _openSettings,
-            icon: const Icon(Icons.settings_outlined),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Row(
-        children: [
-          SizedBox(
-            width: _leftWidth,
-            child: ListenableBuilder(
-              listenable: Listenable.merge([
-                _controller.nodesListenable,
-                _controller.selectionListenable,
-              ]),
-              builder: (context, _) => NodeListPanel(controller: _controller),
-            ),
-          ),
-          PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeLeft),
-          Expanded(
-            child: Column(
-              children: [
-                _PreviewToolbar(
-                  mode: _previewMode,
-                  onChanged: (mode) => setState(() => _previewMode = mode),
-                  interacting: _interacting,
-                  onInteractingChanged: (value) =>
-                      setState(() => _interacting = value),
-                ),
-                Expanded(
-                  child: ListenableBuilder(
-                    listenable: Listenable.merge([
-                      _controller.documentListenable,
-                      _controller.selectionListenable,
-                      _controller.predicatesListenable,
-                    ]),
-                    builder: (context, _) => ScenePreview(
-                      controller: _controller,
-                      feature: _greeterFeature,
-                      mode: _previewMode,
-                      interacting: _interacting,
+            if (_rightCollapsed)
+              _CollapsedInspector(
+                tooltip: strings.expandInspector,
+                onExpand: _toggleRight,
+              )
+            else ...[
+              PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeRight),
+              SizedBox(
+                width: _rightWidth,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                    border: Border(
+                      left: BorderSide(color: Theme.of(context).dividerColor),
                     ),
                   ),
+                  child: InspectorPanel(controller: _controller),
                 ),
-              ],
-            ),
-          ),
-          if (_rightCollapsed)
-            _CollapsedInspector(
-              tooltip: strings.expandInspector,
-              onExpand: _toggleRight,
-            )
-          else ...[
-            PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeRight),
-            SizedBox(
-              width: _rightWidth,
-              child: InspectorPanel(controller: _controller),
-            ),
+              ),
+            ],
           ],
-        ],
-      ),
-      bottomNavigationBar: ListenableBuilder(
-        listenable: _controller.statusListenable,
-        builder: (context, _) => _StatusBar(controller: _controller),
+        ),
+        bottomNavigationBar: ListenableBuilder(
+          listenable: _controller.statusListenable,
+          builder: (context, _) => _StatusBar(controller: _controller),
+        ),
       ),
     );
+  }
+
+  void _deleteSelectedNode() {
+    if (_controller.selectedNode != null) {
+      _controller.deleteSelected();
+    }
   }
 }
 
@@ -382,9 +432,7 @@ class _CollapsedInspector extends StatelessWidget {
     return Container(
       width: 36,
       decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(color: Theme.of(context).dividerColor),
-        ),
+        border: Border(left: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: IconButton(
         tooltip: tooltip,

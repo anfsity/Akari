@@ -57,9 +57,9 @@ class _ScenePreviewState extends State<ScenePreview> {
     if (document == null) {
       return Center(child: Text(EditorStringsScope.of(context).previewEmpty));
     }
-    final aspectRatio = EditorSettingsScope.of(
-      context,
-    ).settings.previewAspectRatio;
+    final aspectRatio = EditorSettingsScope.of(context)
+        .settings
+        .previewAspectRatio;
     final scene = _sceneFor(context, document);
     final theme = _cachedTheme!;
     final safeArea = document.canvas.useSafeArea
@@ -73,8 +73,7 @@ class _ScenePreviewState extends State<ScenePreview> {
           (constraints.maxHeight - size.height) / 2,
         );
         final selected = widget.controller.selectedNode;
-        final selectedVisible =
-            selected != null && _isNodeVisible(selected);
+        final selectedVisible = selected != null && _isNodeVisible(selected);
         return Stack(
           children: [
             Positioned(
@@ -442,7 +441,8 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     final geometry = _geometry;
     return MouseRegion(
       cursor: _cursorFor(_hoverRegion),
-      onHover: (event) => _updateHover(_toCanvas(event.localPosition), geometry),
+      onHover: (event) =>
+          _updateHover(_toCanvas(event.localPosition), geometry),
       onExit: (_) => _setHover(_DragRegion.none),
       child: Listener(
         onPointerDown: (event) {
@@ -476,8 +476,7 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
   Offset _toCanvas(Offset position) => position - widget.canvasOrigin;
 
   _DragRegion _regionAt(Offset position, _OverlayGeometry geometry) {
-    if ((position - geometry.rotationDot).distance <=
-        _rotationDotRadius + 6) {
+    if ((position - geometry.rotationDot).distance <= _rotationDotRadius + 6) {
       return _DragRegion.rotateZ;
     }
     if ((position - geometry.trackball).distance <= _trackballRadius) {
@@ -563,8 +562,8 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     if (geometry.availableWidth <= 0 || geometry.availableHeight <= 0) {
       return;
     }
-    final localDelta = geometry.toLocal(position) -
-        geometry.toLocal(_startPointer);
+    final localDelta =
+        geometry.toLocal(position) - geometry.toLocal(_startPointer);
     final startWidth = geometry.availableWidth * _startRect.width;
     final startHeight = geometry.availableHeight * _startRect.height;
     final maxWidth = 1.0 - _startRect.x;
@@ -674,7 +673,19 @@ class _SelectionPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_SelectionPainter oldDelegate) => true;
+  bool shouldRepaint(_SelectionPainter oldDelegate) {
+    if (canvasOrigin != oldDelegate.canvasOrigin) {
+      return true;
+    }
+    return geometry.baseRect != oldDelegate.geometry.baseRect ||
+        geometry.topLeft != oldDelegate.geometry.topLeft ||
+        geometry.topRight != oldDelegate.geometry.topRight ||
+        geometry.bottomRight != oldDelegate.geometry.bottomRight ||
+        geometry.bottomLeft != oldDelegate.geometry.bottomLeft ||
+        geometry.rotationDot != oldDelegate.geometry.rotationDot ||
+        geometry.trackball != oldDelegate.geometry.trackball ||
+        geometry.resizeHandle != oldDelegate.geometry.resizeHandle;
+  }
 }
 
 void _drawDashedLine(
