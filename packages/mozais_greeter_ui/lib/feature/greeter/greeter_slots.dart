@@ -12,7 +12,10 @@ class GreeterSceneSlots {
     required this.power,
   });
 
-  factory GreeterSceneSlots.fromState(GreeterState state) {
+  factory GreeterSceneSlots.fromState(
+    GreeterState state, {
+    bool? canSelectUser,
+  }) {
     return GreeterSceneSlots(
       service: (mode: state.serviceMode, error: state.serviceError),
       authPrompt: (
@@ -27,6 +30,7 @@ class GreeterSceneSlots {
       accountPicker: AccountPickerSlots(
         users: state.users,
         selected: state.selectedUser,
+        canSelect: canSelectUser ?? (state.authMode == AuthMode.userSelection),
       ),
       sessionPicker: SessionPickerSlots(
         mode: state.catalogMode,
@@ -56,21 +60,26 @@ typedef AuthPromptSlots = ({
 });
 
 class AccountPickerSlots {
-  AccountPickerSlots({required List<UserSummary> users, required this.selected})
-    : users = List.unmodifiable(users);
+  AccountPickerSlots({
+    required List<UserSummary> users,
+    required this.selected,
+    this.canSelect = false,
+  }) : users = List.unmodifiable(users);
 
   final List<UserSummary> users;
   final UserSummary? selected;
+  final bool canSelect;
 
   @override
   bool operator ==(Object other) {
     return other is AccountPickerSlots &&
         listEquals(other.users, users) &&
-        other.selected == selected;
+        other.selected == selected &&
+        other.canSelect == canSelect;
   }
 
   @override
-  int get hashCode => Object.hash(Object.hashAll(users), selected);
+  int get hashCode => Object.hash(Object.hashAll(users), selected, canSelect);
 }
 
 class SessionPickerSlots {

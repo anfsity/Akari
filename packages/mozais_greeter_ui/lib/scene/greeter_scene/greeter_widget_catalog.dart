@@ -365,8 +365,9 @@ class _AccountAvatar extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               customBorder: const CircleBorder(),
-              onTap: () =>
-                  _showAccountPicker(context, account, tokens, onSelect),
+              onTap: account.canSelect
+                  ? () => _showAccountPicker(context, account, tokens, onSelect)
+                  : null,
               child: Center(
                 child: selected == null
                     ? Icon(Icons.person_outline, size: 40, color: accent)
