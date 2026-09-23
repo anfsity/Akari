@@ -22,7 +22,6 @@ Future<void> main(List<String> arguments) async {
   };
   var observedFrameCount = 0;
   var unmatchedFrameCount = 0;
-  var maxPhaseMatchDeltaMs = 0.0;
   var staticBackgroundFrames = 0.0;
   final cycleSummaries = <Map<String, Object?>>[];
 
@@ -83,11 +82,12 @@ Future<void> main(List<String> arguments) async {
     if (match is! Map<String, dynamic>) {
       throw const FormatException('A report is missing frame match data.');
     }
-    unmatchedFrameCount += _readNumber(match, 'unmatched_frame_count').toInt();
-    final delta = _readNumber(match, 'max_delta_ms');
-    if (delta > maxPhaseMatchDeltaMs) {
-      maxPhaseMatchDeltaMs = delta.toDouble();
+    if (match['matching_method'] != 'frame_number') {
+      throw const FormatException(
+        'A report does not use exact frame-number matching.',
+      );
     }
+    unmatchedFrameCount += _readNumber(match, 'unmatched_frame_count').toInt();
     final staticFrames = _readNumber(
       report,
       'static_background_scheduled_frames',
@@ -121,9 +121,9 @@ Future<void> main(List<String> arguments) async {
         ),
     },
     'phase_match': {
+      'matching_method': 'frame_number',
       'unmatched_frame_count': unmatchedFrameCount,
       'matched_frame_count': observedFrameCount - unmatchedFrameCount,
-      'max_delta_ms': maxPhaseMatchDeltaMs,
     },
     'static_background_scheduled_frames': staticBackgroundFrames,
   };

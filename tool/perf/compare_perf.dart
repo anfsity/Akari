@@ -171,6 +171,9 @@ Future<void> main(List<String> arguments) async {
       phaseMatch is! Map<String, dynamic>) {
     failures.add('candidate is missing observed frame phase match data');
   } else {
+    if (phaseMatch['matching_method'] != 'frame_number') {
+      failures.add('candidate does not use exact frame-number matching');
+    }
     final unmatchedFrameCount = _readNumber(
       phaseMatch,
       'unmatched_frame_count',

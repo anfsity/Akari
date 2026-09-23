@@ -42,13 +42,10 @@ Future<void> main(List<String> arguments) async {
     final phaseBuildScopes = phaseEvents
         .where((event) => event.name == 'BUILD')
         .toList();
-    if (phaseBuildScopes.isEmpty) {
-      throw FormatException('${phase.name} contains no Flutter BUILD events.');
-    }
     stdout.writeln(
       '${phase.name}: UI BUILD scopes ${phaseBuildScopes.length}; '
-      'p95 ${_percentile(phaseBuildScopes, 0.95).toStringAsFixed(2)} ms; '
-      'max ${_maximum(phaseBuildScopes).toStringAsFixed(2)} ms',
+      'p95 ${(phaseBuildScopes.isEmpty ? 0.0 : _percentile(phaseBuildScopes, 0.95)).toStringAsFixed(2)} ms; '
+      'max ${(phaseBuildScopes.isEmpty ? 0.0 : _maximum(phaseBuildScopes)).toStringAsFixed(2)} ms',
     );
 
     final widgetBuilds = phaseEvents

@@ -385,45 +385,47 @@ class _AccountAvatar extends StatelessWidget {
   }
 }
 
-Future<void> _showAccountPicker(
+void _showAccountPicker(
   BuildContext context,
   AccountPickerSlots account,
   ThemeTokens tokens,
   ValueChanged<UserSummary> onSelect,
-) async {
-  final selected = await showDialog<UserSummary>(
-    context: context,
-    builder: (context) {
-      final accent = Theme.of(context).colorScheme.primary;
-      return Dialog(
-        backgroundColor: tokens.surfaceColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: BorderSide(color: tokens.surfaceVariantColor),
-        ),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 260, maxHeight: 320),
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.all(10),
-            children: [
-              for (final user in account.users)
-                _UserTile(
-                  user: user,
-                  selected: account.selected?.id == user.id,
-                  accent: accent,
-                  tokens: tokens,
-                  onTap: () => Navigator.of(context).pop(user),
-                ),
-            ],
+) {
+  unawaited(
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        final accent = Theme.of(context).colorScheme.primary;
+        return Dialog(
+          backgroundColor: tokens.surfaceColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(color: tokens.surfaceVariantColor),
           ),
-        ),
-      );
-    },
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 260, maxHeight: 320),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(10),
+              children: [
+                for (final user in account.users)
+                  _UserTile(
+                    user: user,
+                    selected: account.selected?.id == user.id,
+                    accent: accent,
+                    tokens: tokens,
+                    onTap: () {
+                      onSelect(user);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
   );
-  if (selected != null) {
-    onSelect(selected);
-  }
 }
 
 class _AccountAvatarImage extends StatelessWidget {
@@ -614,32 +616,33 @@ class _SessionMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
+    final menuItems = [
+      for (final item in session.sessions)
+        PopupMenuItem<SessionSummary>(
+          value: item,
+          onTap: () => onSelect(item),
+          child: Row(
+            children: [
+              Icon(
+                session.selected?.id == item.id
+                    ? Icons.check_circle
+                    : Icons.desktop_windows_outlined,
+                size: 18,
+                color: session.selected?.id == item.id ? accent : null,
+              ),
+              const SizedBox(width: 12),
+              Text(item.name),
+            ],
+          ),
+        ),
+    ];
     return LayoutBuilder(
       builder: (context, constraints) {
         return PopupMenuButton<SessionSummary>(
           tooltip: 'Choose a session',
-          onSelected: onSelect,
           position: PopupMenuPosition.under,
           constraints: BoxConstraints(minWidth: constraints.maxWidth),
-          itemBuilder: (context) => [
-            for (final item in session.sessions)
-              PopupMenuItem(
-                value: item,
-                child: Row(
-                  children: [
-                    Icon(
-                      session.selected?.id == item.id
-                          ? Icons.check_circle
-                          : Icons.desktop_windows_outlined,
-                      size: 18,
-                      color: session.selected?.id == item.id ? accent : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(item.name),
-                  ],
-                ),
-              ),
-          ],
+          itemBuilder: (context) => menuItems,
           child: _PillSurface(
             tokens: tokens,
             child: Row(
@@ -705,20 +708,49 @@ class _CredentialField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = auth.mode == AuthMode.prompting;
-    final secret = auth.prompt?.kind == PromptKind.secret;
-    return TextField(
-      controller: controller,
-      focusNode: focusNode,
-      enabled: enabled,
-      // The node stays mounted through its exit transition after the prompt is
-      // cleared, so never reveal a response once the field stops accepting it.
-      obscureText: secret || !enabled,
-      textInputAction: TextInputAction.done,
-      textAlign: TextAlign.center,
-      textAlignVertical: TextAlignVertical.center,
-      style: const TextStyle(color: Colors.white, fontSize: 18),
-      decoration: InputDecoration(
-        hintText: enabled ? auth.prompt?.text ?? 'Password' : 'Enter Password',
+    final hintText = auth.mode == AuthMode.prompting
+        ? auth.prompt?.text ?? 'Password'
+        : 'Enter Password';
+    final inputTheme = InputDecorationTheme.of(context);
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, child) {
+        final border = !enabled
+            ? inputTheme.disabledBorder ?? inputTheme.border
+            : focusNode.hasFocus
+            ? inputTheme.focusedBorder ?? inputTheme.enabledBorder
+            : inputTheme.enabledBorder;
+        final borderRadius = border is OutlineInputBorder
+            ? border.borderRadius
+            : BorderRadius.zero;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: inputTheme.fillColor,
+            borderRadius: borderRadius,
+            border: Border.fromBorderSide(
+              border?.borderSide ?? BorderSide.none,
+            ),
+          ),
+          child: child,
+        );
+      },
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        enabled: enabled,
+        // Never reveal a response while the prompt is disabled or exiting.
+        obscureText: auth.prompt?.kind == PromptKind.secret || !enabled,
+        textInputAction: TextInputAction.done,
+        textAlign: TextAlign.center,
+        textAlignVertical: TextAlignVertical.center,
+        style: const TextStyle(color: Colors.white, fontSize: 18),
+        decoration: InputDecoration(
+          hintText: hintText,
+          border: InputBorder.none,
+          filled: false,
+          contentPadding: inputTheme.contentPadding,
+          isDense: inputTheme.isDense,
+        ),
       ),
     );
   }
@@ -777,9 +809,7 @@ class _PrimaryAction extends StatelessWidget {
             padding: EdgeInsets.zero,
             backgroundColor: colorScheme.primary,
             foregroundColor: colorScheme.onPrimary,
-            disabledBackgroundColor: colorScheme.primary.withValues(
-              alpha: 0.4,
-            ),
+            disabledBackgroundColor: colorScheme.primary.withValues(alpha: 0.4),
             disabledForegroundColor: colorScheme.onPrimary.withValues(
               alpha: 0.5,
             ),

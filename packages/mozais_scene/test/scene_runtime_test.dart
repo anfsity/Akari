@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mozais_scene/mozais_scene.dart';
@@ -133,6 +134,111 @@ void main() {
     expect(find.text('gated'), findsOneWidget);
   });
 
+  testWidgets('prewarms hidden node layout when enabled', (tester) async {
+    final document = _document(
+      nodes: const [
+        SceneNode(
+          id: 'gated',
+          kind: SceneNodeKind.decoration,
+          rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
+          visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_runtime(document, prewarmHiddenNodes: true));
+    expect(find.text('gated'), findsOneWidget);
+
+    await tester.pumpWidget(
+      _runtime(
+        document,
+        activePredicates: const {ScenePredicate.isDormant},
+        prewarmHiddenNodes: true,
+      ),
+    );
+    expect(find.text('gated'), findsOneWidget);
+  });
+
+  testWidgets('updates prewarmed visibility from its predicate listenable', (
+    tester,
+  ) async {
+    final document = _document(
+      nodes: const [
+        SceneNode(
+          id: 'gated',
+          kind: SceneNodeKind.decoration,
+          rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
+          visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
+        ),
+      ],
+    );
+    final activePredicates = ValueNotifier<Set<ScenePredicate>>({});
+
+    await tester.pumpWidget(
+      _runtime(
+        document,
+        activePredicatesListenable: activePredicates,
+        prewarmHiddenNodes: true,
+      ),
+    );
+    final gated = find.text('gated');
+    expect(gated.hitTestable(), findsNothing);
+
+    activePredicates.value = const {ScenePredicate.isDormant};
+    await tester.pump();
+    expect(gated.hitTestable(), findsOneWidget);
+
+    activePredicates.dispose();
+  });
+
+  testWidgets('reuses the prewarmed node subtree on visibility changes', (
+    tester,
+  ) async {
+    final document = _document(
+      nodes: const [
+        SceneNode(
+          id: 'gated',
+          kind: SceneNodeKind.decoration,
+          rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
+          visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
+        ),
+      ],
+    );
+    final predicates = ValueNotifier<Set<ScenePredicate>>({});
+    var buildCount = 0;
+    final theme = ThemeBundle(
+      id: 'test',
+      tokens: _tokens(),
+      document: document,
+      backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SceneRuntime(
+            document: document,
+            theme: theme,
+            activePredicates: predicates.value,
+            activePredicatesListenable: predicates,
+            prewarmHiddenNodes: true,
+            nodeBuilder: (context, node) {
+              buildCount++;
+              return Text(node.id);
+            },
+          ),
+        ),
+      ),
+    );
+    expect(buildCount, 1);
+
+    predicates.value = const {ScenePredicate.isDormant};
+    await tester.pump();
+    expect(buildCount, 1);
+
+    predicates.dispose();
+  });
+
   testWidgets('keeps a node mounted through its exit transition', (
     tester,
   ) async {
@@ -189,6 +295,8 @@ SceneDocument _document({required List<SceneNode> nodes}) {
 Widget _runtime(
   SceneDocument document, {
   Set<ScenePredicate> activePredicates = const <ScenePredicate>{},
+  ValueListenable<Set<ScenePredicate>>? activePredicatesListenable,
+  bool prewarmHiddenNodes = false,
 }) {
   final theme = ThemeBundle(
     id: 'test',
@@ -200,6 +308,8 @@ Widget _runtime(
     document,
     theme,
     activePredicates: activePredicates,
+    activePredicatesListenable: activePredicatesListenable,
+    prewarmHiddenNodes: prewarmHiddenNodes,
   );
 }
 
@@ -207,7 +317,9 @@ Widget _runtimeWithTheme(
   SceneDocument document,
   ThemeBundle theme, {
   Set<ScenePredicate> activePredicates = const <ScenePredicate>{},
+  ValueListenable<Set<ScenePredicate>>? activePredicatesListenable,
   double? backgroundBlurSigma,
+  bool prewarmHiddenNodes = false,
 }) {
   return MaterialApp(
     home: Scaffold(
@@ -215,6 +327,8 @@ Widget _runtimeWithTheme(
         document: document,
         theme: theme,
         activePredicates: activePredicates,
+        activePredicatesListenable: activePredicatesListenable,
+        prewarmHiddenNodes: prewarmHiddenNodes,
         backgroundBlurSigma: backgroundBlurSigma == null
             ? null
             : AlwaysStoppedAnimation<double>(backgroundBlurSigma),

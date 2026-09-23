@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
@@ -17,7 +18,9 @@ class SceneRuntime extends StatelessWidget {
     required this.theme,
     required this.nodeBuilder,
     this.activePredicates = const <ScenePredicate>{},
+    this.activePredicatesListenable,
     this.backgroundBlurSigma,
+    this.prewarmHiddenNodes = false,
     super.key,
   });
 
@@ -31,11 +34,19 @@ class SceneRuntime extends StatelessWidget {
   /// condition evaluates true against this set.
   final Set<ScenePredicate> activePredicates;
 
+  /// Notifies only affected node hosts when [activePredicates] changes.
+  final ValueListenable<Set<ScenePredicate>>? activePredicatesListenable;
+
   /// Drives an override of the document background's blur when set.
   ///
   /// A host uses this to ramp the frost as the scene becomes active; null
   /// keeps the blur authored in the document.
   final Animation<double>? backgroundBlurSigma;
+
+  /// Builds and lays out hidden nodes before they become visible.
+  ///
+  /// Hidden nodes remain excluded from pointer, focus, and semantics handling.
+  final bool prewarmHiddenNodes;
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +106,11 @@ class SceneRuntime extends StatelessWidget {
 
     Widget child = _SceneNodeHost(
       visible: visible,
+      activePredicatesListenable: visibleWhen == null
+          ? null
+          : activePredicatesListenable,
+      visibleWhen: visibleWhen,
+      prewarmHiddenNodes: prewarmHiddenNodes,
       motionBuilder: theme.motionBuilder(node.motion),
       spec: (
         preset: node.motion,
@@ -139,18 +155,23 @@ class SceneRuntime extends StatelessWidget {
 /// Owns one node's presence lifecycle.
 ///
 /// The controller runs from 0 (hidden) to 1 (shown) and follows [visible].
-/// When the node leaves the scene the runtime keeps it mounted until the exit
-/// transition settles, then unmounts it so stateful content such as the clock
-/// timer stops.
+/// By default, a hidden node is unmounted after its exit transition. Hosts can
+/// keep it mounted and laid out to avoid building its subtree on demand.
 class _SceneNodeHost extends StatefulWidget {
   const _SceneNodeHost({
     required this.visible,
+    required this.activePredicatesListenable,
+    required this.visibleWhen,
+    required this.prewarmHiddenNodes,
     required this.motionBuilder,
     required this.spec,
     required this.builder,
   });
 
   final bool visible;
+  final ValueListenable<Set<ScenePredicate>>? activePredicatesListenable;
+  final SceneCondition? visibleWhen;
+  final bool prewarmHiddenNodes;
   final SceneMotionBuilder? motionBuilder;
   final SceneMotionSpec spec;
   final WidgetBuilder builder;
@@ -163,6 +184,8 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late Animation<double> _progress;
+  late bool _visible;
+  Widget? _prewarmedChild;
 
   bool get _animates =>
       widget.motionBuilder != null &&
@@ -173,6 +196,10 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
   @override
   void initState() {
     super.initState();
+    _visible = widget.visible;
+    widget.activePredicatesListenable?.addListener(
+      _handleActivePredicatesChanged,
+    );
     _controller = AnimationController(
       vsync: this,
       duration: widget.spec.duration,
@@ -191,25 +218,69 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
   @override
   void didUpdateWidget(_SceneNodeHost oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.builder != oldWidget.builder) {
+      _prewarmedChild = null;
+    }
+    if (widget.activePredicatesListenable !=
+        oldWidget.activePredicatesListenable) {
+      oldWidget.activePredicatesListenable?.removeListener(
+        _handleActivePredicatesChanged,
+      );
+      widget.activePredicatesListenable?.addListener(
+        _handleActivePredicatesChanged,
+      );
+    }
     if (widget.spec.curve != oldWidget.spec.curve) {
       _progress = _controller.drive(CurveTween(curve: widget.spec.curve));
     }
     if (widget.spec.duration != oldWidget.spec.duration) {
       _controller.duration = widget.spec.duration;
     }
-    if (widget.visible != oldWidget.visible) {
-      if (!_animates) {
-        _controller.value = widget.visible ? 1 : 0;
-      } else if (widget.visible) {
-        _controller.forward();
-      } else {
-        _controller.reverse();
-      }
+    final predicates = widget.activePredicatesListenable;
+    final condition = widget.visibleWhen;
+    final nextVisible = predicates != null && condition != null
+        ? evaluateSceneCondition(condition, predicates.value)
+        : widget.visible;
+    if (nextVisible != _visible) {
+      _setVisible(nextVisible);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _prewarmedChild = null;
+  }
+
+  void _handleActivePredicatesChanged() {
+    final condition = widget.visibleWhen;
+    if (condition == null) {
+      return;
+    }
+    final visible = evaluateSceneCondition(
+      condition,
+      widget.activePredicatesListenable!.value,
+    );
+    if (visible != _visible) {
+      setState(() => _setVisible(visible));
+    }
+  }
+
+  void _setVisible(bool visible) {
+    _visible = visible;
+    if (!_animates) {
+      _controller.value = visible ? 1 : 0;
+    } else if (visible) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
     }
   }
 
   void _handleStatus(AnimationStatus status) {
-    if (status == AnimationStatus.dismissed && !widget.visible) {
+    if (status == AnimationStatus.dismissed &&
+        !_visible &&
+        !widget.prewarmHiddenNodes) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {});
@@ -220,6 +291,9 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
 
   @override
   void dispose() {
+    widget.activePredicatesListenable?.removeListener(
+      _handleActivePredicatesChanged,
+    );
     _controller.removeStatusListener(_handleStatus);
     _controller.dispose();
     super.dispose();
@@ -228,20 +302,43 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
   @override
   Widget build(BuildContext context) {
     if (!_animates) {
-      return widget.visible ? widget.builder(context) : const SizedBox.shrink();
+      if (_visible) {
+        return _buildChild(context);
+      }
+      if (!widget.prewarmHiddenNodes) {
+        return const SizedBox.shrink();
+      }
+      return _hideFromInteraction(
+        Opacity(opacity: 0, child: _buildChild(context)),
+      );
     }
-    if (!widget.visible && _controller.status == AnimationStatus.dismissed) {
+    if (!_visible &&
+        _controller.status == AnimationStatus.dismissed &&
+        !widget.prewarmHiddenNodes) {
       return const SizedBox.shrink();
     }
     final animated = widget.motionBuilder!.build(
       context,
       widget.spec,
       _progress,
-      widget.builder(context),
+      _buildChild(context),
     );
-    if (widget.visible) {
+    if (_visible) {
       return animated;
     }
-    return IgnorePointer(child: ExcludeFocus(child: animated));
+    return _hideFromInteraction(animated);
+  }
+
+  Widget _hideFromInteraction(Widget child) {
+    return IgnorePointer(
+      child: ExcludeFocus(child: ExcludeSemantics(child: child)),
+    );
+  }
+
+  Widget _buildChild(BuildContext context) {
+    if (!widget.prewarmHiddenNodes) {
+      return widget.builder(context);
+    }
+    return _prewarmedChild ??= widget.builder(context);
   }
 }
