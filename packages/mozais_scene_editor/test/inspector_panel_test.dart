@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mozais_scene_editor/src/editor_controller.dart';
@@ -69,4 +70,46 @@ void main() {
 
     expect(find.text('kind'), findsOneWidget);
   });
+
+  testWidgets('scrolls the tab strip with the wheel', (tester) async {
+    await pump(tester);
+    final position = _tabScrollPosition(tester);
+    final before = position.pixels;
+
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: tester.getCenter(find.byType(TabBar)),
+        scrollDelta: const Offset(0, 80),
+      ),
+    );
+    await tester.pump();
+
+    expect(position.pixels, greaterThan(before));
+  });
+
+  testWidgets('scrolls the tab strip with a middle-button drag', (
+    tester,
+  ) async {
+    await pump(tester);
+    final position = _tabScrollPosition(tester);
+    final before = position.pixels;
+
+    await tester.dragFrom(
+      tester.getCenter(find.byType(TabBar)),
+      const Offset(-80, 0),
+      buttons: kMiddleMouseButton,
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+
+    expect(position.pixels, greaterThan(before));
+  });
+}
+
+ScrollPosition _tabScrollPosition(WidgetTester tester) {
+  final scrollable = find.descendant(
+    of: find.byType(TabBar),
+    matching: find.byType(Scrollable),
+  );
+  return tester.state<ScrollableState>(scrollable).position;
 }

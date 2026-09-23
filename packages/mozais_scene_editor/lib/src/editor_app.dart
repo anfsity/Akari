@@ -79,6 +79,7 @@ class _EditorScreenState extends State<EditorScreen> {
   PreviewMode _previewMode = PreviewMode.outline;
   double _leftWidth = 240;
   double _rightWidth = 300;
+  bool _rightCollapsed = false;
 
   static const _leftMinWidth = 160.0;
   static const _leftMaxWidth = 420.0;
@@ -196,6 +197,10 @@ class _EditorScreenState extends State<EditorScreen> {
     });
   }
 
+  void _toggleRight() {
+    setState(() => _rightCollapsed = !_rightCollapsed);
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = EditorStringsScope.of(context);
@@ -217,6 +222,12 @@ class _EditorScreenState extends State<EditorScreen> {
           const SizedBox(width: 8),
           TextButton(onPressed: _open, child: Text(strings.open)),
           TextButton(onPressed: _save, child: Text(strings.save)),
+          if (!_rightCollapsed)
+            IconButton(
+              tooltip: strings.collapseInspector,
+              onPressed: _toggleRight,
+              icon: const Icon(Icons.chevron_right),
+            ),
           IconButton(
             tooltip: strings.settings,
             onPressed: _openSettings,
@@ -251,11 +262,18 @@ class _EditorScreenState extends State<EditorScreen> {
                 ],
               ),
             ),
-            PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeRight),
-            SizedBox(
-              width: _rightWidth,
-              child: InspectorPanel(controller: _controller),
-            ),
+            if (_rightCollapsed)
+              _CollapsedInspector(
+                tooltip: strings.expandInspector,
+                onExpand: _toggleRight,
+              )
+            else ...[
+              PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeRight),
+              SizedBox(
+                width: _rightWidth,
+                child: InspectorPanel(controller: _controller),
+              ),
+            ],
           ],
         ),
       ),
@@ -268,6 +286,32 @@ class _EditorScreenState extends State<EditorScreen> {
 }
 
 enum _UnsavedChoice { save, discard, cancel }
+
+/// The narrow rail shown while the inspector is collapsed.
+class _CollapsedInspector extends StatelessWidget {
+  const _CollapsedInspector({required this.tooltip, required this.onExpand});
+
+  final String tooltip;
+  final VoidCallback onExpand;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 36,
+      decoration: BoxDecoration(
+        border: Border(
+          left: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onExpand,
+        padding: EdgeInsets.zero,
+        icon: const Icon(Icons.chevron_left),
+      ),
+    );
+  }
+}
 
 class _PreviewToolbar extends StatelessWidget {
   const _PreviewToolbar({required this.mode, required this.onChanged});

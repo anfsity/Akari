@@ -24,6 +24,11 @@ const _scene = '''
       "id": "panel",
       "kind": "glassPanel",
       "rect": {"x": 0.5, "y": 0.5, "width": 0.2, "height": 0.2}
+    },
+    {
+      "id": "backdrop",
+      "kind": "glassPanel",
+      "rect": {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2}
     }
   ]
 }
@@ -141,9 +146,57 @@ void main() {
     expect(transform.rotationX, lessThan(0));
   });
 
+  testWidgets('clicking another node selects it', (tester) async {
+    await pumpPreview(tester);
+    final preview = previewRect(tester);
+
+    await tester.tapAt(
+      preview.topLeft + Offset(preview.width * 0.2, preview.height * 0.2),
+    );
+    await tester.pump();
+
+    expect(controller.selectedNodeId, 'backdrop');
+  });
+
   testWidgets('real mode embeds the greeter adapter', (tester) async {
     await pumpPreview(tester, mode: PreviewMode.real);
 
     expect(find.byType(GreeterSceneAdapter), findsOneWidget);
+  });
+
+  testWidgets('keeps the embedded scene when only the selection changes', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      EditorStringsScope(
+        strings: const EnglishStrings(),
+        child: EditorSettingsScope(
+          controller: settings,
+          child: MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 450,
+                child: ListenableBuilder(
+                  listenable: controller,
+                  builder: (context, _) => ScenePreview(
+                    controller: controller,
+                    feature: feature,
+                    mode: PreviewMode.outline,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final before = tester.widget<SceneRuntime>(find.byType(SceneRuntime));
+    controller.select('panel');
+    await tester.pump();
+    final after = tester.widget<SceneRuntime>(find.byType(SceneRuntime));
+
+    expect(identical(before, after), isTrue);
   });
 }

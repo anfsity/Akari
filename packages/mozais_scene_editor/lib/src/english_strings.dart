@@ -39,6 +39,10 @@ class EnglishStrings extends EditorStrings {
   String get outline => 'Outline';
   @override
   String get real => 'Real';
+  @override
+  String get collapseInspector => 'Collapse inspector';
+  @override
+  String get expandInspector => 'Expand inspector';
 
   @override
   String get addNode => 'Add node';
