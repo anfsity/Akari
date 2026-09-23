@@ -149,7 +149,12 @@ or scripts.
 - focus-order metadata.
 - background renderer selection and fallback.
 - motion component lifecycle, including enter and exit transitions.
-- repaint boundaries only where an animated or complex layer needs one.
+- one repaint boundary per scene node, so each authored visual component paints
+  independently from the rest of the scene.
+
+Widgets inside a scene node share that node's paint boundary. Add nested
+boundaries only when profiling shows that a complex child needs independent
+repainting.
 
 A node whose `visibleWhen` becomes false stays mounted until its exit
 transition settles and is then unmounted, so stateful content such as the

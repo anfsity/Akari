@@ -4,6 +4,66 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mozais_scene/mozais_scene.dart';
 
 void main() {
+  testWidgets('isolates each scene node behind its own repaint boundary', (
+    tester,
+  ) async {
+    final document = _document(
+      nodes: const [
+        SceneNode(
+          id: 'static',
+          kind: SceneNodeKind.decoration,
+          rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
+        ),
+        SceneNode(
+          id: 'animated',
+          kind: SceneNodeKind.decoration,
+          rect: SceneRect(x: 0.4, y: 0.1, width: 0.2, height: 0.2),
+          motion: SceneMotionPreset.fade,
+        ),
+      ],
+    );
+    final theme = ThemeBundle(
+      id: 'test',
+      tokens: _tokens(),
+      document: document,
+      backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
+      motions: const {SceneMotionPreset.fade: FadeMotionBuilder()},
+    );
+    const rootBoundaryKey = ValueKey('root-boundary');
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: RepaintBoundary(
+          key: rootBoundaryKey,
+          child: SizedBox(
+            width: 400,
+            height: 300,
+            child: SceneRuntime(
+              document: document,
+              theme: theme,
+              nodeBuilder: (context, node) =>
+                  Text(node.id, key: ValueKey(node.id)),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    for (final id in ['static', 'animated']) {
+      final nearestBoundary = find
+          .ancestor(
+            of: find.byKey(ValueKey(id)),
+            matching: find.byType(RepaintBoundary),
+          )
+          .first;
+      expect(
+        tester.widget<RepaintBoundary>(nearestBoundary).key,
+        isNot(rootBoundaryKey),
+      );
+    }
+  });
+
   testWidgets('paints nodes in explicit render order', (tester) async {
     final document = _document(
       nodes: const [
