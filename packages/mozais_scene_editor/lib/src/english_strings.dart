@@ -131,9 +131,15 @@ class EnglishStrings extends EditorStrings {
   @override
   String get importBackground => 'Import background';
   @override
+  String get backdrop => 'Backdrop';
+  @override
   String get chooseFile => 'Choose file';
   @override
   String get goUp => 'Up';
+  @override
+  String get directoryHint => 'Type a folder or file path';
+  @override
+  String get pathNotFound => 'No file or folder at that path.';
   @override
   String get backgroundColor => 'color';
   @override

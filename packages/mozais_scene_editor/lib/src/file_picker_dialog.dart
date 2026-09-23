@@ -6,18 +6,39 @@ import 'editor_strings.dart';
 
 /// A minimal, dependency-free file browser for the desktop editor.
 ///
-/// Returns the chosen file, or null when the dialog is dismissed.
-Future<File?> pickFile(BuildContext context, {Directory? initialDirectory}) {
+/// [initialDirectory] defaults to the user's home directory. When
+/// [extensions] is non-empty, only files with a matching extension (without
+/// the leading dot, case-insensitive) are listed. Returns the chosen file, or
+/// null when the dialog is dismissed.
+Future<File?> pickFile(
+  BuildContext context, {
+  Directory? initialDirectory,
+  Set<String> extensions = const {},
+}) {
   return showDialog<File>(
     context: context,
-    builder: (context) => _FilePickerDialog(initialDirectory: initialDirectory),
+    builder: (context) => _FilePickerDialog(
+      initialDirectory: initialDirectory ?? homeDirectory(),
+      extensions: extensions,
+    ),
   );
 }
 
+/// The user's home directory, or null when it cannot be resolved.
+Directory? homeDirectory() {
+  final home = Platform.environment['HOME'];
+  if (home == null || home.isEmpty) {
+    return null;
+  }
+  final directory = Directory(home);
+  return directory.existsSync() ? directory : null;
+}
+
 class _FilePickerDialog extends StatefulWidget {
-  const _FilePickerDialog({this.initialDirectory});
+  const _FilePickerDialog({this.initialDirectory, this.extensions = const {}});
 
   final Directory? initialDirectory;
+  final Set<String> extensions;
 
   @override
   State<_FilePickerDialog> createState() => _FilePickerDialogState();
@@ -25,6 +46,7 @@ class _FilePickerDialog extends StatefulWidget {
 
 class _FilePickerDialogState extends State<_FilePickerDialog> {
   late Directory _directory;
+  late final TextEditingController _pathController;
   List<FileSystemEntity> _entries = const [];
   String? _error;
 
@@ -32,7 +54,14 @@ class _FilePickerDialogState extends State<_FilePickerDialog> {
   void initState() {
     super.initState();
     _directory = widget.initialDirectory ?? Directory.current;
+    _pathController = TextEditingController(text: _directory.path);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _pathController.dispose();
+    super.dispose();
   }
 
   void _load() {
@@ -49,7 +78,7 @@ class _FilePickerDialogState extends State<_FilePickerDialog> {
           );
         });
       setState(() {
-        _entries = entries;
+        _entries = entries.where(_isVisible).toList();
         _error = null;
       });
     } on Object catch (error) {
@@ -60,8 +89,24 @@ class _FilePickerDialogState extends State<_FilePickerDialog> {
     }
   }
 
+  bool _isVisible(FileSystemEntity entity) {
+    if (entity is Directory) {
+      return true;
+    }
+    if (widget.extensions.isEmpty) {
+      return true;
+    }
+    final name = _name(entity);
+    final dot = name.lastIndexOf('.');
+    if (dot < 0) {
+      return false;
+    }
+    return widget.extensions.contains(name.substring(dot + 1).toLowerCase());
+  }
+
   void _open(Directory directory) {
     _directory = directory;
+    _pathController.text = directory.path;
     _load();
   }
 
@@ -72,6 +117,24 @@ class _FilePickerDialogState extends State<_FilePickerDialog> {
     }
   }
 
+  void _submitPath(String value) {
+    final path = value.trim();
+    if (path.isEmpty) {
+      return;
+    }
+    final directory = Directory(path);
+    if (directory.existsSync()) {
+      _open(directory);
+      return;
+    }
+    final file = File(path);
+    if (file.existsSync()) {
+      Navigator.of(context).pop(file);
+      return;
+    }
+    setState(() => _error = EditorStringsScope.of(context).pathNotFound);
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = EditorStringsScope.of(context);
@@ -79,7 +142,7 @@ class _FilePickerDialogState extends State<_FilePickerDialog> {
       title: Text(strings.chooseFile),
       content: SizedBox(
         width: 560,
-        height: 420,
+        height: 440,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -91,9 +154,13 @@ class _FilePickerDialogState extends State<_FilePickerDialog> {
                   icon: const Icon(Icons.arrow_upward),
                 ),
                 Expanded(
-                  child: Text(
-                    _directory.path,
-                    overflow: TextOverflow.ellipsis,
+                  child: TextField(
+                    controller: _pathController,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: strings.directoryHint,
+                    ),
+                    onSubmitted: _submitPath,
                   ),
                 ),
               ],
