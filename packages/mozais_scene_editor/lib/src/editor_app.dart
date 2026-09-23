@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'editor_settings_scope.dart';
 import 'editor_status.dart';
 import 'editor_strings.dart';
 import 'editor_theme.dart';
+import 'file_picker_dialog.dart';
 import 'inspector_panel.dart';
 import 'node_list_panel.dart';
 import 'pane_divider.dart';
@@ -101,7 +103,9 @@ class _EditorScreenState extends State<EditorScreen> {
     _controller.setPath(path);
     _pathController.text = path;
     if (path.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_open()));
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => unawaited(_openPath(path)),
+      );
     }
   }
 
@@ -159,6 +163,21 @@ class _EditorScreenState extends State<EditorScreen> {
     if (!await _confirmDiscard()) {
       return;
     }
+    final current = _controller.path;
+    final file = await pickFile(
+      context,
+      initialDirectory: current.isEmpty ? null : File(current).parent,
+      extensions: const {'json'},
+    );
+    if (file == null) {
+      return;
+    }
+    await _openPath(file.path);
+  }
+
+  Future<void> _openPath(String path) async {
+    _controller.setPath(path);
+    _pathController.text = path;
     if (await _controller.open()) {
       _rememberPath();
     }

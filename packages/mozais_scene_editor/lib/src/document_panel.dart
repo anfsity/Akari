@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
@@ -7,6 +5,21 @@ import 'editor_controller.dart';
 import 'editor_strings.dart';
 import 'editor_widgets.dart';
 import 'file_picker_dialog.dart';
+
+const _backgroundExtensions = {
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+  'gif',
+  'bmp',
+  'mp4',
+  'webm',
+  'mkv',
+  'mov',
+  'avi',
+  'm4v',
+};
 
 /// Edits the document-level canvas and background.
 class DocumentPanel extends StatelessWidget {
@@ -63,7 +76,7 @@ class DocumentPanel extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             _AssetRow(controller: controller, background: background),
             if (background.kind == SceneBackgroundKind.video)
               Padding(
@@ -73,7 +86,11 @@ class DocumentPanel extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
-            const SizedBox(height: 8),
+          ],
+        ),
+        SectionCard(
+          title: strings.backdrop,
+          children: [
             _ColorField(
               label: strings.backgroundColor,
               value: background.color,
@@ -83,6 +100,7 @@ class DocumentPanel extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 4),
             LabeledSlider(
               label: strings.scrimOpacity,
               value: background.scrimOpacity,
@@ -119,7 +137,10 @@ class _AssetRow extends StatelessWidget {
   final SceneBackground background;
 
   Future<void> _import(BuildContext context) async {
-    final file = await pickFile(context, initialDirectory: _homeDirectory());
+    final file = await pickFile(
+      context,
+      extensions: _backgroundExtensions,
+    );
     if (file != null) {
       await controller.importBackgroundAsset(file);
     }
@@ -128,26 +149,41 @@ class _AssetRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = EditorStringsScope.of(context);
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          strings.backgroundAsset,
+          style: Theme.of(context).textTheme.labelMedium,
+        ),
+        const SizedBox(height: 6),
         Row(
           children: [
-            SizedBox(width: 80, child: Text(strings.backgroundAsset)),
             Expanded(
-              child: Text(
-                background.asset ?? strings.none,
-                overflow: TextOverflow.ellipsis,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: scheme.outlineVariant),
+                ),
+                child: Text(
+                  background.asset ?? strings.none,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              tooltip: strings.importBackground,
+              onPressed: () => _import(context),
+              icon: const Icon(Icons.folder_open),
+            ),
           ],
-        ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: OutlinedButton(
-            onPressed: () => _import(context),
-            child: Text(strings.importBackground),
-          ),
         ),
       ],
     );
@@ -200,15 +236,6 @@ class _ColorField extends StatelessWidget {
       ),
     );
   }
-}
-
-Directory? _homeDirectory() {
-  final home = Platform.environment['HOME'];
-  if (home == null || home.isEmpty) {
-    return null;
-  }
-  final directory = Directory(home);
-  return directory.existsSync() ? directory : null;
 }
 
 int? _parseColor(String text) {

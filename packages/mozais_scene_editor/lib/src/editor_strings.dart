@@ -72,8 +72,11 @@ abstract class EditorStrings {
   String get backgroundKind;
   String get backgroundAsset;
   String get importBackground;
+  String get backdrop;
   String get chooseFile;
   String get goUp;
+  String get directoryHint;
+  String get pathNotFound;
   String get backgroundColor;
   String get scrimOpacity;
   String get blurSigma;
