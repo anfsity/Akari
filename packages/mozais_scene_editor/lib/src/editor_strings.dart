@@ -25,6 +25,7 @@ abstract class EditorStrings {
   String get selectANode;
   String get outline;
   String get real;
+  String get resetPreview;
   String get editMode;
   String get interactMode;
   String get collapseInspector;
@@ -43,6 +44,7 @@ abstract class EditorStrings {
   String get motion;
   String get id;
   String get rectNormalized;
+  String get rectPixels;
   String get x;
   String get y;
   String get width;
@@ -71,6 +73,8 @@ abstract class EditorStrings {
   String get document;
   String get canvas;
   String get canvasFit;
+  String get referenceWidth;
+  String get referenceHeight;
   String get useSafeArea;
   String get background;
   String get backgroundKind;

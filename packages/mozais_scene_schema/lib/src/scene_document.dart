@@ -211,15 +211,29 @@ class SceneTransform {
 }
 
 class SceneCanvas {
-  const SceneCanvas({this.fit = SceneCanvasFit.cover, this.useSafeArea = true});
+  const SceneCanvas({
+    this.fit = SceneCanvasFit.cover,
+    this.useSafeArea = true,
+    this.referenceWidth = 1920,
+    this.referenceHeight = 1080,
+  });
 
   final SceneCanvasFit fit;
   final bool useSafeArea;
+  final int referenceWidth;
+  final int referenceHeight;
 
-  SceneCanvas copyWith({SceneCanvasFit? fit, bool? useSafeArea}) {
+  SceneCanvas copyWith({
+    SceneCanvasFit? fit,
+    bool? useSafeArea,
+    int? referenceWidth,
+    int? referenceHeight,
+  }) {
     return SceneCanvas(
       fit: fit ?? this.fit,
       useSafeArea: useSafeArea ?? this.useSafeArea,
+      referenceWidth: referenceWidth ?? this.referenceWidth,
+      referenceHeight: referenceHeight ?? this.referenceHeight,
     );
   }
 }

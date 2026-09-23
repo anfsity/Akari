@@ -35,6 +35,8 @@ String _generate(SceneDocument document) {
     ..writeln('  canvas: const SceneCanvas(')
     ..writeln('    fit: SceneCanvasFit.${document.canvas.fit.name},')
     ..writeln('    useSafeArea: ${document.canvas.useSafeArea},')
+    ..writeln('    referenceWidth: ${document.canvas.referenceWidth},')
+    ..writeln('    referenceHeight: ${document.canvas.referenceHeight},')
     ..writeln('  ),')
     ..writeln('  background: SceneBackground(')
     ..writeln('    kind: SceneBackgroundKind.${document.background.kind.name},')

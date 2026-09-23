@@ -31,6 +31,16 @@ SceneDocument decodeSceneDocumentMap(Map<String, dynamic> json) {
   }
 
   final canvasJson = _map(json, 'canvas');
+  final referenceWidth = _int(canvasJson, 'referenceWidth', fallback: 1920);
+  final referenceHeight = _int(canvasJson, 'referenceHeight', fallback: 1080);
+  if (referenceWidth < 1 ||
+      referenceWidth > 16384 ||
+      referenceHeight < 1 ||
+      referenceHeight > 16384) {
+    throw const FormatException(
+      'Canvas reference dimensions must be between 1 and 16384 pixels.',
+    );
+  }
   return SceneDocument(
     id: _string(json, 'id'),
     version: version,
@@ -41,6 +51,8 @@ SceneDocument decodeSceneDocumentMap(Map<String, dynamic> json) {
         'canvas.fit',
       ),
       useSafeArea: _bool(canvasJson, 'useSafeArea', fallback: true),
+      referenceWidth: referenceWidth,
+      referenceHeight: referenceHeight,
     ),
     background: _decodeBackground(_map(json, 'background')),
     nodes: nodes,
@@ -60,6 +72,8 @@ Map<String, dynamic> sceneDocumentToMap(SceneDocument document) {
     'canvas': {
       'fit': document.canvas.fit.name,
       'useSafeArea': document.canvas.useSafeArea,
+      'referenceWidth': document.canvas.referenceWidth,
+      'referenceHeight': document.canvas.referenceHeight,
     },
     'background': _encodeBackground(document.background),
     'nodes': [for (final node in document.nodes) _encodeNode(node)],

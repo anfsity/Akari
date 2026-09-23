@@ -40,6 +40,8 @@ class EnglishStrings extends EditorStrings {
   @override
   String get real => 'Real';
   @override
+  String get resetPreview => 'Reset real preview';
+  @override
   String get editMode => 'Edit';
   @override
   String get interactMode => 'Interact';
@@ -73,6 +75,8 @@ class EnglishStrings extends EditorStrings {
   String get id => 'id';
   @override
   String get rectNormalized => 'Rect (normalized)';
+  @override
+  String get rectPixels => 'Exact values';
   @override
   String get x => 'x';
   @override
@@ -128,6 +132,10 @@ class EnglishStrings extends EditorStrings {
   String get canvas => 'Canvas';
   @override
   String get canvasFit => 'fit';
+  @override
+  String get referenceWidth => 'Reference width';
+  @override
+  String get referenceHeight => 'Reference height';
   @override
   String get useSafeArea => 'Use safe area';
   @override
