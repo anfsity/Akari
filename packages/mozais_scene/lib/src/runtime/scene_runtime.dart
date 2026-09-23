@@ -121,10 +121,6 @@ class SceneRuntime extends StatelessWidget {
       builder: (context) =>
           _applyTransform(node, rect.size, nodeBuilder(context, node)),
     );
-    if (node.motion != SceneMotionPreset.none) {
-      child = RepaintBoundary(child: child);
-    }
-
     if (node.isInteractive) {
       child = FocusTraversalOrder(
         order: NumericFocusOrder(node.focusOrder.toDouble()),
@@ -137,7 +133,7 @@ class SceneRuntime extends StatelessWidget {
       top: rect.top,
       width: rect.width,
       height: rect.height,
-      child: child,
+      child: RepaintBoundary(child: child),
     );
   }
 
