@@ -17,3 +17,4 @@ export 'scene/scene_region.dart';
 export 'theme/theme_registry.dart';
 export 'themes/default/theme.dart';
 export 'themes/fallback/theme.dart';
+export 'themes/nocturne/theme.dart';

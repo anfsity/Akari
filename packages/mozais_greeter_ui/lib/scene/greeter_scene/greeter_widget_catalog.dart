@@ -302,6 +302,8 @@ class _GlassPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(theme.tokens.panelRadius);
+    final isNocturne = theme.id == 'nocturne';
+    final scheme = Theme.of(context).colorScheme;
     final panel = DecoratedBox(
       decoration: BoxDecoration(
         color: theme.tokens.glassColor,
@@ -309,24 +311,54 @@ class _GlassPanel extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.055),
+            (isNocturne ? scheme.secondary : Colors.white).withValues(
+              alpha: isNocturne ? 0.13 : 0.055,
+            ),
             Colors.transparent,
-            Colors.black.withValues(alpha: 0.08),
+            (isNocturne ? scheme.primary : Colors.black).withValues(
+              alpha: isNocturne ? 0.08 : 0.08,
+            ),
           ],
           stops: const [0, 0.42, 1],
         ),
         borderRadius: radius,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+        border: Border.all(
+          color: (isNocturne ? scheme.secondary : Colors.white).withValues(
+            alpha: isNocturne ? 0.3 : 0.09,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.42),
-            blurRadius: 34,
-            offset: const Offset(0, 18),
+            color: Colors.black.withValues(alpha: isNocturne ? 0.56 : 0.42),
+            blurRadius: isNocturne ? 24 : 34,
+            offset: Offset(0, isNocturne ? 14 : 18),
           ),
         ],
       ),
       child: child,
     );
+
+    if (isNocturne) {
+      return Stack(
+        clipBehavior: Clip.none,
+        fit: StackFit.expand,
+        children: [
+          Transform.translate(
+            offset: const Offset(8, 10),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: 0.2),
+                borderRadius: radius,
+                border: Border.all(
+                  color: scheme.primary.withValues(alpha: 0.18),
+                ),
+              ),
+            ),
+          ),
+          ClipRRect(borderRadius: radius, child: panel),
+        ],
+      );
+    }
 
     final disableAnimations =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
