@@ -53,6 +53,45 @@ class DocumentPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: LabeledNumberField(
+                    fieldKey: 'canvas.referenceWidth',
+                    label: strings.referenceWidth,
+                    value: document.canvas.referenceWidth.toDouble(),
+                    fractionDigits: 0,
+                    onSubmitted: (value) => controller.updateDocument(
+                      (document) => document.copyWith(
+                        canvas: document.canvas.copyWith(
+                          referenceWidth: value.round().clamp(1, 16384).toInt(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: LabeledNumberField(
+                    fieldKey: 'canvas.referenceHeight',
+                    label: strings.referenceHeight,
+                    value: document.canvas.referenceHeight.toDouble(),
+                    fractionDigits: 0,
+                    onSubmitted: (value) => controller.updateDocument(
+                      (document) => document.copyWith(
+                        canvas: document.canvas.copyWith(
+                          referenceHeight: value
+                              .round()
+                              .clamp(1, 16384)
+                              .toInt(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             SwitchRow(
               label: strings.useSafeArea,
               value: document.canvas.useSafeArea,

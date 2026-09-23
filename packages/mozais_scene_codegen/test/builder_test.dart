@@ -7,7 +7,12 @@ void main() {
 {
   "id": "test",
   "version": 1,
-  "canvas": {"fit": "contain", "useSafeArea": true},
+  "canvas": {
+    "fit": "contain",
+    "useSafeArea": true,
+    "referenceWidth": 2560,
+    "referenceHeight": 1440
+  },
   "background": {"kind": "solid", "color": "#112233"},
   "nodes": [
     {
@@ -22,6 +27,8 @@ void main() {
 ''');
 
     expect(generated, contains('SceneDocument testSceneDocument'));
+    expect(generated, contains('referenceWidth: 2560'));
+    expect(generated, contains('referenceHeight: 1440'));
     expect(generated, contains('SceneNodeKind.primaryAction'));
     expect(generated, contains('SceneAction.beginAuthentication'));
     expect(

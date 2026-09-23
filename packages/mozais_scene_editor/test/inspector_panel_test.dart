@@ -71,6 +71,21 @@ void main() {
     expect(find.text('kind'), findsOneWidget);
   });
 
+  testWidgets('applies exact pixel positions from the layout tab', (
+    tester,
+  ) async {
+    await pump(tester);
+    await tester.tap(find.text('Layout'));
+    await tester.pumpAndSettle();
+
+    final xField = find.byKey(const ValueKey('panel.x:192.0'));
+    await tester.enterText(xField, '384');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    expect(controller.selectedNode!.rect.x, closeTo(0.2, 0.0001));
+  });
+
   testWidgets('scrolls the tab strip with the wheel', (tester) async {
     await pump(tester);
     final position = _tabScrollPosition(tester);

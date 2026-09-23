@@ -68,6 +68,49 @@ class LabeledSlider extends StatelessWidget {
   }
 }
 
+/// A precise numeric field for dimensions that also have a slider control.
+class LabeledNumberField extends StatelessWidget {
+  const LabeledNumberField({
+    required this.fieldKey,
+    required this.label,
+    required this.value,
+    required this.onSubmitted,
+    this.suffix = 'px',
+    this.fractionDigits = 1,
+    super.key,
+  });
+
+  final String fieldKey;
+  final String label;
+  final double value;
+  final ValueChanged<double> onSubmitted;
+  final String suffix;
+  final int fractionDigits;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      key: ValueKey('$fieldKey:${value.toStringAsFixed(fractionDigits)}'),
+      initialValue: value.toStringAsFixed(fractionDigits),
+      decoration: InputDecoration(
+        labelText: label,
+        suffixText: suffix,
+        isDense: true,
+      ),
+      keyboardType: TextInputType.numberWithOptions(
+        decimal: fractionDigits > 0,
+      ),
+      textAlign: TextAlign.end,
+      onFieldSubmitted: (text) {
+        final parsed = double.tryParse(text.trim());
+        if (parsed != null && parsed.isFinite) {
+          onSubmitted(parsed);
+        }
+      },
+    );
+  }
+}
+
 /// A labelled dropdown over an enum's values.
 class EnumDropdown<T extends Enum> extends StatelessWidget {
   const EnumDropdown({

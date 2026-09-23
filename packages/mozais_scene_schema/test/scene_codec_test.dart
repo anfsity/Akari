@@ -5,7 +5,12 @@ const _scene = '''
 {
   "id": "test",
   "version": 1,
-  "canvas": {"fit": "contain", "useSafeArea": true},
+  "canvas": {
+    "fit": "contain",
+    "useSafeArea": true,
+    "referenceWidth": 2560,
+    "referenceHeight": 1440
+  },
   "background": {"kind": "solid", "color": "#112233"},
   "nodes": [
     {
@@ -31,6 +36,8 @@ void main() {
     expect(document.version, 1);
     expect(document.canvas.fit, SceneCanvasFit.contain);
     expect(document.canvas.useSafeArea, isTrue);
+    expect(document.canvas.referenceWidth, 2560);
+    expect(document.canvas.referenceHeight, 1440);
     expect(document.background.kind, SceneBackgroundKind.solid);
     expect(document.background.color, 0xff112233);
 
@@ -74,6 +81,8 @@ void main() {
 ''');
 
     expect(document.canvas.useSafeArea, isTrue);
+    expect(document.canvas.referenceWidth, 1920);
+    expect(document.canvas.referenceHeight, 1080);
     expect(document.background.color, 0xff0d151a);
     expect(document.background.scrimOpacity, 0.35);
 

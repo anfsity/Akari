@@ -100,7 +100,7 @@ void main() {
   testWidgets('edits the background color as hex', (tester) async {
     await pump(tester);
 
-    await tester.enterText(find.byType(TextFormField), '#112233');
+    await tester.enterText(find.byKey(const ValueKey('#0d151a')), '#112233');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
 

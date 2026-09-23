@@ -213,6 +213,46 @@ class _LayoutTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = EditorStringsScope.of(context);
+    final canvas = controller.document!.canvas;
+
+    void updatePixelRect({
+      double? x,
+      double? y,
+      double? width,
+      double? height,
+    }) {
+      controller.updateSelected((node) {
+        final normalizedX = x == null
+            ? node.rect.x
+            : (x / canvas.referenceWidth)
+                  .clamp(0.0, 1.0 - node.rect.width)
+                  .toDouble();
+        final normalizedY = y == null
+            ? node.rect.y
+            : (y / canvas.referenceHeight)
+                  .clamp(0.0, 1.0 - node.rect.height)
+                  .toDouble();
+        final normalizedWidth = width == null
+            ? node.rect.width
+            : (width / canvas.referenceWidth)
+                  .clamp(0.001, 1.0 - normalizedX)
+                  .toDouble();
+        final normalizedHeight = height == null
+            ? node.rect.height
+            : (height / canvas.referenceHeight)
+                  .clamp(0.001, 1.0 - normalizedY)
+                  .toDouble();
+        return node.copyWith(
+          rect: node.rect.copyWith(
+            x: normalizedX,
+            y: normalizedY,
+            width: normalizedWidth,
+            height: normalizedHeight,
+          ),
+        );
+      });
+    }
+
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
@@ -255,6 +295,56 @@ class _LayoutTab extends StatelessWidget {
                 (node) =>
                     node.copyWith(rect: node.rect.copyWith(height: value)),
               ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${strings.rectPixels} (${canvas.referenceWidth} x '
+              '${canvas.referenceHeight})',
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: LabeledNumberField(
+                    fieldKey: '${node.id}.x',
+                    label: strings.x,
+                    value: node.rect.x * canvas.referenceWidth,
+                    onSubmitted: (value) => updatePixelRect(x: value),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: LabeledNumberField(
+                    fieldKey: '${node.id}.y',
+                    label: strings.y,
+                    value: node.rect.y * canvas.referenceHeight,
+                    onSubmitted: (value) => updatePixelRect(y: value),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: LabeledNumberField(
+                    fieldKey: '${node.id}.width',
+                    label: strings.width,
+                    value: node.rect.width * canvas.referenceWidth,
+                    onSubmitted: (value) => updatePixelRect(width: value),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: LabeledNumberField(
+                    fieldKey: '${node.id}.height',
+                    label: strings.height,
+                    value: node.rect.height * canvas.referenceHeight,
+                    onSubmitted: (value) => updatePixelRect(height: value),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
