@@ -35,6 +35,11 @@ const _scene = '''
       "kind": "glassPanel",
       "rect": {"x": 0.6, "y": 0.1, "width": 0.2, "height": 0.2},
       "visibleWhen": "isDormant"
+    },
+    {
+      "id": "top",
+      "kind": "glassPanel",
+      "rect": {"x": 0.1, "y": 0.0, "width": 0.2, "height": 0.1}
     }
   ]
 }
@@ -68,6 +73,7 @@ void main() {
   Future<void> pumpPreview(
     WidgetTester tester, {
     PreviewMode mode = PreviewMode.outline,
+    bool interacting = false,
   }) async {
     await tester.pumpWidget(
       EditorStringsScope(
@@ -83,6 +89,7 @@ void main() {
                   controller: controller,
                   feature: feature,
                   mode: mode,
+                  interacting: interacting,
                 ),
               ),
             ),
@@ -219,6 +226,54 @@ void main() {
     await tester.pump();
 
     expect(controller.selectedNodeId, 'backdrop');
+  });
+
+  testWidgets('rotates a node whose handle sits outside the canvas', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      EditorStringsScope(
+        strings: const EnglishStrings(),
+        child: EditorSettingsScope(
+          controller: settings,
+          child: MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 600,
+                child: ListenableBuilder(
+                  listenable: controller,
+                  builder: (context, _) => ScenePreview(
+                    controller: controller,
+                    feature: feature,
+                    mode: PreviewMode.outline,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    controller.select('top');
+    await tester.pump();
+    final canvas = previewRect(tester);
+
+    // The rotation dot sits 30 logical pixels above the canvas top edge.
+    final dot = Offset(canvas.left + canvas.width * 0.2, canvas.top - 30);
+    await tester.dragFrom(dot, const Offset(30, 0));
+    await tester.pump();
+
+    expect(controller.selectedNode!.transform.rotationZ, greaterThan(0));
+  });
+
+  testWidgets('interact mode removes the selection overlay', (tester) async {
+    await pumpPreview(tester);
+    expect(find.byKey(const ValueKey('selectionOverlay')), findsOneWidget);
+
+    await pumpPreview(tester, interacting: true);
+    expect(find.byKey(const ValueKey('selectionOverlay')), findsNothing);
   });
 
   testWidgets('real mode embeds the greeter adapter', (tester) async {

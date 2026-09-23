@@ -106,4 +106,28 @@ void main() {
 
     expect(controller.document!.background.color, 0xff112233);
   });
+
+  testWidgets('picks a background color from the palette dialog', (
+    tester,
+  ) async {
+    await pump(tester);
+
+    await tester.tap(find.byKey(const ValueKey('colorSwatch')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      '#123456',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    await tester.tap(find.text('Apply'));
+    await tester.pumpAndSettle();
+
+    expect(controller.document!.background.color, 0xff123456);
+  });
 }

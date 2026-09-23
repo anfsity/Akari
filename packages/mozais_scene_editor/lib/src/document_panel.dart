@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
+import 'color_picker_dialog.dart';
 import 'editor_controller.dart';
 import 'editor_strings.dart';
 import 'editor_widgets.dart';
@@ -201,21 +202,34 @@ class _ColorField extends StatelessWidget {
   final int value;
   final ValueChanged<int> onChanged;
 
+  Future<void> _pick(BuildContext context) async {
+    final color = await pickEditorColor(context, initial: value);
+    if (color != null) {
+      onChanged(color);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final hex = encodeSceneColor(value);
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           SizedBox(width: 80, child: Text(label)),
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: Color(value),
-              border: Border.all(color: Theme.of(context).dividerColor),
-              borderRadius: BorderRadius.circular(4),
+          InkWell(
+            key: const ValueKey('colorSwatch'),
+            onTap: () => _pick(context),
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Color(value),
+                border: Border.all(color: scheme.outline),
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
           ),
           const SizedBox(width: 8),

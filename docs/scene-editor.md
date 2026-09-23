@@ -106,6 +106,10 @@ GreeterSceneAdapter(feature: ..., theme: ...)
   Start with orbit mapping (drag delta to rotation); upgrade to a true arcball
   if the feel is not good enough.
 - The cursor changes per region (move / rotate / resize).
+- The overlay covers the whole preview and translates pointer positions into
+  canvas space, so a handle that falls outside the canvas stays grabbable.
+- An **Interact** toggle removes the overlay so the embedded greeter receives
+  pointer events directly for a full interactive preview.
 - Inspector sliders and numeric fields remain for precise values.
 
 ### 4.3 Settings
@@ -146,7 +150,9 @@ When the document is dirty, Open, window close, and switching documents prompt
 
 - A Document panel edits `canvas` and `background`, which the inspector does not
   currently expose. The background asset is a read-only path field with an
-  import button; color, scrim, and blur live in a separate Backdrop card.
+  import button; color, scrim, and blur live in a separate Backdrop card. The
+  color field opens a palette picker with a curated swatch grid and a hex
+  field.
 - Import picks a file, copies it into the asset directory, and sets
   `background.kind` + `asset`.
 - The same picker opens scene documents: its address bar accepts a typed folder

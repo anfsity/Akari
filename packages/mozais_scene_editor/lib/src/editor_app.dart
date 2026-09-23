@@ -79,6 +79,7 @@ class _EditorScreenState extends State<EditorScreen> {
   late final AppLifecycleListener _lifecycleListener;
   late final GreeterFeature _greeterFeature;
   PreviewMode _previewMode = PreviewMode.outline;
+  bool _interacting = false;
   double _leftWidth = 240;
   double _rightWidth = 300;
   bool _rightCollapsed = false;
@@ -280,49 +281,63 @@ class _EditorScreenState extends State<EditorScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: ListenableBuilder(
-        listenable: _controller,
-        builder: (context, _) => Row(
-          children: [
-            SizedBox(
-              width: _leftWidth,
-              child: NodeListPanel(controller: _controller),
+      body: Row(
+        children: [
+          SizedBox(
+            width: _leftWidth,
+            child: ListenableBuilder(
+              listenable: Listenable.merge([
+                _controller.nodesListenable,
+                _controller.selectionListenable,
+              ]),
+              builder: (context, _) => NodeListPanel(controller: _controller),
             ),
-            PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeLeft),
-            Expanded(
-              child: Column(
-                children: [
-                  _PreviewToolbar(
-                    mode: _previewMode,
-                    onChanged: (mode) => setState(() => _previewMode = mode),
-                  ),
-                  Expanded(
-                    child: ScenePreview(
+          ),
+          PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeLeft),
+          Expanded(
+            child: Column(
+              children: [
+                _PreviewToolbar(
+                  mode: _previewMode,
+                  onChanged: (mode) => setState(() => _previewMode = mode),
+                  interacting: _interacting,
+                  onInteractingChanged: (value) =>
+                      setState(() => _interacting = value),
+                ),
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: Listenable.merge([
+                      _controller.documentListenable,
+                      _controller.selectionListenable,
+                      _controller.predicatesListenable,
+                    ]),
+                    builder: (context, _) => ScenePreview(
                       controller: _controller,
                       feature: _greeterFeature,
                       mode: _previewMode,
+                      interacting: _interacting,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            if (_rightCollapsed)
-              _CollapsedInspector(
-                tooltip: strings.expandInspector,
-                onExpand: _toggleRight,
-              )
-            else ...[
-              PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeRight),
-              SizedBox(
-                width: _rightWidth,
-                child: InspectorPanel(controller: _controller),
-              ),
-            ],
+          ),
+          if (_rightCollapsed)
+            _CollapsedInspector(
+              tooltip: strings.expandInspector,
+              onExpand: _toggleRight,
+            )
+          else ...[
+            PaneDivider(dragAxis: Axis.horizontal, onDrag: _resizeRight),
+            SizedBox(
+              width: _rightWidth,
+              child: InspectorPanel(controller: _controller),
+            ),
           ],
-        ),
+        ],
       ),
       bottomNavigationBar: ListenableBuilder(
-        listenable: _controller,
+        listenable: _controller.statusListenable,
         builder: (context, _) => _StatusBar(controller: _controller),
       ),
     );
@@ -358,10 +373,17 @@ class _CollapsedInspector extends StatelessWidget {
 }
 
 class _PreviewToolbar extends StatelessWidget {
-  const _PreviewToolbar({required this.mode, required this.onChanged});
+  const _PreviewToolbar({
+    required this.mode,
+    required this.onChanged,
+    required this.interacting,
+    required this.onInteractingChanged,
+  });
 
   final PreviewMode mode;
   final ValueChanged<PreviewMode> onChanged;
+  final bool interacting;
+  final ValueChanged<bool> onInteractingChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -370,13 +392,33 @@ class _PreviewToolbar extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: SegmentedButton<PreviewMode>(
-          segments: [
-            ButtonSegment(value: PreviewMode.outline, label: Text(strings.outline)),
-            ButtonSegment(value: PreviewMode.real, label: Text(strings.real)),
+        child: Wrap(
+          alignment: WrapAlignment.end,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          children: [
+            IconButton(
+              tooltip: interacting ? strings.editMode : strings.interactMode,
+              isSelected: interacting,
+              onPressed: () => onInteractingChanged(!interacting),
+              icon: const Icon(Icons.touch_app_outlined),
+              selectedIcon: const Icon(Icons.touch_app),
+            ),
+            SegmentedButton<PreviewMode>(
+              segments: [
+                ButtonSegment(
+                  value: PreviewMode.outline,
+                  label: Text(strings.outline),
+                ),
+                ButtonSegment(
+                  value: PreviewMode.real,
+                  label: Text(strings.real),
+                ),
+              ],
+              selected: {mode},
+              onSelectionChanged: (selection) => onChanged(selection.first),
+            ),
           ],
-          selected: {mode},
-          onSelectionChanged: (selection) => onChanged(selection.first),
         ),
       ),
     );

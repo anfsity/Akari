@@ -64,17 +64,18 @@ class _NodeListPanelState extends State<NodeListPanel> {
         ),
         const Divider(height: 1),
         Expanded(
-          child: ListView(
-            children: [
-              for (final node in nodes)
-                ListTile(
-                  dense: true,
-                  selected: node.id == widget.controller.selectedNodeId,
-                  title: Text(node.id),
-                  subtitle: Text(node.kind.name),
-                  onTap: () => widget.controller.select(node.id),
-                ),
-            ],
+          child: ListView.builder(
+            itemCount: nodes.length,
+            itemBuilder: (context, index) {
+              final node = nodes[index];
+              return ListTile(
+                dense: true,
+                selected: node.id == widget.controller.selectedNodeId,
+                title: Text(node.id),
+                subtitle: Text(node.kind.name),
+                onTap: () => widget.controller.select(node.id),
+              );
+            },
           ),
         ),
         PaneDivider(dragAxis: Axis.vertical, onDrag: _resizePredicates),
