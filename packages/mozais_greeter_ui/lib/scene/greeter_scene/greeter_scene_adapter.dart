@@ -53,6 +53,7 @@ class GreeterSceneAdapter extends StatefulWidget {
     required this.feature,
     required this.theme,
     this.handleKeyboard = true,
+    this.exitOnHandoff = true,
     super.key,
   });
 
@@ -64,6 +65,9 @@ class GreeterSceneAdapter extends StatefulWidget {
   /// A host that embeds the greeter beside its own text fields, such as the
   /// scene editor, sets this false so keystrokes are not captured.
   final bool handleKeyboard;
+
+  /// Whether a successful session start closes the host application.
+  final bool exitOnHandoff;
 
   @override
   State<GreeterSceneAdapter> createState() => _GreeterSceneAdapterState();
@@ -365,7 +369,10 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
           if (!mounted) {
             return;
           }
-          ScaffoldMessenger.of(context).showSnackBar(
+          final messenger = ScaffoldMessenger.of(context);
+          messenger.clearSnackBars();
+          messenger.removeCurrentSnackBar();
+          messenger.showSnackBar(
             SnackBar(
               content: Text(message),
               backgroundColor: isError
@@ -375,7 +382,9 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
           );
         });
       case ExitAfterHandoffEffect():
-        unawaited(SystemNavigator.pop());
+        if (widget.exitOnHandoff) {
+          unawaited(SystemNavigator.pop());
+        }
     }
   }
 }

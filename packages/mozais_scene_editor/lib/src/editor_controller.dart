@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
+import 'package:mozais_greeter_ui/theme/palette_extractor.dart';
 import 'package:mozais_scene/mozais_scene.dart';
 
 import 'editor_status.dart';
@@ -411,22 +412,39 @@ String _uniqueAssetName(Directory directory, String name) {
   return '$base-$index$extension';
 }
 
-/// Theme used only to drive the editor preview.
-///
-/// The palette is document-independent, so it is built once; each call only
-/// swaps in the document under edit. Resolves background assets from the
-/// repository root because the editor does not bundle them.
-final ThemeBundle _editorThemeBase = buildDefaultTheme().copyWith(
-  backgrounds: {
-    SceneBackgroundKind.solid: const SolidBackgroundRenderer(),
-    SceneBackgroundKind.image: ImageBackgroundRenderer(
-      resolveImage: (asset) {
-        final file = repoAssetFile(asset);
-        return file == null ? AssetImage(asset) : FileImage(file);
-      },
-    ),
-  },
-);
+/// Resolves the same theme family as the Greeter and points its wallpaper
+/// renderer at repository files that the editor can read directly.
+ThemeBundle editorTheme(SceneDocument document, {Color? seed}) {
+  final resolved = ThemeRegistry.resolveDocument(document, seed: seed);
+  final backgrounds = {...resolved.backgrounds};
+  backgrounds[SceneBackgroundKind.solid] = const SolidBackgroundRenderer();
+  backgrounds[SceneBackgroundKind.image] = ImageBackgroundRenderer(
+    resolveImage: (asset) {
+      final file = repoAssetFile(asset);
+      return file != null && file.existsSync()
+          ? FileImage(file)
+          : AssetImage(asset);
+    },
+  );
+  return resolved.copyWith(document: document, backgrounds: backgrounds);
+}
 
-ThemeBundle editorTheme(SceneDocument document) =>
-    _editorThemeBase.copyWith(document: document);
+Future<Color?> editorBackgroundSeed(SceneDocument document) async {
+  final background = document.background;
+  if (background.kind == SceneBackgroundKind.solid) {
+    return Color(background.color);
+  }
+  final asset = background.asset;
+  if (asset == null) {
+    return null;
+  }
+  final file = repoAssetFile(asset);
+  if (file != null && file.existsSync()) {
+    try {
+      return await extractSeedFromBytes(await file.readAsBytes());
+    } on Object {
+      return null;
+    }
+  }
+  return ThemeRegistry.findBackgroundSeed(editorTheme(document));
+}

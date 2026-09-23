@@ -78,7 +78,7 @@ class _EditorScreenState extends State<EditorScreen> {
   late final SceneEditorController _controller;
   late final TextEditingController _pathController;
   late final AppLifecycleListener _lifecycleListener;
-  late final GreeterFeature _greeterFeature;
+  late GreeterFeature _greeterFeature;
   PreviewMode _previewMode = PreviewMode.outline;
   bool _interacting = false;
   double _leftWidth = 240;
@@ -245,6 +245,16 @@ class _EditorScreenState extends State<EditorScreen> {
     setState(() => _rightCollapsed = !_rightCollapsed);
   }
 
+  void _resetRealPreview() {
+    final previousFeature = _greeterFeature;
+    setState(() {
+      _greeterFeature = GreeterFeature(gateway: DemoGreeterGateway());
+      _interacting = false;
+    });
+    previousFeature.dispose();
+    unawaited(_greeterFeature.initialize());
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = EditorStringsScope.of(context);
@@ -259,16 +269,26 @@ class _EditorScreenState extends State<EditorScreen> {
       child: Scaffold(
         appBar: AppBar(
           titleSpacing: 16,
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.auto_awesome,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 10),
-              Text(strings.appTitle),
-            ],
+          title: LayoutBuilder(
+            builder: (context, constraints) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.auto_awesome,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                if (constraints.maxWidth >= 160) ...[
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      strings.appTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
           actions: [
             ListenableBuilder(
@@ -361,6 +381,7 @@ class _EditorScreenState extends State<EditorScreen> {
                     interacting: _interacting,
                     onInteractingChanged: (value) =>
                         setState(() => _interacting = value),
+                    onReset: _resetRealPreview,
                   ),
                   Expanded(
                     child: DecoratedBox(
@@ -453,12 +474,14 @@ class _PreviewToolbar extends StatelessWidget {
     required this.onChanged,
     required this.interacting,
     required this.onInteractingChanged,
+    required this.onReset,
   });
 
   final PreviewMode mode;
   final ValueChanged<PreviewMode> onChanged;
   final bool interacting;
   final ValueChanged<bool> onInteractingChanged;
+  final VoidCallback onReset;
 
   @override
   Widget build(BuildContext context) {
@@ -479,6 +502,12 @@ class _PreviewToolbar extends StatelessWidget {
               icon: const Icon(Icons.touch_app_outlined),
               selectedIcon: const Icon(Icons.touch_app),
             ),
+            if (mode == PreviewMode.real)
+              IconButton(
+                tooltip: strings.resetPreview,
+                onPressed: onReset,
+                icon: const Icon(Icons.restart_alt),
+              ),
             SegmentedButton<PreviewMode>(
               segments: [
                 ButtonSegment(
