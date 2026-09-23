@@ -132,8 +132,9 @@ Theme selection is compile-time:
 ```
 
 `default` selects the reference-like built-in theme. `fallback` is a minimal
-static theme with no blur or continuous animation. An unknown theme name falls
-back to `fallback`; debug builds assert to surface the configuration error.
+static theme with no blur or continuous animation. `nocturne` is a low-cost
+2.5D theme with layered depth surfaces. An unknown theme name falls back to
+`fallback`; debug builds assert to surface the configuration error.
 
 Theme-specific custom backgrounds and motion implementations are compiled Dart
 extensions registered in `theme.dart`. They are not loaded from external files
