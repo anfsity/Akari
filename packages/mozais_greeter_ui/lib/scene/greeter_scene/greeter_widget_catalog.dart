@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:mozais_scene/mozais_scene.dart';
@@ -303,37 +302,16 @@ class _GlassPanel extends StatelessWidget {
     final radius = BorderRadius.circular(theme.tokens.panelRadius);
     final isNocturne = theme.id == 'nocturne';
     final scheme = Theme.of(context).colorScheme;
-    final panel = DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.tokens.glassColor,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            (isNocturne ? scheme.secondary : Colors.white).withValues(
-              alpha: isNocturne ? 0.13 : 0.055,
-            ),
-            Colors.transparent,
-            (isNocturne ? scheme.primary : Colors.black).withValues(
-              alpha: isNocturne ? 0.08 : 0.08,
-            ),
-          ],
-          stops: const [0, 0.42, 1],
-        ),
+    final panel = Material(
+      color: scheme.surfaceContainerHigh,
+      surfaceTintColor: scheme.surfaceTint,
+      shadowColor: scheme.shadow,
+      elevation: 3,
+      shape: RoundedRectangleBorder(
         borderRadius: radius,
-        border: Border.all(
-          color: (isNocturne ? scheme.secondary : Colors.white).withValues(
-            alpha: isNocturne ? 0.3 : 0.09,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isNocturne ? 0.56 : 0.42),
-            blurRadius: isNocturne ? 24 : 34,
-            offset: Offset(0, isNocturne ? 14 : 18),
-          ),
-        ],
+        side: BorderSide(color: scheme.outlineVariant),
       ),
+      clipBehavior: Clip.antiAlias,
       child: child,
     );
 
@@ -354,27 +332,11 @@ class _GlassPanel extends StatelessWidget {
               ),
             ),
           ),
-          ClipRRect(borderRadius: radius, child: panel),
+          panel,
         ],
       );
     }
-
-    final disableAnimations =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    if (!theme.tokens.allowBlur || disableAnimations) {
-      return ClipRRect(borderRadius: radius, child: panel);
-    }
-
-    return ClipRRect(
-      borderRadius: radius,
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(
-          sigmaX: theme.tokens.blurSigma,
-          sigmaY: theme.tokens.blurSigma,
-        ),
-        child: panel,
-      ),
-    );
+    return panel;
   }
 }
 
@@ -679,6 +641,11 @@ class _SessionMenu extends StatelessWidget {
         return PopupMenuButton<SessionSummary>(
           tooltip: 'Choose a session',
           position: PopupMenuPosition.under,
+          popUpAnimationStyle: const AnimationStyle(
+            duration: Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
           color: scheme.surfaceContainerHigh,
           surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(
