@@ -7,9 +7,6 @@ class ThemeTokens {
     required this.mediumMotion,
     required this.standardCurve,
     required this.minHitTarget,
-    required this.allowBlur,
-    required this.blurSigma,
-    required this.glassColor,
     required this.surfaceColor,
     required this.surfaceVariantColor,
   });
@@ -27,15 +24,6 @@ class ThemeTokens {
 
   /// Minimum touch target enforced for interactive scene nodes.
   final double minHitTarget;
-
-  /// Whether panel surfaces may blur the content behind them.
-  final bool allowBlur;
-
-  /// Gaussian blur sigma for a panel that opts into backdrop blur.
-  final double blurSigma;
-
-  /// Fill for the translucent panel behind the credential card.
-  final Color glassColor;
 
   /// Fill for inset surfaces such as the credential field, avatar fallback,
   /// and session pill.

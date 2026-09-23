@@ -31,7 +31,10 @@ void main() {
       warm.materialTheme.colorScheme.primary,
       isNot(cool.materialTheme.colorScheme.primary),
     );
-    expect(warm.tokens.glassColor, isNot(cool.tokens.glassColor));
+    expect(
+      warm.materialTheme.colorScheme.surfaceContainerHigh,
+      isNot(cool.materialTheme.colorScheme.surfaceContainerHigh),
+    );
   });
 }
 

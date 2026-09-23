@@ -25,6 +25,7 @@ ThemeBundle buildNocturneTheme() {
         onSecondary: _ink,
         surface: _ink,
         onSurface: _text,
+        surfaceContainerHigh: _panel,
         surfaceContainerHighest: _panelRaised,
       );
   return ThemeBundle(
@@ -70,9 +71,6 @@ ThemeBundle buildNocturneTheme() {
       mediumMotion: const Duration(milliseconds: 220),
       standardCurve: Curves.easeOutCubic,
       minHitTarget: 44,
-      allowBlur: false,
-      blurSigma: 0,
-      glassColor: _panel.withValues(alpha: 0.96),
       surfaceColor: _panel,
       surfaceVariantColor: _panelRaised,
     ),

@@ -9,10 +9,17 @@ const _surface = Color(0xff1a242a);
 const _surfaceVariant = Color(0xff26343c);
 
 ThemeBundle buildFallbackTheme() {
-  final colorScheme = ColorScheme.fromSeed(
-    seedColor: _accent,
-    brightness: Brightness.dark,
-  ).copyWith(primary: _accent, onPrimary: _base, surface: _base);
+  final colorScheme =
+      ColorScheme.fromSeed(
+        seedColor: _accent,
+        brightness: Brightness.dark,
+      ).copyWith(
+        primary: _accent,
+        onPrimary: _base,
+        surface: _base,
+        surfaceContainerHigh: _surface,
+        surfaceContainerHighest: _surfaceVariant,
+      );
   return ThemeBundle(
     id: 'fallback',
     tokens: ThemeTokens(
@@ -32,9 +39,6 @@ ThemeBundle buildFallbackTheme() {
       mediumMotion: Duration.zero,
       standardCurve: Curves.linear,
       minHitTarget: 44,
-      allowBlur: false,
-      blurSigma: 0,
-      glassColor: _base.withValues(alpha: 0.86),
       surfaceColor: _surface,
       surfaceVariantColor: _surfaceVariant,
     ),
