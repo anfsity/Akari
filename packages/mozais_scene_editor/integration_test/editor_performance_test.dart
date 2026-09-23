@@ -106,16 +106,22 @@ void main() {
       );
       await tester.pumpAndSettle(const Duration(seconds: 2));
 
+      final capturedMetrics = <String, Object?>{'mode': mode.name};
+
       Future<Map<String, Object?>> measure(
         String label,
-        Future<void> Function(int index) step,
+        void Function(int index) step,
         int iterations,
       ) async {
         final timings = <FrameTiming>[];
+        final actionDurations = <double>[];
         void onTimings(List<FrameTiming> batch) => timings.addAll(batch);
         SchedulerBinding.instance.addTimingsCallback(onTimings);
         for (var i = 0; i < iterations; i++) {
-          await step(i);
+          final stopwatch = Stopwatch()..start();
+          step(i);
+          stopwatch.stop();
+          actionDurations.add(stopwatch.elapsedMicroseconds / 1000);
           await tester.pump(const Duration(milliseconds: 16));
           await Future<void>.delayed(const Duration(milliseconds: 24));
         }
@@ -124,6 +130,8 @@ void main() {
         final report = <String, Object?>{
           'mode': mode.name,
           'case': label,
+          'p50_action_ms': _percentile(actionDurations, 0.50),
+          'p95_action_ms': _percentile(actionDurations, 0.95),
           'p50_build_ms': _percentile(
             measured.map((t) => t.buildDuration.inMicroseconds / 1000),
             0.50,
@@ -144,13 +152,18 @@ void main() {
         };
         // ignore: avoid_print
         print('EDITOR_PERF ${jsonEncode(report)}');
-        binding.reportData = report;
+        for (final entry in report.entries) {
+          if (entry.key != 'mode' && entry.key != 'case') {
+            capturedMetrics['${label}_${entry.key}'] = entry.value;
+          }
+        }
+        binding.reportData = Map<String, Object?>.of(capturedMetrics);
         return report;
       }
 
       final ids = controller.document!.nodes.map((node) => node.id).toList();
 
-      await measure('document-edit', (i) async {
+      await measure('document-edit', (i) {
         controller.updateDocument(
           (document) => document.copyWith(
             background: document.background.copyWith(
@@ -160,17 +173,17 @@ void main() {
         );
       }, 60);
 
-      await measure('selection', (i) async {
+      await measure('selection', (i) {
         controller.select(ids[i % ids.length]);
       }, 120);
 
-      await measure('node-edit', (i) async {
+      await measure('node-edit', (i) {
         controller.updateSelected(
           (node) => node.copyWith(z: i),
         );
       }, 60);
 
-      await measure('predicate', (i) async {
+      await measure('predicate', (i) {
         controller.togglePredicate(ScenePredicate.isDormant);
       }, 60);
 
