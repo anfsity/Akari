@@ -207,7 +207,7 @@ class _LayoutTab extends StatelessWidget {
               label: strings.x,
               value: node.rect.x,
               min: 0,
-              max: 1,
+              max: 1.0 - node.rect.width,
               onChanged: (value) => controller.updateSelected(
                 (node) => node.copyWith(rect: node.rect.copyWith(x: value)),
               ),
@@ -216,7 +216,7 @@ class _LayoutTab extends StatelessWidget {
               label: strings.y,
               value: node.rect.y,
               min: 0,
-              max: 1,
+              max: 1.0 - node.rect.height,
               onChanged: (value) => controller.updateSelected(
                 (node) => node.copyWith(rect: node.rect.copyWith(y: value)),
               ),
@@ -224,8 +224,8 @@ class _LayoutTab extends StatelessWidget {
             LabeledSlider(
               label: strings.width,
               value: node.rect.width,
-              min: 0.01,
-              max: 1,
+              min: node.rect.width < 0.01 ? node.rect.width : 0.01,
+              max: 1.0 - node.rect.x,
               onChanged: (value) => controller.updateSelected(
                 (node) =>
                     node.copyWith(rect: node.rect.copyWith(width: value)),
@@ -234,8 +234,8 @@ class _LayoutTab extends StatelessWidget {
             LabeledSlider(
               label: strings.height,
               value: node.rect.height,
-              min: 0.01,
-              max: 1,
+              min: node.rect.height < 0.01 ? node.rect.height : 0.01,
+              max: 1.0 - node.rect.y,
               onChanged: (value) => controller.updateSelected(
                 (node) =>
                     node.copyWith(rect: node.rect.copyWith(height: value)),

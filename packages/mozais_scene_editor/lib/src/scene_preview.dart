@@ -567,16 +567,16 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
         geometry.toLocal(_startPointer);
     final startWidth = geometry.availableWidth * _startRect.width;
     final startHeight = geometry.availableHeight * _startRect.height;
+    final maxWidth = 1.0 - _startRect.x;
+    final maxHeight = 1.0 - _startRect.y;
     widget.onRectChanged(
       _startRect.copyWith(
-        width: ((startWidth + localDelta.dx) / geometry.availableWidth).clamp(
-          0.02,
-          1.0 - _startRect.x,
-        ),
-        height: ((startHeight + localDelta.dy) / geometry.availableHeight).clamp(
-          0.02,
-          1.0 - _startRect.y,
-        ),
+        width: ((startWidth + localDelta.dx) / geometry.availableWidth)
+            .clamp(math.min(0.02, maxWidth), maxWidth)
+            .toDouble(),
+        height: ((startHeight + localDelta.dy) / geometry.availableHeight)
+            .clamp(math.min(0.02, maxHeight), maxHeight)
+            .toDouble(),
       ),
     );
   }

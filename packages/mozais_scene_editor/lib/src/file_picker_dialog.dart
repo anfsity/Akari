@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -49,13 +50,14 @@ class _FilePickerDialogState extends State<_FilePickerDialog> {
   late final TextEditingController _pathController;
   List<FileSystemEntity> _entries = const [];
   String? _error;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     _directory = widget.initialDirectory ?? Directory.current;
     _pathController = TextEditingController(text: _directory.path);
-    _load();
+    unawaited(_load());
   }
 
   @override
@@ -64,9 +66,11 @@ class _FilePickerDialogState extends State<_FilePickerDialog> {
     super.dispose();
   }
 
-  void _load() {
+  Future<void> _load() async {
+    final generation = ++_loadGeneration;
+    final directory = _directory;
     try {
-      final entries = _directory.listSync()
+      final entries = await directory.list().toList()
         ..sort((left, right) {
           final leftIsDirectory = left is Directory;
           final rightIsDirectory = right is Directory;
@@ -77,11 +81,17 @@ class _FilePickerDialogState extends State<_FilePickerDialog> {
             _name(right).toLowerCase(),
           );
         });
+      if (!mounted || generation != _loadGeneration) {
+        return;
+      }
       setState(() {
         _entries = entries.where(_isVisible).toList();
         _error = null;
       });
     } on Object catch (error) {
+      if (!mounted || generation != _loadGeneration) {
+        return;
+      }
       setState(() {
         _entries = const [];
         _error = '$error';
@@ -107,7 +117,11 @@ class _FilePickerDialogState extends State<_FilePickerDialog> {
   void _open(Directory directory) {
     _directory = directory;
     _pathController.text = directory.path;
-    _load();
+    setState(() {
+      _entries = const [];
+      _error = null;
+    });
+    unawaited(_load());
   }
 
   void _goUp() {
