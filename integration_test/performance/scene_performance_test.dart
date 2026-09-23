@@ -1,15 +1,23 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:ui' show FramePhase;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart'
+    show debugProfileLayoutsEnabled, debugProfilePaintsEnabled;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mozais_greeter/main.dart';
 
+import '../../tool/perf/frame_metrics.dart';
+
 const _frameInterval = Duration(microseconds: 16667);
 const _maxPhaseMatchDeltaMicros = 25000;
+const _captureTimelineDiagnostics = bool.fromEnvironment(
+  'MOZAIS_PERF_TRACE_TIMELINE',
+);
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +28,7 @@ void main() {
     final phaseAtFrameStart = <int, String>{};
     var engineEpochOffset = 0;
     var unmatchedFrameCount = 0;
+    var timingFrameCount = 0;
     var maxPhaseMatchDeltaMicros = 0;
     var activePhase = 'startup';
     var captureFramePhases = true;
@@ -36,15 +45,16 @@ void main() {
 
     void onTimings(List<FrameTiming> batch) {
       for (final timing in batch) {
-        final buildStart = timing.timestampInMicroseconds(
-          FramePhase.buildStart,
+        timingFrameCount++;
+        final vsyncStart = timing.timestampInMicroseconds(
+          FramePhase.vsyncStart,
         );
-        final adjustedBuildStart = buildStart - engineEpochOffset;
+        final adjustedVsyncStart = vsyncStart - engineEpochOffset;
         String? phase;
         var matchDeltaMicros = _maxPhaseMatchDeltaMicros + 1;
         // Linux timestamps can differ by about one display interval.
         for (final entry in phaseAtFrameStart.entries) {
-          final delta = (entry.key - adjustedBuildStart).abs();
+          final delta = (entry.key - adjustedVsyncStart).abs();
           if (delta < matchDeltaMicros) {
             matchDeltaMicros = delta;
             phase = entry.value;
@@ -74,15 +84,50 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 150));
     }
 
+    Future<void> captureStartup() async {
+      await tester.pumpWidget(const MyApp());
+      await tester.pumpAndSettle(_frameInterval);
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle(_frameInterval);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    }
+
+    Future<void> captureWake() =>
+        capturePhase('wake', () => tester.tapAt(const Offset(10, 10)));
+
+    Future<void> tracePhase(String name, Future<void> Function() action) async {
+      developer.Timeline.startSync(name);
+      try {
+        await action();
+      } finally {
+        developer.Timeline.finishSync();
+      }
+    }
+
     SchedulerBinding.instance.addPersistentFrameCallback(onFrame);
     SchedulerBinding.instance.addTimingsCallback(onTimings);
-    await tester.pumpWidget(const MyApp());
-    await tester.pumpAndSettle(_frameInterval);
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    await tester.pumpAndSettle(_frameInterval);
-    await Future<void>.delayed(const Duration(milliseconds: 150));
 
-    await capturePhase('wake', () => tester.tapAt(const Offset(10, 10)));
+    if (_captureTimelineDiagnostics) {
+      debugProfileBuildsEnabledUserWidgets = true;
+      debugProfileLayoutsEnabled = true;
+      debugProfilePaintsEnabled = true;
+      try {
+        final timeline = await binding.traceTimeline(() async {
+          await tracePhase('MOZAIS_PERF.startup', captureStartup);
+          await tracePhase('MOZAIS_PERF.wake', captureWake);
+        });
+        final traceFile = File('build/perf/scene_startup_wake_timeline.json');
+        await traceFile.parent.create(recursive: true);
+        await traceFile.writeAsString(jsonEncode(timeline.toJson()));
+      } finally {
+        debugProfileBuildsEnabledUserWidgets = false;
+        debugProfileLayoutsEnabled = false;
+        debugProfilePaintsEnabled = false;
+      }
+    } else {
+      await captureStartup();
+      await captureWake();
+    }
     await capturePhase(
       'account_picker_open',
       () => tester.tap(find.byTooltip('Choose account')),
@@ -115,13 +160,16 @@ void main() {
     phaseAtFrameStart.clear();
 
     final report = <String, Object?>{
+      'frame_budget_ms': _frameInterval.inMicroseconds / 1000,
+      'observed_frame_count': timingFrameCount,
       ..._summarize(interactionTimings),
       'phases': {
-        for (final entry in phaseTimings.entries)
-          entry.key: _summarize(entry.value),
+        for (final phase in reportedPhases)
+          phase: _summarize(phaseTimings[phase] ?? const <FrameTiming>[]),
       },
       'phase_match': {
         'unmatched_frame_count': unmatchedFrameCount,
+        'matched_frame_count': timingFrameCount - unmatchedFrameCount,
         'max_delta_ms': maxPhaseMatchDeltaMicros / 1000,
       },
       'static_background_scheduled_frames': staticBackgroundFrames,
@@ -135,35 +183,18 @@ void main() {
 }
 
 Map<String, Object?> _summarize(Iterable<FrameTiming> frames) {
-  final samples = frames.toList();
-  double percentile(
-    Duration Function(FrameTiming) duration,
-    double percentile,
-  ) {
-    return _percentile(
-      samples.map((timing) => duration(timing).inMicroseconds / 1000),
-      percentile,
-    );
-  }
-
-  return {
-    'sample_count': samples.length,
-    'p50_build_ms': percentile((timing) => timing.buildDuration, 0.50),
-    'p95_build_ms': percentile((timing) => timing.buildDuration, 0.95),
-    'p50_raster_ms': percentile((timing) => timing.rasterDuration, 0.50),
-    'p95_raster_ms': percentile((timing) => timing.rasterDuration, 0.95),
-    'p50_vsync_overhead_ms': percentile((timing) => timing.vsyncOverhead, 0.50),
-    'p95_vsync_overhead_ms': percentile((timing) => timing.vsyncOverhead, 0.95),
-    'p50_total_span_ms': percentile((timing) => timing.totalSpan, 0.50),
-    'p95_total_span_ms': percentile((timing) => timing.totalSpan, 0.95),
-  };
-}
-
-double _percentile(Iterable<double> values, double percentile) {
-  final sorted = values.toList()..sort();
-  if (sorted.isEmpty) {
-    return 0;
-  }
-  final index = ((sorted.length - 1) * percentile).round();
-  return sorted[index];
+  final samples = frames
+      .map(
+        (timing) => <String, double>{
+          'build_ms': timing.buildDuration.inMicroseconds / 1000,
+          'raster_ms': timing.rasterDuration.inMicroseconds / 1000,
+          'vsync_overhead_ms': timing.vsyncOverhead.inMicroseconds / 1000,
+          'total_span_ms': timing.totalSpan.inMicroseconds / 1000,
+        },
+      )
+      .toList();
+  return summarizeFrameSamples(
+    samples,
+    frameBudgetMs: _frameInterval.inMicroseconds / 1000,
+  );
 }

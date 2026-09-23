@@ -230,9 +230,21 @@ number of usability invariants may assert reachability, focus order, hit target
 size, and absence of overflow.
 
 Performance is verified separately with a Linux/Wayland profile integration
-run. Reports record p50/p95 build and raster frame time, rebuild/repaint scope,
-and whether a settled static background schedules more than a single platform wake-up. Relative regressions
-beyond the documented threshold fail the performance suite.
+run. Reports record p50/p95 and maximum build, raster, vsync overhead, and total
+frame time by interaction phase, count frames beyond the 16.67 ms budget,
+validate phase matching and sample availability, and check whether a settled
+static background schedules more than a single platform wake-up. The gate
+rejects phases with fewer than five matched samples, more than 20% unmatched
+frames, reports with fewer than three measurement cycles, per-phase and
+aggregate interaction p95 total spans over two 16.67 ms frame budgets, and
+build or raster p50/p95 regressions above 20% from baseline. It also rejects
+results when a majority of independent cycles have more than 20% of interaction
+frames beyond the 16.67 ms budget.
+Run `bash scripts/trace-perf-builds.sh` to capture widget build, layout, and
+paint events during startup and first wake in a separate profile run; its
+timings are diagnostic and are not used by the performance gate. Set
+`MOZAIS_FLUTTER_BIN` to use a specific Flutter SDK; the matching Dart binary
+is taken from the same SDK directory.
 
 ## 9. Implementation Order
 
