@@ -154,7 +154,7 @@ class _EditorScreenState extends State<EditorScreen> {
       ),
     );
     return switch (choice) {
-      _UnsavedChoice.save => await _controller.save(),
+      _UnsavedChoice.save => await _controller.save() && !_controller.dirty,
       _UnsavedChoice.discard => true,
       _UnsavedChoice.cancel || null => false,
     };
@@ -180,15 +180,21 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   Future<void> _openPath(String path) async {
-    _controller.setPath(path);
     _pathController.text = path;
-    if (await _controller.open()) {
+    final opened = await _controller.open(path);
+    if (!mounted) {
+      return;
+    }
+    if (opened) {
       _rememberPath();
+    } else if (_controller.document != null) {
+      _pathController.text = _controller.path;
     }
   }
 
   Future<void> _save() async {
-    if (await _controller.save()) {
+    final saved = await _controller.save();
+    if (mounted && saved) {
       _rememberPath();
     }
   }
@@ -242,20 +248,38 @@ class _EditorScreenState extends State<EditorScreen> {
       appBar: AppBar(
         title: Text(strings.appTitle),
         actions: [
-          SizedBox(
-            width: 420,
-            child: TextField(
-              controller: _pathController,
-              decoration: InputDecoration(
-                hintText: strings.pathHint,
-                isDense: true,
-              ),
-              onChanged: _controller.setPath,
-            ),
+          ListenableBuilder(
+            listenable: _controller.operationListenable,
+            builder: (context, _) {
+              final enabled = !_controller.opening && !_controller.saving;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 420,
+                    child: TextField(
+                      controller: _pathController,
+                      enabled: enabled,
+                      decoration: InputDecoration(
+                        hintText: strings.pathHint,
+                        isDense: true,
+                      ),
+                      onChanged: _controller.setPath,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: enabled ? _open : null,
+                    child: Text(strings.open),
+                  ),
+                  TextButton(
+                    onPressed: enabled ? _save : null,
+                    child: Text(strings.save),
+                  ),
+                ],
+              );
+            },
           ),
-          const SizedBox(width: 8),
-          TextButton(onPressed: _open, child: Text(strings.open)),
-          TextButton(onPressed: _save, child: Text(strings.save)),
           IconButton(
             tooltip: _settingsAreDark
                 ? strings.useLightTheme

@@ -15,9 +15,15 @@ class SceneEditorController extends ChangeNotifier {
   final Directory? _assetsDirectory;
   SceneDocument? _document;
   String _path = '';
+  String? _documentPath;
   String? _selectedNodeId;
   EditorStatus _status = EditorStatus.idle;
   bool _dirty = false;
+  bool _opening = false;
+  bool _saving = false;
+  bool _disposed = false;
+  int _documentRevision = 0;
+  int _documentGeneration = 0;
   final Set<ScenePredicate> _activePredicates = <ScenePredicate>{};
 
   final ValueNotifier<SceneDocument?> _documentNotifier = ValueNotifier(null);
@@ -28,12 +34,16 @@ class SceneEditorController extends ChangeNotifier {
   final ValueNotifier<EditorStatus> _statusNotifier =
       ValueNotifier(EditorStatus.idle);
   final ValueNotifier<bool> _dirtyNotifier = ValueNotifier(false);
+  final ValueNotifier<bool> _openingNotifier = ValueNotifier(false);
+  final ValueNotifier<bool> _savingNotifier = ValueNotifier(false);
 
   SceneDocument? get document => _document;
   String get path => _path;
   String? get selectedNodeId => _selectedNodeId;
   EditorStatus get status => _status;
   bool get dirty => _dirty;
+  bool get opening => _opening;
+  bool get saving => _saving;
   Set<ScenePredicate> get activePredicates => _activePredicates;
 
   /// Notifies when the document under edit changes.
@@ -52,20 +62,27 @@ class SceneEditorController extends ChangeNotifier {
   Listenable get statusListenable =>
       Listenable.merge([_statusNotifier, _dirtyNotifier]);
 
+  Listenable get operationListenable =>
+      Listenable.merge([_openingNotifier, _savingNotifier]);
+
   @override
   void dispose() {
+    _disposed = true;
     _documentNotifier.dispose();
     _nodesNotifier.dispose();
     _selectionNotifier.dispose();
     _predicatesNotifier.dispose();
     _statusNotifier.dispose();
     _dirtyNotifier.dispose();
+    _openingNotifier.dispose();
+    _savingNotifier.dispose();
     super.dispose();
   }
 
   void _setDocument(SceneDocument document) {
     final previous = _document;
     _document = document;
+    _documentRevision++;
     _documentNotifier.value = document;
     if (_nodesChanged(previous, document)) {
       _nodesNotifier.value++;
@@ -109,43 +126,86 @@ class SceneEditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> open() async {
-    if (_path.isEmpty) {
+  Future<bool> open([String? requestedPath]) async {
+    if (_opening || _saving) {
+      return false;
+    }
+    final path = requestedPath ?? _path;
+    if (path.isEmpty) {
       _setStatus(const EditorStatus(EditorStatusKind.enterPathFirst));
       notifyListeners();
       return false;
     }
+    _opening = true;
+    _openingNotifier.value = true;
     try {
-      final source = await File(_path).readAsString();
+      final source = await File(path).readAsString();
+      if (_disposed) {
+        return false;
+      }
       final document = decodeSceneDocument(source);
       _setDocument(document);
+      _path = path;
+      _documentPath = path;
+      _documentGeneration++;
       _setSelection(document.nodes.first.id);
       _setDirty(false);
-      _setStatus(EditorStatus(EditorStatusKind.opened, _path));
+      _setStatus(EditorStatus(EditorStatusKind.opened, path));
       notifyListeners();
       return true;
     } on Object catch (error) {
+      if (_disposed) {
+        return false;
+      }
+      if (_document != null && _documentPath != null) {
+        _path = _documentPath!;
+      }
       _setStatus(EditorStatus(EditorStatusKind.openFailed, error));
       notifyListeners();
       return false;
+    } finally {
+      if (!_disposed) {
+        _opening = false;
+        _openingNotifier.value = false;
+      }
     }
   }
 
   Future<bool> save() async {
     final document = _document;
-    if (document == null || _path.isEmpty) {
+    final path = _path;
+    if (document == null || path.isEmpty || _opening || _saving) {
       return false;
     }
+    final revision = _documentRevision;
+    final generation = _documentGeneration;
+    _saving = true;
+    _savingNotifier.value = true;
     try {
-      await File(_path).writeAsString(encodeSceneDocument(document));
-      _setDirty(false);
-      _setStatus(EditorStatus(EditorStatusKind.saved, _path));
-      notifyListeners();
+      await File(path).writeAsString(encodeSceneDocument(document));
+      if (_disposed) {
+        return true;
+      }
+      if (_documentGeneration == generation) {
+        _documentPath = path;
+        if (_documentRevision == revision) {
+          _setDirty(false);
+        }
+        _setStatus(EditorStatus(EditorStatusKind.saved, path));
+        notifyListeners();
+      }
       return true;
     } on Object catch (error) {
-      _setStatus(EditorStatus(EditorStatusKind.saveFailed, error));
-      notifyListeners();
+      if (!_disposed && _documentGeneration == generation) {
+        _setStatus(EditorStatus(EditorStatusKind.saveFailed, error));
+        notifyListeners();
+      }
       return false;
+    } finally {
+      if (!_disposed) {
+        _saving = false;
+        _savingNotifier.value = false;
+      }
     }
   }
 
@@ -225,6 +285,9 @@ class SceneEditorController extends ChangeNotifier {
         ],
       ),
     );
+    if (updated.id != node.id) {
+      _setSelection(updated.id);
+    }
     _setDirty(true);
     notifyListeners();
   }
