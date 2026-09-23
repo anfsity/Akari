@@ -114,7 +114,7 @@ class _PredicateToggles extends StatelessWidget {
             children: [
               for (final predicate in ScenePredicate.values)
                 FilterChip(
-                  label: Text(predicate.name),
+                  label: Text(strings.predicateLabel(predicate)),
                   selected: controller.activePredicates.contains(predicate),
                   onSelected: (_) => controller.togglePredicate(predicate),
                 ),

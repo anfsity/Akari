@@ -5,8 +5,10 @@ import 'editor_strings.dart';
 
 /// Edits a node's `visibleWhen` condition as a flat ANY/ALL rule list.
 ///
-/// Conditions that nest deeper than one combinator level are shown read-only;
-/// the model still supports them, but the simple builder does not author them.
+/// Presets cover the common states; the rule builder offers the full predicate
+/// vocabulary with human labels. Conditions that nest deeper than one
+/// combinator level are shown read-only under Advanced; the model still
+/// supports them, but the simple builder does not author them.
 class ConditionEditor extends StatelessWidget {
   const ConditionEditor({
     required this.condition,
@@ -42,9 +44,70 @@ class ConditionEditor extends StatelessWidget {
           },
         ),
         if (condition != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          _Presets(onChanged: onChanged),
+          const SizedBox(height: 12),
           _RuleBuilder(condition: condition, onChanged: onChanged),
         ],
+      ],
+    );
+  }
+}
+
+class _Presets extends StatelessWidget {
+  const _Presets({required this.onChanged});
+
+  final ValueChanged<SceneCondition?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
+    final presets = <(String, SceneCondition)>[
+      (
+        strings.asleep,
+        const ScenePredicateCondition(ScenePredicate.isDormant),
+      ),
+      (
+        strings.awake,
+        const SceneNot(ScenePredicateCondition(ScenePredicate.isDormant)),
+      ),
+      (
+        strings.authenticating,
+        const SceneAny([
+          ScenePredicateCondition(ScenePredicate.isAuthPrompting),
+          ScenePredicateCondition(ScenePredicate.isAuthSubmitting),
+        ]),
+      ),
+      (
+        strings.errorState,
+        const SceneAny([
+          ScenePredicateCondition(ScenePredicate.isAuthError),
+          ScenePredicateCondition(ScenePredicate.isServiceUnavailable),
+          ScenePredicateCondition(ScenePredicate.isSessionFailed),
+          ScenePredicateCondition(ScenePredicate.hasPowerError),
+        ]),
+      ),
+      (
+        strings.userSelected,
+        const ScenePredicateCondition(ScenePredicate.hasSelectedUser),
+      ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(strings.presets, style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final (label, preset) in presets)
+              ActionChip(
+                label: Text(label),
+                onPressed: () => onChanged(preset),
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -61,17 +124,7 @@ class _RuleBuilder extends StatelessWidget {
     final strings = EditorStringsScope.of(context);
     final draft = _flatten(condition);
     if (draft == null) {
-      return Row(
-        children: [
-          Expanded(
-            child: Text(strings.nestedCondition),
-          ),
-          TextButton(
-            onPressed: () => onChanged(null),
-            child: Text(strings.clear),
-          ),
-        ],
-      );
+      return _Advanced(condition: condition, onChanged: onChanged);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,11 +166,16 @@ class _RuleBuilder extends StatelessWidget {
               isExpanded: true,
               value: clause.predicate,
               onChanged: (value) => onChanged(
-                _build(draft.withClauseAt(index, clause.copyWith(predicate: value))),
+                _build(
+                  draft.withClauseAt(index, clause.copyWith(predicate: value)),
+                ),
               ),
               items: [
                 for (final predicate in ScenePredicate.values)
-                  DropdownMenuItem(value: predicate, child: Text(predicate.name)),
+                  DropdownMenuItem(
+                    value: predicate,
+                    child: Text(strings.predicateLabel(predicate)),
+                  ),
               ],
             ),
           ),
@@ -126,7 +184,10 @@ class _RuleBuilder extends StatelessWidget {
             value: clause.negated,
             onChanged: (value) => onChanged(
               _build(
-                draft.withClauseAt(index, clause.copyWith(negated: value ?? false)),
+                draft.withClauseAt(
+                  index,
+                  clause.copyWith(negated: value ?? false),
+                ),
               ),
             ),
             items: [
@@ -145,6 +206,60 @@ class _RuleBuilder extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Read-only view of a condition the flat builder cannot represent.
+class _Advanced extends StatelessWidget {
+  const _Advanced({required this.condition, required this.onChanged});
+
+  final SceneCondition condition;
+  final ValueChanged<SceneCondition?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = EditorStringsScope.of(context);
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      title: Text(strings.advanced),
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _describe(strings, condition),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            strings.nestedCondition,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: () => onChanged(null),
+            child: Text(strings.clear),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _describe(EditorStrings strings, SceneCondition condition) {
+  return switch (condition) {
+    ScenePredicateCondition(:final predicate) => strings.predicateLabel(
+      predicate,
+    ),
+    SceneAll(:final conditions) =>
+      'all(${conditions.map((child) => _describe(strings, child)).join(', ')})',
+    SceneAny(:final conditions) =>
+      'any(${conditions.map((child) => _describe(strings, child)).join(', ')})',
+    SceneNot(:final condition) => 'not(${_describe(strings, condition)})',
+  };
 }
 
 class _Clause {

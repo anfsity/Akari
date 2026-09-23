@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 /// User-facing copy for the editor.
 ///
@@ -61,6 +62,23 @@ abstract class EditorStrings {
   String get removeProperty;
   String get addProperty;
 
+  String get document;
+  String get canvas;
+  String get canvasFit;
+  String get useSafeArea;
+  String get background;
+  String get backgroundKind;
+  String get backgroundAsset;
+  String get importBackground;
+  String get chooseFile;
+  String get goUp;
+  String get backgroundColor;
+  String get scrimOpacity;
+  String get blurSigma;
+  String get noVideoRenderer;
+  String backgroundImported(String asset);
+  String backgroundImportFailed(Object error);
+
   String get always;
   String get rule;
   String get nestedCondition;
@@ -72,6 +90,14 @@ abstract class EditorStrings {
   String get isNotOperator;
   String get addClause;
   String get removeClause;
+  String get presets;
+  String get asleep;
+  String get awake;
+  String get authenticating;
+  String get errorState;
+  String get userSelected;
+  String get advanced;
+  String predicateLabel(ScenePredicate predicate);
 
   String get appearance;
   String get language;

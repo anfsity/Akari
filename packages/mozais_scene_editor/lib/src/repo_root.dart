@@ -42,3 +42,20 @@ File? repoAssetFile(String asset) {
   }
   return File('${root.path}/$asset');
 }
+
+/// The repository directory that document `assets/...` paths live in.
+Directory? repoAssetsDirectory() {
+  final root = repoRoot();
+  return root == null ? null : Directory('${root.path}/assets');
+}
+
+/// The scene to open at startup.
+///
+/// A configured path is used only while it exists; otherwise the bundled
+/// default is used, so a stale setting after a move cannot break startup.
+String resolveStartupScenePath(String configured) {
+  if (configured.isNotEmpty && File(configured).existsSync()) {
+    return configured;
+  }
+  return defaultScenePath() ?? '';
+}

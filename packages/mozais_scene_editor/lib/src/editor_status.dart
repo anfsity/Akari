@@ -9,6 +9,8 @@ enum EditorStatusKind {
   saved,
   saveFailed,
   keepOneNode,
+  backgroundImported,
+  backgroundImportFailed,
 }
 
 class EditorStatus {
@@ -31,5 +33,9 @@ String describeEditorStatus(EditorStrings strings, EditorStatus status) {
     EditorStatusKind.saved => strings.savedPath(status.detail! as String),
     EditorStatusKind.saveFailed => strings.saveFailed(status.detail!),
     EditorStatusKind.keepOneNode => strings.keepOneNode,
+    EditorStatusKind.backgroundImported =>
+      strings.backgroundImported(status.detail! as String),
+    EditorStatusKind.backgroundImportFailed =>
+      strings.backgroundImportFailed(status.detail!),
   };
 }

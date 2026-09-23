@@ -5,6 +5,7 @@ import 'editor_settings.dart';
 import 'editor_settings_controller.dart';
 import 'editor_strings.dart';
 import 'editor_theme.dart';
+import 'editor_widgets.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({required this.controller, super.key});
@@ -41,7 +42,7 @@ class SettingsPage extends StatelessWidget {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    _Group(
+                    SectionCard(
                       title: strings.appearance,
                       children: [
                         _ThemePicker(controller: controller),
@@ -49,17 +50,17 @@ class SettingsPage extends StatelessWidget {
                         _LanguagePicker(controller: controller),
                       ],
                     ),
-                    _Group(
+                    SectionCard(
                       title: strings.editing,
                       children: [
-                        _SwitchRow(
+                        SwitchRow(
                           label: strings.confirmUnsavedChanges,
                           value: settings.confirmUnsavedChanges,
                           onChanged: (value) => controller.update(
                             settings.copyWith(confirmUnsavedChanges: value),
                           ),
                         ),
-                        _SwitchRow(
+                        SwitchRow(
                           label: strings.gridSnap,
                           value: settings.gridSnap,
                           onChanged: (value) => controller.update(
@@ -69,7 +70,7 @@ class SettingsPage extends StatelessWidget {
                         _AspectRatioPicker(controller: controller),
                       ],
                     ),
-                    _Group(
+                    SectionCard(
                       title: strings.files,
                       children: [
                         _DefaultPathField(controller: controller),
@@ -89,31 +90,6 @@ class SettingsPage extends StatelessWidget {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _Group extends StatelessWidget {
-  const _Group({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            ...children,
-          ],
-        ),
       ),
     );
   }
@@ -211,31 +187,6 @@ class _AspectRatioPicker extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _SwitchRow extends StatelessWidget {
-  const _SwitchRow({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(child: Text(label)),
-          Switch(value: value, onChanged: onChanged),
-        ],
-      ),
     );
   }
 }

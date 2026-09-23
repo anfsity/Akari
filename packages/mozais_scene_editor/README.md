@@ -24,14 +24,21 @@ work on a different document.
 - A dashed selection box follows the node's transform (including rotation and
   perspective), with a dot for in-plane rotation and a trackball for X/Y
   rotation. The cursor changes per region.
-- Inspector for rect, transform (including X/Y/Z rotation), layout, and
-  properties.
-- `visibleWhen` rule builder over the semantic predicate vocabulary.
-- Active-predicate toggles to preview conditional nodes.
+- Tabbed inspector (Document / Identity / Layout / Transform / Visibility /
+  Properties) for the document, rect, transform (including X/Y/Z rotation),
+  layout, and properties.
+- A Document tab edits `canvas` and `background`. Import copies a file into the
+  repository `assets/` directory and sets the background kind from the
+  extension; a video import renders solid until a video renderer exists.
+- `visibleWhen` builder with human-labeled predicates, common presets
+  (asleep / awake / authenticating / error / user selected), the ALL/ANY rule
+  builder, and an Advanced view for nested conditions.
+- Active-predicate toggles, using the same labels, to preview conditional
+  nodes.
 - Draggable pane dividers with min/max widths.
 - **Outline / Real** preview toggle. Real embeds the actual greeter widgets and
-theme, rendering the edited document live; background assets are read from the
-repository root.
+  theme, rendering the edited document live; background assets are read from the
+  repository root.
 - Settings page with named editor themes, a language seam, unsaved-change
   confirmation, grid-snap and preview-aspect-ratio options, and a default scene
   path. Settings persist to `~/.config/mozais/scene_editor.json`.

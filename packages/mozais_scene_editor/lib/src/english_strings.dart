@@ -1,3 +1,5 @@
+import 'package:mozais_scene_schema/mozais_scene_schema.dart';
+
 import 'editor_strings.dart';
 
 /// The default, English copy for the editor.
@@ -109,6 +111,41 @@ class EnglishStrings extends EditorStrings {
   String get addProperty => 'Add property';
 
   @override
+  String get document => 'Document';
+  @override
+  String get canvas => 'Canvas';
+  @override
+  String get canvasFit => 'fit';
+  @override
+  String get useSafeArea => 'Use safe area';
+  @override
+  String get background => 'Background';
+  @override
+  String get backgroundKind => 'kind';
+  @override
+  String get backgroundAsset => 'asset';
+  @override
+  String get importBackground => 'Import background';
+  @override
+  String get chooseFile => 'Choose file';
+  @override
+  String get goUp => 'Up';
+  @override
+  String get backgroundColor => 'color';
+  @override
+  String get scrimOpacity => 'scrim opacity';
+  @override
+  String get blurSigma => 'blur sigma';
+  @override
+  String get noVideoRenderer =>
+      'No video renderer yet; this background renders solid.';
+  @override
+  String backgroundImported(String asset) => 'Imported $asset';
+  @override
+  String backgroundImportFailed(Object error) =>
+      'Background import failed: $error';
+
+  @override
   String get always => 'Always';
   @override
   String get rule => 'Rule';
@@ -130,6 +167,41 @@ class EnglishStrings extends EditorStrings {
   String get addClause => 'Add clause';
   @override
   String get removeClause => 'Remove clause';
+  @override
+  String get presets => 'Presets';
+  @override
+  String get asleep => 'asleep';
+  @override
+  String get awake => 'awake';
+  @override
+  String get authenticating => 'authenticating';
+  @override
+  String get errorState => 'error';
+  @override
+  String get userSelected => 'user selected';
+  @override
+  String get advanced => 'Advanced';
+
+  @override
+  String predicateLabel(ScenePredicate predicate) => switch (predicate) {
+    ScenePredicate.isDormant => 'asleep',
+    ScenePredicate.isServiceStarting => 'service starting',
+    ScenePredicate.isServiceReady => 'service ready',
+    ScenePredicate.isServiceUnavailable => 'service unavailable',
+    ScenePredicate.isUserSelection => 'user selection',
+    ScenePredicate.isAuthPrompting => 'prompting for credentials',
+    ScenePredicate.isAuthSubmitting => 'submitting credentials',
+    ScenePredicate.isSessionSelection => 'session selection',
+    ScenePredicate.isHandingOff => 'handing off',
+    ScenePredicate.isAuthError => 'authentication error',
+    ScenePredicate.hasSelectedUser => 'user selected',
+    ScenePredicate.isSessionLoading => 'loading sessions',
+    ScenePredicate.isSessionReady => 'session ready',
+    ScenePredicate.isSessionEmpty => 'no sessions',
+    ScenePredicate.isSessionFailed => 'session failed',
+    ScenePredicate.isPowerExecuting => 'power action running',
+    ScenePredicate.hasPowerError => 'power action error',
+  };
 
   @override
   String get appearance => 'Appearance';

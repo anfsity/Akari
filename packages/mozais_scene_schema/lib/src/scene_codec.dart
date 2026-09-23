@@ -90,7 +90,7 @@ SceneBackground _decodeBackground(Map<String, dynamic> json) {
   return SceneBackground(
     kind: kind,
     asset: asset,
-    color: _decodeColor(_string(json, 'color', fallback: '#0d151a')),
+    color: decodeSceneColor(_string(json, 'color', fallback: '#0d151a')),
     scrimOpacity: scrimOpacity,
     blurSigma: blurSigma,
     rendererId: _nullableString(json, 'rendererId'),
@@ -101,7 +101,7 @@ Map<String, dynamic> _encodeBackground(SceneBackground background) {
   return {
     'kind': background.kind.name,
     if (background.asset != null) 'asset': background.asset,
-    'color': _encodeColor(background.color),
+    'color': encodeSceneColor(background.color),
     'scrimOpacity': background.scrimOpacity,
     'blurSigma': background.blurSigma,
     if (background.rendererId != null) 'rendererId': background.rendererId,
@@ -244,7 +244,8 @@ Object _encodeCondition(SceneCondition condition) {
   };
 }
 
-int _decodeColor(String value) {
+/// Parses a `#RRGGBB` or `#AARRGGBB` scene color into a 32-bit ARGB value.
+int decodeSceneColor(String value) {
   final hex = value.startsWith('#') ? value.substring(1) : value;
   if (hex.length != 6 && hex.length != 8) {
     throw FormatException('Color must use #RRGGBB or #AARRGGBB: $value');
@@ -257,7 +258,8 @@ int _decodeColor(String value) {
   return parsed;
 }
 
-String _encodeColor(int value) {
+/// Formats a 32-bit ARGB value as a `#RRGGBB` or `#AARRGGBB` scene color.
+String encodeSceneColor(int value) {
   final hex = value.toRadixString(16).padLeft(8, '0');
   if (hex.startsWith('ff')) {
     return '#${hex.substring(2)}';
