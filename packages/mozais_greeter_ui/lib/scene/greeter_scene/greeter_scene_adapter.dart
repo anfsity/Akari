@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mozais_scene/mozais_scene.dart';
@@ -74,21 +75,33 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   final FocusNode _credentialFocusNode = FocusNode();
   final List<String> _typeahead = <String>[];
   late final StreamSubscription<FeatureEffect> _effectSubscription;
+  late final Listenable _featureSlotChanges;
   late final AnimationController _blurController;
   late Animation<double> _blurAnimation;
   late GreeterWidgetCatalog _catalog;
+  late Widget _sceneRuntime;
+  late final ValueNotifier<Set<ScenePredicate>> _activeScenePredicates;
 
   @override
   void initState() {
     super.initState();
     _catalog = _createCatalog();
+    _activeScenePredicates = ValueNotifier(_activePredicates());
     _effectSubscription = widget.feature.effects.listen(_handleEffect);
+    _featureSlotChanges = Listenable.merge([
+      widget.feature.serviceSlots,
+      widget.feature.authPromptSlots,
+      widget.feature.accountPickerSlots,
+      widget.feature.sessionPickerSlots,
+      widget.feature.powerSlots,
+    ])..addListener(_handleSceneSlotsChanged);
     _blurController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),
       value: widget.feature.dormantSlots.value ? 0 : 1,
     );
     _blurAnimation = _createBlurAnimation();
+    _sceneRuntime = _createSceneRuntime();
     widget.feature.dormantSlots.addListener(_handleDormantChanged);
     // Key handling must not depend on the focus chain: the credential field
     // is disabled between attempts, which drops focus to the root scope.
@@ -110,6 +123,8 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     if (widget.theme != oldWidget.theme) {
       _catalog = _createCatalog();
       _blurAnimation = _createBlurAnimation();
+      _activeScenePredicates.value = _activePredicates();
+      _sceneRuntime = _createSceneRuntime();
     }
   }
 
@@ -121,6 +136,18 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       credentialFocusNode: _credentialFocusNode,
       onDispatch: _dispatch,
       onRespond: _respondToPrompt,
+    );
+  }
+
+  Widget _createSceneRuntime() {
+    return SceneRuntime(
+      document: widget.theme.document,
+      theme: widget.theme,
+      activePredicates: _activeScenePredicates.value,
+      activePredicatesListenable: _activeScenePredicates,
+      backgroundBlurSigma: _blurAnimation,
+      prewarmHiddenNodes: true,
+      nodeBuilder: _catalog.build,
     );
   }
 
@@ -140,7 +167,9 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     if (widget.handleKeyboard) {
       FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
     }
+    _featureSlotChanges.removeListener(_handleSceneSlotsChanged);
     widget.feature.dormantSlots.removeListener(_handleDormantChanged);
+    _activeScenePredicates.dispose();
     unawaited(_effectSubscription.cancel());
     _blurController.dispose();
     _credentialController.dispose();
@@ -152,33 +181,24 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   Widget build(BuildContext context) {
     return Focus(
       autofocus: widget.handleKeyboard,
-      child: ListenableBuilder(
-        listenable: Listenable.merge([
-          widget.feature.serviceSlots,
-          widget.feature.authPromptSlots,
-          widget.feature.accountPickerSlots,
-          widget.feature.sessionPickerSlots,
-          widget.feature.powerSlots,
-          widget.feature.dormantSlots,
-        ]),
-        builder: (context, child) {
-          final dormant = widget.feature.dormantSlots.value;
-          return Listener(
-            behavior: HitTestBehavior.translucent,
-            onPointerDown: dormant
-                ? (_) => _dispatch(const WakeGreeterCommand())
-                : null,
-            child: SceneRuntime(
-              document: widget.theme.document,
-              theme: widget.theme,
-              activePredicates: _activePredicates(),
-              backgroundBlurSigma: _blurAnimation,
-              nodeBuilder: _catalog.build,
-            ),
-          );
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) {
+          if (widget.feature.dormantSlots.value) {
+            _dispatch(const WakeGreeterCommand());
+          }
         },
+        child: _sceneRuntime,
       ),
     );
+  }
+
+  void _handleSceneSlotsChanged() {
+    final nextPredicates = _activePredicates();
+    if (setEquals(_activeScenePredicates.value, nextPredicates)) {
+      return;
+    }
+    _activeScenePredicates.value = nextPredicates;
   }
 
   Set<ScenePredicate> _activePredicates() {
@@ -198,10 +218,12 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       // response instead of retaining it in the field during the exit.
       _credentialController.clear();
       _typeahead.clear();
+      _credentialFocusNode.unfocus();
       _blurController.reverse();
     } else {
       _blurController.forward();
     }
+    _handleSceneSlotsChanged();
   }
 
   KeyEventResult _handleKeyEvent(KeyEvent event) {
@@ -260,7 +282,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     final auth = widget.feature.authPromptSlots.value;
     switch (auth.mode) {
       case AuthMode.prompting:
-        _scheduleFlushAndFocus();
+        _flushTypeaheadAndFocus();
       case AuthMode.error:
         final error = auth.error;
         if (error != null) {
@@ -293,13 +315,17 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     return true;
   }
 
-  void _scheduleFlushAndFocus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      _flushTypeahead();
+  void _flushTypeaheadAndFocus() {
+    _flushTypeahead();
+    _credentialFocusNode.canRequestFocus = true;
+    if (_credentialFocusNode.canRequestFocus) {
       _credentialFocusNode.requestFocus();
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _credentialFocusNode.requestFocus();
+      }
     });
   }
 
@@ -332,7 +358,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     switch (effect) {
       case RequestFocusEffect(:final field):
         if (field == 'credential') {
-          _scheduleFlushAndFocus();
+          _flushTypeaheadAndFocus();
         }
       case ShowNoticeEffect(:final message, :final isError):
         WidgetsBinding.instance.addPostFrameCallback((_) {

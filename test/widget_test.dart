@@ -16,7 +16,7 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Choose account'), findsNothing);
+    expect(find.byTooltip('Choose account').hitTestable(), findsNothing);
 
     await _wake(tester);
 
@@ -28,6 +28,23 @@ void main() {
     expect(field.enabled, isFalse);
   });
 
+  testWidgets('keeps credential field geometry stable while waking', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+
+    final field = find.byType(TextField);
+    final dormantSize = tester.getSize(field);
+    final dormantCenter = tester.getCenter(field);
+
+    await _wake(tester);
+    await tester.pumpAndSettle();
+
+    expect(tester.getSize(field), dormantSize);
+    expect(tester.getCenter(field), dormantCenter);
+  });
+
   testWidgets('escape returns to the dormant background', (tester) async {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
@@ -37,7 +54,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Choose account'), findsNothing);
+    expect(find.byTooltip('Choose account').hitTestable(), findsNothing);
   });
 
   testWidgets('shows a digital clock only while dormant', (tester) async {
@@ -48,14 +65,14 @@ void main() {
     expect(clock, findsOneWidget);
 
     await _wake(tester);
-    expect(clock, findsNothing);
+    expect(clock.hitTestable(), findsNothing);
   });
 
   testWidgets('mouse click wakes the greeter', (tester) async {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Choose account'), findsNothing);
+    expect(find.byTooltip('Choose account').hitTestable(), findsNothing);
 
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
@@ -73,11 +90,33 @@ void main() {
     await tester.tap(find.byTooltip('Choose account'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Alice'));
-    await tester.pumpAndSettle();
+    await tester.idle();
+    await tester.pump();
 
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.enabled, isTrue);
     expect(field.focusNode?.hasFocus, isTrue);
+
+    final fieldSurface = find
+        .ancestor(
+          of: find.byType(TextField),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is DecoratedBox &&
+                widget.decoration is BoxDecoration &&
+                (widget.decoration as BoxDecoration).border != null,
+          ),
+        )
+        .first;
+    final decoration =
+        tester.widget<DecoratedBox>(fieldSurface).decoration as BoxDecoration;
+    expect(
+      (decoration.border as Border).top.color,
+      ThemeRegistry.resolve(ThemeRegistry.defaultThemeName)
+          .materialTheme
+          .colorScheme
+          .primary,
+    );
   });
 
   testWidgets('types the waking key into the password field', (tester) async {

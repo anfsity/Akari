@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
-import 'dart:ui' show FramePhase;
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
@@ -14,7 +14,6 @@ import 'package:mozais_greeter/main.dart';
 import '../../tool/perf/frame_metrics.dart';
 
 const _frameInterval = Duration(microseconds: 16667);
-const _maxPhaseMatchDeltaMicros = 25000;
 const _captureTimelineDiagnostics = bool.fromEnvironment(
   'MOZAIS_PERF_TRACE_TIMELINE',
 );
@@ -29,21 +28,18 @@ void main() {
     final actionResponseTimings = {
       for (final phase in measuredInteractionPhases) phase: <FrameTiming>[],
     };
-    var engineEpochOffset = 0;
     var unmatchedFrameCount = 0;
     var timingFrameCount = 0;
-    var maxPhaseMatchDeltaMicros = 0;
     var activePhase = 'startup';
     var captureFramePhases = true;
     var captureActionResponseFrame = false;
-    void onFrame(Duration timestamp) {
+    void onFrame(Duration _) {
       if (captureFramePhases) {
-        final engineTimestamp =
-            SchedulerBinding.instance.currentSystemFrameTimeStamp;
-        // Scheduler frame times are epoch-adjusted; FrameTiming keeps engine time.
-        engineEpochOffset =
-            engineTimestamp.inMicroseconds - timestamp.inMicroseconds;
-        phaseAtFrameStart[timestamp.inMicroseconds] = (
+        final frameNumber = PlatformDispatcher.instance.frameData.frameNumber;
+        if (frameNumber < 0) {
+          return;
+        }
+        phaseAtFrameStart[frameNumber] = (
           phase: activePhase,
           actionResponse: captureActionResponseFrame,
         );
@@ -54,34 +50,19 @@ void main() {
     void onTimings(List<FrameTiming> batch) {
       for (final timing in batch) {
         timingFrameCount++;
-        final vsyncStart = timing.timestampInMicroseconds(
-          FramePhase.vsyncStart,
-        );
-        final adjustedVsyncStart = vsyncStart - engineEpochOffset;
-        String? phase;
-        var actionResponseFrame = false;
-        var matchDeltaMicros = _maxPhaseMatchDeltaMicros + 1;
-        // Linux timestamps can differ by about one display interval.
-        for (final entry in phaseAtFrameStart.entries) {
-          final delta = (entry.key - adjustedVsyncStart).abs();
-          if (delta < matchDeltaMicros) {
-            matchDeltaMicros = delta;
-            phase = entry.value.phase;
-            actionResponseFrame = entry.value.actionResponse;
-          }
-        }
-        if (phase == null) {
+        final frame = timing.frameNumber < 0
+            ? null
+            : phaseAtFrameStart.remove(timing.frameNumber);
+        if (frame == null) {
           unmatchedFrameCount++;
           continue;
         }
-        if (matchDeltaMicros > maxPhaseMatchDeltaMicros) {
-          maxPhaseMatchDeltaMicros = matchDeltaMicros;
-        }
+        final phase = frame.phase;
         phaseTimings.putIfAbsent(phase, () => []).add(timing);
         if (measuredInteractionPhases.contains(phase)) {
           interactionTimings.add(timing);
         }
-        if (actionResponseFrame) {
+        if (frame.actionResponse) {
           actionResponseTimings[phase]?.add(timing);
         }
       }
@@ -92,10 +73,13 @@ void main() {
       Future<void> Function() interaction,
     ) async {
       activePhase = phase;
-      await interaction();
       captureActionResponseFrame = true;
-      await tester.pump(_frameInterval);
-      captureActionResponseFrame = false;
+      try {
+        await interaction();
+        await tester.pump(_frameInterval);
+      } finally {
+        captureActionResponseFrame = false;
+      }
       await tester.pumpAndSettle(_frameInterval);
       await Future<void>.delayed(const Duration(milliseconds: 150));
     }
@@ -106,6 +90,8 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 500));
       await tester.pumpAndSettle(_frameInterval);
       await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(find.byType(TextField), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
     }
 
     Future<void> captureWake() =>
@@ -120,6 +106,61 @@ void main() {
       }
     }
 
+    Future<void> captureNamedPhase(
+      String name,
+      Future<void> Function() action,
+    ) {
+      if (!_captureTimelineDiagnostics) {
+        return action();
+      }
+      return tracePhase('MOZAIS_PERF.$name', action);
+    }
+
+    Future<void> captureJourney() async {
+      await captureNamedPhase('startup', captureStartup);
+      await captureNamedPhase('wake', captureWake);
+      await captureNamedPhase(
+        'account_picker_open',
+        () => capturePhase(
+          'account_picker_open',
+          () => tester.tap(find.byTooltip('Choose account')),
+        ),
+      );
+      await captureNamedPhase(
+        'account_select',
+        () => capturePhase(
+          'account_select',
+          () => tester.tap(find.text('Alice')),
+        ),
+      );
+      await captureNamedPhase(
+        'session_picker_open',
+        () => capturePhase(
+          'session_picker_open',
+          () => tester.tap(find.byTooltip('Choose a session')),
+        ),
+      );
+      await captureNamedPhase(
+        'session_select',
+        () =>
+            capturePhase('session_select', () => tester.tap(find.text('Sway'))),
+      );
+      await captureNamedPhase(
+        'credential_entry',
+        () => capturePhase(
+          'credential_entry',
+          () => tester.enterText(find.byType(TextField), 'secret'),
+        ),
+      );
+      await captureNamedPhase(
+        'credential_submit',
+        () => capturePhase(
+          'credential_submit',
+          () => tester.tap(find.byIcon(Icons.arrow_forward)),
+        ),
+      );
+    }
+
     SchedulerBinding.instance.addPersistentFrameCallback(onFrame);
     SchedulerBinding.instance.addTimingsCallback(onTimings);
 
@@ -128,11 +169,8 @@ void main() {
       debugProfileLayoutsEnabled = true;
       debugProfilePaintsEnabled = true;
       try {
-        final timeline = await binding.traceTimeline(() async {
-          await tracePhase('MOZAIS_PERF.startup', captureStartup);
-          await tracePhase('MOZAIS_PERF.wake', captureWake);
-        });
-        final traceFile = File('build/perf/scene_startup_wake_timeline.json');
+        final timeline = await binding.traceTimeline(captureJourney);
+        final traceFile = File('build/perf/scene_interactions_timeline.json');
         await traceFile.parent.create(recursive: true);
         await traceFile.writeAsString(jsonEncode(timeline.toJson()));
       } finally {
@@ -141,27 +179,8 @@ void main() {
         debugProfilePaintsEnabled = false;
       }
     } else {
-      await captureStartup();
-      await captureWake();
+      await captureJourney();
     }
-    await capturePhase(
-      'account_picker_open',
-      () => tester.tap(find.byTooltip('Choose account')),
-    );
-    await capturePhase('account_select', () => tester.tap(find.text('Alice')));
-    await capturePhase(
-      'session_picker_open',
-      () => tester.tap(find.byTooltip('Choose a session')),
-    );
-    await capturePhase('session_select', () => tester.tap(find.text('Sway')));
-    await capturePhase(
-      'credential_entry',
-      () => tester.enterText(find.byType(TextField), 'secret'),
-    );
-    await capturePhase(
-      'credential_submit',
-      () => tester.tap(find.byIcon(Icons.arrow_forward)),
-    );
 
     activePhase = 'settled_idle';
     await Future<void>.delayed(const Duration(milliseconds: 500));
@@ -188,9 +207,9 @@ void main() {
           phase: _summarize(actionResponseTimings[phase]!),
       },
       'phase_match': {
+        'matching_method': 'frame_number',
         'unmatched_frame_count': unmatchedFrameCount,
         'matched_frame_count': timingFrameCount - unmatchedFrameCount,
-        'max_delta_ms': maxPhaseMatchDeltaMicros / 1000,
       },
       'static_background_scheduled_frames': staticBackgroundFrames,
     };
