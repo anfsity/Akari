@@ -3,27 +3,16 @@ import 'package:mozais_scene/mozais_scene.dart';
 
 import 'default.scene.g.dart';
 
-/// Seed used before extraction runs and whenever the wallpaper cannot be
-/// sampled. The indigo and coral pairing keeps the login controls legible
-/// over both the dark and warm parts of the bundled illustration.
+/// Seed used before extraction runs and when the wallpaper cannot be sampled.
 const _fallbackSeed = Color(0xffb79cff);
-const _base = Color(0xff10111d);
-const _surface = Color(0xff1b1d2d);
-const _surfaceVariant = Color(0xff30334b);
-const _text = Color(0xfff2f1fb);
-
 ThemeBundle buildDefaultTheme({Color? seed, SceneDocument? document}) {
-  final colorScheme =
-      ColorScheme.fromSeed(
-        seedColor: seed ?? _fallbackSeed,
-        brightness: Brightness.dark,
-      ).copyWith(
-        secondary: const Color(0xffffb59f),
-        onSecondary: _base,
-        surface: _base,
-        onSurface: _text,
-        surfaceContainerHighest: _surfaceVariant,
-      );
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: seed ?? _fallbackSeed,
+    brightness: Brightness.dark,
+  );
+  final surface = colorScheme.surfaceContainerLow;
+  final surfaceVariant = colorScheme.surfaceContainerHighest;
+  final text = colorScheme.onSurface;
   return ThemeBundle(
     id: 'default',
     tokens: ThemeTokens(
@@ -32,14 +21,14 @@ ThemeBundle buildDefaultTheme({Color? seed, SceneDocument? document}) {
         colorScheme: colorScheme,
         scaffoldBackgroundColor: Colors.transparent,
         textTheme: Typography.whiteMountainView.apply(
-          bodyColor: _text,
-          displayColor: _text,
+          bodyColor: text,
+          displayColor: text,
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: _surface,
+          fillColor: surface,
           hintStyle: TextStyle(
-            color: Colors.white.withValues(alpha: 0.42),
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.72),
             fontSize: 16,
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 18),
@@ -73,9 +62,9 @@ ThemeBundle buildDefaultTheme({Color? seed, SceneDocument? document}) {
       minHitTarget: 44,
       allowBlur: false,
       blurSigma: 0,
-      glassColor: _base.withValues(alpha: 0.82),
-      surfaceColor: _surface,
-      surfaceVariantColor: _surfaceVariant,
+      glassColor: colorScheme.surfaceContainer.withValues(alpha: 0.82),
+      surfaceColor: surface,
+      surfaceVariantColor: surfaceVariant,
     ),
     document: document ?? defaultSceneDocument,
     backgrounds: const {
