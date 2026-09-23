@@ -66,7 +66,6 @@ class GreeterWidgetCatalog {
         valueListenable: feature.sessionPickerSlots,
         builder: (context, session) => _SessionPill(
           session: session,
-          tokens: theme.tokens,
           onSelect: (value) {
             onDispatch(SelectSessionCommand(value));
           },
@@ -599,13 +598,11 @@ class _AccountName extends StatelessWidget {
 class _SessionPill extends StatelessWidget {
   const _SessionPill({
     required this.session,
-    required this.tokens,
     required this.onSelect,
     required this.onRetry,
   });
 
   final SessionPickerSlots session;
-  final ThemeTokens tokens;
   final ValueChanged<SessionSummary> onSelect;
   final VoidCallback onRetry;
 
@@ -638,7 +635,6 @@ class _SessionPill extends StatelessWidget {
           ),
           CatalogMode.ready || CatalogMode.empty => _SessionMenu(
             session: session,
-            tokens: tokens,
             onSelect: onSelect,
           ),
         },
@@ -648,14 +644,9 @@ class _SessionPill extends StatelessWidget {
 }
 
 class _SessionMenu extends StatelessWidget {
-  const _SessionMenu({
-    required this.session,
-    required this.tokens,
-    required this.onSelect,
-  });
+  const _SessionMenu({required this.session, required this.onSelect});
 
   final SessionPickerSlots session;
-  final ThemeTokens tokens;
   final ValueChanged<SessionSummary> onSelect;
 
   @override
@@ -688,10 +679,15 @@ class _SessionMenu extends StatelessWidget {
         return PopupMenuButton<SessionSummary>(
           tooltip: 'Choose a session',
           position: PopupMenuPosition.under,
+          color: scheme.surfaceContainerHigh,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: scheme.outlineVariant),
+          ),
           constraints: BoxConstraints(minWidth: constraints.maxWidth),
           itemBuilder: (context) => menuItems,
           child: _PillSurface(
-            tokens: tokens,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -724,26 +720,18 @@ class _SessionMenu extends StatelessWidget {
 }
 
 class _PillSurface extends StatelessWidget {
-  const _PillSurface({required this.tokens, required this.child});
+  const _PillSurface({required this.child});
 
-  final ThemeTokens tokens;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    final scheme = Theme.of(context).colorScheme;
+    return Ink(
       decoration: BoxDecoration(
-        color: tokens.surfaceColor,
-        gradient: LinearGradient(
-          colors: [
-            tokens.surfaceVariantColor.withValues(alpha: 0.6),
-            tokens.surfaceColor,
-          ],
-        ),
+        color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: tokens.surfaceVariantColor.withValues(alpha: 0.9),
-        ),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -794,30 +782,33 @@ class _CredentialField extends StatelessWidget {
           child: child,
         );
       },
-      child: TextField(
-        controller: controller,
-        focusNode: focusNode,
-        enabled: enabled,
-        // Never reveal a response while the prompt is disabled or exiting.
-        obscureText: auth.prompt?.kind == PromptKind.secret || !enabled,
-        textInputAction: TextInputAction.done,
-        textAlign: TextAlign.center,
-        textAlignVertical: TextAlignVertical.center,
-        style: TextStyle(
-          color: scheme.onSurface,
-          fontSize: 18,
-          fontWeight: FontWeight.w500,
-        ),
-        decoration: InputDecoration(
-          hintText: hintText,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
-          errorBorder: InputBorder.none,
-          filled: false,
-          contentPadding: inputTheme.contentPadding,
-          isDense: inputTheme.isDense,
+      child: Align(
+        alignment: Alignment.center,
+        child: TextField(
+          controller: controller,
+          focusNode: focusNode,
+          enabled: enabled,
+          // Never reveal a response while the prompt is disabled or exiting.
+          obscureText: auth.prompt?.kind == PromptKind.secret || !enabled,
+          textInputAction: TextInputAction.done,
+          textAlign: TextAlign.center,
+          textAlignVertical: TextAlignVertical.center,
+          style: TextStyle(
+            color: scheme.onSurface,
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+          ),
+          decoration: InputDecoration(
+            hintText: hintText,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            filled: false,
+            contentPadding: inputTheme.contentPadding,
+            isDense: inputTheme.isDense,
+          ),
         ),
       ),
     );

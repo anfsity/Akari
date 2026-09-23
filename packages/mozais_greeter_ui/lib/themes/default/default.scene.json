@@ -66,7 +66,7 @@
     {
       "id": "account_name",
       "kind": "accountName",
-      "rect": {"x": 0.36, "y": 0.395, "width": 0.28, "height": 0.06},
+      "rect": {"x": 0.36, "y": 0.39, "width": 0.28, "height": 0.06},
       "renderOrder": 40,
       "focusOrder": 0,
       "motion": "fade",
@@ -87,7 +87,7 @@
     {
       "id": "credential_field",
       "kind": "credentialField",
-      "rect": {"x": 0.35, "y": 0.585, "width": 0.3, "height": 0.075},
+      "rect": {"x": 0.35, "y": 0.585, "width": 0.3, "height": 0.06},
       "renderOrder": 40,
       "focusOrder": 40,
       "motion": "fade",
@@ -97,7 +97,7 @@
     {
       "id": "primary_action",
       "kind": "primaryAction",
-      "rect": {"x": 0.47, "y": 0.67, "width": 0.06, "height": 0.08},
+      "rect": {"x": 0.47, "y": 0.685, "width": 0.06, "height": 0.08},
       "renderOrder": 40,
       "focusOrder": 50,
       "motion": "hoverLift",
