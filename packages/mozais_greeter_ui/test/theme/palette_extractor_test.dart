@@ -5,8 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mozais_greeter_ui/theme/palette_extractor.dart';
 
 void main() {
-  test('averages the sampled pixels into a seed color', () {
-    final seed = calculateSeedFromRgba(
+  test('selects a dominant vibrant hue from the sampled pixels', () {
+    final seed = calculateAccentFromRgba(
       _rgba(const [
         [0, 0, 0],
         [255, 255, 255],
@@ -15,11 +15,11 @@ void main() {
       ]),
     );
 
-    expect(seed, const Color(0xff584c71));
+    expect(seed, HSVColor.fromAHSV(1, 260, 0.55, 0.95).toColor());
   });
 
-  test('returns black for empty input', () {
-    expect(calculateSeedFromRgba(Uint8List(0)), const Color(0xff000000));
+  test('uses a neutral accent for empty input', () {
+    expect(calculateAccentFromRgba(Uint8List(0)), const Color(0xffd0d0d0));
   });
 }
 
