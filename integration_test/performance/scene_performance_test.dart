@@ -18,6 +18,8 @@ void main() {
     await tester.pumpAndSettle();
     SchedulerBinding.instance.addTimingsCallback(onTimings);
 
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Choose account'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Alice'));
@@ -28,8 +30,6 @@ void main() {
     await tester.tap(find.text('Sway'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.arrow_forward));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'secret');
     await tester.tap(find.byIcon(Icons.arrow_forward));
     await tester.pumpAndSettle();
