@@ -65,7 +65,11 @@ class _InspectorPanelState extends State<InspectorPanel>
           child: TabBarView(
             controller: _tabs,
             children: [
-              DocumentPanel(controller: widget.controller),
+              ListenableBuilder(
+                listenable: widget.controller.documentListenable,
+                builder: (context, _) =>
+                    DocumentPanel(controller: widget.controller),
+              ),
               _nodeTab((node) => _IdentityTab(controller: widget.controller, node: node)),
               _nodeTab((node) => _LayoutTab(controller: widget.controller, node: node)),
               _nodeTab((node) => _TransformTab(controller: widget.controller, node: node)),
@@ -79,11 +83,21 @@ class _InspectorPanelState extends State<InspectorPanel>
   }
 
   Widget _nodeTab(Widget Function(SceneNode node) builder) {
-    final node = widget.controller.selectedNode;
-    if (node == null) {
-      return Center(child: Text(EditorStringsScope.of(context).selectANode));
-    }
-    return builder(node);
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        widget.controller.documentListenable,
+        widget.controller.selectionListenable,
+      ]),
+      builder: (context, _) {
+        final node = widget.controller.selectedNode;
+        if (node == null) {
+          return Center(
+            child: Text(EditorStringsScope.of(context).selectANode),
+          );
+        }
+        return builder(node);
+      },
+    );
   }
 
   /// Scrolls the tab strip with the wheel and with a middle-button drag.

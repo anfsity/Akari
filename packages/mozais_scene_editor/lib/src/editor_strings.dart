@@ -25,6 +25,8 @@ abstract class EditorStrings {
   String get selectANode;
   String get outline;
   String get real;
+  String get editMode;
+  String get interactMode;
   String get collapseInspector;
   String get expandInspector;
   String get useLightTheme;
@@ -80,6 +82,8 @@ abstract class EditorStrings {
   String get directoryHint;
   String get pathNotFound;
   String get backgroundColor;
+  String get hexColor;
+  String get apply;
   String get scrimOpacity;
   String get blurSigma;
   String get noVideoRenderer;

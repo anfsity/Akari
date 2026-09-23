@@ -40,6 +40,10 @@ class EnglishStrings extends EditorStrings {
   @override
   String get real => 'Real';
   @override
+  String get editMode => 'Edit';
+  @override
+  String get interactMode => 'Interact';
+  @override
   String get collapseInspector => 'Collapse inspector';
   @override
   String get expandInspector => 'Expand inspector';
@@ -146,6 +150,10 @@ class EnglishStrings extends EditorStrings {
   String get pathNotFound => 'No file or folder at that path.';
   @override
   String get backgroundColor => 'color';
+  @override
+  String get hexColor => 'Hex color';
+  @override
+  String get apply => 'Apply';
   @override
   String get scrimOpacity => 'scrim opacity';
   @override

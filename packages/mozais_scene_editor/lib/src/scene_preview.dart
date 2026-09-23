@@ -28,12 +28,17 @@ class ScenePreview extends StatefulWidget {
     required this.controller,
     required this.feature,
     required this.mode,
+    this.interacting = false,
     super.key,
   });
 
   final SceneEditorController controller;
   final GreeterFeature feature;
   final PreviewMode mode;
+
+  /// When true the selection overlay is removed so the embedded greeter
+  /// receives pointer events directly.
+  final bool interacting;
 
   @override
   State<ScenePreview> createState() => _ScenePreviewState();
@@ -63,68 +68,81 @@ class _ScenePreviewState extends State<ScenePreview> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = _fit(constraints.biggest, aspectRatio);
+        final origin = Offset(
+          (constraints.maxWidth - size.width) / 2,
+          (constraints.maxHeight - size.height) / 2,
+        );
         final selected = widget.controller.selectedNode;
         final selectedVisible =
             selected != null && _isNodeVisible(selected);
-        return Center(
-          child: SizedBox(
-            width: size.width,
-            height: size.height,
-            child: Stack(
-              children: [
-                Positioned.fill(child: scene),
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white24),
+        return Stack(
+          children: [
+            Positioned(
+              left: origin.dx,
+              top: origin.dy,
+              width: size.width,
+              height: size.height,
+              child: Stack(
+                children: [
+                  Positioned.fill(child: scene),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.white24),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                if (selected != null && selectedVisible)
-                  Positioned.fill(
-                    child: _SelectionOverlay(
-                      key: const ValueKey('selectionOverlay'),
-                      node: selected,
+                ],
+              ),
+            ),
+            // The overlay fills the whole preview so handles dragged outside
+            // the canvas stay grabbable.
+            if (!widget.interacting) ...[
+              if (selected != null && selectedVisible)
+                Positioned.fill(
+                  child: _SelectionOverlay(
+                    key: const ValueKey('selectionOverlay'),
+                    canvasOrigin: origin,
+                    node: selected,
+                    previewSize: size,
+                    safeArea: safeArea,
+                    minHitTarget: theme.tokens.minHitTarget,
+                    onSelectAt: (position) => _selectNodeAt(
+                      position: position,
+                      document: document,
                       previewSize: size,
                       safeArea: safeArea,
                       minHitTarget: theme.tokens.minHitTarget,
-                      onSelectAt: (position) => _selectNodeAt(
-                        position: position,
-                        document: document,
-                        previewSize: size,
-                        safeArea: safeArea,
-                        minHitTarget: theme.tokens.minHitTarget,
-                      ),
-                      onRectChanged: (rect) => widget.controller.updateSelected(
-                        (node) => node.copyWith(rect: rect),
-                      ),
-                      onTransformChanged: (transform) =>
-                          widget.controller.updateSelected(
-                            (node) => node.copyWith(transform: transform),
-                          ),
                     ),
-                  )
-                else
-                  // No visible selection to drag, but a click can still pick
-                  // the topmost node under the pointer.
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTapUp: (details) => _selectNodeAt(
-                        position: details.localPosition,
-                        document: document,
-                        previewSize: size,
-                        safeArea: safeArea,
-                        minHitTarget: theme.tokens.minHitTarget,
-                      ),
-                      child: const SizedBox.expand(),
+                    onRectChanged: (rect) => widget.controller.updateSelected(
+                      (node) => node.copyWith(rect: rect),
                     ),
+                    onTransformChanged: (transform) =>
+                        widget.controller.updateSelected(
+                          (node) => node.copyWith(transform: transform),
+                        ),
                   ),
-              ],
-            ),
-          ),
+                )
+              else
+                // No visible selection to drag, but a click can still pick
+                // the topmost node under the pointer.
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapUp: (details) => _selectNodeAt(
+                      position: details.localPosition - origin,
+                      document: document,
+                      previewSize: size,
+                      safeArea: safeArea,
+                      minHitTarget: theme.tokens.minHitTarget,
+                    ),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+            ],
+          ],
         );
       },
     );
@@ -374,6 +392,7 @@ MouseCursor _cursorFor(_DragRegion region) {
 
 class _SelectionOverlay extends StatefulWidget {
   const _SelectionOverlay({
+    required this.canvasOrigin,
     required this.node,
     required this.previewSize,
     required this.safeArea,
@@ -384,6 +403,8 @@ class _SelectionOverlay extends StatefulWidget {
     super.key,
   });
 
+  /// The canvas's top-left corner inside the overlay's coordinate space.
+  final Offset canvasOrigin;
   final SceneNode node;
   final Size previewSize;
   final EdgeInsets safeArea;
@@ -421,30 +442,38 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     final geometry = _geometry;
     return MouseRegion(
       cursor: _cursorFor(_hoverRegion),
-      onHover: (event) => _updateHover(event.localPosition, geometry),
+      onHover: (event) => _updateHover(_toCanvas(event.localPosition), geometry),
       onExit: (_) => _setHover(_DragRegion.none),
       child: Listener(
         onPointerDown: (event) {
-          _pressRegion = _regionAt(event.localPosition, geometry);
-          _pressPointer = event.localPosition;
+          final position = _toCanvas(event.localPosition);
+          _pressRegion = _regionAt(position, geometry);
+          _pressPointer = position;
         },
         onPointerUp: (_) => _pressRegion = _DragRegion.none,
         onPointerCancel: (_) => _pressRegion = _DragRegion.none,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapUp: (details) => widget.onSelectAt(details.localPosition),
+          onTapUp: (details) =>
+              widget.onSelectAt(_toCanvas(details.localPosition)),
           onPanStart: (_) => _handlePanStart(geometry),
-          onPanUpdate: (details) => _handlePanUpdate(details.localPosition),
+          onPanUpdate: (details) =>
+              _handlePanUpdate(_toCanvas(details.localPosition)),
           onPanEnd: (_) => _handlePanEnd(),
           onPanCancel: _handlePanEnd,
           child: CustomPaint(
-            painter: _SelectionPainter(geometry: geometry),
+            painter: _SelectionPainter(
+              geometry: geometry,
+              canvasOrigin: widget.canvasOrigin,
+            ),
             child: const SizedBox.expand(),
           ),
         ),
       ),
     );
   }
+
+  Offset _toCanvas(Offset position) => position - widget.canvasOrigin;
 
   _DragRegion _regionAt(Offset position, _OverlayGeometry geometry) {
     if ((position - geometry.rotationDot).distance <=
@@ -578,12 +607,15 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
 }
 
 class _SelectionPainter extends CustomPainter {
-  _SelectionPainter({required this.geometry});
+  _SelectionPainter({required this.geometry, required this.canvasOrigin});
 
   final _OverlayGeometry geometry;
+  final Offset canvasOrigin;
 
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.translate(canvasOrigin.dx, canvasOrigin.dy);
     final outline = Paint()
       ..color = _accent
       ..strokeWidth = 1.5
@@ -638,6 +670,7 @@ class _SelectionPainter extends CustomPainter {
         ..strokeWidth = 1
         ..style = PaintingStyle.stroke,
     );
+    canvas.restore();
   }
 
   @override

@@ -25,7 +25,10 @@ the built-in file browser; the path field still accepts a path directly.
 - A dashed selection box follows the node's transform (including rotation and
   perspective), with a dot for in-plane rotation and a trackball for X/Y
   rotation. The cursor changes per region, and the box is hidden while the node
-  is not visible under the active predicates.
+  is not visible under the active predicates. Handles outside the canvas stay
+  grabbable.
+- **Interact** toggle removes the selection overlay so the embedded greeter is
+  fully usable; **Edit** restores selection and drag.
 - Tabbed inspector (Document / Identity / Layout / Transform / Visibility /
   Properties) for the document, rect, transform (including X/Y/Z rotation),
   layout, and properties. The tab strip scrolls with the wheel or a
@@ -33,7 +36,8 @@ the built-in file browser; the path field still accepts a path directly.
 - A Document tab edits `canvas` and `background`. Import copies a file into the
   repository `assets/` directory and sets the background kind from the
   extension; a video import renders solid until a video renderer exists. The
-  picker's address bar accepts a typed folder or file path.
+  picker's address bar accepts a typed folder or file path, and the color field
+  opens a palette picker.
 - `visibleWhen` builder with human-labeled predicates, common presets
   (asleep / awake / authenticating / error / user selected), the ALL/ANY rule
   builder, and an Advanced view for nested conditions.

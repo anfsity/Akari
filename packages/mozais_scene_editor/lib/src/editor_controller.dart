@@ -20,12 +20,75 @@ class SceneEditorController extends ChangeNotifier {
   bool _dirty = false;
   final Set<ScenePredicate> _activePredicates = <ScenePredicate>{};
 
+  final ValueNotifier<SceneDocument?> _documentNotifier = ValueNotifier(null);
+  final ValueNotifier<int> _nodesNotifier = ValueNotifier(0);
+  final ValueNotifier<String?> _selectionNotifier = ValueNotifier(null);
+  final ValueNotifier<Set<ScenePredicate>> _predicatesNotifier =
+      ValueNotifier(const {});
+  final ValueNotifier<EditorStatus> _statusNotifier =
+      ValueNotifier(EditorStatus.idle);
+  final ValueNotifier<bool> _dirtyNotifier = ValueNotifier(false);
+
   SceneDocument? get document => _document;
   String get path => _path;
   String? get selectedNodeId => _selectedNodeId;
   EditorStatus get status => _status;
   bool get dirty => _dirty;
   Set<ScenePredicate> get activePredicates => _activePredicates;
+
+  /// Notifies when the document under edit changes.
+  Listenable get documentListenable => _documentNotifier;
+
+  /// Notifies when the node list's displayed ids, kinds, or order change.
+  Listenable get nodesListenable => _nodesNotifier;
+
+  /// Notifies when the selected node changes.
+  Listenable get selectionListenable => _selectionNotifier;
+
+  /// Notifies when the active predicate set changes.
+  Listenable get predicatesListenable => _predicatesNotifier;
+
+  /// Notifies when the status text or dirty flag changes.
+  Listenable get statusListenable =>
+      Listenable.merge([_statusNotifier, _dirtyNotifier]);
+
+  @override
+  void dispose() {
+    _documentNotifier.dispose();
+    _nodesNotifier.dispose();
+    _selectionNotifier.dispose();
+    _predicatesNotifier.dispose();
+    _statusNotifier.dispose();
+    _dirtyNotifier.dispose();
+    super.dispose();
+  }
+
+  void _setDocument(SceneDocument document) {
+    final previous = _document;
+    _document = document;
+    _documentNotifier.value = document;
+    if (_nodesChanged(previous, document)) {
+      _nodesNotifier.value++;
+    }
+  }
+
+  void _setSelection(String? id) {
+    _selectedNodeId = id;
+    _selectionNotifier.value = id;
+  }
+
+  void _setDirty(bool value) {
+    if (_dirty == value) {
+      return;
+    }
+    _dirty = value;
+    _dirtyNotifier.value = value;
+  }
+
+  void _setStatus(EditorStatus status) {
+    _status = status;
+    _statusNotifier.value = status;
+  }
 
   SceneNode? get selectedNode {
     final document = _document;
@@ -48,21 +111,21 @@ class SceneEditorController extends ChangeNotifier {
 
   Future<bool> open() async {
     if (_path.isEmpty) {
-      _status = const EditorStatus(EditorStatusKind.enterPathFirst);
+      _setStatus(const EditorStatus(EditorStatusKind.enterPathFirst));
       notifyListeners();
       return false;
     }
     try {
       final source = await File(_path).readAsString();
       final document = decodeSceneDocument(source);
-      _document = document;
-      _selectedNodeId = document.nodes.first.id;
-      _dirty = false;
-      _status = EditorStatus(EditorStatusKind.opened, _path);
+      _setDocument(document);
+      _setSelection(document.nodes.first.id);
+      _setDirty(false);
+      _setStatus(EditorStatus(EditorStatusKind.opened, _path));
       notifyListeners();
       return true;
     } on Object catch (error) {
-      _status = EditorStatus(EditorStatusKind.openFailed, error);
+      _setStatus(EditorStatus(EditorStatusKind.openFailed, error));
       notifyListeners();
       return false;
     }
@@ -75,19 +138,19 @@ class SceneEditorController extends ChangeNotifier {
     }
     try {
       await File(_path).writeAsString(encodeSceneDocument(document));
-      _dirty = false;
-      _status = EditorStatus(EditorStatusKind.saved, _path);
+      _setDirty(false);
+      _setStatus(EditorStatus(EditorStatusKind.saved, _path));
       notifyListeners();
       return true;
     } on Object catch (error) {
-      _status = EditorStatus(EditorStatusKind.saveFailed, error);
+      _setStatus(EditorStatus(EditorStatusKind.saveFailed, error));
       notifyListeners();
       return false;
     }
   }
 
   void select(String id) {
-    _selectedNodeId = id;
+    _setSelection(id);
     notifyListeners();
   }
 
@@ -97,8 +160,8 @@ class SceneEditorController extends ChangeNotifier {
     if (document == null) {
       return;
     }
-    _document = update(document);
-    _dirty = true;
+    _setDocument(update(document));
+    _setDirty(true);
     notifyListeners();
   }
 
@@ -113,9 +176,11 @@ class SceneEditorController extends ChangeNotifier {
     }
     final directory = _assetsDirectory ?? repoAssetsDirectory();
     if (directory == null) {
-      _status = EditorStatus(
-        EditorStatusKind.backgroundImportFailed,
-        const FileSystemException('Repository assets directory not found.'),
+      _setStatus(
+        EditorStatus(
+          EditorStatusKind.backgroundImportFailed,
+          const FileSystemException('Repository assets directory not found.'),
+        ),
       );
       notifyListeners();
       return false;
@@ -128,7 +193,7 @@ class SceneEditorController extends ChangeNotifier {
       );
       await source.copy('${directory.path}/$name');
       final asset = 'assets/$name';
-      _status = EditorStatus(EditorStatusKind.backgroundImported, asset);
+      _setStatus(EditorStatus(EditorStatusKind.backgroundImported, asset));
       updateDocument(
         (document) => document.copyWith(
           background: document.background.copyWith(
@@ -139,7 +204,7 @@ class SceneEditorController extends ChangeNotifier {
       );
       return true;
     } on Object catch (error) {
-      _status = EditorStatus(EditorStatusKind.backgroundImportFailed, error);
+      _setStatus(EditorStatus(EditorStatusKind.backgroundImportFailed, error));
       notifyListeners();
       return false;
     }
@@ -152,13 +217,15 @@ class SceneEditorController extends ChangeNotifier {
       return;
     }
     final updated = update(node);
-    _document = document.copyWith(
-      nodes: [
-        for (final candidate in document.nodes)
-          if (candidate.id == node.id) updated else candidate,
-      ],
+    _setDocument(
+      document.copyWith(
+        nodes: [
+          for (final candidate in document.nodes)
+            if (candidate.id == node.id) updated else candidate,
+        ],
+      ),
     );
-    _dirty = true;
+    _setDirty(true);
     notifyListeners();
   }
 
@@ -173,9 +240,9 @@ class SceneEditorController extends ChangeNotifier {
       kind: SceneNodeKind.decoration,
       rect: const SceneRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2),
     );
-    _document = document.copyWith(nodes: [...document.nodes, node]);
-    _selectedNodeId = id;
-    _dirty = true;
+    _setDocument(document.copyWith(nodes: [...document.nodes, node]));
+    _setSelection(id);
+    _setDirty(true);
     notifyListeners();
   }
 
@@ -193,9 +260,9 @@ class SceneEditorController extends ChangeNotifier {
         y: (node.rect.y + 0.02).clamp(0, 1 - node.rect.height),
       ),
     );
-    _document = document.copyWith(nodes: [...document.nodes, copy]);
-    _selectedNodeId = id;
-    _dirty = true;
+    _setDocument(document.copyWith(nodes: [...document.nodes, copy]));
+    _setSelection(id);
+    _setDirty(true);
     notifyListeners();
   }
 
@@ -211,13 +278,13 @@ class SceneEditorController extends ChangeNotifier {
         if (candidate.id != node.id) candidate,
     ];
     if (nodes.isEmpty) {
-      _status = const EditorStatus(EditorStatusKind.keepOneNode);
+      _setStatus(const EditorStatus(EditorStatusKind.keepOneNode));
       notifyListeners();
       return;
     }
-    _document = document.copyWith(nodes: nodes);
-    _selectedNodeId = nodes.first.id;
-    _dirty = true;
+    _setDocument(document.copyWith(nodes: nodes));
+    _setSelection(nodes.first.id);
+    _setDirty(true);
     notifyListeners();
   }
 
@@ -225,8 +292,26 @@ class SceneEditorController extends ChangeNotifier {
     if (!_activePredicates.remove(predicate)) {
       _activePredicates.add(predicate);
     }
+    _predicatesNotifier.value = {..._activePredicates};
     notifyListeners();
   }
+}
+
+bool _nodesChanged(SceneDocument? previous, SceneDocument next) {
+  if (previous == null) {
+    return true;
+  }
+  final before = previous.paintOrder;
+  final after = next.paintOrder;
+  if (before.length != after.length) {
+    return true;
+  }
+  for (var i = 0; i < before.length; i++) {
+    if (before[i].id != after[i].id || before[i].kind != after[i].kind) {
+      return true;
+    }
+  }
+  return false;
 }
 
 String _uniqueNodeId(SceneDocument document, String base) {
