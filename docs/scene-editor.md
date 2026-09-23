@@ -120,12 +120,15 @@ A settings route with grouped options:
 - **Editing**: confirm unsaved changes, grid snap, preview aspect ratio.
 - **Files**: default scene path.
 
-Editor themes are well-known palettes mapped to a `ColorScheme`: Catppuccin
-(Latte/Mocha), Tokyo Night, GitHub (Light/Dark), Nord, Dracula. They affect the
-editor UI only, never the greeter's compile-time `ThemeTokens`. Settings persist
-to `~/.config/mozais/scene_editor.json` with `dart:io`. The app restyles
+Editor themes are well-known palettes mapped to a `ColorScheme`: Mozais Aurora
+(Aurora/Aurora Dawn), Catppuccin (Latte/Mocha), Tokyo Night, GitHub
+(Light/Dark), Nord, and Dracula. They affect the editor UI only, never the
+greeter's compile-time `ThemeTokens`. Settings persist to
+`~/.config/mozais/scene_editor.json` with `dart:io`. The app restyles
 immediately, so the page has no separate preview card; a light/dark toggle in
-the app bar switches to the opposite brightness of the current theme.
+the app bar switches to the opposite brightness of the current theme. The
+editor also provides Ctrl/Cmd+S, Ctrl/Cmd+O, and Delete shortcuts for the
+common document and node actions.
 
 Language is English only for now, behind an `EditorStrings` abstraction with an
 `EnglishStrings` implementation and a locale registry, so adding a locale is a

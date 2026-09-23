@@ -52,5 +52,8 @@ the built-in file browser; the path field still accepts a path directly.
   confirmation, grid-snap and preview-aspect-ratio options, and a default scene
   path. Settings persist to `~/.config/mozais/scene_editor.json`. An app-bar
   toggle switches the current theme to its light or dark counterpart.
+- The default editor palette is Mozais Aurora, with an Aurora Dawn light
+  counterpart. Ctrl/Cmd+S saves, Ctrl/Cmd+O opens, and Delete removes the
+  selected node.
 - Save / Discard / Cancel prompt when opening a document or closing the window
   with unsaved changes.
