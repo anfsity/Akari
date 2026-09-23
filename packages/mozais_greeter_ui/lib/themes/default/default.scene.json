@@ -9,14 +9,14 @@
     "kind": "image",
     "asset": "assets/(139810879)年越し三人娘 『OIOI × 東方Project』.jpg",
     "color": "#000000",
-    "scrimOpacity": 0.5,
-    "blurSigma": 24
+    "scrimOpacity": 0.44,
+    "blurSigma": 14
   },
   "nodes": [
     {
       "id": "clock",
       "kind": "dateTime",
-      "rect": {"x": 0.031, "y": 0.046, "width": 0.22, "height": 0.045},
+      "rect": {"x": 0.035, "y": 0.05, "width": 0.24, "height": 0.045},
       "renderOrder": 10,
       "focusOrder": 0,
       "motion": "fade",
@@ -35,7 +35,7 @@
     {
       "id": "power_actions",
       "kind": "powerActions",
-      "rect": {"x": 0.90, "y": 0.028, "width": 0.08, "height": 0.04},
+      "rect": {"x": 0.87, "y": 0.035, "width": 0.095, "height": 0.04},
       "renderOrder": 20,
       "focusOrder": 30,
       "motion": "fade",
@@ -45,7 +45,7 @@
     {
       "id": "glass_panel",
       "kind": "glassPanel",
-      "rect": {"x": 0.34, "y": 0.20, "width": 0.32, "height": 0.60},
+      "rect": {"x": 0.32, "y": 0.18, "width": 0.36, "height": 0.64},
       "renderOrder": 30,
       "focusOrder": 0,
       "motion": "fadeScale",
@@ -55,7 +55,7 @@
     {
       "id": "avatar",
       "kind": "avatar",
-      "rect": {"x": 0.4625, "y": 0.245, "width": 0.075, "height": 0.1333},
+      "rect": {"x": 0.45, "y": 0.225, "width": 0.1, "height": 0.16},
       "renderOrder": 40,
       "focusOrder": 10,
       "motion": "fadeScale",
@@ -66,7 +66,7 @@
     {
       "id": "account_name",
       "kind": "accountName",
-      "rect": {"x": 0.38, "y": 0.41, "width": 0.24, "height": 0.05},
+      "rect": {"x": 0.36, "y": 0.395, "width": 0.28, "height": 0.06},
       "renderOrder": 40,
       "focusOrder": 0,
       "motion": "fade",
@@ -76,7 +76,7 @@
     {
       "id": "session_picker",
       "kind": "sessionPicker",
-      "rect": {"x": 0.40, "y": 0.485, "width": 0.20, "height": 0.06},
+      "rect": {"x": 0.37, "y": 0.48, "width": 0.26, "height": 0.065},
       "renderOrder": 40,
       "focusOrder": 20,
       "motion": "fade",
@@ -87,7 +87,7 @@
     {
       "id": "credential_field",
       "kind": "credentialField",
-      "rect": {"x": 0.37, "y": 0.59, "width": 0.26, "height": 0.08},
+      "rect": {"x": 0.35, "y": 0.585, "width": 0.3, "height": 0.075},
       "renderOrder": 40,
       "focusOrder": 40,
       "motion": "fade",
@@ -97,7 +97,7 @@
     {
       "id": "primary_action",
       "kind": "primaryAction",
-      "rect": {"x": 0.478, "y": 0.675, "width": 0.044, "height": 0.078},
+      "rect": {"x": 0.47, "y": 0.67, "width": 0.06, "height": 0.08},
       "renderOrder": 40,
       "focusOrder": 50,
       "motion": "hoverLift",
@@ -108,7 +108,7 @@
     {
       "id": "status",
       "kind": "status",
-      "rect": {"x": 0.37, "y": 0.765, "width": 0.26, "height": 0.03},
+      "rect": {"x": 0.35, "y": 0.765, "width": 0.3, "height": 0.035},
       "renderOrder": 40,
       "focusOrder": 0,
       "motion": "fade",
