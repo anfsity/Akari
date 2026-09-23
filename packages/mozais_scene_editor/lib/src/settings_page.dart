@@ -59,18 +59,15 @@ class SettingsPage extends StatelessWidget {
                   SwitchRow(
                     label: strings.gridSnap,
                     value: settings.gridSnap,
-                    onChanged: (value) => controller.update(
-                      settings.copyWith(gridSnap: value),
-                    ),
+                    onChanged: (value) =>
+                        controller.update(settings.copyWith(gridSnap: value)),
                   ),
                   _AspectRatioPicker(controller: controller),
                 ],
               ),
               SectionCard(
                 title: strings.files,
-                children: [
-                  _DefaultPathField(controller: controller),
-                ],
+                children: [_DefaultPathField(controller: controller)],
               ),
             ],
           );
@@ -93,21 +90,52 @@ class _ThemePicker extends StatelessWidget {
       children: [
         SizedBox(width: 160, child: Text(strings.editorTheme)),
         Expanded(
-          child: DropdownButton<EditorThemeId>(
-            isExpanded: true,
-            value: settings.themeId,
-            onChanged: (value) {
-              if (value != null) {
-                controller.update(settings.copyWith(themeId: value));
-              }
-            },
-            items: [
-              for (final theme in editorThemes.values)
-                DropdownMenuItem(value: theme.id, child: Text(theme.name)),
-            ],
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<EditorThemeId>(
+              isExpanded: true,
+              value: settings.themeId,
+              onChanged: (value) {
+                if (value != null) {
+                  controller.update(settings.copyWith(themeId: value));
+                }
+              },
+              items: [
+                for (final theme in editorThemes.values)
+                  DropdownMenuItem(
+                    value: theme.id,
+                    child: Row(
+                      children: [
+                        _ThemeSwatch(color: theme.palette.accent),
+                        const SizedBox(width: 10),
+                        Text(theme.name),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ThemeSwatch extends StatelessWidget {
+  const _ThemeSwatch({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 8),
+        ],
+      ),
+      child: const SizedBox(width: 12, height: 12),
     );
   }
 }
@@ -192,9 +220,8 @@ class _DefaultPathField extends StatelessWidget {
         hintText: EditorStringsScope.of(context).pathHint,
         isDense: true,
       ),
-      onFieldSubmitted: (value) => controller.update(
-        settings.copyWith(defaultScenePath: value.trim()),
-      ),
+      onFieldSubmitted: (value) =>
+          controller.update(settings.copyWith(defaultScenePath: value.trim())),
     );
   }
 }
