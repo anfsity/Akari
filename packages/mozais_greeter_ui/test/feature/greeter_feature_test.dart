@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mozais_greeter_ui/feature/greeter/greeter_commands.dart';
-import 'package:mozais_greeter_ui/feature/greeter/greeter_effect.dart';
-import 'package:mozais_greeter_ui/feature/greeter/greeter_feature.dart';
-import 'package:mozais_greeter_ui/feature/greeter/greeter_state.dart';
-import 'package:mozais_greeter_ui/feature/greeter/ports/greeter_gateway.dart';
-import 'package:mozais_greeter_ui/feature/greeter/ports/session_store.dart';
+import 'package:mozais_greeter_ui/feature/greeter_commands.dart';
+import 'package:mozais_greeter_ui/feature/greeter_effect.dart';
+import 'package:mozais_greeter_ui/feature/greeter_feature.dart';
+import 'package:mozais_greeter_ui/feature/greeter_state.dart';
+import 'package:mozais_greeter_ui/feature/ports/greeter_gateway.dart';
+import 'package:mozais_greeter_ui/feature/ports/session_store.dart';
 
 void main() {
   test('initializes from the backend state snapshot', () async {

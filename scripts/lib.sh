@@ -30,3 +30,28 @@ mozais_log_dir() {
   mkdir -p -- "$log_dir"
   printf '%s\n' "$log_dir"
 }
+
+mozais_run_dev_cli() {
+  local repo_root="$1"
+  shift
+
+  local flutter_bin="${MOZAIS_FLUTTER_BIN:-}"
+  if [[ -n "$flutter_bin" && "$flutter_bin" != /* ]]; then
+    flutter_bin="$repo_root/$flutter_bin"
+  fi
+
+  local dart_bin="${MOZAIS_DART_BIN:-}"
+  if [[ -n "$dart_bin" && "$dart_bin" != /* ]]; then
+    dart_bin="$repo_root/$dart_bin"
+  fi
+  if [[ -z "$dart_bin" && -n "$flutter_bin" ]]; then
+    dart_bin="$(dirname -- "$flutter_bin")/dart"
+  fi
+
+  if [[ -n "$dart_bin" ]]; then
+    exec "$dart_bin" "$repo_root/tool/mozais.dart" "$@"
+  fi
+
+  cd -- "$repo_root"
+  exec fvm dart run tool/mozais.dart "$@"
+}

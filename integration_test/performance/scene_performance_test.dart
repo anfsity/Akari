@@ -17,6 +17,14 @@ const _frameInterval = Duration(microseconds: 16667);
 const _captureTimelineDiagnostics = bool.fromEnvironment(
   'MOZAIS_PERF_TRACE_TIMELINE',
 );
+const _timelinePath = String.fromEnvironment(
+  'MOZAIS_PERF_TIMELINE_PATH',
+  defaultValue: 'build/perf/scene_interactions_timeline.json',
+);
+const _reportPath = String.fromEnvironment(
+  'MOZAIS_PERF_REPORT_PATH',
+  defaultValue: 'build/perf/scene_report.json',
+);
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -170,7 +178,7 @@ void main() {
       debugProfilePaintsEnabled = true;
       try {
         final timeline = await binding.traceTimeline(captureJourney);
-        final traceFile = File('build/perf/scene_interactions_timeline.json');
+        final traceFile = File(_timelinePath);
         await traceFile.parent.create(recursive: true);
         await traceFile.writeAsString(jsonEncode(timeline.toJson()));
       } finally {
@@ -214,7 +222,7 @@ void main() {
       'static_background_scheduled_frames': staticBackgroundFrames,
     };
 
-    final output = File('build/perf/scene_report.json');
+    final output = File(_reportPath);
     await output.parent.create(recursive: true);
     await output.writeAsString(jsonEncode(report));
     binding.reportData = report;
