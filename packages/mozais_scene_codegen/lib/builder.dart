@@ -54,7 +54,7 @@ String _generate(SceneDocument document) {
     buffer
       ..writeln('    SceneNode(')
       ..writeln('      id: ${_dartString(node.id)},')
-      ..writeln('      kind: SceneNodeKind.${node.kind.name},')
+      ..writeln('      componentId: ${_dartString(node.componentId)},')
       ..writeln('      rect: const SceneRect(')
       ..writeln('        x: ${node.rect.x},')
       ..writeln('        y: ${node.rect.y},')
@@ -80,9 +80,7 @@ String _generate(SceneDocument document) {
       ..writeln(
         '      visibleWhen: ${node.visibleWhen == null ? 'null' : 'const ${_conditionLiteral(node.visibleWhen!)}'},',
       )
-      ..writeln(
-        '      action: ${node.action == null ? 'null' : 'SceneAction.${node.action!.name}'},',
-      )
+      ..writeln('      interactive: ${node.interactive},')
       ..writeln('      properties: <String, String>{');
     for (final entry in node.properties.entries) {
       buffer.writeln(

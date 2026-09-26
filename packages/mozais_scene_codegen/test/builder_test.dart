@@ -29,8 +29,8 @@ void main() {
     expect(generated, contains('SceneDocument testSceneDocument'));
     expect(generated, contains('referenceWidth: 2560'));
     expect(generated, contains('referenceHeight: 1440'));
-    expect(generated, contains('SceneNodeKind.primaryAction'));
-    expect(generated, contains('SceneAction.beginAuthentication'));
+    expect(generated, contains("componentId: 'primaryAction'"));
+    expect(generated, contains('interactive: true'));
     expect(
       generated,
       contains(

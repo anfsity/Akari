@@ -2,9 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
-import 'package:mozais_greeter_ui/theme/palette_extractor.dart';
 import 'package:mozais_scene/mozais_scene.dart';
+import 'package:mozais_theme_catalog/mozais_theme_catalog.dart';
+import 'package:mozais_theme_sdk/mozais_theme_sdk.dart'
+    show ThemeDefinition, extractSeedFromBytes;
 
 import 'editor_status.dart';
 import 'repo_root.dart';
@@ -30,10 +31,12 @@ class SceneEditorController extends ChangeNotifier {
   final ValueNotifier<SceneDocument?> _documentNotifier = ValueNotifier(null);
   final ValueNotifier<int> _nodesNotifier = ValueNotifier(0);
   final ValueNotifier<String?> _selectionNotifier = ValueNotifier(null);
-  final ValueNotifier<Set<ScenePredicate>> _predicatesNotifier =
-      ValueNotifier(const {});
-  final ValueNotifier<EditorStatus> _statusNotifier =
-      ValueNotifier(EditorStatus.idle);
+  final ValueNotifier<Set<ScenePredicate>> _predicatesNotifier = ValueNotifier(
+    const {},
+  );
+  final ValueNotifier<EditorStatus> _statusNotifier = ValueNotifier(
+    EditorStatus.idle,
+  );
   final ValueNotifier<bool> _dirtyNotifier = ValueNotifier(false);
   final ValueNotifier<bool> _openingNotifier = ValueNotifier(false);
   final ValueNotifier<bool> _savingNotifier = ValueNotifier(false);
@@ -50,7 +53,7 @@ class SceneEditorController extends ChangeNotifier {
   /// Notifies when the document under edit changes.
   Listenable get documentListenable => _documentNotifier;
 
-  /// Notifies when the node list's displayed ids, kinds, or order change.
+  /// Notifies when the node list's IDs, components, or order change.
   Listenable get nodesListenable => _nodesNotifier;
 
   /// Notifies when the selected node changes.
@@ -301,7 +304,7 @@ class SceneEditorController extends ChangeNotifier {
     final id = _uniqueNodeId(document, 'node');
     final node = SceneNode(
       id: id,
-      kind: SceneNodeKind.decoration,
+      componentId: 'decoration',
       rect: const SceneRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2),
     );
     _setDocument(document.copyWith(nodes: [...document.nodes, node]));
@@ -371,7 +374,8 @@ bool _nodesChanged(SceneDocument? previous, SceneDocument next) {
     return true;
   }
   for (var i = 0; i < before.length; i++) {
-    if (before[i].id != after[i].id || before[i].kind != after[i].kind) {
+    if (before[i].id != after[i].id ||
+        before[i].componentId != after[i].componentId) {
       return true;
     }
   }
@@ -414,9 +418,13 @@ String _uniqueAssetName(Directory directory, String name) {
 
 /// Resolves the same theme family as the Greeter and points its wallpaper
 /// renderer at repository files that the editor can read directly.
-ThemeBundle editorTheme(SceneDocument document, {Color? seed}) {
-  final resolved = ThemeRegistry.resolveDocument(document, seed: seed);
-  final backgrounds = {...resolved.backgrounds};
+ThemeDefinition editorTheme(SceneDocument document, {Color? seed}) {
+  final themeName = const String.fromEnvironment(
+    'MOZAIS_THEME',
+    defaultValue: ThemeRegistry.defaultThemeName,
+  );
+  final resolved = ThemeRegistry.resolve(themeName, seed: seed);
+  final backgrounds = {...resolved.bundle.backgrounds};
   backgrounds[SceneBackgroundKind.solid] = const SolidBackgroundRenderer();
   backgrounds[SceneBackgroundKind.image] = ImageBackgroundRenderer(
     resolveImage: (asset) {
@@ -426,7 +434,10 @@ ThemeBundle editorTheme(SceneDocument document, {Color? seed}) {
           : AssetImage(asset);
     },
   );
-  return resolved.copyWith(document: document, backgrounds: backgrounds);
+  return resolved.copyWith(
+    document: document,
+    bundle: resolved.bundle.copyWith(backgrounds: backgrounds),
+  );
 }
 
 Future<Color?> editorBackgroundSeed(SceneDocument document) async {

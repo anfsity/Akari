@@ -1,13 +1,13 @@
 {
   "id": "default",
-  "version": 1,
+  "version": 2,
   "canvas": {
     "fit": "cover",
     "useSafeArea": true
   },
   "background": {
     "kind": "image",
-    "asset": "assets/(139810879)年越し三人娘 『OIOI × 東方Project』.jpg",
+    "asset": "packages/mozais_theme_default/assets/(139810879)年越し三人娘 『OIOI × 東方Project』.jpg",
     "color": "#000000",
     "scrimOpacity": 0.44,
     "blurSigma": 14
@@ -15,7 +15,7 @@
   "nodes": [
     {
       "id": "clock",
-      "kind": "dateTime",
+      "component": "dateTime",
       "rect": {"x": 0.035, "y": 0.05, "width": 0.24, "height": 0.045},
       "renderOrder": 10,
       "focusOrder": 0,
@@ -24,7 +24,7 @@
     },
     {
       "id": "clock_time",
-      "kind": "dateTime",
+      "component": "dateTime",
       "rect": {"x": 0.30, "y": 0.42, "width": 0.40, "height": 0.16},
       "renderOrder": 10,
       "focusOrder": 0,
@@ -34,17 +34,17 @@
     },
     {
       "id": "power_actions",
-      "kind": "powerActions",
+      "component": "powerActions",
       "rect": {"x": 0.87, "y": 0.035, "width": 0.095, "height": 0.04},
       "renderOrder": 20,
       "focusOrder": 30,
       "motion": "fade",
-      "action": "requestPowerAction",
+      "interactive": true,
       "properties": {"variant": "icon-row"}
     },
     {
       "id": "glass_panel",
-      "kind": "glassPanel",
+      "component": "glassPanel",
       "rect": {"x": 0.32, "y": 0.18, "width": 0.36, "height": 0.64},
       "renderOrder": 30,
       "focusOrder": 0,
@@ -54,18 +54,18 @@
     },
     {
       "id": "avatar",
-      "kind": "avatar",
+      "component": "avatar",
       "rect": {"x": 0.45, "y": 0.225, "width": 0.1, "height": 0.16},
       "renderOrder": 40,
       "focusOrder": 10,
       "motion": "fadeScale",
-      "action": "selectUser",
+      "interactive": true,
       "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "circle"}
     },
     {
       "id": "account_name",
-      "kind": "accountName",
+      "component": "accountName",
       "rect": {"x": 0.36, "y": 0.39, "width": 0.28, "height": 0.06},
       "renderOrder": 40,
       "focusOrder": 0,
@@ -75,39 +75,40 @@
     },
     {
       "id": "session_picker",
-      "kind": "sessionPicker",
+      "component": "sessionPicker",
       "rect": {"x": 0.37, "y": 0.48, "width": 0.26, "height": 0.065},
       "renderOrder": 40,
       "focusOrder": 20,
       "motion": "fade",
-      "action": "selectSession",
+      "interactive": true,
       "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "pill"}
     },
     {
       "id": "credential_field",
-      "kind": "credentialField",
+      "component": "credentialField",
       "rect": {"x": 0.35, "y": 0.585, "width": 0.3, "height": 0.06},
       "renderOrder": 40,
       "focusOrder": 40,
       "motion": "fade",
+      "interactive": true,
       "visibleWhen": {"not": "isDormant"},
       "properties": {"variant": "outline"}
     },
     {
       "id": "primary_action",
-      "kind": "primaryAction",
+      "component": "primaryAction",
       "rect": {"x": 0.47, "y": 0.685, "width": 0.06, "height": 0.08},
       "renderOrder": 40,
       "focusOrder": 50,
       "motion": "hoverLift",
-      "action": "beginAuthentication",
+      "interactive": true,
       "visibleWhen": {"any": ["isAuthPrompting", "isAuthSubmitting", "isAuthError"]},
       "properties": {"variant": "round-arrow"}
     },
     {
       "id": "status",
-      "kind": "status",
+      "component": "status",
       "rect": {"x": 0.35, "y": 0.765, "width": 0.3, "height": 0.035},
       "renderOrder": 40,
       "focusOrder": 0,

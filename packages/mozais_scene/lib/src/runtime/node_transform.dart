@@ -20,7 +20,7 @@ Rect sceneNodeRect({
   final left = safeArea.left + availableWidth * node.rect.x;
   final top = safeArea.top + availableHeight * node.rect.y;
 
-  if (node.isInteractive) {
+  if (node.interactive) {
     width = math.max(width, minHitTarget);
     height = math.max(height, minHitTarget);
   }

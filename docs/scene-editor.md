@@ -16,7 +16,11 @@ UI**, so theme authors can iterate without running the login stack.
 packages/mozais_scene_schema   Flutter-free model, condition evaluator, JSON codec
 packages/mozais_scene          runtime, theme bundle, background and motion registries
 packages/mozais_scene_codegen  build_runner generator (decode JSON, emit Dart)
-packages/mozais_greeter_ui     feature, scene composition, themes  (no dbus)
+packages/mozais_greeter_ui     feature and scene composition (no dbus)
+packages/mozais_theme_sdk      semantic Host API for compiled themes
+packages/mozais_theme_default  built-in default theme
+packages/mozais_theme_fallback built-in fallback theme
+packages/mozais_theme_catalog  compile-time selection of built-in themes
 packages/mozais_scene_editor   desktop editor
 <root>  mozais_greeter (app)   main, app wiring, infrastructure/dbus (thin shell)
 ```
@@ -57,8 +61,8 @@ tree or app install.
   pointer. The embedded scene is cached so moving the selection does not
   rebuild the background, blur, or greeter widgets.
 - The reusable UI is extracted into `mozais_greeter_ui`; the app is a thin
-  shell over it. `buildDefaultTheme` accepts a `SceneDocument`, so the editor
-  previews the edited document with the real theme. The editor embeds
+  shell over it. The editor previews the edited document with the real theme.
+  The editor embeds
   `GreeterFeature(DemoGreeterGateway())` and `GreeterSceneAdapter` behind an
   **Outline / Real** toggle, and resolves background assets from the repository
   root with a file-based image provider.
@@ -83,7 +87,7 @@ The preview embeds the real greeter in the editor process:
 
 ```text
 GreeterFeature(gateway: DemoGreeterGateway())
-buildDefaultTheme(document: editedDocument)
+ThemeRegistry.resolve('default').copyWith(document: editedDocument)
 GreeterSceneAdapter(feature: ..., theme: ...)
 ```
 
@@ -91,9 +95,9 @@ GreeterSceneAdapter(feature: ..., theme: ...)
 - Scene edits render live (in-memory `SceneDocument`, no codegen).
 - Widget-code edits update through the editor's own `flutter run` hot reload.
 - An **Outline / Real** toggle keeps the placeholder preview for layout work.
-- Requires `buildDefaultTheme({Color? seed, SceneDocument? document})` as the
-  document-injection seam, and an editor-side background renderer that loads
-  `assets/...` from the repository root.
+- Theme packages own their scenes, component assemblies, tokens, and assets.
+  The editor resolves the same compile-time catalog as the greeter and loads
+  both repository `assets/...` and theme package assets from the checkout.
 
 ### 4.2 Mouse manipulation
 

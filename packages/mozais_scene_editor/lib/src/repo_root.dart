@@ -2,13 +2,13 @@ import 'dart:io';
 
 /// Walks up from the working directory to the repository root.
 ///
-/// The editor runs from inside its package, so the root is located by the
-/// `mozais_greeter_ui` package rather than a fixed relative path.
+/// The editor runs from inside its package, so the root is located by a theme
+/// package rather than a fixed relative path.
 Directory? repoRoot() {
   var directory = Directory.current;
   for (var depth = 0; depth < 8; depth++) {
     final marker = File(
-      '${directory.path}/packages/mozais_greeter_ui/pubspec.yaml',
+      '${directory.path}/packages/mozais_theme_default/pubspec.yaml',
     );
     if (marker.existsSync()) {
       return directory;
@@ -22,14 +22,14 @@ Directory? repoRoot() {
   return null;
 }
 
-/// The bundled default scene inside the UI package.
+/// The bundled default scene inside its theme package.
 String? defaultScenePath() {
   final root = repoRoot();
   if (root == null) {
     return null;
   }
   final candidate = File(
-    '${root.path}/packages/mozais_greeter_ui/lib/themes/default/default.scene.json',
+    '${root.path}/packages/mozais_theme_default/lib/default.scene.json',
   );
   return candidate.existsSync() ? candidate.path : null;
 }

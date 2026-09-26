@@ -6,9 +6,7 @@ void main() {
   group('sceneNodeRect', () {
     test('maps a normalized rect into scene coordinates', () {
       final rect = sceneNodeRect(
-        node: _node(
-          const SceneRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
-        ),
+        node: _node(const SceneRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4)),
         sceneSize: const Size(1000, 500),
         safeArea: EdgeInsets.zero,
         minHitTarget: 44,
@@ -21,7 +19,7 @@ void main() {
       final rect = sceneNodeRect(
         node: _node(
           const SceneRect(x: 0, y: 0, width: 0.01, height: 0.01),
-          kind: SceneNodeKind.primaryAction,
+          interactive: true,
         ),
         sceneSize: const Size(1000, 500),
         safeArea: EdgeInsets.zero,
@@ -95,7 +93,13 @@ void main() {
 
 SceneNode _node(
   SceneRect rect, {
-  SceneNodeKind kind = SceneNodeKind.decoration,
+  String componentId = 'decoration',
+  bool interactive = false,
 }) {
-  return SceneNode(id: 'node', kind: kind, rect: rect);
+  return SceneNode(
+    id: 'node',
+    componentId: componentId,
+    rect: rect,
+    interactive: interactive,
+  );
 }

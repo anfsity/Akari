@@ -170,22 +170,28 @@ class _IdentityTab extends StatelessWidget {
           children: [
             _IdField(controller: controller, node: node),
             const SizedBox(height: 8),
-            EnumDropdown<SceneNodeKind>(
-              label: strings.kind,
-              value: node.kind,
-              values: SceneNodeKind.values,
-              onChanged: (value) => controller.updateSelected(
-                (node) => node.copyWith(kind: value),
+            TextFormField(
+              key: ValueKey('${node.id}:${node.componentId}'),
+              initialValue: node.componentId,
+              decoration: InputDecoration(
+                labelText: strings.component,
+                isDense: true,
               ),
+              onFieldSubmitted: (value) {
+                final componentId = value.trim();
+                if (componentId.isNotEmpty) {
+                  controller.updateSelected(
+                    (node) => node.copyWith(componentId: componentId),
+                  );
+                }
+              },
             ),
             const SizedBox(height: 8),
-            NullableEnumDropdown<SceneAction>(
-              label: strings.action,
-              noneLabel: strings.none,
-              value: node.action,
-              values: SceneAction.values,
+            SwitchRow(
+              label: strings.interactive,
+              value: node.interactive,
               onChanged: (value) => controller.updateSelected(
-                (node) => node.copyWith(action: value),
+                (node) => node.copyWith(interactive: value),
               ),
             ),
             const SizedBox(height: 8),

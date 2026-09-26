@@ -10,14 +10,15 @@ dependencies:
     sdk: flutter
   mozais_scene:
     path: ../mozais_scene
+  mozais_theme_sdk:
+    path: ../mozais_theme_sdk
 
 dev_dependencies:
-  build_runner: ^2.4.13
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
-  mozais_scene_codegen:
-    path: ../mozais_scene_codegen
+  mozais_theme_default:
+    path: ../mozais_theme_default
 
 flutter:
   uses-material-design: true

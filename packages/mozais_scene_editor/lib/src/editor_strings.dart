@@ -39,8 +39,8 @@ abstract class EditorStrings {
   String get activePredicates;
 
   String get identity;
-  String get kind;
-  String get action;
+  String get component;
+  String get interactive;
   String get motion;
   String get id;
   String get rectNormalized;

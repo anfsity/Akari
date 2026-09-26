@@ -2,6 +2,44 @@ import 'dart:convert';
 
 import 'scene_document.dart';
 
+const _legacyComponentIds = <String>{
+  'background',
+  'glassPanel',
+  'avatar',
+  'accountName',
+  'accountPicker',
+  'sessionPicker',
+  'credentialField',
+  'primaryAction',
+  'secondaryAction',
+  'powerActions',
+  'dateTime',
+  'status',
+  'decoration',
+};
+
+const _legacyInteractiveComponentIds = <String>{
+  'accountPicker',
+  'sessionPicker',
+  'credentialField',
+  'primaryAction',
+  'secondaryAction',
+  'powerActions',
+};
+
+const _legacyActionIds = <String>{
+  'selectUser',
+  'selectSession',
+  'beginAuthentication',
+  'respondToPrompt',
+  'cancelAuthentication',
+  'requestPowerAction',
+  'retryAuthentication',
+  'retryPrompt',
+  'reconnectService',
+  'retrySessionCatalog',
+};
+
 /// Decodes a scene document from its JSON authoring form.
 SceneDocument decodeSceneDocument(String source) {
   final decoded = jsonDecode(source);
@@ -14,7 +52,7 @@ SceneDocument decodeSceneDocument(String source) {
 /// Decodes a scene document from an already-parsed JSON map.
 SceneDocument decodeSceneDocumentMap(Map<String, dynamic> json) {
   final version = _int(json, 'version');
-  if (version != 1) {
+  if (version != 1 && version != currentSceneVersion) {
     throw FormatException('Unsupported scene version: $version');
   }
 
@@ -22,7 +60,7 @@ SceneDocument decodeSceneDocumentMap(Map<String, dynamic> json) {
   final nodeIds = <String>{};
   final nodes = <SceneNode>[
     for (final rawNode in nodesJson)
-      _decodeNode(_asMap(rawNode, 'nodes[]'), nodeIds),
+      _decodeNode(_asMap(rawNode, 'nodes[]'), nodeIds, version),
   ];
   if (nodes.isEmpty) {
     throw const FormatException(
@@ -43,7 +81,7 @@ SceneDocument decodeSceneDocumentMap(Map<String, dynamic> json) {
   }
   return SceneDocument(
     id: _string(json, 'id'),
-    version: version,
+    version: currentSceneVersion,
     canvas: SceneCanvas(
       fit: _enumValue(
         SceneCanvasFit.values,
@@ -90,6 +128,7 @@ SceneBackground _decodeBackground(Map<String, dynamic> json) {
   if (asset != null &&
       (asset.contains('..') ||
           (!asset.startsWith('assets/') &&
+              !asset.startsWith('packages/') &&
               kind == SceneBackgroundKind.image))) {
     throw FormatException('Invalid background asset path: $asset');
   }
@@ -122,7 +161,11 @@ Map<String, dynamic> _encodeBackground(SceneBackground background) {
   };
 }
 
-SceneNode _decodeNode(Map<String, dynamic> json, Set<String> nodeIds) {
+SceneNode _decodeNode(
+  Map<String, dynamic> json,
+  Set<String> nodeIds,
+  int version,
+) {
   final id = _string(json, 'id');
   if (!nodeIds.add(id)) {
     throw FormatException('Duplicate scene node id: $id');
@@ -140,11 +183,22 @@ SceneNode _decodeNode(Map<String, dynamic> json, Set<String> nodeIds) {
   }
 
   final transformJson = _map(json, 'transform', fallback: const {});
-  final actionName = _nullableString(json, 'action');
+  final versionOne = version == 1;
+  final componentId = _string(json, versionOne ? 'kind' : 'component');
+  if (componentId.trim().isEmpty) {
+    throw FormatException('Node $id has an empty component id.');
+  }
+  if (versionOne && !_legacyComponentIds.contains(componentId)) {
+    throw FormatException('Unknown version 1 node kind: $componentId');
+  }
 
+  final legacyAction = versionOne ? _nullableString(json, 'action') : null;
+  if (legacyAction != null && !_legacyActionIds.contains(legacyAction)) {
+    throw FormatException('Unknown version 1 node action: $legacyAction');
+  }
   return SceneNode(
     id: id,
-    kind: _enumValue(SceneNodeKind.values, _string(json, 'kind'), 'node.kind'),
+    componentId: componentId,
     rect: rect,
     transform: SceneTransform(
       translateX: _double(transformJson, 'translateX', fallback: 0),
@@ -167,9 +221,10 @@ SceneNode _decodeNode(Map<String, dynamic> json, Set<String> nodeIds) {
       'node.motion',
     ),
     visibleWhen: _decodeCondition(json['visibleWhen'], 'node.visibleWhen'),
-    action: actionName == null
-        ? null
-        : _enumValue(SceneAction.values, actionName, 'node.action'),
+    interactive: versionOne
+        ? legacyAction != null ||
+              _legacyInteractiveComponentIds.contains(componentId)
+        : _bool(json, 'interactive', fallback: false),
     properties: <String, String>{
       for (final entry in _map(json, 'properties', fallback: const {}).entries)
         entry.key: _asString(entry.value, 'node.properties.${entry.key}'),
@@ -180,7 +235,7 @@ SceneNode _decodeNode(Map<String, dynamic> json, Set<String> nodeIds) {
 Map<String, dynamic> _encodeNode(SceneNode node) {
   return {
     'id': node.id,
-    'kind': node.kind.name,
+    'component': node.componentId,
     'rect': {
       'x': node.rect.x,
       'y': node.rect.y,
@@ -194,7 +249,7 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
     if (node.motion != SceneMotionPreset.none) 'motion': node.motion.name,
     if (node.visibleWhen != null)
       'visibleWhen': _encodeCondition(node.visibleWhen!),
-    if (node.action != null) 'action': node.action!.name,
+    if (node.interactive) 'interactive': true,
     if (node.properties.isNotEmpty) 'properties': node.properties,
   };
 }

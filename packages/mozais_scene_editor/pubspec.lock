@@ -167,6 +167,34 @@ packages:
       relative: true
     source: path
     version: "0.0.0"
+  mozais_theme_catalog:
+    dependency: "direct main"
+    description:
+      path: "../mozais_theme_catalog"
+      relative: true
+    source: path
+    version: "0.0.0"
+  mozais_theme_default:
+    dependency: transitive
+    description:
+      path: "../mozais_theme_default"
+      relative: true
+    source: path
+    version: "0.0.0"
+  mozais_theme_fallback:
+    dependency: transitive
+    description:
+      path: "../mozais_theme_fallback"
+      relative: true
+    source: path
+    version: "0.0.0"
+  mozais_theme_sdk:
+    dependency: "direct main"
+    description:
+      path: "../mozais_theme_sdk"
+      relative: true
+    source: path
+    version: "0.0.0"
   path:
     dependency: transitive
     description:

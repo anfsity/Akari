@@ -146,7 +146,7 @@ class _NodeTileState extends State<_NodeTile> {
       dense: true,
       selected: _selected,
       title: Text(widget.node.id),
-      subtitle: Text(widget.node.kind.name),
+      subtitle: Text(widget.node.componentId),
       onTap: () => widget.controller.select(widget.node.id),
     );
   }

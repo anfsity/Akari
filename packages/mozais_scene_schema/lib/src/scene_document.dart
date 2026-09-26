@@ -1,20 +1,6 @@
 enum SceneCanvasFit { cover, contain, reflow }
 
-enum SceneNodeKind {
-  background,
-  glassPanel,
-  avatar,
-  accountName,
-  accountPicker,
-  sessionPicker,
-  credentialField,
-  primaryAction,
-  secondaryAction,
-  powerActions,
-  dateTime,
-  status,
-  decoration,
-}
+const currentSceneVersion = 2;
 
 /// Boolean questions about semantic greeter state used by [SceneCondition].
 ///
@@ -86,19 +72,6 @@ bool evaluateSceneCondition(
     SceneNot(:final condition) =>
       !evaluateSceneCondition(condition, activePredicates),
   };
-}
-
-enum SceneAction {
-  selectUser,
-  selectSession,
-  beginAuthentication,
-  respondToPrompt,
-  cancelAuthentication,
-  requestPowerAction,
-  retryAuthentication,
-  retryPrompt,
-  reconnectService,
-  retrySessionCatalog,
 }
 
 enum SceneMotionPreset {
@@ -285,7 +258,7 @@ class SceneBackground {
 class SceneNode {
   const SceneNode({
     required this.id,
-    required this.kind,
+    required this.componentId,
     required this.rect,
     this.transform = const SceneTransform(),
     this.z = 0,
@@ -293,12 +266,12 @@ class SceneNode {
     this.focusOrder = 0,
     this.motion = SceneMotionPreset.none,
     this.visibleWhen,
-    this.action,
+    this.interactive = false,
     this.properties = const <String, String>{},
   });
 
   final String id;
-  final SceneNodeKind kind;
+  final String componentId;
   final SceneRect rect;
   final SceneTransform transform;
   final int z;
@@ -309,21 +282,12 @@ class SceneNode {
   /// Condition controlling whether the node is present; null means always.
   final SceneCondition? visibleWhen;
 
-  final SceneAction? action;
+  final bool interactive;
   final Map<String, String> properties;
-
-  bool get isInteractive =>
-      action != null ||
-      kind == SceneNodeKind.accountPicker ||
-      kind == SceneNodeKind.sessionPicker ||
-      kind == SceneNodeKind.credentialField ||
-      kind == SceneNodeKind.primaryAction ||
-      kind == SceneNodeKind.secondaryAction ||
-      kind == SceneNodeKind.powerActions;
 
   SceneNode copyWith({
     String? id,
-    SceneNodeKind? kind,
+    String? componentId,
     SceneRect? rect,
     SceneTransform? transform,
     int? z,
@@ -331,12 +295,12 @@ class SceneNode {
     int? focusOrder,
     SceneMotionPreset? motion,
     Object? visibleWhen = _unset,
-    Object? action = _unset,
+    bool? interactive,
     Map<String, String>? properties,
   }) {
     return SceneNode(
       id: id ?? this.id,
-      kind: kind ?? this.kind,
+      componentId: componentId ?? this.componentId,
       rect: rect ?? this.rect,
       transform: transform ?? this.transform,
       z: z ?? this.z,
@@ -346,9 +310,7 @@ class SceneNode {
       visibleWhen: identical(visibleWhen, _unset)
           ? this.visibleWhen
           : visibleWhen as SceneCondition?,
-      action: identical(action, _unset)
-          ? this.action
-          : action as SceneAction?,
+      interactive: interactive ?? this.interactive,
       properties: properties ?? this.properties,
     );
   }

@@ -11,19 +11,23 @@ The frontend is split into four cooperating areas:
 
 ```text
 Feature
-  business state, commands, recovery, D-Bus port
+  business state, typed slots, commands, recovery, D-Bus port
         |
         v
 GreeterSceneAdapter
-  maps Greeter slots/effects to SceneRuntime actions
+  maps semantic state to scene predicates and UI actions
+        |
+        v
+ThemeDefinition
+  theme identity, authored scene, component assembly
+        |
+        v
+ThemeBundle
+  visual tokens, background renderers, motion presets
         |
         v
 SceneRuntime
   document layout, layers, transforms, motion lifecycle
-        |
-        v
-ThemeBundle
-  tokens, generated SceneDocument, compiled renderers, motion presets
 ```
 
 `Feature` never knows about a theme, background renderer, blur, motion preset,
@@ -55,12 +59,13 @@ a `SceneDocument`, `ThemeBundle`, visual context, or log.
 
 ## 3. Theme and Scene Document
 
-A theme is a directory under `packages/mozais_greeter_ui/lib/themes/<name>/`
+A theme is a build-time Dart package under `packages/mozais_theme_<name>/`
 containing:
 
 - `*.scene.json`: authoring layout and visibility conditions.
 - generated `*.scene.g.dart`: typed Dart emitted by build_runner.
-- `theme.dart`: compile-time assembly of tokens and optional Dart extensions.
+- `theme.dart`: compile-time assembly of tokens and theme-owned components.
+- `assets/`: package-owned images and other bundled resources.
 
 The authoring document is versioned and contains:
 
@@ -95,7 +100,8 @@ closed vocabulary of semantic predicates such as `isDormant` or
 `isAuthPrompting`. A null condition means the node is always present. The
 vocabulary and actions are enumerations over semantic greeter state; arbitrary
 expressions, scripts, runtime-loaded Dart, backend types, and untrusted asset
-paths are not allowed.
+paths are not part of the scene contract. Repository assets use `assets/...`;
+theme-owned Flutter package assets use `packages/<package>/assets/...`.
 
 Production code consumes generated Dart. Runtime JSON parsing is not part of
 the application path.
@@ -114,31 +120,51 @@ packages/mozais_scene_editor   desktop editor over the same model and runtime
 import. The generator and the editor share the schema's codec and validation
 instead of each parsing the document format.
 
-## 4. ThemeBundle and Theme Selection
+## 4. ThemeDefinition and Selection
 
-`ThemeBundle` combines:
+`ThemeDefinition` is the theme package's owner of one theme's identity, generated
+scene document, component assembly, and visual runtime bundle:
 
 ```text
-ThemeTokens
-SceneDocument
-BackgroundRenderer registry
-SceneMotionBuilder registry
+ThemeDefinition
+  id
+  SceneDocument
+  GreeterThemeComponents factory
+  ThemeBundle
+    ThemeTokens
+    BackgroundRenderer registry
+    SceneMotionBuilder registry
 ```
 
-Theme selection is compile-time:
+`ThemeBundle` contains only visual tokens and renderer registrations. The
+theme definition exposes `buildScene`, which combines that theme's authored
+document, visual bundle, and component factory into the generic `SceneRuntime`.
+The greeter adapter supplies semantic state, host capabilities, and wake
+progress; it does not assemble the scene runtime. Each theme declares its
+component factory with its scene. A theme may explicitly reuse an existing
+component implementation when the behavior and presentation are shared, as the
+fallback theme currently does.
+
+The reusable semantic API lives in `mozais_theme_sdk`. It exposes display-safe
+slot listenables and semantic callbacks through `GreeterHost`, without giving a
+theme access to the feature state owner, D-Bus, or backend objects. The greeter
+adapter supplies that Host API to the selected compiled theme.
+
+`mozais_theme_catalog` is the app's compile-time list of built-in themes. Theme
+selection is compile-time:
 
 ```text
 --dart-define=MOZAIS_THEME=default
 ```
 
 `default` selects the reference-like built-in theme. `fallback` is a minimal
-static theme with no blur or continuous animation. `nocturne` is a low-cost
-2.5D theme with layered depth surfaces. An unknown theme name falls back to
-`fallback`; debug builds assert to surface the configuration error.
+static theme with no blur or continuous animation. An unknown theme name falls
+back to `fallback`; debug builds assert to surface the configuration error.
 
-Theme-specific custom backgrounds and motion implementations are compiled Dart
-extensions registered in `theme.dart`. They are not loaded from external files
-or scripts.
+The app and editor depend on the theme packages selected by the catalog. Theme
+packages contain their own scenes, component assemblies, tokens, and assets;
+their Dart and Flutter code is compiled into the application. Runtime loading of
+new Dart or Flutter code is not supported.
 
 ## 5. SceneRuntime
 
@@ -151,6 +177,12 @@ or scripts.
 - motion component lifecycle, including enter and exit transitions.
 - one repaint boundary per scene node, so each authored visual component paints
   independently from the rest of the scene.
+
+Theme components subscribe to the typed slot that owns their content through
+`SceneRegion` or another local `ListenableBuilder`. `ValueListenableBuilder`
+limits which component subtree rebuilds; the node `RepaintBoundary` limits
+which scene node repaints. Scene predicate notifications are handled by each
+node host, so a visibility change does not rebuild the complete scene tree.
 
 Widgets inside a scene node share that node's paint boundary. Add nested
 boundaries only when profiling shows that a complex child needs independent
@@ -201,13 +233,15 @@ Full-screen animated blur is out of scope.
 ## 7. Greeter Adapter and Slots
 
 `GreeterFeature` exposes typed region slots and commands. `GreeterSceneAdapter`
-binds those slots to a generated `SceneDocument` through a typed widget
-catalog. The catalog preserves ordinary Flutter input, focus, keyboard, and
-accessibility behavior.
+maps display state to scene predicates, creates the narrow `GreeterHost`, and
+asks the selected `ThemeDefinition` to build its scene. Theme components cannot
+reach the `GreeterFeature` state owner. The theme component set maps its own
+scene nodes to ordinary Flutter widgets, preserving native input, focus,
+keyboard, and accessibility behavior.
 
 The Feature projection contains no `BackgroundSlots`. Visual mood is derived by
 the adapter or theme when a theme explicitly needs it. The credential response
-remains local to the Scene text controller until it is sent as a command.
+remains local to the adapter's text controller until it is sent as a command.
 
 ## 8. Testing Policy
 

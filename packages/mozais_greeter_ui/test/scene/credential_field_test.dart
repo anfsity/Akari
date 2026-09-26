@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 import 'package:mozais_scene/mozais_scene.dart';
+import 'package:mozais_theme_default/theme.dart';
 
 void main() {
   testWidgets('credential text fills its node so the prompt centers', (
@@ -19,7 +20,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'credential',
-          kind: SceneNodeKind.credentialField,
+          componentId: 'credentialField',
           rect: SceneRect(x: 0.3, y: 0.5, width: 0.4, height: 0.06),
           visibleWhen: SceneNot(
             ScenePredicateCondition(ScenePredicate.isDormant),

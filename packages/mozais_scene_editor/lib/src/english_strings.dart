@@ -66,9 +66,9 @@ class EnglishStrings extends EditorStrings {
   @override
   String get identity => 'Identity';
   @override
-  String get kind => 'kind';
+  String get component => 'component';
   @override
-  String get action => 'action';
+  String get interactive => 'interactive';
   @override
   String get motion => 'motion';
   @override
