@@ -11,21 +11,19 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'static',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
         ),
         SceneNode(
           id: 'animated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.4, y: 0.1, width: 0.2, height: 0.2),
           motion: SceneMotionPreset.fade,
         ),
       ],
     );
     final theme = ThemeBundle(
-      id: 'test',
       tokens: _tokens(),
-      document: document,
       backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
       motions: const {SceneMotionPreset.fade: FadeMotionBuilder()},
     );
@@ -69,13 +67,13 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'later',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.2, y: 0.2, width: 0.2, height: 0.2),
           renderOrder: 20,
         ),
         SceneNode(
           id: 'earlier',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           renderOrder: 10,
         ),
@@ -98,9 +96,9 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'tiny_action',
-          kind: SceneNodeKind.primaryAction,
+          componentId: 'primaryAction',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.001, height: 0.001),
-          action: SceneAction.beginAuthentication,
+          interactive: true,
         ),
       ],
     );
@@ -126,7 +124,7 @@ void main() {
         nodes: const [
           SceneNode(
             id: 'content',
-            kind: SceneNodeKind.decoration,
+            componentId: 'decoration',
             rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           ),
         ],
@@ -152,15 +150,13 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'content',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
         ),
       ],
     );
     final theme = ThemeBundle(
-      id: 'test',
       tokens: _tokens(),
-      document: document,
       backgrounds: {SceneBackgroundKind.image: renderer},
     );
 
@@ -178,7 +174,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'gated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
         ),
@@ -199,7 +195,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'gated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
         ),
@@ -226,7 +222,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'gated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
         ),
@@ -258,7 +254,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'gated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
         ),
@@ -267,9 +263,7 @@ void main() {
     final predicates = ValueNotifier<Set<ScenePredicate>>({});
     var buildCount = 0;
     final theme = ThemeBundle(
-      id: 'test',
       tokens: _tokens(),
-      document: document,
       backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
     );
 
@@ -306,7 +300,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'gated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           motion: SceneMotionPreset.fade,
           visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
@@ -314,9 +308,7 @@ void main() {
       ],
     );
     final theme = ThemeBundle(
-      id: 'test',
       tokens: _tokens(),
-      document: document,
       backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
       motions: const {SceneMotionPreset.fade: FadeMotionBuilder()},
     );
@@ -359,9 +351,7 @@ Widget _runtime(
   bool prewarmHiddenNodes = false,
 }) {
   final theme = ThemeBundle(
-    id: 'test',
     tokens: _tokens(),
-    document: document,
     backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
   );
   return _runtimeWithTheme(

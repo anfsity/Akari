@@ -5,12 +5,12 @@ void main() {
   test('copyWith replaces only the provided fields', () {
     const node = SceneNode(
       id: 'panel',
-      kind: SceneNodeKind.glassPanel,
+      componentId: 'glassPanel',
       rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
       z: 1,
       motion: SceneMotionPreset.fade,
       visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
-      action: SceneAction.selectUser,
+      interactive: true,
     );
 
     final moved = node.copyWith(
@@ -22,25 +22,25 @@ void main() {
     expect(moved.rect.y, 0.1);
     expect(moved.transform.rotationZ, 15);
     expect(moved.transform.scaleX, 1);
-    expect(moved.kind, SceneNodeKind.glassPanel);
+    expect(moved.componentId, 'glassPanel');
     expect(moved.z, 1);
     expect(moved.motion, SceneMotionPreset.fade);
     expect(moved.visibleWhen, isNotNull);
-    expect(moved.action, SceneAction.selectUser);
+    expect(moved.interactive, isTrue);
   });
 
-  test('copyWith can clear a nullable condition and action', () {
+  test('copyWith clears a condition and updates interactivity', () {
     const node = SceneNode(
       id: 'panel',
-      kind: SceneNodeKind.glassPanel,
+      componentId: 'glassPanel',
       rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
       visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
-      action: SceneAction.selectUser,
+      interactive: true,
     );
 
-    final cleared = node.copyWith(visibleWhen: null, action: null);
+    final cleared = node.copyWith(visibleWhen: null, interactive: false);
 
     expect(cleared.visibleWhen, isNull);
-    expect(cleared.action, isNull);
+    expect(cleared.interactive, isFalse);
   });
 }

@@ -1,0 +1,21 @@
+name: mozais_theme_catalog
+description: Compile-time catalog of Mozais built-in greeter themes.
+publish_to: none
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  mozais_theme_default:
+    path: ../mozais_theme_default
+  mozais_theme_fallback:
+    path: ../mozais_theme_fallback
+  mozais_theme_sdk:
+    path: ../mozais_theme_sdk
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

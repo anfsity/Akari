@@ -81,9 +81,7 @@ Color calculateAccentFromRgba(Uint8List rgba) {
     final averageBrightness = pixelCount == 0
         ? 0.0
         : brightnessTotal / pixelCount;
-    return averageBrightness < 0.5
-        ? _lightNeutralAccent
-        : _darkNeutralAccent;
+    return averageBrightness < 0.5 ? _lightNeutralAccent : _darkNeutralAccent;
   }
 
   final wrapSample = samples[_bucketCount - 1];

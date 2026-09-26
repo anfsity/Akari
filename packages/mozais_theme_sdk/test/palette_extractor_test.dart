@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mozais_greeter_ui/theme/palette_extractor.dart';
+import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
 
 void main() {
   test('selects a dominant vibrant hue from the sampled pixels', () {

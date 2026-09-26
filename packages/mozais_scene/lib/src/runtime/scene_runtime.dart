@@ -121,7 +121,7 @@ class SceneRuntime extends StatelessWidget {
       builder: (context) =>
           _applyTransform(node, rect.size, nodeBuilder(context, node)),
     );
-    if (node.isInteractive) {
+    if (node.interactive) {
       child = FocusTraversalOrder(
         order: NumericFocusOrder(node.focusOrder.toDouble()),
         child: child,

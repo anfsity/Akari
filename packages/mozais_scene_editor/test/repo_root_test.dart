@@ -15,9 +15,7 @@ void main() {
   test('resolves the bundled default scene from the repository root', () {
     expect(
       defaultScenePath(),
-      endsWith(
-        'packages/mozais_greeter_ui/lib/themes/default/default.scene.json',
-      ),
+      endsWith('packages/mozais_theme_default/lib/default.scene.json'),
     );
   });
 

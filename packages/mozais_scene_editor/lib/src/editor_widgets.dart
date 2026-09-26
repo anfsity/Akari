@@ -58,10 +58,7 @@ class LabeledSlider extends StatelessWidget {
         ),
         SizedBox(
           width: 52,
-          child: Text(
-            value.toStringAsFixed(2),
-            textAlign: TextAlign.right,
-          ),
+          child: Text(value.toStringAsFixed(2), textAlign: TextAlign.right),
         ),
       ],
     );
@@ -141,45 +138,6 @@ class EnumDropdown<T extends Enum> extends StatelessWidget {
               }
             },
             items: [
-              for (final option in values)
-                DropdownMenuItem(value: option, child: Text(option.name)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// A labelled dropdown over an enum's values plus a null "none" option.
-class NullableEnumDropdown<T extends Enum> extends StatelessWidget {
-  const NullableEnumDropdown({
-    required this.label,
-    required this.noneLabel,
-    required this.value,
-    required this.values,
-    required this.onChanged,
-    super.key,
-  });
-
-  final String label;
-  final String noneLabel;
-  final T? value;
-  final List<T> values;
-  final ValueChanged<T?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(width: 80, child: Text(label)),
-        Expanded(
-          child: DropdownButton<T?>(
-            isExpanded: true,
-            value: value,
-            onChanged: onChanged,
-            items: [
-              DropdownMenuItem(value: null, child: Text(noneLabel)),
               for (final option in values)
                 DropdownMenuItem(value: option, child: Text(option.name)),
             ],

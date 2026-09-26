@@ -9,7 +9,7 @@ import 'package:mozais_greeter_ui/feature/greeter/greeter_state.dart';
 import 'package:mozais_greeter_ui/feature/greeter/ports/greeter_gateway.dart';
 import 'package:mozais_greeter/main.dart';
 import 'package:mozais_greeter_ui/scene/greeter_scene/greeter_scene_adapter.dart';
-import 'package:mozais_greeter_ui/theme/theme_registry.dart';
+import 'package:mozais_theme_catalog/mozais_theme_catalog.dart';
 
 void main() {
   testWidgets('starts dormant and reveals controls on wake', (tester) async {

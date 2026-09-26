@@ -13,7 +13,7 @@ fvm flutter run -d linux
 ```
 
 The editor starts by opening the configured default scene path, or
-`packages/mozais_greeter_ui/lib/themes/default/default.scene.json` from the
+`packages/mozais_theme_default/lib/default.scene.json` from the
 repository root when none is set. **Open** picks a `.scene.json` file through
 the built-in file browser; the path field still accepts a path directly.
 
@@ -33,6 +33,8 @@ the built-in file browser; the path field still accepts a path directly.
   Properties) for the document, rect, transform (including X/Y/Z rotation),
   layout, and properties. The tab strip scrolls with the wheel or a
   middle-button drag.
+- Node identity stores a theme-owned component ID and an explicit interactive
+  flag; the scene schema does not define a global component catalog.
 - A Document tab edits `canvas` and `background`. Import copies a file into the
   repository `assets/` directory and sets the background kind from the
   extension; a video import renders solid until a video renderer exists. The

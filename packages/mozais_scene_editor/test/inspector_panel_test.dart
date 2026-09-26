@@ -68,7 +68,7 @@ void main() {
     await tester.tap(find.text('Identity'));
     await tester.pumpAndSettle();
 
-    expect(find.text('kind'), findsOneWidget);
+    expect(find.text('component'), findsOneWidget);
   });
 
   testWidgets('applies exact pixel positions from the layout tab', (

@@ -33,7 +33,7 @@ void main() {
     final document = decodeSceneDocument(_scene);
 
     expect(document.id, 'test');
-    expect(document.version, 1);
+    expect(document.version, currentSceneVersion);
     expect(document.canvas.fit, SceneCanvasFit.contain);
     expect(document.canvas.useSafeArea, isTrue);
     expect(document.canvas.referenceWidth, 2560);
@@ -43,7 +43,7 @@ void main() {
 
     final node = document.nodes.single;
     expect(node.id, 'action');
-    expect(node.kind, SceneNodeKind.primaryAction);
+    expect(node.componentId, 'primaryAction');
     expect(node.rect.x, 0.1);
     expect(node.rect.height, 0.4);
     expect(node.transform.rotationZ, 12.5);
@@ -51,7 +51,7 @@ void main() {
     expect(node.transform.scaleX, 1);
     expect(node.z, 2);
     expect(node.motion, SceneMotionPreset.fadeSlide);
-    expect(node.action, SceneAction.beginAuthentication);
+    expect(node.interactive, isTrue);
     expect(node.properties, {'variant': 'compact'});
     final visibleWhen = node.visibleWhen;
     expect(visibleWhen, isA<SceneAny>());
@@ -90,7 +90,7 @@ void main() {
     expect(node.transform.isIdentity, isTrue);
     expect(node.motion, SceneMotionPreset.none);
     expect(node.visibleWhen, isNull);
-    expect(node.action, isNull);
+    expect(node.interactive, isFalse);
     expect(node.properties, isEmpty);
   });
 
@@ -111,7 +111,7 @@ void main() {
       nodes: [
         SceneNode(
           id: 'panel',
-          kind: SceneNodeKind.glassPanel,
+          componentId: 'glassPanel',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           visibleWhen: SceneNot(
             ScenePredicateCondition(ScenePredicate.isDormant),
@@ -121,10 +121,7 @@ void main() {
     );
 
     final map = sceneDocumentToMap(document);
-    expect(
-      (map['nodes'] as List).single['visibleWhen'],
-      {'not': 'isDormant'},
-    );
+    expect((map['nodes'] as List).single['visibleWhen'], {'not': 'isDormant'});
   });
 
   test('rejects an unknown predicate', () {

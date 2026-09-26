@@ -15,6 +15,10 @@ dependencies:
     path: ../mozais_scene
   mozais_scene_schema:
     path: ../mozais_scene_schema
+  mozais_theme_catalog:
+    path: ../mozais_theme_catalog
+  mozais_theme_sdk:
+    path: ../mozais_theme_sdk
 
 dev_dependencies:
   flutter_test:
