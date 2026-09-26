@@ -97,14 +97,7 @@ class SceneRuntime extends StatelessWidget {
     final safeArea = document.canvas.useSafeArea
         ? MediaQuery.paddingOf(context)
         : EdgeInsets.zero;
-    final rect = sceneNodeRect(
-      node: node,
-      sceneSize: size,
-      safeArea: safeArea,
-      minHitTarget: theme.tokens.minHitTarget,
-    );
-
-    Widget child = _SceneNodeHost(
+    final content = _SceneNodeHost(
       visible: visible,
       activePredicatesListenable: visibleWhen == null
           ? null
@@ -118,32 +111,35 @@ class SceneRuntime extends StatelessWidget {
         curve: theme.tokens.standardCurve,
         reducedMotion: reducedMotion,
       ),
-      builder: (context) =>
-          _applyTransform(node, rect.size, nodeBuilder(context, node)),
+      builder: (context) => nodeBuilder(context, node),
     );
-    if (node.interactive) {
-      child = FocusTraversalOrder(
-        order: NumericFocusOrder(node.focusOrder.toDouble()),
-        child: child,
+
+    final rect = sceneNodeRect(
+      node: node,
+      sceneSize: size,
+      safeArea: safeArea,
+      minHitTarget: theme.tokens.minHitTarget,
+    );
+    Widget transformed = RepaintBoundary(
+      child: node.interactive
+          ? FocusTraversalOrder(
+              order: NumericFocusOrder(node.focusOrder.toDouble()),
+              child: content,
+            )
+          : content,
+    );
+    if (!node.transform.isIdentity) {
+      transformed = Transform(
+        transform: sceneNodeTransformMatrix(node.transform, rect.size),
+        child: transformed,
       );
     }
-
     return Positioned(
       left: rect.left,
       top: rect.top,
       width: rect.width,
       height: rect.height,
-      child: RepaintBoundary(child: child),
-    );
-  }
-
-  Widget _applyTransform(SceneNode node, Size size, Widget child) {
-    if (node.transform.isIdentity) {
-      return child;
-    }
-    return Transform(
-      transform: sceneNodeTransformMatrix(node.transform, size),
-      child: child,
+      child: transformed,
     );
   }
 }

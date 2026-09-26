@@ -113,12 +113,12 @@ Flutter:
 packages/mozais_scene_schema   Flutter-free model, condition evaluator, JSON codec
 packages/mozais_scene          runtime, theme bundle, background and motion registries
 packages/mozais_scene_codegen  build_runner generator that decodes JSON and emits Dart
-packages/mozais_scene_editor   desktop editor over the same model and runtime
+packages/mozais_greeter_components optional reusable semantic component set
 ```
 
 `mozais_scene` re-exports the schema, so application code keeps a single
-import. The generator and the editor share the schema's codec and validation
-instead of each parsing the document format.
+import. Scene build tooling uses the schema's codec and validation as the
+authoritative implementation for parsing scene documents.
 
 ## 4. ThemeDefinition and Selection
 
@@ -150,7 +150,12 @@ slot listenables and semantic callbacks through `GreeterHost`, without giving a
 theme access to the feature state owner, D-Bus, or backend objects. The greeter
 adapter supplies that Host API to the selected compiled theme.
 
-`mozais_theme_catalog` is the app's compile-time list of built-in themes. Theme
+`mozais_theme_catalog` is the executable's generated compile-time catalog. It
+is a composition-root dependency, not a dependency of the theme SDK or of
+another theme. The `build` command discovers local `mozais_theme_*` packages,
+updates the catalog's generated dependency block, and emits the registry from
+the package naming and `lib/theme.dart` entrypoint conventions. A theme package
+can be developed and tested independently without editing the catalog. Theme
 selection is compile-time:
 
 ```text
@@ -161,10 +166,12 @@ selection is compile-time:
 static theme with no blur or continuous animation. An unknown theme name falls
 back to `fallback`; debug builds assert to surface the configuration error.
 
-The app and editor depend on the theme packages selected by the catalog. Theme
-packages contain their own scenes, component assemblies, tokens, and assets;
-their Dart and Flutter code is compiled into the application. Runtime loading of
-new Dart or Flutter code is not supported.
+The greeter executable depends on the theme packages selected by the catalog.
+Each theme package owns its scenes, component assembly, tokens, and assets. A
+theme may depend on SDK or explicitly shared component packages, but one theme
+must not import another theme package. Its Dart and Flutter code is compiled
+into the application; runtime loading of new Dart or Flutter code is not
+supported.
 
 ## 5. SceneRuntime
 
@@ -284,11 +291,11 @@ Each interaction also records the first response frame separately from its
 later animation frames. Its UI-thread build/layout/paint work must stay below
 5 ms in every measured cycle; raster, vsync scheduling, and normal transitions
 remain covered by the frame metrics above.
-Run `bash scripts/trace-perf-builds.sh` to capture widget build, layout, and
-paint events during startup and first wake in a separate profile run; its
-timings are diagnostic and are not used by the performance gate. Set
-`MOZAIS_FLUTTER_BIN` to use a specific Flutter SDK; the matching Dart binary
-is taken from the same SDK directory.
+Run `fvm dart run tool/mozais.dart trace-perf` to capture widget build, layout,
+and paint events during a separate profile run; its timings are diagnostic
+and are not used by the performance gate. Set `MOZAIS_FLUTTER_BIN` to use a
+specific Flutter SDK; the matching Dart binary is taken from the same SDK
+directory.
 
 ## 9. Implementation Order
 
@@ -298,5 +305,3 @@ is taken from the same SDK directory.
 4. Add the default and fallback themes.
 5. Replace layout assertions with interaction coverage.
 6. Add the separate profile performance suite.
-7. Build the scene editor as a tool on the same model and runtime
-   (`packages/mozais_scene_editor`).

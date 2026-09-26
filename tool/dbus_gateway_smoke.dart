@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:mozais_greeter_ui/feature/greeter/greeter_state.dart';
-import 'package:mozais_greeter_ui/feature/greeter/ports/greeter_gateway.dart';
+import 'package:mozais_greeter_ui/feature/greeter_state.dart';
+import 'package:mozais_greeter_ui/feature/ports/greeter_gateway.dart';
 import 'package:mozais_greeter/infrastructure/dbus/greeter_dbus_gateway.dart';
 
 Future<void> main() async {

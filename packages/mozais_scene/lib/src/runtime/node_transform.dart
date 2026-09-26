@@ -5,8 +5,7 @@ import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 
 /// The axis-aligned rect a node occupies in the scene before its transform.
 ///
-/// Shared by the runtime and the editor overlay so both agree on layout,
-/// including the minimum hit target applied to interactive nodes.
+/// Includes the minimum hit target applied to interactive nodes.
 Rect sceneNodeRect({
   required SceneNode node,
   required Size sceneSize,

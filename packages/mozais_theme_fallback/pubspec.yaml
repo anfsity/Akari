@@ -10,8 +10,8 @@ dependencies:
     sdk: flutter
   mozais_scene:
     path: ../mozais_scene
-  mozais_theme_default:
-    path: ../mozais_theme_default
+  mozais_greeter_components:
+    path: ../mozais_greeter_components
   mozais_theme_sdk:
     path: ../mozais_theme_sdk
 

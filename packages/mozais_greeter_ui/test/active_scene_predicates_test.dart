@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mozais_greeter_ui/feature/greeter/greeter_slots.dart';
-import 'package:mozais_greeter_ui/feature/greeter/greeter_state.dart';
-import 'package:mozais_greeter_ui/scene/greeter_scene/greeter_scene_adapter.dart';
+import 'package:mozais_greeter_ui/feature/greeter_slots.dart';
+import 'package:mozais_greeter_ui/feature/greeter_state.dart';
+import 'package:mozais_greeter_ui/scene/greeter_scene_adapter.dart';
 import 'package:mozais_scene/mozais_scene.dart';
 
 void main() {
@@ -58,7 +58,11 @@ void main() {
       ),
       power: (
         mode: PowerMode.executing,
-        error: (kind: GreeterErrorKind.power, message: 'x', recovery: GreeterRecovery.reconnectService),
+        error: (
+          kind: GreeterErrorKind.power,
+          message: 'x',
+          recovery: GreeterRecovery.reconnectService,
+        ),
       ),
       dormant: false,
     );

@@ -3,13 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$script_dir/.." && pwd)"
+# shellcheck source=lib.sh
+source "$script_dir/lib.sh"
 
-if [[ -n "${MOZAIS_DART_BIN:-}" ]]; then
-  dart_command=("$MOZAIS_DART_BIN")
-else
-  dart_command=(fvm dart)
-fi
-for theme_dir in mozais_theme_default mozais_theme_fallback; do
-  cd -- "$repo_root/packages/$theme_dir"
-  "${dart_command[@]}" run build_runner build
-done
+mozais_run_dev_cli "$repo_root" generate-scenes "$@"

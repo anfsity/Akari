@@ -28,7 +28,6 @@ if [[ ! -f "$repo_root/backend/Cargo.toml" ]]; then
 fi
 
 check_command cargo
-check_command fvm
 check_command dbus-run-session
 check_command busctl
 check_command clang
@@ -56,20 +55,55 @@ if command -v cargo >/dev/null 2>&1 && [[ -f "$repo_root/backend/Cargo.toml" ]];
   fi
 fi
 
-if [[ -x "$repo_root/.fvm/flutter_sdk/bin/flutter" ]]; then
-  flutter_version=''
-  if flutter_version="$("$repo_root/.fvm/flutter_sdk/bin/flutter" --version 2>&1)"; then
-    printf 'ok   %-20s %s\n' flutter "$repo_root/.fvm/flutter_sdk/bin/flutter"
-    sed -n '1,3p' <<<"$flutter_version"
+flutter_command=(fvm flutter)
+dart_command=(fvm dart)
+custom_flutter="${MOZAIS_FLUTTER_BIN:-}"
+custom_dart="${MOZAIS_DART_BIN:-}"
+
+if [[ -n "$custom_flutter" ]]; then
+  if [[ "$custom_flutter" != /* ]]; then
+    custom_flutter="$repo_root/$custom_flutter"
+  fi
+  flutter_command=("$custom_flutter")
+  if [[ -z "$custom_dart" ]]; then
+    custom_dart="$(dirname -- "$custom_flutter")/dart"
+  fi
+fi
+
+if [[ -n "$custom_dart" ]]; then
+  if [[ "$custom_dart" != /* ]]; then
+    custom_dart="$repo_root/$custom_dart"
+  fi
+  dart_command=("$custom_dart")
+fi
+
+if [[ "${flutter_command[0]}" == fvm || "${dart_command[0]}" == fvm ]]; then
+  check_command fvm
+fi
+
+check_sdk() {
+  local sdk_name="$1"
+  shift
+  local sdk_version=''
+
+  if ! command -v "$1" >/dev/null 2>&1; then
+    printf 'miss %-20s %s\n' "$sdk_name" "${1} is unavailable"
+    missing=1
+    return
+  fi
+
+  if sdk_version="$("$@" --version 2>&1)"; then
+    printf 'ok   %-20s %s\n' "$sdk_name" "$*"
+    sed -n '1,3p' <<<"$sdk_version"
   else
-    printf '%s\n' "$flutter_version" | sed -n '1,3p' >&2
-    printf 'miss %-20s Flutter SDK exists but could not run\n' flutter
+    printf '%s\n' "$sdk_version" | sed -n '1,3p' >&2
+    printf 'miss %-20s SDK could not run\n' "$sdk_name"
     missing=1
   fi
-else
-  printf 'miss %-20s run scripts/bootstrap-toolchain.sh first\n' flutter
-  missing=1
-fi
+}
+
+check_sdk flutter "${flutter_command[@]}"
+check_sdk dart "${dart_command[@]}"
 
 check_command sway
 check_command greetd

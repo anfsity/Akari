@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mozais_scene/mozais_scene.dart';
-import 'package:mozais_theme_default/theme.dart' show DefaultThemeComponents;
+import 'package:mozais_greeter_components/mozais_greeter_components.dart';
 import 'package:mozais_theme_sdk/mozais_theme_sdk.dart' show ThemeDefinition;
 
 import 'fallback.scene.g.dart';
@@ -10,7 +10,7 @@ const _base = Color(0xff0d151a);
 const _surface = Color(0xff1a242a);
 const _surfaceVariant = Color(0xff26343c);
 
-ThemeDefinition buildFallbackTheme() {
+ThemeDefinition buildFallbackTheme({Color? seed}) {
   final colorScheme =
       ColorScheme.fromSeed(
         seedColor: _accent,
@@ -53,6 +53,6 @@ ThemeDefinition buildFallbackTheme() {
       },
       motions: const {SceneMotionPreset.none: FadeMotionBuilder()},
     ),
-    components: DefaultThemeComponents.new,
+    components: StandardGreeterComponents.new,
   );
 }

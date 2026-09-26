@@ -8,10 +8,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # BEGIN GENERATED THEME DEPENDENCIES
   mozais_theme_default:
     path: ../mozais_theme_default
   mozais_theme_fallback:
     path: ../mozais_theme_fallback
+  # END GENERATED THEME DEPENDENCIES
   mozais_theme_sdk:
     path: ../mozais_theme_sdk
 
