@@ -239,7 +239,7 @@ my_theme/
 Theme SDK packages expose:
 
 ```text
-mozais_theme_sdk
+theme_sdk
   Host components
   typed host state
   layout and animation helpers
@@ -375,22 +375,22 @@ same Theme Studio diagnostics validate every generated change.
 The target package layout is:
 
 ```text
-mozais_greeter_host
+greeter_host
   Rust/Dart Host contract and typed display state
 
-mozais_theme_sdk
+theme_sdk
   Theme author API and semantic components
 
-mozais_theme_runtime
+theme_runtime
   Theme composition, layout, input, motion, and repaint regions
 
-mozais_theme_studio
+theme_studio
   Project editor, preview, Inspector, and diagnostics
 
-mozais_theme_tooling
+theme_tooling
   Theme Generator, build commands, source mapping, and profiles
 
-mozais_theme_test
+theme_test
   State, screenshot, interaction, and performance suites
 ```
 

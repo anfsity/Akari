@@ -1,4 +1,4 @@
-name: mozais_greeter
+name: greeter
 description: Compile-time themeable Flutter greeter for Mozais.
 publish_to: none
 version: 1.0.0+1
@@ -11,12 +11,12 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   dbus: ^0.7.11
-  mozais_greeter_ui:
-    path: packages/mozais_greeter_ui
-  mozais_scene:
-    path: packages/mozais_scene
-  mozais_theme_catalog:
-    path: packages/mozais_theme_catalog
+  greeter_ui:
+    path: packages/greeter_ui
+  scene:
+    path: packages/scene
+  theme_catalog:
+    path: packages/theme_catalog
 
 dev_dependencies:
   flutter_lints: ^6.0.0

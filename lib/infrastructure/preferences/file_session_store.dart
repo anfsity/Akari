@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
+import 'package:greeter_ui/greeter_ui.dart';
 
 /// Persists the selected session id under the XDG state directory.
 ///
