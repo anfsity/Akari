@@ -14,7 +14,7 @@ void writeRunPlan({
   final runDirectoryPath = _join(repoRoot.path, runDirectory);
   final reportFile = reportPath == null
       ? File(_join(runDirectoryPath, 'report.json'))
-      : _resolveFile(repoRoot, reportPath);
+      : File(_resolvePath(repoRoot, reportPath));
   final redactor = _SecretRedactor.fromEnvironments([
     Platform.environment,
     for (final step in steps) step.environment,
@@ -37,7 +37,7 @@ void writeRunPlan({
           {
             'id': step.id,
             'command': redactor.redactCommand(step.command),
-            'working_directory': _join(repoRoot.path, step.workingDirectory),
+            'working_directory': _resolvePath(repoRoot, step.workingDirectory),
             'environment': redactor.redactEnvironment(step.environment),
             'stdout_log': _join(runDirectory, '${step.id}.stdout.log'),
             'stderr_log': _join(runDirectory, '${step.id}.stderr.log'),
@@ -166,7 +166,7 @@ Future<int> runDevCommand({
       : {'performance': performance};
   final reportFile = reportPath == null
       ? File(_join(runDirectoryPath, 'report.json'))
-      : _resolveFile(repoRoot, reportPath);
+      : File(_resolvePath(repoRoot, reportPath));
   await reportFile.parent.create(recursive: true);
 
   final resolvedArtifacts = _resolveArtifactPaths(
@@ -233,7 +233,7 @@ Future<_StepResult> _runStep({
     final process = await Process.start(
       step.command.first,
       step.command.skip(1).toList(),
-      workingDirectory: _join(repoRoot.path, step.workingDirectory),
+      workingDirectory: _resolvePath(repoRoot, step.workingDirectory),
       environment: step.environment.isEmpty
           ? null
           : {...Platform.environment, ...step.environment},
@@ -333,9 +333,8 @@ Map<String, Object?> _withoutFrameSamples(Map<String, dynamic> value) {
   return Map<String, Object?>.from(value)..remove('frame_samples');
 }
 
-File _resolveFile(Directory repoRoot, String path) {
-  final file = File(path);
-  return file.isAbsolute ? file : File(_join(repoRoot.path, path));
+String _resolvePath(Directory repoRoot, String path) {
+  return File(path).isAbsolute ? path : _join(repoRoot.path, path);
 }
 
 String _relativePath(Directory repoRoot, String path) {

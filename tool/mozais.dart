@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'src/command_plans.dart';
 import 'src/run_report.dart';
+import 'src/theme_catalog.dart';
 
 const _commands = {
   'build',
@@ -32,6 +33,15 @@ Future<void> main(List<String> arguments) async {
 
     final options = _parseOptions(command, arguments.skip(1).toList());
     final repoRoot = _findRepoRoot();
+    final buildTheme = command == 'build'
+        ? getThemePackage(
+            Directory(
+              options.themePath ?? _join(repoRoot.path, 'themes/default'),
+            ),
+          )
+        : null;
+    final buildMode =
+        options.buildMode ?? (options.preview ? 'debug' : 'release');
     final runDirectory = await _createRunDirectory(
       repoRoot,
       reserve: !options.dryRun,
@@ -42,9 +52,16 @@ Future<void> main(List<String> arguments) async {
       repoRoot,
       runDirectory,
       buildTarget: options.buildTarget,
-      buildMode: options.buildMode,
+      buildMode: buildMode,
+      buildTheme: buildTheme,
+      preview: options.preview,
     );
-    final artifactPaths = artifactPathsFor(command, runDirectory);
+    final artifactPaths = artifactPathsFor(
+      command,
+      runDirectory,
+      buildTarget: options.buildTarget,
+      buildMode: buildMode,
+    );
     if (options.dryRun) {
       writeRunPlan(
         command: command,
@@ -81,7 +98,7 @@ void _writeUsage([String? command]) {
     stdout.writeln('''Usage: fvm dart run tool/mozais.dart <command> [options]
 
 Commands:
-  build           Discover themes, generate sources, and build the Flutter app.
+  build           Build a theme in its own host project; optionally launch preview.
   verify          Run the full backend, Dart, Flutter, and D-Bus verification.
   verify-perf     Run the Linux profile performance gate.
   generate-scenes Generate generated theme scene code.
@@ -93,6 +110,8 @@ Options:
   --cycles COUNT      Measurement cycles for verify-perf (minimum: 3).
   --platform NAME     Flutter build target for build (default: linux).
   --mode MODE         Flutter build mode: debug, profile, or release.
+  --theme PATH        Theme project for build (default: themes/default).
+  --preview           Build and launch a Linux preview with demo login state.
   --dry-run           Print the resolved execution plan as JSON.
   -h, --help          Show command help.''');
     return;
@@ -101,7 +120,7 @@ Options:
   stdout.writeln('Usage: fvm dart run tool/mozais.dart $command [options]');
   if (command == 'build') {
     stdout.writeln(
-      'Options: --platform NAME, --mode debug|profile|release, --format text|json, --report PATH, --dry-run.',
+      'Options: --theme PATH, --preview, --platform NAME, --mode debug|profile|release, --format text|json, --report PATH, --dry-run.',
     );
   } else if (command == 'verify-perf') {
     stdout.writeln(
@@ -117,6 +136,8 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
   var cycles = _minimumPerfCycles;
   var buildTarget = 'linux';
   String? buildMode;
+  String? themePath;
+  var preview = false;
   String? reportPath;
   var dryRun = false;
   var formatSeen = false;
@@ -128,6 +149,16 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
 
   for (var index = 0; index < arguments.length; index++) {
     final option = arguments[index];
+    if (option == '--preview') {
+      if (command != 'build') {
+        throw const FormatException('--preview is only valid for build.');
+      }
+      if (preview) {
+        throw const FormatException('Duplicate --preview option.');
+      }
+      preview = true;
+      continue;
+    }
     if (option == '--dry-run') {
       if (dryRunSeen) {
         throw const FormatException('Duplicate --dry-run option.');
@@ -142,6 +173,7 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
       '--cycles',
       '--platform',
       '--mode',
+      '--theme',
     }.contains(option)) {
       throw FormatException('Unknown option: $option');
     }
@@ -151,6 +183,14 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
     }
     final value = arguments[++index];
     switch (option) {
+      case '--theme':
+        if (command != 'build') {
+          throw const FormatException('--theme is only valid for build.');
+        }
+        if (themePath != null) {
+          throw const FormatException('Duplicate --theme option.');
+        }
+        themePath = value;
       case '--format':
         if (formatSeen) {
           throw const FormatException('Duplicate --format option.');
@@ -213,6 +253,10 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
     }
   }
 
+  if (preview && buildTarget != 'linux') {
+    throw const FormatException('--preview requires --platform linux.');
+  }
+
   return _CliOptions(
     format: format,
     cycles: cycles,
@@ -220,6 +264,8 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
     buildMode: buildMode,
     reportPath: reportPath,
     dryRun: dryRun,
+    themePath: themePath,
+    preview: preview,
   );
 }
 
@@ -290,6 +336,8 @@ class _CliOptions {
     required this.buildMode,
     required this.reportPath,
     required this.dryRun,
+    required this.themePath,
+    required this.preview,
   });
 
   final RunOutputFormat format;
@@ -298,4 +346,6 @@ class _CliOptions {
   final String? buildMode;
   final String? reportPath;
   final bool dryRun;
+  final String? themePath;
+  final bool preview;
 }

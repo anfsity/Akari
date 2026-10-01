@@ -208,14 +208,14 @@ packages:
   theme_default:
     dependency: "direct main"
     description:
-      path: "../theme_default"
+      path: "../../themes/default"
       relative: true
     source: path
     version: "0.0.0"
   theme_fallback:
     dependency: "direct main"
     description:
-      path: "../theme_fallback"
+      path: "../../themes/fallback"
       relative: true
     source: path
     version: "0.0.0"

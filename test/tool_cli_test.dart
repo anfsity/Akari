@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../tool/src/command_plans.dart';
 import '../tool/src/run_report.dart';
 
 void main() {
@@ -17,6 +18,117 @@ void main() {
       await tempRoot.delete(recursive: true);
     }
   });
+
+  test('build plans use theme metadata outside the repository', () async {
+    final project = await _createThemeProject(tempRoot);
+    final result = await _runTool([
+      'build',
+      '--theme',
+      project.path,
+      '--preview',
+      '--dry-run',
+    ]);
+    expect(result.exitCode, 0, reason: result.stderr);
+    final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+    final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
+    expect(steps.first['working_directory'], project.path);
+    expect(steps[1]['id'], 'scenes.generate_theme_ocean');
+    final build = steps.singleWhere(
+      (step) => step['id'] == 'flutter.build_linux',
+    );
+    expect(build['command'], contains('--debug'));
+    expect(build['command'], contains('--dart-define=MOZAIS_BACKEND=demo'));
+    expect(steps.last['id'], 'theme.preview');
+    expect(
+      (steps.last['command'] as List).single,
+      endsWith('/debug/bundle/greeter'),
+    );
+    expect(
+      Directory('${Directory.current.path}/${plan['run_directory']}')
+          .existsSync(),
+      isFalse,
+    );
+  });
+
+  test('preview options reject unsupported commands and platforms', () async {
+    for (final arguments in [
+      ['verify', '--preview'],
+      ['build', '--preview', '--platform', 'web'],
+      ['build', '--theme', 'themes/default', '--theme', 'themes/fallback'],
+    ]) {
+      final result = await _runTool(arguments);
+      expect(result.exitCode, 2, reason: '$arguments: ${result.stderr}');
+    }
+  });
+
+  test(
+    'build launches an external theme without changing the platform catalog',
+    () async {
+      final project = await _createThemeProject(tempRoot);
+      final catalogManifest = File('packages/theme_catalog/pubspec.yaml');
+      final catalogRegistry = File(
+        'packages/theme_catalog/lib/src/theme_registry.g.dart',
+      );
+      final manifestBefore = await catalogManifest.readAsString();
+      final registryBefore = await catalogRegistry.readAsString();
+      final launchMarker = File('${tempRoot.path}/preview-started');
+      final flutter = File('${tempRoot.path}/flutter');
+      final dart = File('${tempRoot.path}/dart');
+      final preview = File('${tempRoot.path}/preview');
+      await preview.writeAsString(
+        '#!/bin/sh\nprintf launched > ${_shellQuote(launchMarker.path)}\n',
+      );
+      await flutter.writeAsString('''#!/bin/sh
+if [ "\$1" = build ]; then
+  mkdir -p build/linux/x64/debug/bundle
+  cp ${_shellQuote(preview.path)} build/linux/x64/debug/bundle/greeter
+fi
+''');
+      final dartCommand = getDartCommand(Directory.current);
+      await dart.writeAsString('''#!/bin/sh
+if [ "\$1" = run ] && [ "\$2" = build_runner ]; then
+  exit 0
+fi
+exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
+''');
+      final chmod = await Process.run('chmod', [
+        '+x',
+        flutter.path,
+        dart.path,
+        preview.path,
+      ]);
+      expect(chmod.exitCode, 0, reason: chmod.stderr);
+      final result = await _runTool(
+        ['build', '--theme', project.path, '--preview', '--format', 'json'],
+        environment: {
+          'MOZAIS_FLUTTER_BIN': flutter.path,
+          'MOZAIS_DART_BIN': dart.path,
+        },
+      );
+      expect(result.exitCode, 0, reason: result.stderr);
+      final report = jsonDecode(result.stdout) as Map<String, dynamic>;
+      final runDirectory = Directory(
+        '${Directory.current.path}/${report['artifacts']['run_directory']}',
+      );
+      addTearDown(() => runDirectory.delete(recursive: true));
+      expect(report['status'], 'passed');
+      expect(await launchMarker.readAsString(), 'launched');
+      expect(await catalogManifest.readAsString(), manifestBefore);
+      expect(await catalogRegistry.readAsString(), registryBefore);
+      final host = Directory(
+        '${Directory.current.path}/${report['artifacts']['host_project']}',
+      );
+      final hostManifest = jsonDecode(
+        await File('${host.path}/pubspec.yaml').readAsString(),
+      ) as Map<String, dynamic>;
+      expect(hostManifest['dependencies']['theme_ocean']['path'], project.path);
+      expect(hostManifest['dependencies'], isNot(contains('theme_catalog')));
+      final entrypoint = await File('${host.path}/lib/main.dart')
+          .readAsString();
+      expect(entrypoint, contains('themeBuilder: buildOceanTheme'));
+      expect(entrypoint, isNot(contains('FileSessionStore')));
+    },
+  );
 
   test(
     'json format writes only the machine-readable run report to stdout',
@@ -336,21 +448,40 @@ void main() {
   );
 }
 
+Future<Directory> _createThemeProject(Directory parent) async {
+  final project = Directory('${parent.path}/external theme');
+  await Directory('${project.path}/lib').create(recursive: true);
+  await File('${project.path}/pubspec.yaml').writeAsString('''
+name: theme_ocean
+environment:
+  sdk: ^3.13.2
+''');
+  await File('${project.path}/lib/theme.dart').writeAsString('''
+import 'package:flutter/material.dart';
+import 'package:theme_sdk/theme_sdk.dart';
+
+ThemeDefinition buildOceanTheme({Color? seed}) => throw UnimplementedError();
+''');
+  await File('${project.path}/lib/ocean.scene.json').writeAsString('{}');
+  return project;
+}
+
+String _shellQuote(String value) => "'${value.replaceAll("'", "'\\''")}'";
+
 Future<ProcessResult> _runTool(
   List<String> arguments, {
   Map<String, String> environment = const {},
   Set<String> unsetEnvironmentVariables = const {},
 }) {
-  final dartBin =
-      Platform.environment['MOZAIS_DART_BIN'] ?? Platform.resolvedExecutable;
+  final dartCommand = getDartCommand(Directory.current);
   final childEnvironment = {...Platform.environment};
   for (final key in unsetEnvironmentVariables) {
     childEnvironment.remove(key);
   }
   childEnvironment.addAll(environment);
   return Process.run(
-    dartBin,
-    ['tool/mozais.dart', ...arguments],
+    dartCommand.first,
+    [...dartCommand.skip(1), 'tool/mozais.dart', ...arguments],
     workingDirectory: Directory.current.path,
     environment: childEnvironment,
     includeParentEnvironment: false,

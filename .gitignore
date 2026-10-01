@@ -18,6 +18,8 @@
 !/lib/
 !/packages/
 !/packages/**
+!/themes/
+!/themes/**
 !/lib/**
 !/test/
 !/test/**

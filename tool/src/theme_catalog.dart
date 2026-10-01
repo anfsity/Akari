@@ -1,4 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
+
+import 'package:path/path.dart' as path;
+import 'package:yaml/yaml.dart';
 
 const generatedDependenciesStart = '# BEGIN GENERATED THEME DEPENDENCIES';
 const generatedDependenciesEnd = '# END GENERATED THEME DEPENDENCIES';
@@ -10,68 +14,68 @@ class ThemePackage {
     required this.packageName,
     required this.themeName,
     required this.builderName,
+    required this.directory,
   });
 
   final String packageName;
   final String themeName;
   final String builderName;
+  final Directory directory;
+}
 
-  String get relativePath => 'packages/$packageName';
+ThemePackage getThemePackage(Directory projectDirectory) {
+  final directory = Directory(projectDirectory.resolveSymbolicLinksSync());
+  final manifest = File(_join(directory.path, 'pubspec.yaml'));
+  final pubspec = loadYaml(manifest.readAsStringSync());
+  final packageName = pubspec is YamlMap ? pubspec['name'] : null;
+  if (packageName is! String || !packageName.startsWith(_themePackagePrefix)) {
+    throw FormatException('Theme package names must start with theme_.');
+  }
+  final themeName = packageName.substring(_themePackagePrefix.length);
+  if (!RegExp(r'^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$').hasMatch(themeName)) {
+    throw FormatException(
+      'Theme package $packageName must use a lowercase underscore name.',
+    );
+  }
+  final libDirectory = Directory(_join(directory.path, 'lib'));
+  final entrypoint = File(_join(libDirectory.path, 'theme.dart'));
+  final sceneFiles = libDirectory.existsSync()
+      ? libDirectory
+            .listSync(recursive: true, followLinks: false)
+            .whereType<File>()
+            .where((file) => file.path.endsWith('.scene.json'))
+            .toList()
+      : const <File>[];
+  if (!entrypoint.existsSync() || sceneFiles.isEmpty) {
+    throw FormatException(
+      '$packageName must contain lib/theme.dart and a .scene.json document.',
+    );
+  }
+  final builderName = _builderName(themeName);
+  if (!RegExp(r'\b' + RegExp.escape(builderName) + r'\s*\(')
+      .hasMatch(entrypoint.readAsStringSync())) {
+    throw FormatException(
+      '$packageName must export $builderName() from lib/theme.dart.',
+    );
+  }
+  return ThemePackage(
+    packageName: packageName,
+    themeName: themeName,
+    builderName: builderName,
+    directory: directory,
+  );
 }
 
 List<ThemePackage> findThemePackages(Directory repoRoot) {
-  final packagesDirectory = Directory(_join(repoRoot.path, 'packages'));
-  if (!packagesDirectory.existsSync()) {
-    throw StateError('Missing packages directory: ${packagesDirectory.path}');
-  }
-
-  final themes = <ThemePackage>[];
-  for (final directory
-      in packagesDirectory
-          .listSync(followLinks: false)
-          .whereType<Directory>()) {
-    final packageName = _lastSegment(directory.path);
-    if (!packageName.startsWith(_themePackagePrefix)) {
-      continue;
-    }
-
-    final themeName = packageName.substring(_themePackagePrefix.length);
-    if (!RegExp(r'^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$').hasMatch(themeName)) {
-      throw FormatException(
-        'Theme package $packageName must use a lowercase underscore name.',
-      );
-    }
-
-    final libDirectory = Directory(_join(directory.path, 'lib'));
-    final entrypoint = File(_join(libDirectory.path, 'theme.dart'));
-    final sceneFiles = libDirectory.existsSync()
-        ? libDirectory
-              .listSync(recursive: true, followLinks: false)
-              .whereType<File>()
-              .where((file) => file.path.endsWith('.scene.json'))
-              .toList()
-        : const <File>[];
-    if (!entrypoint.existsSync() || sceneFiles.isEmpty) {
-      continue;
-    }
-
-    final builderName = _builderName(themeName);
-    final entrypointSource = entrypoint.readAsStringSync();
-    if (!RegExp(r'\b' + RegExp.escape(builderName) + r'\s*\(')
-        .hasMatch(entrypointSource)) {
-      throw FormatException(
-        '$packageName must export $builderName() from lib/theme.dart.',
-      );
-    }
-    themes.add(
-      ThemePackage(
-        packageName: packageName,
-        themeName: themeName,
-        builderName: builderName,
-      ),
-    );
-  }
-
+  final themesDirectory = Directory(_join(repoRoot.path, 'themes'));
+  final themes = themesDirectory
+      .listSync(followLinks: false)
+      .whereType<Directory>()
+      .where(
+        (directory) => File(_join(directory.path, 'pubspec.yaml')).existsSync(),
+      )
+      .map(getThemePackage)
+      .toList();
   themes.sort((left, right) => left.packageName.compareTo(right.packageName));
   final names = <String>{};
   for (final theme in themes) {
@@ -99,7 +103,11 @@ void writeThemeCatalog({
     throw StateError('Missing theme catalog pubspec: ${pubspec.path}');
   }
   pubspec.writeAsStringSync(
-    _withGeneratedDependencies(pubspec.readAsStringSync(), themes),
+    _withGeneratedDependencies(
+      pubspec.readAsStringSync(),
+      themes,
+      catalogDirectory,
+    ),
   );
 
   final registry = File(
@@ -149,7 +157,11 @@ $builders
 ''';
 }
 
-String _withGeneratedDependencies(String pubspec, List<ThemePackage> themes) {
+String _withGeneratedDependencies(
+  String pubspec,
+  List<ThemePackage> themes,
+  Directory catalogDirectory,
+) {
   final start = pubspec.indexOf(generatedDependenciesStart);
   final end = pubspec.indexOf(
     generatedDependenciesEnd,
@@ -165,7 +177,9 @@ String _withGeneratedDependencies(String pubspec, List<ThemePackage> themes) {
   for (final theme in themes) {
     block
       ..writeln('  ${theme.packageName}:')
-      ..writeln('    path: ../${theme.packageName}');
+      ..writeln(
+        '    path: ${jsonEncode(path.relative(theme.directory.path, from: catalogDirectory.path))}',
+      );
   }
   block.write('  $generatedDependenciesEnd');
   return pubspec.replaceRange(
@@ -181,10 +195,6 @@ String _builderName(String themeName) {
       .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
       .join();
   return 'build${pascalName}Theme';
-}
-
-String _lastSegment(String path) {
-  return path.split(Platform.pathSeparator).last;
 }
 
 String _join(String base, String relative) {

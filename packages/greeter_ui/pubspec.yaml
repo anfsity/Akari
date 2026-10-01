@@ -18,7 +18,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   theme_default:
-    path: ../theme_default
+    path: ../../themes/default
 
 flutter:
   uses-material-design: true

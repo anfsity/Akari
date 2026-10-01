@@ -1,3 +1,4 @@
+import 'dart:ffi';
 import 'dart:io';
 
 import 'run_report.dart';
@@ -9,37 +10,47 @@ List<RunStep> buildStepsFor(
   Directory repoRoot,
   String runDirectory, {
   String buildTarget = 'linux',
-  String? buildMode,
+  String buildMode = 'release',
+  ThemePackage? buildTheme,
+  bool preview = false,
 }) {
   switch (command) {
     case 'build':
-      final themes = findThemePackages(repoRoot);
+      final theme = buildTheme!;
+      final hostDirectory = '$runDirectory/theme_host';
       return [
-        _step('themes.catalog.generate', [
-          ..._dartCommand(repoRoot),
-          'run',
-          'tool/theme_catalog.dart',
-          '--write',
-        ]),
-        _step('themes.catalog.pub_get', [
+        _step('theme.pub_get', [
           ..._flutterCommand(repoRoot),
           'pub',
           'get',
-        ], workingDirectory: 'packages/theme_catalog'),
-        _step('app.pub_get', [..._flutterCommand(repoRoot), 'pub', 'get']),
-        for (final theme in themes)
-          _step('themes.pub_get_${theme.packageName}', [
-            ..._flutterCommand(repoRoot),
-            'pub',
-            'get',
-          ], workingDirectory: theme.relativePath),
-        ..._sceneGenerationSteps(repoRoot, themes),
+        ], workingDirectory: theme.directory.path),
+        ..._sceneGenerationSteps(repoRoot, [theme]),
+        _step('theme.host.generate', [
+          ...getDartCommand(repoRoot),
+          'tool/theme_host.dart',
+          theme.directory.path,
+          _join(repoRoot.path, hostDirectory),
+          if (preview) '--preview',
+        ]),
+        _step('theme.host.pub_get', [
+          ..._flutterCommand(repoRoot),
+          'pub',
+          'get',
+        ], workingDirectory: hostDirectory),
         _step('flutter.build_$buildTarget', [
           ..._flutterCommand(repoRoot),
           'build',
           buildTarget,
-          if (buildMode != null) '--$buildMode',
-        ]),
+          '--$buildMode',
+          '--dart-define=MOZAIS_BACKEND=${preview ? 'demo' : 'real'}',
+        ], workingDirectory: hostDirectory),
+        if (preview)
+          _step('theme.preview', [
+            _join(
+              repoRoot.path,
+              getLinuxExecutablePath(runDirectory, buildMode),
+            ),
+          ], workingDirectory: hostDirectory),
       ];
     case 'verify':
       final themes = findThemePackages(repoRoot);
@@ -77,19 +88,19 @@ List<RunStep> buildStepsFor(
         _step('flutter.analyze', [..._flutterCommand(repoRoot), 'analyze']),
         _step('flutter.test', [..._flutterCommand(repoRoot), 'test']),
         _step('scene_schema.analyze', [
-          ..._dartCommand(repoRoot),
+          ...getDartCommand(repoRoot),
           'analyze',
         ], workingDirectory: 'packages/scene_schema'),
         _step('scene_schema.test', [
-          ..._dartCommand(repoRoot),
+          ...getDartCommand(repoRoot),
           'test',
         ], workingDirectory: 'packages/scene_schema'),
         _step('scene_codegen.analyze', [
-          ..._dartCommand(repoRoot),
+          ...getDartCommand(repoRoot),
           'analyze',
         ], workingDirectory: 'packages/scene_codegen'),
         _step('scene_codegen.test', [
-          ..._dartCommand(repoRoot),
+          ...getDartCommand(repoRoot),
           'test',
         ], workingDirectory: 'packages/scene_codegen'),
         _step('scene.analyze', [
@@ -114,7 +125,7 @@ List<RunStep> buildStepsFor(
           [
             'bash',
             'scripts/debug-dbus.sh',
-            ..._dartCommand(repoRoot),
+            ...getDartCommand(repoRoot),
             'run',
             'tool/dbus_gateway_smoke.dart',
           ],
@@ -144,7 +155,7 @@ List<RunStep> buildStepsFor(
       }
       steps.add(
         _step('performance.aggregate', [
-          ..._dartCommand(repoRoot),
+          ...getDartCommand(repoRoot),
           'run',
           'tool/perf/aggregate_perf.dart',
           '--output',
@@ -157,7 +168,7 @@ List<RunStep> buildStepsFor(
       );
       steps.add(
         _step('performance.compare', [
-          ..._dartCommand(repoRoot),
+          ...getDartCommand(repoRoot),
           'run',
           'tool/perf/compare_perf.dart',
           '--baseline',
@@ -186,7 +197,7 @@ List<RunStep> buildStepsFor(
           '--target=integration_test/performance/scene_performance_test.dart',
         ]),
         _step('performance.summarize_trace', [
-          ..._dartCommand(repoRoot),
+          ...getDartCommand(repoRoot),
           'run',
           'tool/perf/summarize_timeline.dart',
           '--input',
@@ -206,11 +217,11 @@ List<RunStep> _sceneGenerationSteps(
   return [
     for (final theme in discoveredThemes)
       _step('scenes.generate_${theme.packageName}', [
-        ..._dartCommand(repoRoot),
+        ...getDartCommand(repoRoot),
         'run',
         'build_runner',
         'build',
-      ], workingDirectory: theme.relativePath),
+      ], workingDirectory: theme.directory.path),
   ];
 }
 
@@ -218,26 +229,29 @@ List<RunStep> _getThemeVerificationSteps(
   Directory repoRoot,
   List<ThemePackage> themes,
 ) {
-  final packageNames = [
-    'greeter_components',
-    'theme_sdk',
-    'theme_catalog',
-    ...themes.map((theme) => theme.packageName),
-  ];
+  final packageNames = ['greeter_components', 'theme_sdk', 'theme_catalog'];
   return [
     for (final packageName in packageNames)
-      ..._getFlutterPackageVerificationSteps(repoRoot, packageName),
+      ..._getFlutterPackageVerificationSteps(
+        repoRoot,
+        Directory(_join(repoRoot.path, 'packages/$packageName')),
+        packageName,
+      ),
+    for (final theme in themes)
+      ..._getFlutterPackageVerificationSteps(
+        repoRoot,
+        theme.directory,
+        theme.packageName,
+      ),
   ];
 }
 
 List<RunStep> _getFlutterPackageVerificationSteps(
   Directory repoRoot,
+  Directory directory,
   String packageName,
 ) {
-  final workingDirectory = 'packages/$packageName';
-  final testDirectory = Directory(
-    _join(repoRoot.path, '$workingDirectory/test'),
-  );
+  final testDirectory = Directory(_join(directory.path, 'test'));
   final hasTests =
       testDirectory.existsSync() &&
       testDirectory
@@ -250,12 +264,12 @@ List<RunStep> _getFlutterPackageVerificationSteps(
     _step('$packageName.analyze', [
       ...flutter,
       'analyze',
-    ], workingDirectory: workingDirectory),
+    ], workingDirectory: directory.path),
     if (hasTests)
       _step('$packageName.test', [
         ...flutter,
         'test',
-      ], workingDirectory: workingDirectory),
+      ], workingDirectory: directory.path),
   ];
 }
 
@@ -275,12 +289,16 @@ RunStep _step(
 
 List<String> _flutterCommand(Directory repoRoot) {
   final customFlutter = Platform.environment['MOZAIS_FLUTTER_BIN'];
-  return customFlutter == null || customFlutter.isEmpty
-      ? ['fvm', 'flutter']
-      : [_resolveSdkBinary(customFlutter, repoRoot)];
+  if (customFlutter != null && customFlutter.isNotEmpty) {
+    return [_resolveSdkBinary(customFlutter, repoRoot)];
+  }
+  final localFlutter = File(
+    _join(repoRoot.path, '.fvm/flutter_sdk/bin/flutter'),
+  );
+  return localFlutter.existsSync() ? [localFlutter.path] : ['fvm', 'flutter'];
 }
 
-List<String> _dartCommand(Directory repoRoot) {
+List<String> getDartCommand(Directory repoRoot) {
   final customDart = Platform.environment['MOZAIS_DART_BIN'];
   if (customDart != null && customDart.isNotEmpty) {
     return [_resolveSdkBinary(customDart, repoRoot)];
@@ -290,7 +308,8 @@ List<String> _dartCommand(Directory repoRoot) {
     final flutterPath = _resolveSdkBinary(customFlutter, repoRoot);
     return [_join(File(flutterPath).parent.path, 'dart')];
   }
-  return ['fvm', 'dart'];
+  final localDart = File(_join(repoRoot.path, '.fvm/flutter_sdk/bin/dart'));
+  return localDart.existsSync() ? [localDart.path] : ['fvm', 'dart'];
 }
 
 String _resolveSdkBinary(String binary, Directory repoRoot) {
@@ -298,8 +317,19 @@ String _resolveSdkBinary(String binary, Directory repoRoot) {
   return file.isAbsolute ? binary : _join(repoRoot.path, binary);
 }
 
-Map<String, String> artifactPathsFor(String command, String runDirectory) {
+Map<String, String> artifactPathsFor(
+  String command,
+  String runDirectory, {
+  String buildTarget = 'linux',
+  String buildMode = 'release',
+}) {
   return switch (command) {
+    'build' => {
+      'host_project': '$runDirectory/theme_host',
+      'build_directory': '$runDirectory/theme_host/build/$buildTarget',
+      if (buildTarget == 'linux')
+        'executable': getLinuxExecutablePath(runDirectory, buildMode),
+    },
     'verify-perf' => {
       'performance_report': 'build/perf/scene_report.json',
       'performance_raw_reports': '$runDirectory/perf',
@@ -309,6 +339,15 @@ Map<String, String> artifactPathsFor(String command, String runDirectory) {
     },
     _ => const {},
   };
+}
+
+String getLinuxExecutablePath(String runDirectory, String buildMode) {
+  final architecture = switch (Abi.current()) {
+    Abi.linuxX64 => 'x64',
+    Abi.linuxArm64 => 'arm64',
+    _ => throw UnsupportedError('Linux builds require an x64 or arm64 host.'),
+  };
+  return '$runDirectory/theme_host/build/linux/$architecture/$buildMode/bundle/greeter';
 }
 
 String _join(String base, String relative) {
