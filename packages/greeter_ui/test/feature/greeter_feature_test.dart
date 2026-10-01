@@ -202,9 +202,15 @@ void main() {
       await _flushEvents();
       await feature.dispatch(const WakeGreeterCommand());
 
-      var accountChanges = 0;
+      final accountChanges = <({String? selectedId, bool canSelect})>[];
       var sessionChanges = 0;
-      feature.accountPickerSlots.addListener(() => accountChanges++);
+      feature.accountPickerSlots.addListener(() {
+        final account = feature.accountPickerSlots.value;
+        accountChanges.add((
+          selectedId: account.selected?.id,
+          canSelect: account.canSelect,
+        ));
+      });
       feature.sessionPickerSlots.addListener(() => sessionChanges++);
 
       // The default session is selected while the catalog loads.
@@ -213,7 +219,10 @@ void main() {
       await feature.dispatch(SelectUserCommand(gateway.users.first));
       await _flushEvents();
 
-      expect(accountChanges, 1);
+      expect(accountChanges, [
+        (selectedId: 'alice', canSelect: true),
+        (selectedId: 'alice', canSelect: false),
+      ]);
       expect(sessionChanges, 0);
       expect(feature.state.authMode, AuthMode.prompting);
 
@@ -277,6 +286,7 @@ void main() {
       expect(feature.state.authMode, AuthMode.userSelection);
       expect(gateway.listSessionsCalls, 1);
 
+      await feature.dispatch(const WakeGreeterCommand());
       await feature.dispatch(SelectUserCommand(gateway.users.first));
       expect(feature.state.selectedUser?.id, 'alice');
       expect(feature.state.authMode, AuthMode.userSelection);
@@ -285,8 +295,8 @@ void main() {
       await _flushEvents();
 
       expect(feature.state.catalogMode, CatalogMode.ready);
-      await _selectDefaultSession(feature);
       expect(feature.state.selectedSession?.id, 'wayland:sway');
+      expect(feature.state.authMode, AuthMode.prompting);
 
       feature.dispose();
     },
