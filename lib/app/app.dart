@@ -2,12 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:greeter_ui/greeter_ui.dart';
-import 'package:theme_catalog/theme_catalog.dart';
+import 'package:theme_sdk/theme_sdk.dart';
 
 import '../infrastructure/dbus/greeter_dbus_gateway.dart';
 
 class MyApp extends StatefulWidget {
-  const MyApp({this.sessionStore = const NoopSessionStore(), super.key});
+  const MyApp({
+    required this.themeBuilder,
+    this.sessionStore = const NoopSessionStore(),
+    super.key,
+  });
+
+  final ThemeBuilder themeBuilder;
 
   /// Persistence for the selected session; the default keeps tests isolated.
   final SessionStore sessionStore;
@@ -34,22 +40,18 @@ class _MyAppState extends State<MyApp> {
       gateway: gateway,
       sessionStore: widget.sessionStore,
     );
-    final themeName = const String.fromEnvironment(
-      'MOZAIS_THEME',
-      defaultValue: ThemeRegistry.defaultThemeName,
-    );
-    _theme = ThemeRegistry.resolve(themeName);
-    unawaited(_loadThemeSeed(themeName));
+    _theme = widget.themeBuilder();
+    unawaited(_loadThemeSeed());
     unawaited(_feature.initialize());
   }
 
-  Future<void> _loadThemeSeed(String themeName) async {
-    final seed = await ThemeRegistry.findBackgroundSeed(_theme);
+  Future<void> _loadThemeSeed() async {
+    final seed = await _theme.findBackgroundSeed();
     if (!mounted || seed == null) {
       return;
     }
     setState(() {
-      _theme = ThemeRegistry.resolve(themeName, seed: seed);
+      _theme = widget.themeBuilder(seed: seed);
     });
   }
 

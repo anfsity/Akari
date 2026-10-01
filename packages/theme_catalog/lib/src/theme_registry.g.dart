@@ -5,8 +5,6 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_default/theme.dart' show buildDefaultTheme;
 import 'package:theme_fallback/theme.dart' show buildFallbackTheme;
 
-typedef ThemeBuilder = ThemeDefinition Function({Color? seed});
-
 class ThemeRegistry {
   const ThemeRegistry._();
 
@@ -25,21 +23,5 @@ class ThemeRegistry {
     );
     final builder = _builders[name] ?? _builders[fallbackThemeName]!;
     return builder(seed: seed);
-  }
-
-  /// Samples the theme background for a dynamic palette seed.
-  ///
-  /// Returns null when the theme has no image background or the asset cannot
-  /// be decoded, in which case the caller keeps the built-in seed.
-  static Future<Color?> findBackgroundSeed(ThemeDefinition theme) async {
-    final asset = theme.document.background.asset;
-    if (asset == null) {
-      return null;
-    }
-    try {
-      return await extractSeed(asset);
-    } on Object {
-      return null;
-    }
   }
 }

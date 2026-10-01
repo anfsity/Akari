@@ -307,7 +307,7 @@ packages:
     source: path
     version: "0.0.0"
   theme_default:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       path: "packages/theme_default"
       relative: true
@@ -321,7 +321,7 @@ packages:
     source: path
     version: "0.0.0"
   theme_sdk:
-    dependency: transitive
+    dependency: "direct main"
     description:
       path: "packages/theme_sdk"
       relative: true

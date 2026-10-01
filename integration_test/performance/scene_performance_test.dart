@@ -10,6 +10,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:greeter/main.dart';
+import 'package:theme_default/theme.dart';
 
 import '../../tool/perf/frame_metrics.dart';
 
@@ -93,7 +94,7 @@ void main() {
     }
 
     Future<void> captureStartup() async {
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
       await tester.pumpAndSettle(_frameInterval);
       await Future<void>.delayed(const Duration(milliseconds: 500));
       await tester.pumpAndSettle(_frameInterval);
