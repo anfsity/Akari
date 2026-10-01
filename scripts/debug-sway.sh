@@ -34,7 +34,7 @@ esac
 
 fvm flutter build linux --debug --dart-define="MOZAIS_BACKEND=$backend" "$@"
 
-app="$repo_root/build/linux/x64/debug/bundle/mozais_greeter"
+app="$repo_root/build/linux/x64/debug/bundle/greeter"
 if [[ ! -x "$app" ]]; then
   printf 'Flutter bundle was not found: %s\n' "$app" >&2
   exit 1

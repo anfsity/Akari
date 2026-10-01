@@ -7,7 +7,7 @@ another theme package.
 ## Package Shape
 
 ```text
-packages/mozais_theme_<name>/
+packages/theme_<name>/
   pubspec.yaml
   assets/
   lib/
@@ -19,9 +19,9 @@ packages/mozais_theme_<name>/
   test/
 ```
 
-The package depends on `mozais_theme_sdk` and `mozais_scene`. It may depend on
-an explicitly shared component package such as `mozais_greeter_components`, but
-it must not depend on `mozais_theme_default`, `mozais_theme_fallback`, or any
+The package depends on `theme_sdk` and `scene`. It may depend on
+an explicitly shared component package such as `greeter_components`, but
+it must not depend on `theme_default`, `theme_fallback`, or any
 other concrete theme.
 
 `theme.dart` creates one `ThemeDefinition` containing the generated
@@ -32,16 +32,16 @@ declared by the package's `pubspec.yaml` and referenced with
 
 ## Build Boundary
 
-The builder discovers every `mozais_theme_*` package containing a
+The builder discovers every `theme_*` package containing a
 `.scene.json` file and a `lib/theme.dart` entrypoint. The suffix is the theme
 id, and the entrypoint follows the naming convention
 `build<Name>Theme({Color? seed})`; for example,
-`mozais_theme_ocean` exports `buildOceanTheme`. `fallback` and `default` are
+`theme_ocean` exports `buildOceanTheme`. `fallback` and `default` are
 required package ids for this executable.
 
 Run `fvm dart run tool/mozais.dart build` after adding a package. The build
 command scans the packages, updates the generated theme dependencies in
-`mozais_theme_catalog`, generates the catalog registry, runs `build_runner` in
+`theme_catalog`, generates the catalog registry, runs `build_runner` in
 each theme package, and then invokes `flutter build linux`. No core registry or
 catalog import needs to be edited by hand. Use `--platform` and `--mode` to
 select another Flutter build target or mode.

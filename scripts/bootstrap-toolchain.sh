@@ -19,7 +19,7 @@ fvm flutter config --enable-linux-desktop
 if [[ ! -f pubspec.yaml ]]; then
   fvm flutter create \
     --platforms=linux \
-    --project-name=mozais_greeter \
+    --project-name=greeter \
     --org=dev.mozais \
     --no-pub \
     .

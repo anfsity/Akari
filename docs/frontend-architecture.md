@@ -59,7 +59,7 @@ a `SceneDocument`, `ThemeBundle`, visual context, or log.
 
 ## 3. Theme and Scene Document
 
-A theme is a build-time Dart package under `packages/mozais_theme_<name>/`
+A theme is a build-time Dart package under `packages/theme_<name>/`
 containing:
 
 - `*.scene.json`: authoring layout and visibility conditions.
@@ -110,13 +110,13 @@ The scene code is split so tooling can reuse the schema without pulling in
 Flutter:
 
 ```text
-packages/mozais_scene_schema   Flutter-free model, condition evaluator, JSON codec
-packages/mozais_scene          runtime, theme bundle, background and motion registries
-packages/mozais_scene_codegen  build_runner generator that decodes JSON and emits Dart
-packages/mozais_greeter_components optional reusable semantic component set
+packages/scene_schema   Flutter-free model, condition evaluator, JSON codec
+packages/scene          runtime, theme bundle, background and motion registries
+packages/scene_codegen  build_runner generator that decodes JSON and emits Dart
+packages/greeter_components optional reusable semantic component set
 ```
 
-`mozais_scene` re-exports the schema, so application code keeps a single
+`scene` re-exports the schema, so application code keeps a single
 import. Scene build tooling uses the schema's codec and validation as the
 authoritative implementation for parsing scene documents.
 
@@ -145,14 +145,14 @@ component factory with its scene. A theme may explicitly reuse an existing
 component implementation when the behavior and presentation are shared, as the
 fallback theme currently does.
 
-The reusable semantic API lives in `mozais_theme_sdk`. It exposes display-safe
+The reusable semantic API lives in `theme_sdk`. It exposes display-safe
 slot listenables and semantic callbacks through `GreeterHost`, without giving a
 theme access to the feature state owner, D-Bus, or backend objects. The greeter
 adapter supplies that Host API to the selected compiled theme.
 
-`mozais_theme_catalog` is the executable's generated compile-time catalog. It
+`theme_catalog` is the executable's generated compile-time catalog. It
 is a composition-root dependency, not a dependency of the theme SDK or of
-another theme. The `build` command discovers local `mozais_theme_*` packages,
+another theme. The `build` command discovers local `theme_*` packages,
 updates the catalog's generated dependency block, and emits the registry from
 the package naming and `lib/theme.dart` entrypoint conventions. A theme package
 can be developed and tested independently without editing the catalog. Theme

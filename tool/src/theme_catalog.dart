@@ -3,7 +3,7 @@ import 'dart:io';
 const generatedDependenciesStart = '# BEGIN GENERATED THEME DEPENDENCIES';
 const generatedDependenciesEnd = '# END GENERATED THEME DEPENDENCIES';
 
-const _themePackagePrefix = 'mozais_theme_';
+const _themePackagePrefix = 'theme_';
 
 class ThemePackage {
   const ThemePackage({
@@ -81,9 +81,7 @@ List<ThemePackage> findThemePackages(Directory repoRoot) {
   }
   for (final requiredName in ['default', 'fallback']) {
     if (!names.contains(requiredName)) {
-      throw StateError(
-        'The theme catalog requires mozais_theme_$requiredName.',
-      );
+      throw StateError('The theme catalog requires theme_$requiredName.');
     }
   }
   return themes;
@@ -94,7 +92,7 @@ void writeThemeCatalog({
   required List<ThemePackage> themes,
 }) {
   final catalogDirectory = Directory(
-    _join(repoRoot.path, 'packages/mozais_theme_catalog'),
+    _join(repoRoot.path, 'packages/theme_catalog'),
   );
   final pubspec = File(_join(catalogDirectory.path, 'pubspec.yaml'));
   if (!pubspec.existsSync()) {
@@ -113,7 +111,7 @@ void writeThemeCatalog({
 String generateThemeRegistry(List<ThemePackage> themes) {
   final imports = StringBuffer()
     ..writeln("import 'package:flutter/material.dart';")
-    ..writeln("import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';");
+    ..writeln("import 'package:theme_sdk/theme_sdk.dart';");
   for (final theme in themes) {
     imports.writeln(
       "import 'package:${theme.packageName}/theme.dart' show ${theme.builderName};",

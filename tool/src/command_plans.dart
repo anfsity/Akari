@@ -25,7 +25,7 @@ List<RunStep> buildStepsFor(
           ..._flutterCommand(repoRoot),
           'pub',
           'get',
-        ], workingDirectory: 'packages/mozais_theme_catalog'),
+        ], workingDirectory: 'packages/theme_catalog'),
         _step('app.pub_get', [..._flutterCommand(repoRoot), 'pub', 'get']),
         for (final theme in themes)
           _step('themes.pub_get_${theme.packageName}', [
@@ -79,35 +79,35 @@ List<RunStep> buildStepsFor(
         _step('scene_schema.analyze', [
           ..._dartCommand(repoRoot),
           'analyze',
-        ], workingDirectory: 'packages/mozais_scene_schema'),
+        ], workingDirectory: 'packages/scene_schema'),
         _step('scene_schema.test', [
           ..._dartCommand(repoRoot),
           'test',
-        ], workingDirectory: 'packages/mozais_scene_schema'),
+        ], workingDirectory: 'packages/scene_schema'),
         _step('scene_codegen.analyze', [
           ..._dartCommand(repoRoot),
           'analyze',
-        ], workingDirectory: 'packages/mozais_scene_codegen'),
+        ], workingDirectory: 'packages/scene_codegen'),
         _step('scene_codegen.test', [
           ..._dartCommand(repoRoot),
           'test',
-        ], workingDirectory: 'packages/mozais_scene_codegen'),
+        ], workingDirectory: 'packages/scene_codegen'),
         _step('scene.analyze', [
           ..._flutterCommand(repoRoot),
           'analyze',
-        ], workingDirectory: 'packages/mozais_scene'),
+        ], workingDirectory: 'packages/scene'),
         _step('scene.test', [
           ..._flutterCommand(repoRoot),
           'test',
-        ], workingDirectory: 'packages/mozais_scene'),
+        ], workingDirectory: 'packages/scene'),
         _step('greeter_ui.analyze', [
           ..._flutterCommand(repoRoot),
           'analyze',
-        ], workingDirectory: 'packages/mozais_greeter_ui'),
+        ], workingDirectory: 'packages/greeter_ui'),
         _step('greeter_ui.test', [
           ..._flutterCommand(repoRoot),
           'test',
-        ], workingDirectory: 'packages/mozais_greeter_ui'),
+        ], workingDirectory: 'packages/greeter_ui'),
         ..._getThemeVerificationSteps(repoRoot, themes),
         _step(
           'dbus.smoke',
@@ -219,9 +219,9 @@ List<RunStep> _getThemeVerificationSteps(
   List<ThemePackage> themes,
 ) {
   final packageNames = [
-    'mozais_greeter_components',
-    'mozais_theme_sdk',
-    'mozais_theme_catalog',
+    'greeter_components',
+    'theme_sdk',
+    'theme_catalog',
     ...themes.map((theme) => theme.packageName),
   ];
   return [

@@ -11,7 +11,7 @@ fvm dart run tool/mozais.dart trace-perf
 ```
 
 `build` is the theme composition entry point. It discovers every local
-`mozais_theme_*` package, regenerates the catalog and scene sources, resolves
+`theme_*` package, regenerates the catalog and scene sources, resolves
 package dependencies, and builds the Linux Flutter application. A new theme
 package only needs to follow the [theme package contract](theme-package.md).
 
