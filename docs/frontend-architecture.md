@@ -59,8 +59,8 @@ a `SceneDocument`, `ThemeBundle`, visual context, or log.
 
 ## 3. Theme and Scene Document
 
-A theme is a build-time Dart package under `packages/theme_<name>/`
-containing:
+A theme is an independent Dart package. Built-in projects live under `themes/`;
+the CLI can also build a project outside this repository. A project contains:
 
 - `*.scene.json`: authoring layout and visibility conditions.
 - generated `*.scene.g.dart`: typed Dart emitted by build_runner.
@@ -155,13 +155,11 @@ itself. The executable entrypoint selects the builder; the host initializes the
 theme and rebuilds it with a sampled background seed when available. Background
 seed extraction belongs to `ThemeDefinition`, so it does not require a catalog.
 
-`theme_catalog` is the executable's generated compile-time catalog. It
-is a composition-root dependency, not a dependency of the theme SDK or of
-another theme. The `build` command discovers local `theme_*` packages,
-updates the catalog's generated dependency block, and emits the registry from
-the package naming and `lib/theme.dart` entrypoint conventions. A theme package
-can be developed and tested independently without editing the catalog. Theme
-selection is compile-time:
+`theme_catalog` is the repository application's generated compile-time catalog,
+used by its entrypoint and tests. It is a composition-root dependency, not a
+dependency of the SDK or another theme. `tool/theme_catalog.dart` discovers the
+built-in projects under `themes/` and regenerates this development catalog.
+The repository application's theme selection is compile-time:
 
 ```text
 --dart-define=MOZAIS_THEME=default
@@ -171,8 +169,10 @@ selection is compile-time:
 static theme with no blur or continuous animation. An unknown theme name falls
 back to `fallback`; debug builds assert to surface the configuration error.
 
-The greeter executable depends on the theme packages selected by the catalog.
-Each theme package owns its scenes, component assembly, tokens, and assets. A
+The CLI build path selects one project with `--theme PATH` and generates a
+separate host that injects its builder into `MyApp`. This host does not depend on
+the catalog. `--preview` builds and launches that same host with demo login state.
+Each theme project owns its scenes, component assembly, tokens, and assets. A
 theme may depend on SDK or explicitly shared component packages, but one theme
 must not import another theme package. Its Dart and Flutter code is compiled
 into the application; runtime loading of new Dart or Flutter code is not
