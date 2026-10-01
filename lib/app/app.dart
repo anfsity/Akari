@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
-import 'package:mozais_theme_catalog/mozais_theme_catalog.dart';
+import 'package:greeter_ui/greeter_ui.dart';
+import 'package:theme_catalog/theme_catalog.dart';
 
 import '../infrastructure/dbus/greeter_dbus_gateway.dart';
 

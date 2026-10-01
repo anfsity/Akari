@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mozais_greeter/infrastructure/preferences/file_session_store.dart';
+import 'package:greeter/infrastructure/preferences/file_session_store.dart';
 
 void main() {
   late Directory directory;
