@@ -8,12 +8,13 @@ import 'package:greeter_ui/feature/greeter_feature.dart';
 import 'package:greeter_ui/feature/greeter_state.dart';
 import 'package:greeter_ui/feature/ports/greeter_gateway.dart';
 import 'package:greeter/main.dart';
+import 'package:theme_default/theme.dart';
 import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
 import 'package:theme_catalog/theme_catalog.dart';
 
 void main() {
   testWidgets('starts dormant and reveals controls on wake', (tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('Choose account').hitTestable(), findsNothing);
@@ -31,7 +32,7 @@ void main() {
   testWidgets('keeps credential field geometry stable while waking', (
     tester,
   ) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
     await tester.pumpAndSettle();
 
     final field = find.byType(TextField);
@@ -46,7 +47,7 @@ void main() {
   });
 
   testWidgets('escape returns to the dormant background', (tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
     await tester.pumpAndSettle();
     await _wake(tester);
     expect(find.byTooltip('Choose account'), findsOneWidget);
@@ -58,7 +59,7 @@ void main() {
   });
 
   testWidgets('shows a digital clock only while dormant', (tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
     await tester.pumpAndSettle();
 
     final clock = find.textContaining(RegExp(r'^\d{2}:\d{2}$'));
@@ -69,7 +70,7 @@ void main() {
   });
 
   testWidgets('mouse click wakes the greeter', (tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('Choose account').hitTestable(), findsNothing);
@@ -83,7 +84,7 @@ void main() {
   testWidgets('selecting an account begins authentication automatically', (
     tester,
   ) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
     await tester.pumpAndSettle();
     await _wake(tester);
 
@@ -274,7 +275,7 @@ void main() {
   testWidgets('submits a response and starts the selected session', (
     tester,
   ) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
     await tester.pumpAndSettle();
     await _wake(tester);
 
@@ -298,7 +299,7 @@ void main() {
   testWidgets('the confirm arrow submits the same response as enter', (
     tester,
   ) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
     await tester.pumpAndSettle();
     await _wake(tester);
 
@@ -322,7 +323,7 @@ void main() {
   });
 
   testWidgets('power actions remain independently reachable', (tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('Suspend'), findsOneWidget);

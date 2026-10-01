@@ -150,6 +150,11 @@ slot listenables and semantic callbacks through `GreeterHost`, without giving a
 theme access to the feature state owner, D-Bus, or backend objects. The greeter
 adapter supplies that Host API to the selected compiled theme.
 
+The application host receives a `ThemeBuilder` instead of selecting a theme
+itself. The executable entrypoint selects the builder; the host initializes the
+theme and rebuilds it with a sampled background seed when available. Background
+seed extraction belongs to `ThemeDefinition`, so it does not require a catalog.
+
 `theme_catalog` is the executable's generated compile-time catalog. It
 is a composition-root dependency, not a dependency of the theme SDK or of
 another theme. The `build` command discovers local `theme_*` packages,

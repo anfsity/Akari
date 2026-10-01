@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:scene/scene.dart';
 
 import 'greeter_host.dart';
+import 'palette_extractor.dart';
 import 'theme_components.dart';
+
+typedef ThemeBuilder = ThemeDefinition Function({Color? seed});
 
 /// Complete compile-time theme bundle: its scene, component implementation,
 /// and visual runtime configuration are constructed together by its package.
@@ -23,6 +26,18 @@ class ThemeDefinition {
   ThemeTokens get tokens => bundle.tokens;
 
   ThemeData get materialTheme => bundle.materialTheme;
+
+  Future<Color?> findBackgroundSeed() async {
+    final asset = document.background.asset;
+    if (asset == null) {
+      return null;
+    }
+    try {
+      return await extractSeed(asset);
+    } on Object {
+      return null;
+    }
+  }
 
   Widget buildScene({
     required GreeterHost host,
