@@ -208,7 +208,7 @@ packages:
   theme_default:
     dependency: "direct dev"
     description:
-      path: "../theme_default"
+      path: "../../themes/default"
       relative: true
     source: path
     version: "0.0.0"

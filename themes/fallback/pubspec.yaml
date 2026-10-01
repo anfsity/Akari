@@ -9,17 +9,17 @@ dependencies:
   flutter:
     sdk: flutter
   scene:
-    path: ../scene
+    path: ../../packages/scene
   greeter_components:
-    path: ../greeter_components
+    path: ../../packages/greeter_components
   theme_sdk:
-    path: ../theme_sdk
+    path: ../../packages/theme_sdk
 
 dev_dependencies:
   build_runner: ^2.4.13
   flutter_lints: ^6.0.0
   scene_codegen:
-    path: ../scene_codegen
+    path: ../../packages/scene_codegen
 
 flutter:
   uses-material-design: true

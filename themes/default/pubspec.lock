@@ -177,7 +177,7 @@ packages:
   greeter_components:
     dependency: "direct main"
     description:
-      path: "../greeter_components"
+      path: "../../packages/greeter_components"
       relative: true
     source: path
     version: "0.0.0"
@@ -296,21 +296,21 @@ packages:
   scene:
     dependency: "direct main"
     description:
-      path: "../scene"
+      path: "../../packages/scene"
       relative: true
     source: path
     version: "0.0.0"
   scene_codegen:
     dependency: "direct dev"
     description:
-      path: "../scene_codegen"
+      path: "../../packages/scene_codegen"
       relative: true
     source: path
     version: "0.0.0"
   scene_schema:
     dependency: transitive
     description:
-      path: "../scene_schema"
+      path: "../../packages/scene_schema"
       relative: true
     source: path
     version: "0.0.0"
@@ -386,7 +386,7 @@ packages:
   theme_sdk:
     dependency: "direct main"
     description:
-      path: "../theme_sdk"
+      path: "../../packages/theme_sdk"
       relative: true
     source: path
     version: "0.0.0"

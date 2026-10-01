@@ -10,9 +10,9 @@ dependencies:
     sdk: flutter
   # BEGIN GENERATED THEME DEPENDENCIES
   theme_default:
-    path: ../theme_default
+    path: "../../themes/default"
   theme_fallback:
-    path: ../theme_fallback
+    path: "../../themes/fallback"
   # END GENERATED THEME DEPENDENCIES
   theme_sdk:
     path: ../theme_sdk
