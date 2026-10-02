@@ -9,10 +9,12 @@ import 'package:flutter/rendering.dart'
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+
 import 'package:greeter/app/app.dart';
+
 import 'package:theme_default/theme.dart';
 
-import '../../tool/perf/frame_metrics.dart';
+import '../frame_metrics.dart';
 
 const _frameInterval = Duration(microseconds: 16667);
 const _captureTimelineDiagnostics = bool.fromEnvironment(
@@ -57,6 +59,9 @@ void main() {
     }
 
     void onTimings(List<FrameTiming> batch) {
+      // Timings arrive in delayed batches, possibly after the active phase has
+      // changed. Correlate with the phase recorded at frame start by engine
+      // frame number; callback arrival time would misattribute transition work.
       for (final timing in batch) {
         timingFrameCount++;
         final frame = timing.frameNumber < 0
@@ -82,6 +87,8 @@ void main() {
       Future<void> Function() interaction,
     ) async {
       activePhase = phase;
+      // Capture one response frame per action before later animation frames.
+      // Its UI-thread cost stays measurable even when transitions dominate p95.
       captureActionResponseFrame = true;
       try {
         await interaction();
@@ -174,6 +181,8 @@ void main() {
     SchedulerBinding.instance.addTimingsCallback(onTimings);
 
     if (_captureTimelineDiagnostics) {
+      // Widget/layout/paint instrumentation adds overhead. Enable it only for
+      // the separate diagnostic trace, not normal performance gate measurements.
       debugProfileBuildsEnabledUserWidgets = true;
       debugProfileLayoutsEnabled = true;
       debugProfilePaintsEnabled = true;

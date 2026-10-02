@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'theme_perf.dart';
+
 enum RunOutputFormat { text, json }
 
 void writeRunPlan({
@@ -79,6 +81,11 @@ Future<int> runDevCommand({
 }) async {
   final runDirectoryPath = _join(repoRoot.path, runDirectory);
   await Directory(runDirectoryPath).create(recursive: true);
+  final performanceOutput = artifactPaths['performance_output'];
+  if (performanceOutput != null) {
+    await Directory(_resolvePath(repoRoot, performanceOutput))
+        .create(recursive: true);
+  }
   final eventsPath = _join(runDirectoryPath, 'events.jsonl');
   final events = File(eventsPath).openWrite();
   final redactor = _SecretRedactor.fromEnvironments([
@@ -159,19 +166,25 @@ Future<int> runDevCommand({
 
   stopwatch.stop();
   final finishedAt = DateTime.now().toUtc();
-  Map<String, Object?>? performance;
+  Map<String, String>? themeArtifacts;
   String? reportError;
-  if (command == 'verify-perf' &&
-      stepResults.any(
-        (result) =>
-            result.id == 'performance.aggregate' && result.status == 'passed',
-      )) {
-    try {
-      performance = await _readPerformanceSummary(
-        _join(repoRoot.path, 'build/perf/scene_report.json'),
-      );
-    } catch (error) {
-      reportError = redactor.redact('$error');
+  final performanceResultPath = artifactPaths['performance_result'];
+  if (performanceResultPath != null) {
+    final manifest = File(_resolvePath(repoRoot, performanceResultPath));
+    final commandPassed = stepResults.every(
+      (result) => result.status == 'passed',
+    );
+    // A failed theme may still publish diagnostic artifacts. A successful
+    // theme must supply a valid manifest before the run can be reported passed.
+    if (commandPassed || await manifest.exists()) {
+      try {
+        themeArtifacts = {
+          for (final entry in (await getThemePerfArtifacts(manifest)).entries)
+            entry.key: _relativePath(repoRoot, entry.value),
+        };
+      } catch (error) {
+        reportError = redactor.redact('$error');
+      }
     }
   }
   final status =
@@ -182,9 +195,9 @@ Future<int> runDevCommand({
   final reportErrorFields = reportError == null
       ? const <String, String>{}
       : {'error': reportError};
-  final performanceFields = performance == null
+  final themeArtifactFields = themeArtifacts == null
       ? const <String, Object?>{}
-      : {'performance': performance};
+      : {'theme_artifacts': themeArtifacts};
   final reportFile = reportPath == null
       ? File(_join(runDirectoryPath, 'report.json'))
       : File(_resolvePath(repoRoot, reportPath));
@@ -206,7 +219,7 @@ Future<int> runDevCommand({
     'artifacts': resolvedArtifacts,
     'steps': [for (final result in stepResults) result.toJson()],
     'report_path': _relativePath(repoRoot, reportFile.path),
-    ...performanceFields,
+    ...themeArtifactFields,
     ...reportErrorFields,
   };
 
@@ -229,7 +242,13 @@ Future<int> runDevCommand({
     );
     stderr.writeln('Logs: ${_relativePath(repoRoot, runDirectoryPath)}');
   }
-  return status == 'passed' ? 0 : 1;
+  if (status == 'passed') return 0;
+  if (performanceResultPath != null) {
+    for (final result in stepResults) {
+      if (result.status == 'failed') return result.exitCode ?? 1;
+    }
+  }
+  return 1;
 }
 
 Future<_StepResult> _runStep({
@@ -355,30 +374,6 @@ Future<void> _copyOutput(
     mirror?.write(remainder);
   }
   await log.flush();
-}
-
-Future<Map<String, Object?>> _readPerformanceSummary(String path) async {
-  final decoded = jsonDecode(await File(path).readAsString());
-  if (decoded is! Map<String, dynamic>) {
-    throw FormatException('$path must contain a JSON object.');
-  }
-  final summary = _withoutFrameSamples(decoded);
-  for (final field in ['phases', 'action_response_frames']) {
-    final phases = summary[field];
-    if (phases is Map<String, dynamic>) {
-      summary[field] = {
-        for (final entry in phases.entries)
-          entry.key: entry.value is Map<String, dynamic>
-              ? _withoutFrameSamples(entry.value as Map<String, dynamic>)
-              : entry.value,
-      };
-    }
-  }
-  return summary;
-}
-
-Map<String, Object?> _withoutFrameSamples(Map<String, dynamic> value) {
-  return Map<String, Object?>.from(value)..remove('frame_samples');
 }
 
 String _resolvePath(Directory repoRoot, String path) {

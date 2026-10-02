@@ -8,7 +8,7 @@ import 'package:greeter_ui/feature/greeter_feature.dart';
 import 'package:greeter_ui/feature/greeter_state.dart';
 import 'package:greeter_ui/feature/ports/greeter_gateway.dart';
 
-import '../../../lib/app/app.dart';
+import 'package:greeter/app/app.dart';
 
 import 'package:theme_default/theme.dart';
 import 'package:theme_sdk/theme_sdk.dart';

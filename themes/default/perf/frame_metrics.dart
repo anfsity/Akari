@@ -16,6 +16,9 @@ const reportedPhases = [
   'settled_idle',
 ];
 
+/// Summarizes raw frames using rounded indices into sorted samples, without
+/// interpolating timings. Empty input emits zero metrics alongside a zero sample
+/// count; the gate must check that count rather than interpret zeros as success.
 Map<String, Object?> summarizeFrameSamples(
   Iterable<FrameMetricSample> frames, {
   required double frameBudgetMs,

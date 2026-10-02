@@ -3,10 +3,10 @@ import 'dart:io';
 
 import 'run_report.dart';
 import 'theme_project.dart';
+import 'theme_perf.dart';
 
 List<RunStep> buildStepsFor(
   String command,
-  int cycles,
   Directory repoRoot,
   String runDirectory, {
   String buildTarget = 'linux',
@@ -15,6 +15,7 @@ List<RunStep> buildStepsFor(
   bool preview = false,
   int? jobs,
   String backendMode = 'mock',
+  List<String> themeArguments = const [],
 }) {
   switch (command) {
     case 'build':
@@ -209,78 +210,39 @@ List<RunStep> buildStepsFor(
         ),
       ];
     case 'verify-perf':
-      final steps = <RunStep>[..._sceneGenerationSteps(repoRoot)];
-      final flutter = getFlutterCommand(repoRoot);
-      for (var cycle = 1; cycle <= cycles; cycle++) {
-        final cycleReport = '$runDirectory/perf/scene_report_$cycle.json';
-        steps.add(
-          _step('performance.drive_$cycle', [
-            ...flutter,
-            'drive',
-            '-d',
-            'linux',
-            '--profile',
-            '--no-dds',
-            '--dart-define=MOZAIS_PERF_REPORT_PATH=$cycleReport',
-            '--driver=test_driver/integration_test.dart',
-            '--target=integration_test/performance/scene_performance_test.dart',
-          ]),
-        );
-      }
-      steps.add(
-        _step('performance.aggregate', [
-          ...getDartCommand(repoRoot),
-          'run',
-          'tool/perf/aggregate_perf.dart',
-          '--output',
-          'build/perf/scene_report.json',
-          for (var cycle = 1; cycle <= cycles; cycle++) ...[
-            '--input',
-            '$runDirectory/perf/scene_report_$cycle.json',
-          ],
-        ]),
-      );
-      steps.add(
-        _step('performance.compare', [
-          ...getDartCommand(repoRoot),
-          'run',
-          'tool/perf/compare_perf.dart',
-          '--baseline',
-          'tool/perf/baselines/default.json',
-          '--candidate',
-          'build/perf/scene_report.json',
-        ]),
-      );
-      return steps;
+    case 'trace-perf':
+      final theme = selectedTheme!;
+      final operation = command == 'verify-perf' ? 'verify' : 'trace';
+      final entrypoint = getThemePerfCommand(theme, operation);
+      final executable = switch (entrypoint.first) {
+        'dart' => getDartCommand(repoRoot),
+        'flutter' => getFlutterCommand(repoRoot),
+        final executable => [executable],
+      };
+      return [
+        _step('theme.pub_get', [
+          ...getFlutterCommand(repoRoot),
+          'pub',
+          'get',
+        ], workingDirectory: theme.directory.path),
+        ..._sceneGenerationSteps(repoRoot, [theme]),
+        _step(
+          'theme.perf.$operation',
+          [...executable, ...entrypoint.skip(1), ...themeArguments],
+          workingDirectory: theme.directory.path,
+          environment: {
+            'MOZAIS_PERF_OUTPUT_DIR': _join(
+              repoRoot.path,
+              '$runDirectory/perf',
+            ),
+          },
+        ),
+      ];
     case 'generate-scenes':
       return _sceneGenerationSteps(
         repoRoot,
         selectedTheme == null ? null : [selectedTheme],
       );
-    case 'trace-perf':
-      final timeline = '$runDirectory/perf/scene_interactions_timeline.json';
-      return [
-        ..._sceneGenerationSteps(repoRoot),
-        _step('performance.trace', [
-          ...getFlutterCommand(repoRoot),
-          'drive',
-          '-d',
-          'linux',
-          '--profile',
-          '--no-dds',
-          '--dart-define=MOZAIS_PERF_TRACE_TIMELINE=true',
-          '--dart-define=MOZAIS_PERF_TIMELINE_PATH=$timeline',
-          '--driver=test_driver/integration_test.dart',
-          '--target=integration_test/performance/scene_performance_test.dart',
-        ]),
-        _step('performance.summarize_trace', [
-          ...getDartCommand(repoRoot),
-          'run',
-          'tool/perf/summarize_timeline.dart',
-          '--input',
-          timeline,
-        ]),
-      ];
     default:
       throw StateError('No step plan for command $command.');
   }
@@ -420,12 +382,9 @@ Map<String, String> artifactPathsFor(
       if (buildTarget == 'linux')
         'executable': getLinuxExecutablePath(hostDirectory, buildMode),
     },
-    'verify-perf' => {
-      'performance_report': 'build/perf/scene_report.json',
-      'performance_raw_reports': '$runDirectory/perf',
-    },
-    'trace-perf' => {
-      'timeline': '$runDirectory/perf/scene_interactions_timeline.json',
+    'verify-perf' || 'trace-perf' => {
+      'performance_output': '$runDirectory/perf',
+      'performance_result': '$runDirectory/perf/result.json',
     },
     _ => const {},
   };

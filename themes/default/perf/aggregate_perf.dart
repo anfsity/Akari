@@ -13,6 +13,8 @@ Future<void> main(List<String> arguments) async {
     throw const FormatException('All reports must use the same frame budget.');
   }
 
+  // Pool raw samples and recompute percentiles. Averaging each cycle's p95
+  // would give a different statistic and hide cycles with different sample counts.
   final interactionSamples = <FrameMetricSample>[];
   final phaseSamples = {
     for (final phase in reportedPhases) phase: <FrameMetricSample>[],
@@ -69,6 +71,8 @@ Future<void> main(List<String> arguments) async {
     if (sampleCount == 0) {
       throw FormatException('Cycle ${cycle + 1} has no interaction frames.');
     }
+    // Keep cycle-level budget rates as well as pooled metrics: the gate needs
+    // to distinguish a repeatable slowdown from one unusually noisy run.
     cycleSummaries.add({
       'cycle': cycle + 1,
       ...interactionSummary,
@@ -92,6 +96,8 @@ Future<void> main(List<String> arguments) async {
       report,
       'static_background_scheduled_frames',
     );
+    // Any cycle with continuing idle wake-ups matters. An average could conceal
+    // a continuously animating background behind quieter measurements.
     if (staticFrames > staticBackgroundFrames) {
       staticBackgroundFrames = staticFrames.toDouble();
     }

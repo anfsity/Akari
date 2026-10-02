@@ -13,7 +13,6 @@ const _commands = {
   'generate-scenes',
   'trace-perf',
 };
-const _minimumPerfCycles = 3;
 
 Future<void> main(List<String> arguments) async {
   try {
@@ -26,7 +25,9 @@ Future<void> main(List<String> arguments) async {
     if (!_commands.contains(command)) {
       throw FormatException('Unknown command: $command');
     }
-    if (arguments
+    final separator = arguments.indexOf('--');
+    final cliArguments = separator < 0 ? arguments : arguments.take(separator);
+    if (cliArguments
         .skip(1)
         .any((argument) => argument == '-h' || argument == '--help')) {
       _writeUsage(command);
@@ -37,7 +38,13 @@ Future<void> main(List<String> arguments) async {
     final repoRoot = _findRepoRoot();
     final selectedTheme =
         (options.themePath != null ||
-            const {'build', 'run', 'preview'}.contains(command))
+            const {
+              'build',
+              'run',
+              'preview',
+              'verify-perf',
+              'trace-perf',
+            }.contains(command))
         ? getThemePackage(
             Directory(
               options.themePath ?? _join(repoRoot.path, 'themes/default'),
@@ -53,7 +60,6 @@ Future<void> main(List<String> arguments) async {
     );
     final steps = buildStepsFor(
       command,
-      options.cycles,
       repoRoot,
       runDirectory,
       buildTarget: options.buildTarget,
@@ -62,6 +68,7 @@ Future<void> main(List<String> arguments) async {
       preview: preview,
       jobs: options.jobs,
       backendMode: options.backendMode,
+      themeArguments: options.themeArguments,
     );
     final artifactPaths = artifactPathsFor(
       command,
@@ -147,22 +154,32 @@ Options:
   --jobs COUNT        Limit Cargo and native compile/link parallel jobs.
   --platform NAME     Flutter target for build (default: linux).
   --mode MODE         debug, profile, or release (build: release; run/preview: debug).
-  --cycles COUNT      Performance cycles for verify-perf (minimum: 3).
   --format text|json  Console output format (default: text).
   --report PATH       Write the run report to PATH.
   --dry-run           Print the execution plan without changing files.
-  -h, --help          Show help.''');
+  -h, --help          Show help.
+  -- [arguments]      Forward arguments to the theme perf command.''');
 }
 
 _CliOptions _parseOptions(String command, List<String> arguments) {
+  final separator = arguments.indexOf('--');
+  final themeArguments = separator < 0
+      ? <String>[]
+      : arguments.sublist(separator + 1);
+  if (separator >= 0 && command != 'verify-perf' && command != 'trace-perf') {
+    throw FormatException('$command does not accept theme arguments after --.');
+  }
+  arguments = separator < 0 ? arguments : arguments.sublist(0, separator);
   final values = <String, String>{};
   var dryRun = false;
   final specific = switch (command) {
     'build' => {'--theme', '--jobs', '--mode', '--platform'},
     'run' => {'--theme', '--jobs', '--mode', '--backend'},
     'preview' => {'--theme', '--jobs', '--mode'},
-    'verify-perf' => {'--cycles'},
-    'verify' || 'generate-scenes' => {'--theme'},
+    'verify' ||
+    'generate-scenes' ||
+    'verify-perf' ||
+    'trace-perf' => {'--theme'},
     _ => <String>{},
   };
   final allowed = {'--format', '--report', ...specific};
@@ -210,15 +227,9 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
   if (!const {'mock', 'real'}.contains(backend)) {
     throw FormatException('Unknown backend transport: $backend');
   }
-  final cycles = values.containsKey('--cycles')
-      ? int.tryParse(values['--cycles']!)
-      : _minimumPerfCycles;
-  if (cycles == null || cycles < _minimumPerfCycles) {
-    throw const FormatException('--cycles must be an integer of at least 3.');
-  }
   return _CliOptions(
     format: format,
-    cycles: cycles,
+    themeArguments: themeArguments,
     buildTarget: target,
     buildMode: mode,
     themePath: values['--theme'],
@@ -291,7 +302,7 @@ String _join(String base, String relative) {
 class _CliOptions {
   const _CliOptions({
     required this.format,
-    required this.cycles,
+    required this.themeArguments,
     required this.buildTarget,
     required this.buildMode,
     required this.reportPath,
@@ -301,7 +312,7 @@ class _CliOptions {
     required this.backendMode,
   });
   final RunOutputFormat format;
-  final int cycles;
+  final List<String> themeArguments;
   final String buildTarget;
   final String? buildMode;
   final String? reportPath;
