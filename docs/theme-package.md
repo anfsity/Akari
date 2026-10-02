@@ -76,15 +76,15 @@ this contract.
 
 ## Repository Development
 
-`generate-scenes`, `verify`, and the performance commands discover projects
-under `themes/`, without requiring specific theme names. Each project is
-identified by its own manifest and builder entrypoint; package names must be
+`generate-scenes` and `verify` discover projects under `themes/`, without
+requiring specific theme names. Performance commands select a single project.
+Each project is identified by its own manifest and builder entrypoint; package names must be
 unique within the repository.
 
 The root project provides shared application code. Repository tests inject
 theme builders directly, and the debugging entrypoint `tool/dev_main.dart`
-selects the default theme explicitly. Performance fixtures also use that theme.
-An external theme build requires only the selected project.
+selects the default theme explicitly. Performance fixtures belong to their
+theme project. An external theme build requires only the selected project.
 
 Host projects retain Flutter and native build caches between runs. Shared application
 source is linked into the host, and Linux runner files are synchronized only when
@@ -93,3 +93,55 @@ they change. Run directories contain logs and reports rather than another build.
 Rust mock and production builds use separate stable target directories beneath
 `backend/target/mozais-mock/` and `backend/target/mozais-real/`. Commands sharing a
 theme serialize on a process lock; different themes can build independently.
+
+## Performance Protocol
+
+Themes own their perf entrypoints, UI interactions, measurements, baselines,
+thresholds, and trace analysis. No UI selectors or metric fields are required by
+Mozais. A theme opts into either operation explicitly in its `pubspec.yaml`:
+
+```yaml
+perf:
+  version: 1
+  verify: [dart, run, perf/verify.dart]
+  trace: [dart, run, perf/trace.dart]
+```
+
+Each entry is a non-empty argument array. Commands execute in the theme project
+with no implicit shell. A leading `dart` or `flutter` uses the repository's
+configured SDK; other executables use normal process resolution. Missing entries
+mean unsupported operations; Mozais never falls back to another theme's tests.
+
+```sh
+fvm dart run tool/mozais.dart verify-perf --theme /path/to/theme -- --custom-option value
+fvm dart run tool/mozais.dart trace-perf --theme /path/to/theme
+```
+
+The CLI forwards arguments after `--` verbatim, including `--help`, and provides
+an existing absolute output directory through `MOZAIS_PERF_OUTPUT_DIR`.
+The command's exit code determines test success: zero means success and nonzero
+means failure. A successful command must also provide a valid `result.json` in
+that directory. Commands can publish results before a failure to retain
+registered diagnostics.
+
+```json
+{
+  "version": 1,
+  "artifacts": [
+    {"name": "report", "path": "report.json"},
+    {"name": "timeline", "path": "timeline.json"}
+  ]
+}
+```
+
+Artifact names must be non-empty and unique. Paths must be relative to the output
+directory, exist, and resolve within it, including through symlinks. An empty
+artifact list is allowed. The CLI validates this envelope and records paths in
+its run report's `theme_artifacts` map. Artifact names, formats, and contents are
+chosen by the theme and are not interpreted by the CLI. Unsupported versions,
+invalid manifests, or missing success manifests fail the protocol check.
+
+The default theme declares both commands and keeps its current interaction
+journey and baseline under `perf/`. Its runner prepares a reusable Linux test
+host with the required test dependencies. The fallback theme has not opted in;
+it does not inherit the default theme's performance journey or thresholds.

@@ -67,10 +67,31 @@ their arguments, working directories, exit codes, timing, and log paths. The
 `events.jsonl` file records run and step start and finish events. Child command
 output stays in the per-step logs so JSON stdout remains parseable.
 
-The performance gate runs three measurement cycles by default. Additional
-cycles can be requested with `--cycles COUNT`, where `COUNT` must be at least
-three. Each cycle writes its raw report into that run's artifact directory;
-the aggregate report remains at `build/perf/scene_report.json`.
+`verify-perf` and `trace-perf` select one theme with `--theme PATH`, defaulting
+to `themes/default`. They execute that theme's explicitly declared perf command
+after resolving its dependencies and generating its scenes. The CLI does not
+supply interaction scripts, metric schemas, baselines, or pass/fail thresholds.
+See the [theme perf protocol](theme-package.md#performance-protocol).
+
+Arguments following `--` are passed literally to the theme command. For the
+default theme, request five measurement cycles with:
+
+```sh
+fvm dart run tool/mozais.dart verify-perf --theme themes/default -- --cycles 5
+```
+
+The default theme owns its Linux profile integration fixture, measurement and
+trace tools, and baseline under `themes/default/perf/`. Its gate defaults to
+three cycles, requires at least three, and accepts `--baseline PATH` after `--`.
+The fallback theme currently declares no performance commands.
+
+Each perf command receives an absolute `MOZAIS_PERF_OUTPUT_DIR` pointing to
+`build/tool/runs/<run-id>/perf/`. Successful commands must publish `result.json`;
+the run report records its validated artifact paths in `theme_artifacts` without
+parsing the artifact contents. Failed commands can publish diagnostic artifacts
+too. Their nonzero exit codes are preserved, and missing failure manifests do
+not hide the command failure. Protocol errors fail the run while retaining its
+logs and report. JSON console output remains a single CLI report.
 
 Host projects retain Flutter and native build caches between runs. Shared application
 source is linked into the host, and Linux runner files are synchronized only when

@@ -16,6 +16,11 @@ dependencies:
     path: ../../packages/theme_sdk
 
 dev_dependencies:
+  greeter:
+    path: ../..
+  yaml: ^3.1.3
+  integration_test:
+    sdk: flutter
   dbus: ^0.7.11
   greeter_ui:
     path: ../../packages/greeter_ui
@@ -30,3 +35,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+
+perf:
+  version: 1
+  verify: [dart, run, perf/run.dart, verify]
+  trace: [dart, run, perf/run.dart, trace]

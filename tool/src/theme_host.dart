@@ -10,6 +10,7 @@ void createThemeHost({
   required ThemePackage theme,
   required Directory output,
   required bool preview,
+  Map<String, Object?> devDependencies = const {},
 }) {
   output.createSync(recursive: true);
   final lib = Directory('${output.path}/lib')..createSync(recursive: true);
@@ -48,6 +49,7 @@ void createThemeHost({
       theme.packageName: {'path': theme.directory.path},
     },
     'flutter': {'uses-material-design': true},
+    if (devDependencies.isNotEmpty) 'dev_dependencies': devDependencies,
   };
   _writeIfChanged(
     File('${output.path}/pubspec.yaml'),
@@ -91,8 +93,7 @@ void _syncDirectory(Directory source, Directory target) {
     } else if (entity is File) {
       final file = File('${target.path}/$name');
       final bytes = entity.readAsBytesSync();
-      if (!file.existsSync() ||
-          !_isSameBytes(bytes, file.readAsBytesSync())) {
+      if (!file.existsSync() || !_isSameBytes(bytes, file.readAsBytesSync())) {
         file.writeAsBytesSync(bytes);
       }
     }

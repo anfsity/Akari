@@ -79,6 +79,8 @@ Future<void> main(List<String> arguments) async {
 }
 
 void _writeRankedEvents(String title, List<_TimelineEvent> events) {
+  // Inclusive timings contain nested child work. Rank them for diagnosis, but
+  // do not sum them as independent costs or compare them to the frame gate.
   stdout.writeln('$title (inclusive duration):');
   final byName = <String, List<_TimelineEvent>>{};
   for (final event in events) {
@@ -106,6 +108,9 @@ bool _isWithinAny(_TimelineEvent event, List<_TimelineEvent> scopes) {
 }
 
 List<_TimelineEvent> _readDartEvents(List traceEvents) {
+  // Traces may contain nested begin/end pairs or complete duration events.
+  // Separate stacks by process/thread so scopes cannot close another thread's
+  // event when names repeat during concurrent rendering work.
   final openEvents = <String, List<_OpenTimelineEvent>>{};
   final completeEvents = <_TimelineEvent>[];
 

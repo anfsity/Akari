@@ -56,6 +56,8 @@ Future<void> main(List<String> arguments) async {
       if (measurementCycles != null && cycles.length != measurementCycles) {
         failures.add('candidate cycle count does not match measurement count');
       }
+      // Require a majority for the noisy over-budget rate. Absolute span,
+      // first-response, sample-quality, and baseline checks still apply below.
       final requiredCycles = cycles.length ~/ 2 + 1;
       if (cyclesOverLimit >= requiredCycles) {
         failures.add(
@@ -131,6 +133,9 @@ Future<void> main(List<String> arguments) async {
     _printPhaseSummary(phases);
   }
 
+  // Long transitions contribute many frames and can dilute a slow initial
+  // response in aggregate percentiles. Gate that first frame separately using
+  // its maximum UI-thread build time across all measurement cycles.
   final actionResponseFrames = candidate['action_response_frames'];
   if (actionResponseFrames is! Map<String, dynamic>) {
     failures.add('candidate is missing action response frame data');
