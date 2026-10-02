@@ -3,6 +3,9 @@ import 'package:scene_schema/scene_schema.dart';
 
 Builder sceneBuilder(BuilderOptions options) => SceneBuilder();
 
+/// Converts authoring JSON to typed Dart during the theme build. Validation is
+/// delegated to scene_schema so generated scenes and editor tooling agree on
+/// the accepted document contract.
 class SceneBuilder implements Builder {
   @override
   Map<String, List<String>> get buildExtensions => const {
@@ -28,6 +31,8 @@ String _generate(SceneDocument document) {
     ..writeln("import 'package:scene/scene.dart';")
     ..writeln()
     ..writeln(
+      // A getter creates a fresh document after hot reload. A cached top-level
+      // final would keep the old scene even after regenerated code is loaded.
       'SceneDocument get ${_variableName(document.id)} => SceneDocument(',
     )
     ..writeln('  id: ${_dartString(document.id)},')
