@@ -35,7 +35,9 @@ Future<void> main(List<String> arguments) async {
 
     final options = _parseOptions(command, arguments.skip(1).toList());
     final repoRoot = _findRepoRoot();
-    final buildTheme = const {'build', 'run', 'preview'}.contains(command)
+    final selectedTheme =
+        (options.themePath != null ||
+            const {'build', 'run', 'preview'}.contains(command))
         ? getThemePackage(
             Directory(
               options.themePath ?? _join(repoRoot.path, 'themes/default'),
@@ -56,7 +58,7 @@ Future<void> main(List<String> arguments) async {
       runDirectory,
       buildTarget: options.buildTarget,
       buildMode: buildMode,
-      buildTheme: buildTheme,
+      selectedTheme: selectedTheme,
       preview: preview,
       jobs: options.jobs,
       backendMode: options.backendMode,
@@ -66,7 +68,7 @@ Future<void> main(List<String> arguments) async {
       runDirectory,
       buildTarget: options.buildTarget,
       buildMode: buildMode,
-      buildTheme: buildTheme,
+      selectedTheme: selectedTheme,
       preview: preview,
       backendMode: command == 'run' ? options.backendMode : 'real',
     );
@@ -82,9 +84,9 @@ Future<void> main(List<String> arguments) async {
       return;
     }
 
-    final themes = buildTheme == null
+    final themes = selectedTheme == null
         ? findThemePackages(repoRoot)
-        : [buildTheme];
+        : [selectedTheme];
     final locks = <RandomAccessFile>[];
     try {
       // Theme generation writes into the source package, so serialize all
@@ -160,6 +162,7 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
     'run' => {'--theme', '--jobs', '--mode', '--backend'},
     'preview' => {'--theme', '--jobs', '--mode'},
     'verify-perf' => {'--cycles'},
+    'verify' || 'generate-scenes' => {'--theme'},
     _ => <String>{},
   };
   final allowed = {'--format', '--report', ...specific};
