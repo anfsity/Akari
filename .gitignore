@@ -31,8 +31,6 @@
 # Linux runner and application resources.
 !/linux/
 !/linux/**
-!/assets/
-!/assets/**
 
 # Backend
 !/backend/
