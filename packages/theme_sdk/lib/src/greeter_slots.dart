@@ -12,6 +12,8 @@ typedef AuthPromptSlots = ({
   String? promptError,
 });
 
+/// Value projection whose list equality suppresses unrelated slot notifications
+/// even when the feature creates a new snapshot with the same users.
 class AccountPickerSlots {
   AccountPickerSlots({
     required List<UserSummary> users,
@@ -35,6 +37,8 @@ class AccountPickerSlots {
   int get hashCode => Object.hash(Object.hashAll(users), selected, canSelect);
 }
 
+/// Catalog projection with content equality, allowing refreshes that preserve
+/// content to avoid rebuilding the picker solely due to a new list instance.
 class SessionPickerSlots {
   SessionPickerSlots({
     required this.mode,

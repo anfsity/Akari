@@ -12,6 +12,11 @@ typedef SceneNodeBuilder = Widget Function(
   SceneNode node,
 );
 
+/// Executes an authored document using compiled renderers and components.
+///
+/// Layout and presence belong here; authentication and component content do
+/// not. Each node has a paint boundary and a local presence host so motion or
+/// visibility changes can update independently of the rest of the scene.
 class SceneRuntime extends StatelessWidget {
   const SceneRuntime({
     required this.document,
@@ -46,6 +51,8 @@ class SceneRuntime extends StatelessWidget {
   /// Builds and lays out hidden nodes before they become visible.
   ///
   /// Hidden nodes remain excluded from pointer, focus, and semantics handling.
+  /// Their state and subscriptions remain alive, trading resource use while
+  /// hidden for lower latency when they first appear.
   final bool prewarmHiddenNodes;
 
   @override
@@ -122,6 +129,8 @@ class SceneRuntime extends StatelessWidget {
     );
     Widget transformed = RepaintBoundary(
       child: node.interactive
+          // Keyboard order is authored separately from paint order; raising a
+          // visual layer must not silently reorder navigation between controls.
           ? FocusTraversalOrder(
               order: NumericFocusOrder(node.focusOrder.toDouble()),
               child: content,
@@ -260,6 +269,8 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
 
   void _setVisible(bool visible) {
     _visible = visible;
+    // Reuse the current controller value on reversal. Restarting at an endpoint
+    // would jump when a new predicate update interrupts an enter or exit.
     if (!_animates) {
       _controller.value = visible ? 1 : 0;
     } else if (visible) {
@@ -273,6 +284,8 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
     if (status == AnimationStatus.dismissed &&
         !_visible &&
         !widget.prewarmHiddenNodes) {
+      // Dismissal can occur while another lifecycle method is building. The
+      // next frame removes the exited subtree without mutating that build.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {});
@@ -322,6 +335,9 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
   }
 
   Widget _hideFromInteraction(Widget child) {
+    // Exiting nodes remain visible until motion settles, but stop accepting
+    // input immediately. Transparent or prewarmed nodes also leave traversal
+    // and accessibility so they cannot trap focus or announce hidden content.
     return IgnorePointer(
       child: ExcludeFocus(child: ExcludeSemantics(child: child)),
     );
@@ -331,6 +347,9 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
     if (!widget.prewarmHiddenNodes) {
       return widget.builder(context);
     }
+    // Cache the widget configuration across presence changes. Its own slot
+    // listeners still rebuild content; builder or inherited dependency changes
+    // invalidate this cache in the lifecycle hooks above.
     return _prewarmedChild ??= widget.builder(context);
   }
 }

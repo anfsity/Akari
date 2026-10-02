@@ -5,6 +5,10 @@ import 'greeter_models.dart';
 import 'greeter_slots.dart';
 
 /// Typed greeter state and semantic actions available to compiled themes.
+///
+/// Listenables expose display state without giving components the feature or
+/// transport. The adapter owns the controller and focus node; components borrow
+/// them and must not dispose them or copy credential text into scene properties.
 class GreeterHost {
   const GreeterHost({
     required this.serviceSlots,

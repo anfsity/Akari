@@ -35,6 +35,8 @@ class ThemeDefinition {
     try {
       return await extractSeed(asset);
     } on Object {
+      // Palette extraction is optional decoration. Missing or undecodable
+      // wallpaper must leave the theme's authored default palette usable.
       return null;
     }
   }
@@ -57,6 +59,9 @@ class ThemeDefinition {
       activePredicates: activePredicates,
       activePredicatesListenable: activePredicatesListenable,
       backgroundBlurSigma: backgroundBlurSigma,
+      // Prepare input and picker subtrees before wake to reduce first-response
+      // work. Hidden components stay mounted, so their timers/listeners must
+      // remain cheap even when pointer, focus, and semantics are excluded.
       prewarmHiddenNodes: true,
       nodeBuilder: components.build,
     );
