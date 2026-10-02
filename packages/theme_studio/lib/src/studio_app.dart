@@ -277,6 +277,43 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                                     ],
                                   ),
                                 ),
+                              if (editor != null)
+                                Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      OutlineButton(
+                                        onPressed: () {
+                                          if (_inspector.currentState!
+                                              .apply()) {
+                                            editor.duplicateSelectedNode();
+                                          }
+                                        },
+                                        child: const Text('Duplicate node'),
+                                      ),
+                                      const Gap(8),
+                                      OutlineButton(
+                                        onPressed: editor.canDeleteNode
+                                            ? () {
+                                                if (_inspector.currentState!
+                                                    .apply()) {
+                                                  editor.deleteSelectedNode();
+                                                }
+                                              }
+                                            : null,
+                                        child: const Text('Delete node'),
+                                      ),
+                                      if (!editor.canDeleteNode) ...[
+                                        const Gap(8),
+                                        const Text(
+                                          'A scene needs at least one node.',
+                                        ).small().muted(),
+                                      ],
+                                    ],
+                                  ),
+                                ),
                             ],
                           ),
                         ),
