@@ -63,9 +63,10 @@ impl AuthActorHandle {
     /// The token is cancelled before the command is queued so an in-flight
     /// transport operation observes cancellation while the actor preserves
     /// the ordering of state cleanup.
-    pub(super) fn interrupt_current(&self, expected_attempt: Option<&str>) -> bool {
+    pub(super) fn interrupt_current(&self, expected_attempt: Option<&str>, caller: &str) -> bool {
         let control = self.control.borrow().clone();
         if let Some(control) = control
+            && control.caller == caller
             && expected_attempt.is_none_or(|attempt| attempt == control.attempt_id)
         {
             control.cancellation.cancel();
@@ -81,7 +82,7 @@ impl AuthActorHandle {
         username: String,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<String> {
-        self.interrupt_current(None);
+        self.interrupt_current(None, &caller);
         self.send_with(|reply| AuthCommand::Begin {
             caller,
             username,
@@ -94,11 +95,13 @@ impl AuthActorHandle {
     /// Submits a UI response to the actor for the active prompt.
     pub(super) async fn respond(
         &self,
+        caller: String,
         attempt_id: String,
         response: zeroize::Zeroizing<String>,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
         self.send_with(|reply| AuthCommand::Respond {
+            caller,
             attempt_id,
             response,
             emitter,
@@ -110,13 +113,14 @@ impl AuthActorHandle {
     /// Requests cancellation of one specific authentication attempt.
     pub(super) async fn cancel(
         &self,
+        caller: String,
         attempt_id: String,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
-        let allow_after_cleanup = self.interrupt_current(Some(&attempt_id));
+        let allow_after_cleanup = self.interrupt_current(Some(&attempt_id), &caller);
         self.send_with(|reply| AuthCommand::Cancel {
             expected_attempt: Some(attempt_id),
-            expected_caller: None,
+            expected_caller: Some(caller),
             allow_after_cleanup,
             emitter: Some(emitter),
             reply,
@@ -127,10 +131,12 @@ impl AuthActorHandle {
     /// Moves an authenticated attempt into backend-owned session resolution.
     pub(super) async fn resolve_session(
         &self,
+        caller: String,
         attempt_id: String,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
         self.send_with(|reply| AuthCommand::BeginSessionResolution {
+            caller,
             attempt_id,
             emitter,
             reply,
@@ -141,11 +147,13 @@ impl AuthActorHandle {
     /// Reports that the selected session disappeared during catalog lookup.
     pub(super) async fn session_unavailable(
         &self,
+        caller: String,
         attempt_id: String,
         detail: String,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
         self.send_with(|reply| AuthCommand::SessionUnavailable {
+            caller,
             attempt_id,
             detail,
             emitter,
@@ -157,11 +165,13 @@ impl AuthActorHandle {
     /// Reports a session-catalog failure while retaining actor ownership of state.
     pub(super) async fn session_resolution_failed(
         &self,
+        caller: String,
         attempt_id: String,
         detail: String,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
         self.send_with(|reply| AuthCommand::FailSessionResolution {
+            caller,
             attempt_id,
             detail,
             emitter,
@@ -173,11 +183,13 @@ impl AuthActorHandle {
     /// Starts the backend-validated session through the active greetd transport.
     pub(super) async fn start_session(
         &self,
+        caller: String,
         attempt_id: String,
         session: SessionEntry,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
         self.send_with(|reply| AuthCommand::StartSession {
+            caller,
             attempt_id,
             session,
             emitter,
@@ -254,6 +266,7 @@ impl AuthSnapshot {
 
 #[derive(Clone, Debug)]
 struct AttemptControl {
+    caller: String,
     attempt_id: String,
     cancellation: CancellationToken,
 }
@@ -267,6 +280,7 @@ enum AuthCommand {
         reply: oneshot::Sender<fdo::Result<String>>,
     },
     Respond {
+        caller: String,
         attempt_id: String,
         response: zeroize::Zeroizing<String>,
         emitter: SignalEmitter<'static>,
@@ -280,23 +294,27 @@ enum AuthCommand {
         reply: oneshot::Sender<fdo::Result<()>>,
     },
     BeginSessionResolution {
+        caller: String,
         attempt_id: String,
         emitter: SignalEmitter<'static>,
         reply: oneshot::Sender<fdo::Result<()>>,
     },
     SessionUnavailable {
+        caller: String,
         attempt_id: String,
         detail: String,
         emitter: SignalEmitter<'static>,
         reply: oneshot::Sender<fdo::Result<()>>,
     },
     FailSessionResolution {
+        caller: String,
         attempt_id: String,
         detail: String,
         emitter: SignalEmitter<'static>,
         reply: oneshot::Sender<fdo::Result<()>>,
     },
     StartSession {
+        caller: String,
         attempt_id: String,
         session: SessionEntry,
         emitter: SignalEmitter<'static>,
@@ -364,11 +382,16 @@ async fn run_actor(
                 let _ = reply.send(result);
             }
             AuthCommand::Respond {
+                caller,
                 attempt_id,
                 response,
                 emitter,
                 reply,
             } => {
+                if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
+                    let _ = reply.send(Err(error));
+                    continue;
+                }
                 let result = handle_respond(
                     &mut actor,
                     &attempt_id,
@@ -400,30 +423,45 @@ async fn run_actor(
                 let _ = reply.send(result);
             }
             AuthCommand::BeginSessionResolution {
+                caller,
                 attempt_id,
                 emitter,
                 reply,
             } => {
+                if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
+                    let _ = reply.send(Err(error));
+                    continue;
+                }
                 let result = resolve_session(&mut actor, &attempt_id, &emitter, &snapshots).await;
                 let _ = reply.send(result);
             }
             AuthCommand::SessionUnavailable {
+                caller,
                 attempt_id,
                 detail,
                 emitter,
                 reply,
             } => {
+                if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
+                    let _ = reply.send(Err(error));
+                    continue;
+                }
                 let result =
                     session_unavailable(&mut actor, &attempt_id, detail, &emitter, &snapshots)
                         .await;
                 let _ = reply.send(result);
             }
             AuthCommand::FailSessionResolution {
+                caller,
                 attempt_id,
                 detail,
                 emitter,
                 reply,
             } => {
+                if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
+                    let _ = reply.send(Err(error));
+                    continue;
+                }
                 let result = session_resolution_failed(
                     &mut actor,
                     &attempt_id,
@@ -436,11 +474,16 @@ async fn run_actor(
                 let _ = reply.send(result);
             }
             AuthCommand::StartSession {
+                caller,
                 attempt_id,
                 session,
                 emitter,
                 reply,
             } => {
+                if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
+                    let _ = reply.send(Err(error));
+                    continue;
+                }
                 let result = handle_start_session(
                     &mut actor,
                     &attempt_id,
@@ -475,6 +518,11 @@ async fn handle_begin(
     if actor.power_busy {
         return Err(fdo::Error::Failed("power action is in progress".to_owned()));
     }
+    if actor.caller.as_deref().is_some_and(|owner| owner != caller) {
+        return Err(fdo::Error::AccessDenied(
+            "authentication belongs to another D-Bus caller".to_owned(),
+        ));
+    }
     cancel_current(actor, None, None, false, None, snapshots, controls).await?;
 
     let cancellation = CancellationToken::new();
@@ -488,6 +536,7 @@ async fn handle_begin(
     actor.caller_watcher = Some(watcher_token.clone());
     publish_state(&actor.auth, &attempt_id, snapshots);
     let _ = controls.send(Some(AttemptControl {
+        caller: caller.clone(),
         attempt_id: attempt_id.clone(),
         cancellation: cancellation.clone(),
     }));
@@ -822,16 +871,13 @@ async fn consume_response(
                 // A rejected credential is retryable: keep the attempt alive,
                 // surface the failure, and restart the greetd session so the
                 // user can answer the prompt again without a new attempt.
-                if error_type == "auth_error"
-                    && actor.auth.state() == AuthState::SubmittingResponse
+                if error_type == "auth_error" && actor.auth.state() == AuthState::SubmittingResponse
                 {
                     let username = actor
                         .auth
                         .active_username()
                         .ok_or_else(|| {
-                            fdo::Error::Failed(
-                                "authentication attempt is unavailable".to_owned(),
-                            )
+                            fdo::Error::Failed("authentication attempt is unavailable".to_owned())
                         })?
                         .to_owned();
                     actor
@@ -860,12 +906,7 @@ async fn consume_response(
                         }
                         Err(error) => {
                             return Err(fail_transaction(
-                                actor,
-                                attempt_id,
-                                error,
-                                &emitter,
-                                snapshots,
-                                controls,
+                                actor, attempt_id, error, &emitter, snapshots, controls,
                             )
                             .await);
                         }
@@ -886,12 +927,7 @@ async fn consume_response(
                         Err(error) => {
                             actor.transport.take();
                             return Err(fail_transaction(
-                                actor,
-                                attempt_id,
-                                error,
-                                &emitter,
-                                snapshots,
-                                controls,
+                                actor, attempt_id, error, &emitter, snapshots, controls,
                             )
                             .await);
                         }
@@ -1043,7 +1079,12 @@ async fn cancel_current(
     if let Some(expected_caller) = expected_caller
         && actor.caller.as_deref() != Some(expected_caller)
     {
-        return Ok(());
+        if allow_after_cleanup && actor.auth.state() == AuthState::Idle {
+            return Ok(());
+        }
+        return Err(fdo::Error::AccessDenied(
+            "authentication belongs to another D-Bus caller".to_owned(),
+        ));
     }
     if !auth_in_progress(actor.auth.state()) || actor.auth.state() == AuthState::Cancelling {
         return Ok(());
@@ -1345,6 +1386,16 @@ async fn emit_prompt_best_effort(
     {
         tracing::debug!(%error, "could not emit Prompt");
     }
+}
+
+fn validate_owned_attempt(actor: &ActorState, attempt_id: &str, caller: &str) -> fdo::Result<()> {
+    validate_attempt(&actor.auth, attempt_id)?;
+    if actor.caller.as_deref() != Some(caller) {
+        return Err(fdo::Error::AccessDenied(
+            "authentication belongs to another D-Bus caller".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_attempt(auth: &AuthStateMachine, attempt_id: &str) -> fdo::Result<()> {
