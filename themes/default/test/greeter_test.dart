@@ -7,7 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:greeter_ui/feature/greeter_feature.dart';
 import 'package:greeter_ui/feature/greeter_state.dart';
 import 'package:greeter_ui/feature/ports/greeter_gateway.dart';
-import 'package:greeter/app/app.dart';
+
+import '../../../lib/app/app.dart';
+
 import 'package:theme_default/theme.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 import 'package:greeter_ui/scene/greeter_scene_adapter.dart';

@@ -11,7 +11,7 @@ List<RunStep> buildStepsFor(
   String runDirectory, {
   String buildTarget = 'linux',
   String buildMode = 'release',
-  ThemePackage? buildTheme,
+  ThemePackage? selectedTheme,
   bool preview = false,
   int? jobs,
   String backendMode = 'mock',
@@ -22,7 +22,7 @@ List<RunStep> buildStepsFor(
     case 'preview':
       final live = command != 'build';
       final transport = command == 'run' ? backendMode : 'real';
-      final theme = buildTheme!;
+      final theme = selectedTheme!;
       final hostDirectory = getThemeHostDirectory(theme, preview: preview);
       return [
         if (!preview)
@@ -108,7 +108,9 @@ List<RunStep> buildStepsFor(
           ),
       ];
     case 'verify':
-      final themes = findThemePackages(repoRoot);
+      final themes = selectedTheme == null
+          ? findThemePackages(repoRoot)
+          : [selectedTheme];
       return [
         _step('toolchain.check', ['bash', 'scripts/check-toolchain.sh']),
         _step('backend.format', [
@@ -139,8 +141,25 @@ List<RunStep> buildStepsFor(
           '--',
           '--test-threads=1',
         ], workingDirectory: 'backend'),
+        for (final theme in themes)
+          _step('${theme.packageName}.pub_get', [
+            ...getFlutterCommand(repoRoot),
+            'pub',
+            'get',
+          ], workingDirectory: theme.directory.path),
         ..._sceneGenerationSteps(repoRoot, themes),
-        _step('flutter.analyze', [...getFlutterCommand(repoRoot), 'analyze']),
+        _step('flutter.analyze', [
+          ...getFlutterCommand(repoRoot),
+          'analyze',
+          'lib',
+          'test',
+          'tool/src',
+          'tool/mozais.dart',
+          'tool/theme_host.dart',
+          'tool/theme_session.dart',
+          'tool/dbus_gateway_smoke.dart',
+          if (selectedTheme == null) 'tool/dev_main.dart',
+        ]),
         _step('flutter.test', [...getFlutterCommand(repoRoot), 'test']),
         _step('scene_schema.analyze', [
           ...getDartCommand(repoRoot),
@@ -234,7 +253,10 @@ List<RunStep> buildStepsFor(
       );
       return steps;
     case 'generate-scenes':
-      return _sceneGenerationSteps(repoRoot);
+      return _sceneGenerationSteps(
+        repoRoot,
+        selectedTheme == null ? null : [selectedTheme],
+      );
     case 'trace-perf':
       final timeline = '$runDirectory/perf/scene_interactions_timeline.json';
       return [
@@ -381,13 +403,13 @@ Map<String, String> artifactPathsFor(
   String runDirectory, {
   String buildTarget = 'linux',
   String buildMode = 'release',
-  ThemePackage? buildTheme,
+  ThemePackage? selectedTheme,
   bool preview = false,
   String backendMode = 'real',
 }) {
-  final hostDirectory = buildTheme == null
+  final hostDirectory = selectedTheme == null
       ? null
-      : getThemeHostDirectory(buildTheme, preview: preview);
+      : getThemeHostDirectory(selectedTheme, preview: preview);
   return switch (command) {
     'build' || 'run' || 'preview' => {
       if (!preview)

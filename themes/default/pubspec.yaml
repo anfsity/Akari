@@ -16,6 +16,9 @@ dependencies:
     path: ../../packages/theme_sdk
 
 dev_dependencies:
+  dbus: ^0.7.11
+  greeter_ui:
+    path: ../../packages/greeter_ui
   build_runner: ^2.4.13
   flutter_lints: ^6.0.0
   flutter_test:
