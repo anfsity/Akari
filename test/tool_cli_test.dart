@@ -95,7 +95,7 @@ void main() {
         3,
         Directory.current,
         'runs/build',
-        buildTheme: getThemePackage(project),
+        selectedTheme: getThemePackage(project),
         jobs: 4,
       );
       final backend = plan.singleWhere((step) => step.id == 'backend.build');
@@ -197,6 +197,37 @@ sys.exit(1)
       endsWith('/mozais-mock/debug/backend'),
     );
   });
+
+  test(
+    'verify selects an external theme without generating other themes',
+    () async {
+      final project = await _createThemeProject(tempRoot);
+      final result = await _runTool([
+        'verify',
+        '--theme',
+        project.path,
+        '--dry-run',
+      ]);
+      expect(result.exitCode, 0, reason: result.stderr);
+      final steps = (jsonDecode(result.stdout)['steps'] as List)
+          .cast<Map<String, dynamic>>();
+      expect(
+        steps
+            .where((step) => (step['id'] as String).startsWith('scenes.'))
+            .map((step) => step['id']),
+        ['scenes.generate_theme_ocean'],
+      );
+      expect(steps.any((step) => step['id'] == 'theme_ocean.analyze'), isTrue);
+      expect(
+        steps.any((step) => step['id'] == 'theme_default.analyze'),
+        isFalse,
+      );
+      expect(
+        steps.singleWhere((step) => step['id'] == 'flutter.analyze')['command'],
+        isNot(contains('tool/dev_main.dart')),
+      );
+    },
+  );
 
   test('discovers themes without required built-in names', () async {
     final themesDirectory = Directory('${tempRoot.path}/themes');

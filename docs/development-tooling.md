@@ -29,14 +29,16 @@ the last working theme. `r` regenerates and reloads, `R` restarts, and `q` quits
 Profile/release sessions do not hot reload. Both commands accept `--jobs COUNT`.
 Production `build` defaults to release and compiles both frontend and Rust backend.
 
-`verify` analyzes the shared theme SDK, components, and every project
-discovered under `themes/`. It also runs a theme project's Flutter tests when it
-contains `*_test.dart` files under `test/`.
+`verify` analyzes shared code, the backend, and every project discovered under
+`themes/`. With `--theme PATH`, it checks only the selected theme alongside shared
+code and the backend. Theme-specific UI tests live in their theme package. It
+also runs a theme project's Flutter tests when it contains `*_test.dart` files under `test/`.
 
 The root project contains shared application code and repository tests. The CLI
 generates the executable entrypoint for each selected theme. For repository
 debugging, `tool/dev_main.dart` explicitly injects the default theme;
-`scripts/debug-ui.sh` and `scripts/debug-sway.sh` use this entrypoint. To run it
+`scripts/debug-sway.sh` uses this entrypoint. `scripts/debug-ui.sh` delegates to
+`run` and accepts the same CLI options. To run it
 directly with demo login state after generating scenes:
 
 ```sh
