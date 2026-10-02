@@ -258,6 +258,7 @@ fn tokenize_exec(value: &str) -> Result<Vec<String>, ()> {
     let mut token = String::new();
     let mut quote = None;
     let mut escaped = false;
+    let mut token_started = false;
 
     for character in value.chars() {
         if escaped {
@@ -266,6 +267,9 @@ fn tokenize_exec(value: &str) -> Result<Vec<String>, ()> {
             continue;
         }
 
+        if quote.is_some() || !character.is_whitespace() {
+            token_started = true;
+        }
         match quote {
             Some(current_quote) if character == current_quote => quote = None,
             Some(_) if character == '\\' => escaped = true,
@@ -273,8 +277,9 @@ fn tokenize_exec(value: &str) -> Result<Vec<String>, ()> {
             None if character == '\\' => escaped = true,
             None if character == '\'' || character == '"' => quote = Some(character),
             None if character.is_whitespace() => {
-                if !token.is_empty() {
+                if token_started {
                     tokens.push(std::mem::take(&mut token));
+                    token_started = false;
                 }
             }
             None => token.push(character),
@@ -284,7 +289,7 @@ fn tokenize_exec(value: &str) -> Result<Vec<String>, ()> {
     if escaped || quote.is_some() {
         return Err(());
     }
-    if !token.is_empty() {
+    if token_started {
         tokens.push(token);
     }
 
@@ -418,6 +423,22 @@ mod tests {
             ["wrapper", "argument with spaces"]
         );
         assert!(tokenize_exec("wrapper 'unfinished").is_err());
+    }
+
+    #[test]
+    fn preserves_explicit_empty_arguments() {
+        for (input, expected) in [
+            (r#"wrapper "" next"#, vec!["wrapper", "", "next"]),
+            ("wrapper ''", vec!["wrapper", ""]),
+            (r#"wrapper "" '' next"#, vec!["wrapper", "", "", "next"]),
+            (r#"wrapper prefix""suffix"#, vec!["wrapper", "prefixsuffix"]),
+            ("  wrapper   next  ", vec!["wrapper", "next"]),
+            ("  ", vec![]),
+            (r#""""#, vec![""]),
+        ] {
+            assert_eq!(tokenize_exec(input).unwrap(), expected, "{input}");
+        }
+        assert!(tokenize_exec("wrapper \\").is_err());
     }
 
     #[test]
