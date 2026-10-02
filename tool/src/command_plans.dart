@@ -1,6 +1,6 @@
-import 'dart:ffi';
 import 'dart:io';
 
+import 'build_links.dart';
 import 'run_report.dart';
 import 'theme_project.dart';
 import 'theme_perf.dart';
@@ -76,6 +76,18 @@ List<RunStep> buildStepsFor(
             ],
             workingDirectory: hostDirectory,
             environment: {if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs'},
+          ),
+        if (!live && buildTarget == 'linux')
+          _step(
+            'build.links',
+            [
+              ...getDartCommand(repoRoot),
+              'tool/build_links.dart',
+              repoRoot.path,
+              theme.directory.path,
+              buildMode,
+            ],
+            dependencies: const ['backend.build', 'flutter.build_linux'],
           ),
         if (live)
           _step(
@@ -381,6 +393,8 @@ Map<String, String> artifactPathsFor(
       'build_directory': '$hostDirectory/build/$buildTarget',
       if (buildTarget == 'linux')
         'executable': getLinuxExecutablePath(hostDirectory, buildMode),
+      if (command == 'build' && buildTarget == 'linux')
+        ...getBuildLinkPaths(selectedTheme!),
     },
     'verify-perf' || 'trace-perf' => {
       'performance_output': '$runDirectory/perf',
@@ -388,15 +402,6 @@ Map<String, String> artifactPathsFor(
     },
     _ => const {},
   };
-}
-
-String getLinuxExecutablePath(String hostDirectory, String buildMode) {
-  final architecture = switch (Abi.current()) {
-    Abi.linuxX64 => 'x64',
-    Abi.linuxArm64 => 'arm64',
-    _ => throw UnsupportedError('Linux builds require an x64 or arm64 host.'),
-  };
-  return '$hostDirectory/build/linux/$architecture/$buildMode/bundle/greeter';
 }
 
 String _join(String base, String relative) {
