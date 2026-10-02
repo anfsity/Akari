@@ -10,7 +10,7 @@ usage() {
   printf '%s\n' \
     'Usage: scripts/debug-dbus.sh [command [args...]]' \
     '  Starts the mock backend and command on one private D-Bus session.' \
-    '  With no command, runs scripts/debug-ui.sh.' \
+    '  With no command, runs the Mozais CLI run command.' \
     'Environment:' \
     '  MOZAIS_BACKEND_MODE=mock|real   Backend transport (default: mock).' \
     '  MOZAIS_START_BACKEND=0|1        Skip or start the backend (default: 1).' \
@@ -24,7 +24,7 @@ if [[ "${1:-}" == -h || "${1:-}" == --help ]]; then
 fi
 
 if [[ "$#" -eq 0 ]]; then
-  exec "$script_dir/debug-ui.sh"
+  mozais_run_dev_cli "$repo_root" run
 fi
 
 inside_private_bus=0
@@ -37,7 +37,6 @@ if [[ "$inside_private_bus" -eq 0 ]]; then
   if [[ -z "${MOZAIS_LOG_DIR:-}" ]]; then
     export MOZAIS_LOG_DIR="$repo_root/logs/debug-$(date +%Y%m%d-%H%M%S)-$$"
   fi
-  log_dir="$(mozais_log_dir "$repo_root")"
   export MOZAIS_PRIVATE_BUS=1
   exec dbus-run-session -- "$script_dir/debug-dbus.sh" --inside-private-bus "$@"
 fi
