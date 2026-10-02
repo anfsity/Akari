@@ -7,6 +7,10 @@ import 'session_component.dart';
 import 'status_component.dart';
 import 'system_components.dart';
 
+/// Optional component vocabulary shared explicitly by compiled themes.
+/// Slot-backed components listen to their own content; this factory binds
+/// semantic callbacks without owning authentication or rebuilding the full scene.
+/// A theme using different component IDs supplies its own factory.
 class StandardGreeterComponents implements GreeterThemeComponents {
   const StandardGreeterComponents(this.theme);
 

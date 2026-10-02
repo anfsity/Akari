@@ -15,6 +15,9 @@ class GreeterStatusLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Service failure takes precedence because authentication cannot recover
+    // without it. During a usable prompt, keep rejection text ahead of catalog
+    // errors so the user sees why the previous credential was rejected.
     final message = switch (service.mode) {
       ServiceMode.starting => 'Starting greeter service...',
       ServiceMode.unavailable =>
