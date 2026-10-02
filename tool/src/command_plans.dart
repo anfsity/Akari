@@ -13,17 +13,32 @@ List<RunStep> buildStepsFor(
   String buildMode = 'release',
   ThemePackage? buildTheme,
   bool preview = false,
+  int? jobs,
 }) {
   switch (command) {
     case 'build':
       final theme = buildTheme!;
       final hostDirectory = getThemeHostDirectory(theme, preview: preview);
       return [
-        _step('theme.pub_get', [
-          ..._flutterCommand(repoRoot),
-          'pub',
-          'get',
-        ], workingDirectory: theme.directory.path),
+        if (!preview)
+          _step(
+            'backend.build',
+            [
+              'cargo',
+              'build',
+              '--locked',
+              if (buildMode != 'debug') '--release',
+              if (jobs != null) ...['--jobs', '$jobs'],
+            ],
+            workingDirectory: 'backend',
+            dependencies: const [],
+          ),
+        _step(
+          'theme.pub_get',
+          [..._flutterCommand(repoRoot), 'pub', 'get'],
+          workingDirectory: theme.directory.path,
+          dependencies: const [],
+        ),
         ..._sceneGenerationSteps(repoRoot, [theme]),
         _step('theme.host.generate', [
           ...getDartCommand(repoRoot),
@@ -37,13 +52,18 @@ List<RunStep> buildStepsFor(
           'pub',
           'get',
         ], workingDirectory: hostDirectory),
-        _step('flutter.build_$buildTarget', [
-          ..._flutterCommand(repoRoot),
-          'build',
-          buildTarget,
-          '--$buildMode',
-          '--dart-define=MOZAIS_BACKEND=${preview ? 'demo' : 'real'}',
-        ], workingDirectory: hostDirectory),
+        _step(
+          'flutter.build_$buildTarget',
+          [
+            ..._flutterCommand(repoRoot),
+            'build',
+            buildTarget,
+            '--$buildMode',
+            '--dart-define=MOZAIS_BACKEND=${preview ? 'demo' : 'real'}',
+          ],
+          workingDirectory: hostDirectory,
+          environment: {if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs'},
+        ),
         if (preview)
           _step('theme.preview', [
             _join(
@@ -278,12 +298,16 @@ RunStep _step(
   List<String> command, {
   String workingDirectory = '.',
   Map<String, String> environment = const {},
+  List<String>? dependencies,
+  bool interactive = false,
 }) {
   return RunStep(
     id: id,
     command: command,
     workingDirectory: workingDirectory,
     environment: environment,
+    dependencies: dependencies,
+    interactive: interactive,
   );
 }
 
@@ -330,6 +354,9 @@ Map<String, String> artifactPathsFor(
       : getThemeHostDirectory(buildTheme, preview: preview);
   return switch (command) {
     'build' => {
+      if (!preview)
+        'backend_executable':
+            'backend/target/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
       'host_project': hostDirectory!,
       'build_directory': '$hostDirectory/build/$buildTarget',
       if (buildTarget == 'linux')

@@ -2,6 +2,14 @@
 cmake_minimum_required(VERSION 3.13)
 project(runner LANGUAGES CXX)
 
+# Flutter invokes Ninja directly, so CMAKE_BUILD_PARALLEL_LEVEL does not
+# configure these builds. A shared pool caps native compile and link jobs.
+if(DEFINED ENV{MOZAIS_BUILD_JOBS})
+  set_property(GLOBAL PROPERTY JOB_POOLS mozais_native=$ENV{MOZAIS_BUILD_JOBS})
+  set(CMAKE_JOB_POOL_COMPILE mozais_native)
+  set(CMAKE_JOB_POOL_LINK mozais_native)
+endif()
+
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "greeter")

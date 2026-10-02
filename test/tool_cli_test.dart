@@ -86,6 +86,85 @@ void main() {
     },
   );
 
+  test(
+    'build plans compile production backend and configure native jobs',
+    () async {
+      final project = await _createThemeProject(tempRoot);
+      final plan = buildStepsFor(
+        'build',
+        3,
+        Directory.current,
+        'runs/build',
+        buildTheme: getThemePackage(project),
+        jobs: 4,
+      );
+      final backend = plan.singleWhere((step) => step.id == 'backend.build');
+      expect(backend.command, containsAll(['--release', '--jobs', '4']));
+      expect(backend.command, isNot(contains('mock')));
+      final flutter = plan.singleWhere(
+        (step) => step.id == 'flutter.build_linux',
+      );
+      expect(flutter.environment['MOZAIS_BUILD_JOBS'], '4');
+      expect(backend.dependencies, isEmpty);
+      expect(
+        plan.singleWhere((step) => step.id == 'theme.pub_get').dependencies,
+        isEmpty,
+      );
+    },
+  );
+
+  test(
+    'independent steps overlap and dependents wait for both branches',
+    () async {
+      final gate = File('${tempRoot.path}/gate.py');
+      await gate.writeAsString("""import pathlib, sys, time
+name, other = sys.argv[1:]
+pathlib.Path(name).touch()
+for _ in range(500):
+    if pathlib.Path(other).exists():
+        sys.exit(0)
+    time.sleep(0.01)
+sys.exit(1)
+""");
+      final status = await runDevCommand(
+        command: 'build',
+        format: RunOutputFormat.json,
+        reportPath: null,
+        repoRoot: tempRoot,
+        runDirectory: 'runs/concurrent',
+        steps: [
+          RunStep(
+            id: 'left',
+            command: ['python3', gate.path, 'left.ready', 'right.ready'],
+            workingDirectory: '.',
+            environment: const {},
+            dependencies: const [],
+          ),
+          RunStep(
+            id: 'right',
+            command: ['python3', gate.path, 'right.ready', 'left.ready'],
+            workingDirectory: '.',
+            environment: const {},
+            dependencies: const [],
+          ),
+          RunStep(
+            id: 'join',
+            command: [
+              'bash',
+              '-c',
+              'test -f left.ready && test -f right.ready',
+            ],
+            workingDirectory: '.',
+            environment: const {},
+            dependencies: const ['left', 'right'],
+          ),
+        ],
+        artifactPaths: const {},
+      );
+      expect(status, 0);
+    },
+  );
+
   test('discovers themes without required built-in names', () async {
     final themesDirectory = Directory('${tempRoot.path}/themes');
     final project = await _createThemeProject(themesDirectory);
