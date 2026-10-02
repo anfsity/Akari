@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../tool/src/command_plans.dart';
 import '../tool/src/run_report.dart';
-import '../tool/src/theme_catalog.dart';
+import '../tool/src/theme_project.dart';
 
 void main() {
   late Directory tempRoot;
@@ -29,6 +29,45 @@ void main() {
     expect(themes, hasLength(1));
     expect(themes.single.packageName, 'theme_ocean');
     expect(themes.single.directory.path, project.path);
+  });
+
+  test('rejects duplicate theme package names', () async {
+    final themesDirectory = Directory('${tempRoot.path}/themes');
+    await _createThemeProject(themesDirectory);
+    final duplicate = await _createThemeProject(
+      Directory('${tempRoot.path}/duplicate'),
+    );
+    await duplicate.rename('${themesDirectory.path}/another theme');
+
+    expect(() => findThemePackages(tempRoot), throwsStateError);
+  });
+
+  test('verification plans discover independent theme projects', () async {
+    await _createThemeProject(Directory('${tempRoot.path}/themes'));
+
+    final steps = buildStepsFor('verify', 3, tempRoot, 'runs/verify');
+
+    expect(
+      steps
+          .where((step) => step.id.startsWith('scenes.generate_'))
+          .map((step) => step.id),
+      ['scenes.generate_theme_ocean'],
+    );
+    expect(
+      steps
+          .where((step) => step.id.endsWith('.analyze'))
+          .map((step) => step.id),
+      unorderedEquals([
+        'flutter.analyze',
+        'scene_schema.analyze',
+        'scene_codegen.analyze',
+        'scene.analyze',
+        'greeter_ui.analyze',
+        'greeter_components.analyze',
+        'theme_sdk.analyze',
+        'theme_ocean.analyze',
+      ]),
+    );
   });
 
   test('build plans use theme metadata outside the repository', () async {
@@ -74,15 +113,11 @@ void main() {
   });
 
   test(
-    'build launches an external theme without changing the platform catalog',
+    'build launches an external theme using only its selected theme dependency',
     () async {
       final project = await _createThemeProject(tempRoot);
-      final catalogManifest = File('packages/theme_catalog/pubspec.yaml');
-      final catalogRegistry = File(
-        'packages/theme_catalog/lib/src/theme_registry.g.dart',
-      );
-      final manifestBefore = await catalogManifest.readAsString();
-      final registryBefore = await catalogRegistry.readAsString();
+      final platformManifest = File('pubspec.yaml');
+      final manifestBefore = await platformManifest.readAsString();
       final launchMarker = File('${tempRoot.path}/preview-started');
       final flutter = File('${tempRoot.path}/flutter');
       final dart = File('${tempRoot.path}/dart');
@@ -125,8 +160,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
       addTearDown(() => runDirectory.delete(recursive: true));
       expect(report['status'], 'passed');
       expect(await launchMarker.readAsString(), 'launched');
-      expect(await catalogManifest.readAsString(), manifestBefore);
-      expect(await catalogRegistry.readAsString(), registryBefore);
+      expect(await platformManifest.readAsString(), manifestBefore);
       final host = Directory(
         '${Directory.current.path}/${report['artifacts']['host_project']}',
       );
@@ -134,7 +168,16 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         await File('${host.path}/pubspec.yaml').readAsString(),
       ) as Map<String, dynamic>;
       expect(hostManifest['dependencies']['theme_ocean']['path'], project.path);
-      expect(hostManifest['dependencies'], isNot(contains('theme_catalog')));
+      expect(
+        hostManifest['dependencies'].keys,
+        unorderedEquals([
+          'flutter',
+          'dbus',
+          'greeter_ui',
+          'theme_sdk',
+          'theme_ocean',
+        ]),
+      );
       final entrypoint = await File('${host.path}/lib/main.dart')
           .readAsString();
       expect(entrypoint, contains('themeBuilder: buildOceanTheme'));

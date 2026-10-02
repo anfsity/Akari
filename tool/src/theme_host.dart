@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
-import 'theme_catalog.dart';
+import 'theme_project.dart';
 
 void createThemeHost({
   required Directory repoRoot,

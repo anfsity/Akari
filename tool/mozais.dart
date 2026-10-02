@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'src/command_plans.dart';
 import 'src/run_report.dart';
-import 'src/theme_catalog.dart';
+import 'src/theme_project.dart';
 
 const _commands = {
   'build',

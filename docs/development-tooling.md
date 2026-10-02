@@ -13,7 +13,7 @@ fvm dart run tool/mozais.dart trace-perf
 `build` accepts a theme project with `--theme PATH`, defaulting to
 `themes/default`. It resolves that project's dependencies, generates its scene
 source, and builds a separate host project in the run directory. The host imports
-only the selected theme and does not rewrite the platform catalog. Projects can
+only the selected theme. Projects can
 live outside the Mozais repository. See the
 [theme project contract](theme-package.md).
 
@@ -22,9 +22,19 @@ Preview uses demo login state and defaults to debug mode; normal builds use the
 real backend and default to release mode. The command waits until the preview
 window closes. It launches the compiled executable without Flutter hot reload.
 
-`verify` analyzes the shared theme SDK, catalog, components, and every project
+`verify` analyzes the shared theme SDK, components, and every project
 discovered under `themes/`. It also runs a theme project's Flutter tests when it
 contains `*_test.dart` files under `test/`.
+
+The root project contains shared application code and repository tests. The CLI
+generates the executable entrypoint for each selected theme. For repository
+debugging, `tool/dev_main.dart` explicitly injects the default theme;
+`scripts/debug-ui.sh` and `scripts/debug-sway.sh` use this entrypoint. To run it
+directly with demo login state after generating scenes:
+
+```sh
+fvm flutter run -d linux --target tool/dev_main.dart
+```
 
 The `scripts/build.sh`, `scripts/verify.sh`, `scripts/verify-perf.sh`,
 `scripts/generate-scenes.sh`,

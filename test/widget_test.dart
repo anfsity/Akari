@@ -7,10 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:greeter_ui/feature/greeter_feature.dart';
 import 'package:greeter_ui/feature/greeter_state.dart';
 import 'package:greeter_ui/feature/ports/greeter_gateway.dart';
-import 'package:greeter/main.dart';
+import 'package:greeter/app/app.dart';
 import 'package:theme_default/theme.dart';
 import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
-import 'package:theme_catalog/theme_catalog.dart';
 
 void main() {
   testWidgets('starts dormant and reveals controls on wake', (tester) async {
@@ -113,17 +112,14 @@ void main() {
         tester.widget<DecoratedBox>(fieldSurface).decoration as BoxDecoration;
     expect(
       (decoration.border as Border).top.color,
-      ThemeRegistry.resolve(ThemeRegistry.defaultThemeName)
-          .materialTheme
-          .colorScheme
-          .primary,
+      buildDefaultTheme().materialTheme.colorScheme.primary,
     );
   });
 
   testWidgets('types the waking key into the password field', (tester) async {
     final feature = GreeterFeature(gateway: _SingleUserGateway());
     await feature.initialize();
-    final theme = ThemeRegistry.resolve(ThemeRegistry.defaultThemeName);
+    final theme = buildDefaultTheme();
 
     await tester.pumpWidget(
       MaterialApp(
@@ -151,7 +147,7 @@ void main() {
   ) async {
     final feature = GreeterFeature(gateway: _SingleUserGateway());
     await feature.initialize();
-    final theme = ThemeRegistry.resolve(ThemeRegistry.defaultThemeName);
+    final theme = buildDefaultTheme();
 
     await tester.pumpWidget(
       MaterialApp(
@@ -184,7 +180,7 @@ void main() {
   testWidgets('escape works from the retry error state', (tester) async {
     final feature = GreeterFeature(gateway: _SingleUserGateway());
     await feature.initialize();
-    final theme = ThemeRegistry.resolve(ThemeRegistry.defaultThemeName);
+    final theme = buildDefaultTheme();
 
     await tester.pumpWidget(
       MaterialApp(
@@ -212,7 +208,7 @@ void main() {
   testWidgets('escape works when no control holds focus', (tester) async {
     final feature = GreeterFeature(gateway: _SingleUserGateway());
     await feature.initialize();
-    final theme = ThemeRegistry.resolve(ThemeRegistry.defaultThemeName);
+    final theme = buildDefaultTheme();
 
     await tester.pumpWidget(
       MaterialApp(
@@ -245,7 +241,7 @@ void main() {
   ) async {
     final feature = GreeterFeature(gateway: _SingleUserGateway());
     await feature.initialize();
-    final theme = ThemeRegistry.resolve(ThemeRegistry.defaultThemeName);
+    final theme = buildDefaultTheme();
 
     await tester.pumpWidget(
       MaterialApp(

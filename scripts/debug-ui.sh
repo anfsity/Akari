@@ -26,5 +26,6 @@ esac
 cd -- "$repo_root"
 exec fvm flutter run \
   -d linux \
+  --target=tool/dev_main.dart \
   --dart-define="MOZAIS_BACKEND=$backend" \
   "$@"

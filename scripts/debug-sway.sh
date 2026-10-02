@@ -32,7 +32,7 @@ case "$backend" in
     ;;
 esac
 
-fvm flutter build linux --debug --dart-define="MOZAIS_BACKEND=$backend" "$@"
+fvm flutter build linux --debug --target=tool/dev_main.dart --dart-define="MOZAIS_BACKEND=$backend" "$@"
 
 app="$repo_root/build/linux/x64/debug/bundle/greeter"
 if [[ ! -x "$app" ]]; then
