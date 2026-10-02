@@ -49,6 +49,8 @@ mozais_run_dev_cli() {
   fi
 
   if [[ -n "$dart_bin" ]]; then
+    # Preserve the caller's cwd: relative --theme and --report paths belong to
+    # the invocation directory, while the entrypoint itself is repository-bound.
     exec "$dart_bin" "$repo_root/tool/mozais.dart" "$@"
   fi
 
