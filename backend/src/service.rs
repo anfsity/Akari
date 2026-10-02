@@ -6,9 +6,13 @@ mod auth;
 use std::sync::Arc;
 
 use tokio::sync::Notify;
-use zbus::{fdo, interface, message::Header, object_server::SignalEmitter};
+use zbus::{
+    fdo, interface,
+    message::Header,
+    object_server::{ResponseDispatchNotifier, SignalEmitter},
+};
 
-use self::auth::AuthActorHandle;
+use self::auth::{AuthActorHandle, AuthActorTask};
 use crate::{
     session_catalog::{SessionCatalog, SessionCatalogError},
     users::UserCatalog,
@@ -21,24 +25,24 @@ pub const OBJECT_PATH: &str = "/io/mozais/Greeter";
 /// D-Bus service exposing user/session catalogs and serialized authentication.
 pub struct GreeterService {
     auth: AuthActorHandle,
+    handoff: Arc<Notify>,
     sessions: SessionCatalog,
     users: UserCatalog,
 }
 
-impl Default for GreeterService {
-    fn default() -> Self {
-        Self::new(Arc::new(Notify::new()))
-    }
-}
-
 impl GreeterService {
     /// Creates a service whose successful session handoff notifies the backend runtime.
-    pub fn new(handoff: Arc<Notify>) -> Self {
-        Self {
-            auth: AuthActorHandle::spawn(handoff),
-            sessions: SessionCatalog::default(),
-            users: UserCatalog::default(),
-        }
+    pub fn new(handoff: Arc<Notify>) -> (Self, AuthActorTask) {
+        let (auth, task) = AuthActorHandle::spawn();
+        (
+            Self {
+                auth,
+                handoff,
+                sessions: SessionCatalog::default(),
+                users: UserCatalog::default(),
+            },
+            task,
+        )
     }
 
     fn owned_emitter(emitter: SignalEmitter<'_>) -> SignalEmitter<'static> {
@@ -48,8 +52,8 @@ impl GreeterService {
 
 #[interface(name = "io.mozais.Greeter1")]
 impl GreeterService {
-    async fn get_state(&self) -> (String, String) {
-        self.auth.current_state()
+    async fn get_state(&self) -> fdo::Result<(String, String)> {
+        self.auth.get_state()
     }
 
     async fn list_users(&self) -> fdo::Result<Vec<(String, String, String)>> {
@@ -129,7 +133,7 @@ impl GreeterService {
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         attempt_id: String,
         session_id: String,
-    ) -> fdo::Result<()> {
+    ) -> fdo::Result<ResponseDispatchNotifier<()>> {
         let caller = get_caller(&header)?;
         let emitter = Self::owned_emitter(emitter);
         self.auth
@@ -171,7 +175,14 @@ impl GreeterService {
         // so a stale lookup cannot start a session for a newer transaction.
         self.auth
             .start_session(caller, attempt_id, session, emitter)
-            .await
+            .await?;
+        let (response, dispatched) = ResponseDispatchNotifier::new(());
+        let handoff = Arc::clone(&self.handoff);
+        tokio::spawn(async move {
+            dispatched.await;
+            handoff.notify_one();
+        });
+        Ok(response)
     }
 
     async fn power_action(&self, action: String) -> fdo::Result<()> {
