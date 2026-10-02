@@ -63,6 +63,8 @@ class _SessionMenu extends StatelessWidget {
       for (final item in session.sessions)
         PopupMenuItem<SessionSummary>(
           value: item,
+          // Apply the choice on activation while the popup is dismissing, so
+          // the selected label does not wait for the reverse route transition.
           onTap: () => onSelect(item),
           child: Row(
             children: [

@@ -179,6 +179,9 @@ class ThemePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // The background owns frost. An opaque local Material surface keeps the
+    // panel legible without sampling and blurring that background again during
+    // each foreground animation or input update.
     return Material(
       color: scheme.surfaceContainerHigh,
       surfaceTintColor: scheme.surfaceTint,

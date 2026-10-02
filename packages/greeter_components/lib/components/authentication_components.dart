@@ -21,6 +21,9 @@ class CredentialField extends StatelessWidget {
         ? auth.prompt?.text ?? 'Password'
         : 'Enter Password';
     final inputTheme = InputDecorationTheme.of(context);
+    // Draw the border around the entire scene region while centering the native
+    // text field inside it. The inner field disables its own decoration so the
+    // authored region, rather than the text's intrinsic height, owns the surface.
     return ListenableBuilder(
       listenable: focusNode,
       builder: (context, child) {
