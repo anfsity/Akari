@@ -50,6 +50,8 @@ Matrix4 sceneNodeTransformMatrix(SceneTransform transform, Size size) {
     matrix.setEntry(3, 2, transform.perspective);
   }
 
+  // Move the local pivot to the origin for the transform, then move it back.
+  // Applying alignment again at the widget layer would offset the pivot twice.
   return Matrix4.identity()
     ..translateByDouble(originX, originY, 0, 1)
     ..multiply(matrix)

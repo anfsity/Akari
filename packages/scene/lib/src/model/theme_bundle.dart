@@ -5,6 +5,10 @@ import '../runtime/background_renderer.dart';
 import '../runtime/motion.dart';
 import 'theme_tokens.dart';
 
+/// Visual registrations assembled at compile time by one theme package.
+/// Maps are copied so a caller cannot change renderer selection under a mounted
+/// scene. Missing backgrounds fall back to solid; missing motions skip presence
+/// animation in the runtime.
 class ThemeBundle {
   ThemeBundle({
     required this.tokens,

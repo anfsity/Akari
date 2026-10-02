@@ -85,6 +85,8 @@ enum SceneMotionPreset {
 
 enum SceneBackgroundKind { image, solid, video, custom }
 
+/// Fractions of the available canvas, independent of screen pixel dimensions.
+/// Layout uses the safe-area-adjusted canvas when that policy is enabled.
 class SceneRect {
   const SceneRect({
     required this.x,
@@ -121,6 +123,9 @@ class SceneRect {
   }
 }
 
+/// Transform in node-local coordinates: translations use logical pixels,
+/// rotations use degrees, and pivots use fractions of the node's laid-out size.
+/// These units differ deliberately from [SceneRect]'s normalized canvas units.
 class SceneTransform {
   const SceneTransform({
     this.translateX = 0,
@@ -255,6 +260,9 @@ class SceneBackground {
   }
 }
 
+/// Authored layout and component identity, without executable business logic.
+/// [componentId] is resolved by the selected theme's component factory; string
+/// properties configure that component rather than invoking backend commands.
 class SceneNode {
   const SceneNode({
     required this.id,
@@ -331,6 +339,8 @@ class SceneDocument {
   final SceneBackground background;
   final List<SceneNode> nodes;
 
+  /// Draw order uses renderOrder first and z as its tie-breaker. Focus order is
+  /// independent. Sorting a copy preserves the original authoring order.
   List<SceneNode> get paintOrder {
     final ordered = [...nodes]
       ..sort((left, right) {

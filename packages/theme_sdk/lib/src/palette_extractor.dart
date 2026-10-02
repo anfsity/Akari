@@ -67,6 +67,9 @@ Color calculateAccentFromRgba(Uint8List rgba) {
     }
 
     final bucket = (hsv.hue / 10).floor() % _bucketCount;
+    // Count vivid pixels by hue rather than averaging RGB: neutral wallpaper
+    // regions would otherwise wash out the accent. Each bin keeps its most
+    // vivid representative while accumulating the entire bin's weight.
     final weight = hsv.saturation * hsv.value;
     histogram[bucket] += weight;
     final sample = samples[bucket];
@@ -84,6 +87,8 @@ Color calculateAccentFromRgba(Uint8List rgba) {
     return averageBrightness < 0.5 ? _lightNeutralAccent : _darkNeutralAccent;
   }
 
+  // Red straddles the 0/360-degree boundary. Merge those bins so one red region
+  // does not lose to another hue just because its samples fall on both sides.
   final wrapSample = samples[_bucketCount - 1];
   if (wrapSample != null &&
       (samples[0] == null ||

@@ -41,6 +41,10 @@ const _legacyActionIds = <String>{
 };
 
 /// Decodes a scene document from its JSON authoring form.
+///
+/// Tooling and code generation share this boundary for shape, enum, layout,
+/// and asset-path checks. Production consumes the resulting generated Dart
+/// instead of parsing JSON during login.
 SceneDocument decodeSceneDocument(String source) {
   final decoded = jsonDecode(source);
   if (decoded is! Map<String, dynamic>) {
@@ -183,6 +187,8 @@ SceneNode _decodeNode(
   }
 
   final transformJson = _map(json, 'transform', fallback: const {});
+  // Normalize the old closed kind/action vocabulary into v2 components and
+  // interactivity here. Runtime and codegen consume only the current model.
   final versionOne = version == 1;
   final componentId = _string(json, versionOne ? 'kind' : 'component');
   if (componentId.trim().isEmpty) {
