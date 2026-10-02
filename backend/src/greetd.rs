@@ -321,6 +321,9 @@ impl GreetdClient {
     /// The serialized request and complete frame are zeroized when their
     /// owners are dropped because authentication responses can be embedded in
     /// the request payload.
+    /// Cancellation or timeout can interrupt a frame partway through I/O. The
+    /// actor must discard this connection on those errors rather than reuse it
+    /// for another request and risk pairing that request with an old response.
     async fn request<T>(
         &mut self,
         request: &T,

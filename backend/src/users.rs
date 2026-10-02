@@ -91,6 +91,8 @@ impl UserCatalog {
     }
 
     async fn connect_system_bus(&self) -> Result<zbus::Connection, UserCatalogError> {
+        // Serialize only connection initialization/replacement. The returned
+        // clone lets user queries perform D-Bus I/O without holding this mutex.
         let mut cached = self.connection.lock().await;
         if let Some(connection) = cached.as_ref()
             && !connection.is_closed()
