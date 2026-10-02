@@ -6,6 +6,8 @@ import 'src/theme_project.dart';
 
 const _commands = {
   'build',
+  'run',
+  'preview',
   'verify',
   'verify-perf',
   'generate-scenes',
@@ -33,15 +35,16 @@ Future<void> main(List<String> arguments) async {
 
     final options = _parseOptions(command, arguments.skip(1).toList());
     final repoRoot = _findRepoRoot();
-    final buildTheme = command == 'build'
+    final buildTheme = const {'build', 'run', 'preview'}.contains(command)
         ? getThemePackage(
             Directory(
               options.themePath ?? _join(repoRoot.path, 'themes/default'),
             ),
           )
         : null;
+    final preview = command == 'preview';
     final buildMode =
-        options.buildMode ?? (options.preview ? 'debug' : 'release');
+        options.buildMode ?? (command == 'build' ? 'release' : 'debug');
     final runDirectory = await _createRunDirectory(
       repoRoot,
       reserve: !options.dryRun,
@@ -54,8 +57,9 @@ Future<void> main(List<String> arguments) async {
       buildTarget: options.buildTarget,
       buildMode: buildMode,
       buildTheme: buildTheme,
-      preview: options.preview,
+      preview: preview,
       jobs: options.jobs,
+      backendMode: options.backendMode,
     );
     final artifactPaths = artifactPathsFor(
       command,
@@ -63,7 +67,8 @@ Future<void> main(List<String> arguments) async {
       buildTarget: options.buildTarget,
       buildMode: buildMode,
       buildTheme: buildTheme,
-      preview: options.preview,
+      preview: preview,
+      backendMode: command == 'run' ? options.backendMode : 'real',
     );
     if (options.dryRun) {
       writeRunPlan(
@@ -121,193 +126,103 @@ Future<void> main(List<String> arguments) async {
 }
 
 void _writeUsage([String? command]) {
-  if (command == null) {
-    stdout.writeln('''Usage: fvm dart run tool/mozais.dart <command> [options]
-
+  stdout.writeln(
+    'Usage: fvm dart run tool/mozais.dart ${command ?? '<command>'} [options]',
+  );
+  stdout.writeln('''
 Commands:
-  build           Build a theme in its own host project; optionally launch preview.
-  verify          Run the full backend, Dart, Flutter, and D-Bus verification.
-  verify-perf     Run the Linux profile performance gate.
-  generate-scenes Generate generated theme scene code.
-  trace-perf      Capture and summarize a Flutter performance timeline.
+  build           Build the selected frontend and production Rust backend.
+  run             Run the selected greeter and backend on a private D-Bus session.
+  preview         Run the selected theme with demo login state.
+  verify          Verify shared code, backend, and theme projects.
+  verify-perf     Execute the selected theme's performance gate.
+  generate-scenes Generate theme scene code.
+  trace-perf      Execute the selected theme's performance trace.
 
 Options:
-  --format text|json  Select console output format (default: text).
-  --report PATH       Write the JSON run report to PATH.
-  --cycles COUNT      Measurement cycles for verify-perf (minimum: 3).
-  --platform NAME     Flutter build target for build (default: linux).
-  --mode MODE         Flutter build mode: debug, profile, or release.
-  --theme PATH        Theme project for build (default: themes/default).
-  --jobs COUNT        Limit native compilation and Cargo parallel jobs.
-  --preview           Build and launch a Linux preview with demo login state.
-  --dry-run           Print the resolved execution plan as JSON.
-  -h, --help          Show command help.''');
-    return;
-  }
-
-  stdout.writeln('Usage: fvm dart run tool/mozais.dart $command [options]');
-  if (command == 'build') {
-    stdout.writeln(
-      'Options: --theme PATH, --preview, --platform NAME, --mode debug|profile|release, --format text|json, --report PATH, --dry-run.',
-    );
-  } else if (command == 'verify-perf') {
-    stdout.writeln(
-      'Options: --format text|json, --report PATH, --cycles COUNT (minimum: 3), --dry-run.',
-    );
-  } else {
-    stdout.writeln('Options: --format text|json, --report PATH, --dry-run.');
-  }
+  --theme PATH        Select a theme project (default: themes/default).
+  --backend mock|real Backend transport for run (default: mock).
+  --jobs COUNT        Limit Cargo and native compile/link parallel jobs.
+  --platform NAME     Flutter target for build (default: linux).
+  --mode MODE         debug, profile, or release (build: release; run/preview: debug).
+  --cycles COUNT      Performance cycles for verify-perf (minimum: 3).
+  --format text|json  Console output format (default: text).
+  --report PATH       Write the run report to PATH.
+  --dry-run           Print the execution plan without changing files.
+  -h, --help          Show help.''');
 }
 
 _CliOptions _parseOptions(String command, List<String> arguments) {
-  var format = RunOutputFormat.text;
-  var cycles = _minimumPerfCycles;
-  var buildTarget = 'linux';
-  String? buildMode;
-  String? themePath;
-  var preview = false;
-  int? jobs;
-  String? reportPath;
+  final values = <String, String>{};
   var dryRun = false;
-  var formatSeen = false;
-  var cyclesSeen = false;
-  var reportSeen = false;
-  var dryRunSeen = false;
-  var buildTargetSeen = false;
-  var buildModeSeen = false;
-
+  final specific = switch (command) {
+    'build' => {'--theme', '--jobs', '--mode', '--platform'},
+    'run' => {'--theme', '--jobs', '--mode', '--backend'},
+    'preview' => {'--theme', '--jobs', '--mode'},
+    'verify-perf' => {'--cycles'},
+    _ => <String>{},
+  };
+  final allowed = {'--format', '--report', ...specific};
   for (var index = 0; index < arguments.length; index++) {
     final option = arguments[index];
-    if (option == '--preview') {
-      if (command != 'build') {
-        throw const FormatException('--preview is only valid for build.');
-      }
-      if (preview) {
-        throw const FormatException('Duplicate --preview option.');
-      }
-      preview = true;
-      continue;
-    }
     if (option == '--dry-run') {
-      if (dryRunSeen) {
+      if (dryRun) {
         throw const FormatException('Duplicate --dry-run option.');
       }
-      dryRunSeen = true;
       dryRun = true;
       continue;
     }
-    if (!const {
-      '--format',
-      '--report',
-      '--cycles',
-      '--platform',
-      '--mode',
-      '--theme',
-      '--jobs',
-    }.contains(option)) {
-      throw FormatException('Unknown option: $option');
+    if (!allowed.contains(option)) {
+      throw FormatException('Unknown option for $command: $option');
+    }
+    if (values.containsKey(option)) {
+      throw FormatException('Duplicate $option option.');
     }
     if (index + 1 >= arguments.length ||
         arguments[index + 1].startsWith('--')) {
       throw FormatException('Missing value for $option.');
     }
-    final value = arguments[++index];
-    switch (option) {
-      case '--jobs':
-        if (command != 'build') {
-          throw const FormatException('--jobs is only valid for build.');
-        }
-        if (jobs != null) {
-          throw const FormatException('Duplicate --jobs option.');
-        }
-        jobs = int.tryParse(value);
-        if (jobs == null || jobs < 1) {
-          throw const FormatException('--jobs must be a positive integer.');
-        }
-      case '--theme':
-        if (command != 'build') {
-          throw const FormatException('--theme is only valid for build.');
-        }
-        if (themePath != null) {
-          throw const FormatException('Duplicate --theme option.');
-        }
-        themePath = value;
-      case '--format':
-        if (formatSeen) {
-          throw const FormatException('Duplicate --format option.');
-        }
-        formatSeen = true;
-        format = switch (value) {
-          'text' => RunOutputFormat.text,
-          'json' => RunOutputFormat.json,
-          _ => throw FormatException('Unknown output format: $value'),
-        };
-      case '--report':
-        if (reportSeen) {
-          throw const FormatException('Duplicate --report option.');
-        }
-        reportSeen = true;
-        reportPath = value;
-      case '--cycles':
-        if (command != 'verify-perf') {
-          throw const FormatException(
-            '--cycles is only valid for verify-perf.',
-          );
-        }
-        if (cyclesSeen) {
-          throw const FormatException('Duplicate --cycles option.');
-        }
-        cyclesSeen = true;
-        final parsedCycles = int.tryParse(value);
-        if (parsedCycles == null || parsedCycles < _minimumPerfCycles) {
-          throw FormatException(
-            '--cycles must be an integer of at least $_minimumPerfCycles.',
-          );
-        }
-        cycles = parsedCycles;
-      case '--platform':
-        if (command != 'build') {
-          throw const FormatException('--platform is only valid for build.');
-        }
-        if (buildTargetSeen) {
-          throw const FormatException('Duplicate --platform option.');
-        }
-        buildTargetSeen = true;
-        if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(value)) {
-          throw FormatException('Invalid Flutter build target: $value');
-        }
-        buildTarget = value;
-      case '--mode':
-        if (command != 'build') {
-          throw const FormatException('--mode is only valid for build.');
-        }
-        if (buildModeSeen) {
-          throw const FormatException('Duplicate --mode option.');
-        }
-        buildModeSeen = true;
-        if (!const {'debug', 'profile', 'release'}.contains(value)) {
-          throw FormatException('Unknown Flutter build mode: $value');
-        }
-        buildMode = value;
-      default:
-        throw FormatException('Unknown option: $option');
-    }
+    values[option] = arguments[++index];
   }
-
-  if (preview && buildTarget != 'linux') {
-    throw const FormatException('--preview requires --platform linux.');
+  final format = switch (values['--format'] ?? 'text') {
+    'text' => RunOutputFormat.text,
+    'json' => RunOutputFormat.json,
+    final value => throw FormatException('Unknown output format: $value'),
+  };
+  final jobs = values.containsKey('--jobs')
+      ? int.tryParse(values['--jobs']!)
+      : null;
+  if (values.containsKey('--jobs') && (jobs == null || jobs < 1)) {
+    throw const FormatException('--jobs must be a positive integer.');
   }
-
+  final mode = values['--mode'];
+  if (mode != null && !const {'debug', 'profile', 'release'}.contains(mode)) {
+    throw FormatException('Unknown Flutter build mode: $mode');
+  }
+  final target = values['--platform'] ?? 'linux';
+  if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(target)) {
+    throw FormatException('Invalid Flutter build target: $target');
+  }
+  final backend = values['--backend'] ?? 'mock';
+  if (!const {'mock', 'real'}.contains(backend)) {
+    throw FormatException('Unknown backend transport: $backend');
+  }
+  final cycles = values.containsKey('--cycles')
+      ? int.tryParse(values['--cycles']!)
+      : _minimumPerfCycles;
+  if (cycles == null || cycles < _minimumPerfCycles) {
+    throw const FormatException('--cycles must be an integer of at least 3.');
+  }
   return _CliOptions(
     format: format,
     cycles: cycles,
-    buildTarget: buildTarget,
-    buildMode: buildMode,
-    reportPath: reportPath,
+    buildTarget: target,
+    buildMode: mode,
+    themePath: values['--theme'],
+    reportPath: values['--report'],
     dryRun: dryRun,
-    themePath: themePath,
-    preview: preview,
     jobs: jobs,
+    backendMode: backend,
   );
 }
 
@@ -379,10 +294,9 @@ class _CliOptions {
     required this.reportPath,
     required this.dryRun,
     required this.themePath,
-    required this.preview,
     required this.jobs,
+    required this.backendMode,
   });
-
   final RunOutputFormat format;
   final int cycles;
   final String buildTarget;
@@ -390,6 +304,6 @@ class _CliOptions {
   final String? reportPath;
   final bool dryRun;
   final String? themePath;
-  final bool preview;
   final int? jobs;
+  final String backendMode;
 }

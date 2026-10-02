@@ -14,9 +14,14 @@ List<RunStep> buildStepsFor(
   ThemePackage? buildTheme,
   bool preview = false,
   int? jobs,
+  String backendMode = 'mock',
 }) {
   switch (command) {
     case 'build':
+    case 'run':
+    case 'preview':
+      final live = command != 'build';
+      final transport = command == 'run' ? backendMode : 'real';
       final theme = buildTheme!;
       final hostDirectory = getThemeHostDirectory(theme, preview: preview);
       return [
@@ -27,7 +32,13 @@ List<RunStep> buildStepsFor(
               'cargo',
               'build',
               '--locked',
+              '--target-dir',
+              'target/mozais-$transport',
               if (buildMode != 'debug') '--release',
+              if (command == 'run' && backendMode == 'mock') ...[
+                '--features',
+                'mock',
+              ],
               if (jobs != null) ...['--jobs', '$jobs'],
             ],
             workingDirectory: 'backend',
@@ -35,7 +46,7 @@ List<RunStep> buildStepsFor(
           ),
         _step(
           'theme.pub_get',
-          [..._flutterCommand(repoRoot), 'pub', 'get'],
+          [...getFlutterCommand(repoRoot), 'pub', 'get'],
           workingDirectory: theme.directory.path,
           dependencies: const [],
         ),
@@ -48,29 +59,53 @@ List<RunStep> buildStepsFor(
           if (preview) '--preview',
         ]),
         _step('theme.host.pub_get', [
-          ..._flutterCommand(repoRoot),
+          ...getFlutterCommand(repoRoot),
           'pub',
           'get',
         ], workingDirectory: hostDirectory),
-        _step(
-          'flutter.build_$buildTarget',
-          [
-            ..._flutterCommand(repoRoot),
-            'build',
-            buildTarget,
-            '--$buildMode',
-            '--dart-define=MOZAIS_BACKEND=${preview ? 'demo' : 'real'}',
-          ],
-          workingDirectory: hostDirectory,
-          environment: {if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs'},
-        ),
-        if (preview)
-          _step('theme.preview', [
-            _join(
-              repoRoot.path,
-              getLinuxExecutablePath(hostDirectory, buildMode),
-            ),
-          ], workingDirectory: hostDirectory),
+        if (!live)
+          _step(
+            'flutter.build_$buildTarget',
+            [
+              ...getFlutterCommand(repoRoot),
+              'build',
+              buildTarget,
+              '--$buildMode',
+              '--dart-define=MOZAIS_BACKEND=${preview ? 'demo' : 'real'}',
+            ],
+            workingDirectory: hostDirectory,
+            environment: {if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs'},
+          ),
+        if (live)
+          _step(
+            'theme.$command',
+            [
+              if (!preview) ...[
+                'bash',
+                _join(repoRoot.path, 'scripts/debug-dbus.sh'),
+              ],
+              ...getDartCommand(repoRoot),
+              _join(repoRoot.path, 'tool/theme_session.dart'),
+              theme.directory.path,
+              _join(repoRoot.path, hostDirectory),
+              buildMode,
+              preview ? 'demo' : 'real',
+            ],
+            workingDirectory: hostDirectory,
+            dependencies: [if (!preview) 'backend.build', 'theme.host.pub_get'],
+            interactive: true,
+            environment: {
+              if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs',
+              if (!preview) ...{
+                'MOZAIS_BACKEND_MODE': backendMode,
+                'MOZAIS_BACKEND_BIN': _join(
+                  repoRoot.path,
+                  'backend/target/mozais-$transport/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
+                ),
+                'MOZAIS_LOG_DIR': _join(repoRoot.path, '$runDirectory/dbus'),
+              },
+            },
+          ),
       ];
     case 'verify':
       final themes = findThemePackages(repoRoot);
@@ -105,8 +140,8 @@ List<RunStep> buildStepsFor(
           '--test-threads=1',
         ], workingDirectory: 'backend'),
         ..._sceneGenerationSteps(repoRoot, themes),
-        _step('flutter.analyze', [..._flutterCommand(repoRoot), 'analyze']),
-        _step('flutter.test', [..._flutterCommand(repoRoot), 'test']),
+        _step('flutter.analyze', [...getFlutterCommand(repoRoot), 'analyze']),
+        _step('flutter.test', [...getFlutterCommand(repoRoot), 'test']),
         _step('scene_schema.analyze', [
           ...getDartCommand(repoRoot),
           'analyze',
@@ -124,19 +159,19 @@ List<RunStep> buildStepsFor(
           'test',
         ], workingDirectory: 'packages/scene_codegen'),
         _step('scene.analyze', [
-          ..._flutterCommand(repoRoot),
+          ...getFlutterCommand(repoRoot),
           'analyze',
         ], workingDirectory: 'packages/scene'),
         _step('scene.test', [
-          ..._flutterCommand(repoRoot),
+          ...getFlutterCommand(repoRoot),
           'test',
         ], workingDirectory: 'packages/scene'),
         _step('greeter_ui.analyze', [
-          ..._flutterCommand(repoRoot),
+          ...getFlutterCommand(repoRoot),
           'analyze',
         ], workingDirectory: 'packages/greeter_ui'),
         _step('greeter_ui.test', [
-          ..._flutterCommand(repoRoot),
+          ...getFlutterCommand(repoRoot),
           'test',
         ], workingDirectory: 'packages/greeter_ui'),
         ..._getThemeVerificationSteps(repoRoot, themes),
@@ -156,7 +191,7 @@ List<RunStep> buildStepsFor(
       ];
     case 'verify-perf':
       final steps = <RunStep>[..._sceneGenerationSteps(repoRoot)];
-      final flutter = _flutterCommand(repoRoot);
+      final flutter = getFlutterCommand(repoRoot);
       for (var cycle = 1; cycle <= cycles; cycle++) {
         final cycleReport = '$runDirectory/perf/scene_report_$cycle.json';
         steps.add(
@@ -205,7 +240,7 @@ List<RunStep> buildStepsFor(
       return [
         ..._sceneGenerationSteps(repoRoot),
         _step('performance.trace', [
-          ..._flutterCommand(repoRoot),
+          ...getFlutterCommand(repoRoot),
           'drive',
           '-d',
           'linux',
@@ -278,7 +313,7 @@ List<RunStep> _getFlutterPackageVerificationSteps(
           .listSync(recursive: true, followLinks: false)
           .whereType<File>()
           .any((file) => file.path.endsWith('_test.dart'));
-  final flutter = _flutterCommand(repoRoot);
+  final flutter = getFlutterCommand(repoRoot);
 
   return [
     _step('$packageName.analyze', [
@@ -311,7 +346,7 @@ RunStep _step(
   );
 }
 
-List<String> _flutterCommand(Directory repoRoot) {
+List<String> getFlutterCommand(Directory repoRoot) {
   final customFlutter = Platform.environment['MOZAIS_FLUTTER_BIN'];
   if (customFlutter != null && customFlutter.isNotEmpty) {
     return [_resolveSdkBinary(customFlutter, repoRoot)];
@@ -348,15 +383,16 @@ Map<String, String> artifactPathsFor(
   String buildMode = 'release',
   ThemePackage? buildTheme,
   bool preview = false,
+  String backendMode = 'real',
 }) {
   final hostDirectory = buildTheme == null
       ? null
       : getThemeHostDirectory(buildTheme, preview: preview);
   return switch (command) {
-    'build' => {
+    'build' || 'run' || 'preview' => {
       if (!preview)
         'backend_executable':
-            'backend/target/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
+            'backend/target/mozais-$backendMode/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
       'host_project': hostDirectory!,
       'build_directory': '$hostDirectory/build/$buildTarget',
       if (buildTarget == 'linux')
