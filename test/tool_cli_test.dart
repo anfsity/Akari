@@ -22,6 +22,66 @@ void main() {
   });
 
   test(
+    'studio plans a separate editor host without backend transport',
+    () async {
+      final result = await _runTool([
+        'studio',
+        '-t',
+        'themes/default',
+        '-j',
+        '2',
+        '--dry-run',
+      ]);
+      expect(result.exitCode, 0, reason: result.stderr);
+      final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+      final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
+      expect(steps.map((step) => step['id']), isNot(contains('backend.build')));
+      expect(
+        steps.singleWhere(
+          (step) => step['id'] == 'theme.host.generate',
+        )['command'],
+        contains('--studio'),
+      );
+      expect(steps.last['id'], 'theme.studio');
+      expect(steps.last['command'].last, 'demo');
+      expect(steps.last['environment']['MOZAIS_BUILD_JOBS'], '2');
+      expect(plan['artifacts']['host_project'], endsWith('/studio'));
+      expect(plan['artifacts'], isNot(contains('backend_executable')));
+    },
+  );
+
+  test('studio host imports only its editor and selected theme with literal scene paths', () async {
+    final project = await _createThemeProject(
+      Directory('${tempRoot.path}/theme with \$dollar'),
+    );
+    final theme = getThemePackage(project);
+    final host = Directory('${tempRoot.path}/studio');
+    createThemeHost(
+      repoRoot: Directory.current,
+      theme: theme,
+      output: host,
+      preview: true,
+      studio: true,
+    );
+    final manifest = jsonDecode(
+      File('${host.path}/pubspec.yaml').readAsStringSync(),
+    );
+    expect(manifest['dependencies']['theme_studio'], isNotNull);
+    expect(manifest['dependencies']['dbus'], isNull);
+    expect(manifest['dependencies']['greeter_ui'], isNull);
+    final entrypoint = File('${host.path}/lib/main.dart').readAsStringSync();
+    expect(entrypoint, contains('ThemeStudioApp('));
+    expect(entrypoint, contains(r'\$dollar'));
+    expect(entrypoint, contains('buildOceanTheme'));
+    expect(entrypoint, isNot(contains('MyApp')));
+    expect(Directory('${host.path}/lib').listSync(), hasLength(1));
+    expect(
+      getThemeHostDirectory(theme, preview: true, studio: true),
+      isNot(getThemeHostDirectory(theme, preview: true)),
+    );
+  });
+
+  test(
     'short options reach native build steps and command help is scoped',
     () async {
       final result = await _runTool([
@@ -333,6 +393,7 @@ sys.exit(1)
         'greeter_ui.analyze',
         'greeter_components.analyze',
         'theme_sdk.analyze',
+        'theme_studio.analyze',
         'theme_ocean.analyze',
       ]),
     );

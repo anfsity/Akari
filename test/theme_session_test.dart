@@ -141,7 +141,10 @@ pathlib.Path(${jsonEncode(generated.path)}).write_text(content)
       await scene.writeAsString('invalid');
       await failed.future.timeout(const Duration(seconds: 15));
       expect(output, isNot(contains('reloaded')));
-      await scene.writeAsString('updated');
+      final saved = await scene.parent.createTemp('.mozais-studio-');
+      await File('${saved.path}/scene.json').writeAsString('updated');
+      await File('${saved.path}/scene.json').rename(scene.path);
+      await saved.delete();
       await reloaded.future.timeout(const Duration(seconds: 15));
       process.stdin.write('q');
       expect(await process.exitCode.timeout(const Duration(seconds: 15)), 0);

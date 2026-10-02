@@ -64,6 +64,10 @@ the last working theme. `r` regenerates and reloads, `R` restarts, and `q` quits
 Profile/release sessions do not hot reload. Both commands accept `--jobs COUNT`.
 Production `build` defaults to release and compiles both frontend and Rust backend.
 
+Use `studio --theme PATH` to edit scene JSON with a shadcn inspector, compiled
+theme preview, node selection, undo/redo, and explicit saving. Studio runs in a
+separate debug host with simulated data. See [Theme Studio](theme-studio.md).
+
 `verify` analyzes shared code, the backend, and every project discovered under
 `themes/`. With `--theme PATH`, it checks only the selected theme alongside shared
 code and the backend. Theme-specific UI tests live in their theme package. It
