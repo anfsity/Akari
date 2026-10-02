@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:theme_catalog/theme_catalog.dart';
+import 'package:theme_default/theme.dart';
 
 void main() {
   test('builds the default palette from its extracted seed', () {
-    final warm = ThemeRegistry.resolve(
-      ThemeRegistry.defaultThemeName,
-      seed: const Color(0xffe53935),
-    );
-    final cool = ThemeRegistry.resolve(
-      ThemeRegistry.defaultThemeName,
-      seed: const Color(0xff1e88e5),
-    );
+    final warm = buildDefaultTheme(seed: const Color(0xffe53935));
+    final cool = buildDefaultTheme(seed: const Color(0xff1e88e5));
 
     expect(
       warm.materialTheme.colorScheme.primary,
