@@ -18,8 +18,8 @@ class SceneEditor extends ChangeNotifier {
   late String _savedDocument;
   late SceneDocument _document;
   late String _selectedId;
-  final _undo = <SceneDocument>[];
-  final _redo = <SceneDocument>[];
+  final _undo = <({SceneDocument document, String selectedId})>[];
+  final _redo = <({SceneDocument document, String selectedId})>[];
 
   SceneDocument get document => _document;
   String get selectedId => _selectedId;
@@ -28,6 +28,7 @@ class SceneEditor extends ChangeNotifier {
   bool get isDirty => encodeSceneDocument(_document) != _savedDocument;
   bool get canUndo => _undo.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
+  bool get canDeleteNode => _document.nodes.length > 1;
 
   void selectNode(String id) {
     _document.nodes.firstWhere((node) => node.id == id);
@@ -40,29 +41,62 @@ class SceneEditor extends ChangeNotifier {
     if (index < 0) throw ArgumentError.value(node.id, 'node.id');
     final nodes = [..._document.nodes];
     nodes[index] = node;
+    _updateDocument(_document.copyWith(nodes: nodes), selectedId: _selectedId);
+  }
+
+  void duplicateSelectedNode() {
+    final node = selectedNode;
+    final ids = _document.nodes.map((entry) => entry.id).toSet();
+    var id = '${node.id}-copy';
+    var suffix = 2;
+    while (ids.contains(id)) {
+      id = '${node.id}-copy-${suffix++}';
+    }
+    final nodes = [..._document.nodes];
+    nodes.insert(nodes.indexOf(node) + 1, node.copyWith(id: id));
+    _updateDocument(_document.copyWith(nodes: nodes), selectedId: id);
+  }
+
+  void deleteSelectedNode() {
+    if (!canDeleteNode) {
+      throw StateError('A scene must contain at least one node.');
+    }
+    final nodes = [..._document.nodes];
+    final index = nodes.indexWhere((node) => node.id == _selectedId);
+    nodes.removeAt(index);
+    _updateDocument(
+      _document.copyWith(nodes: nodes),
+      selectedId: nodes[index < nodes.length ? index : index - 1].id,
+    );
+  }
+
+  void _updateDocument(SceneDocument document, {required String selectedId}) {
     // The codec is the same boundary used by code generation. Invalid edits
     // never replace the last working preview or create an undo entry.
-    final updated = decodeSceneDocument(
-      encodeSceneDocument(_document.copyWith(nodes: nodes)),
-    );
+    final updated = decodeSceneDocument(encodeSceneDocument(document));
     if (encodeSceneDocument(updated) == encodeSceneDocument(_document)) return;
-    _undo.add(_document);
+    _undo.add((document: _document, selectedId: _selectedId));
     _redo.clear();
     _document = updated;
+    _selectedId = selectedId;
     notifyListeners();
   }
 
   void undo() {
     if (!canUndo) return;
-    _redo.add(_document);
-    _document = _undo.removeLast();
+    _redo.add((document: _document, selectedId: _selectedId));
+    final previous = _undo.removeLast();
+    _document = previous.document;
+    _selectedId = previous.selectedId;
     notifyListeners();
   }
 
   void redo() {
     if (!canRedo) return;
-    _undo.add(_document);
-    _document = _redo.removeLast();
+    _undo.add((document: _document, selectedId: _selectedId));
+    final next = _redo.removeLast();
+    _document = next.document;
+    _selectedId = next.selectedId;
     notifyListeners();
   }
 
