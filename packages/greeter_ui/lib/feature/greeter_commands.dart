@@ -14,6 +14,8 @@ class BeginAuthenticationCommand extends GreeterCommand {
   const BeginAuthenticationCommand();
 }
 
+/// Transient credential input passed directly to the gateway. Do not log this
+/// command or retain it in state, slots, or a replayable command history.
 class RespondToPromptCommand extends GreeterCommand {
   const RespondToPromptCommand(this.response);
 

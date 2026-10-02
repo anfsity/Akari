@@ -30,6 +30,12 @@ enum BackendAuthState {
   unknown,
 }
 
+/// Immutable frontend snapshot, separate from the backend protocol phase.
+///
+/// Service, catalog, authentication, and power errors remain independent so
+/// failure in one operation does not erase another operation's recovery state.
+/// Lists are copied on construction to prevent later caller mutations from
+/// bypassing slot notifications. Credential responses never belong here.
 class GreeterState {
   GreeterState({
     required this.serviceMode,
@@ -95,6 +101,9 @@ class GreeterState {
   /// it. Service errors force it awake so the failure stays visible.
   final bool dormant;
 
+  /// Null arguments preserve existing values; `clear*` flags explicitly remove
+  /// nullable values. This distinguishes an omitted update from clearing a
+  /// prompt, selection, or error during a transition.
   GreeterState copyWith({
     ServiceMode? serviceMode,
     CatalogMode? catalogMode,
