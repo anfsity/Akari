@@ -34,6 +34,8 @@ class BackendDisconnected extends GreeterEvent {
   const BackendDisconnected();
 }
 
+/// Display snapshot used to check service readiness, not to resume an attempt:
+/// the GetState contract intentionally supplies no attempt ownership token.
 class BackendStateSnapshot {
   const BackendStateSnapshot({required this.state, required this.detail});
 
@@ -41,6 +43,12 @@ class BackendStateSnapshot {
   final String detail;
 }
 
+/// Transport boundary for the feature, implemented by D-Bus and local preview.
+///
+/// Events must preserve backend emission order. Authentication signals may
+/// precede [beginAuthentication]'s reply, so consumers must subscribe first
+/// and correlate them with the returned attempt ID. Session execution remains
+/// backend-owned; callers submit a catalog ID rather than a command or env.
 abstract interface class GreeterGateway {
   Stream<GreeterEvent> get events;
 
@@ -63,6 +71,8 @@ abstract interface class GreeterGateway {
   Future<void> close();
 }
 
+/// Display-safe error from the transport boundary. Raw transport exceptions
+/// and request payloads must not become theme-visible error messages.
 class GreeterGatewayException implements Exception {
   const GreeterGatewayException(
     this.message, {
