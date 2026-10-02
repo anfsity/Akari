@@ -92,7 +92,7 @@ void _syncDirectory(Directory source, Directory target) {
       final file = File('${target.path}/$name');
       final bytes = entity.readAsBytesSync();
       if (!file.existsSync() ||
-          !_areBytesEqual(bytes, file.readAsBytesSync())) {
+          !_isSameBytes(bytes, file.readAsBytesSync())) {
         file.writeAsBytesSync(bytes);
       }
     }
@@ -105,7 +105,7 @@ void _syncDirectory(Directory source, Directory target) {
   }
 }
 
-bool _areBytesEqual(List<int> source, List<int> target) {
+bool _isSameBytes(List<int> source, List<int> target) {
   if (source.length != target.length) return false;
   for (var index = 0; index < source.length; index++) {
     if (source[index] != target[index]) return false;

@@ -17,10 +17,17 @@ only the selected theme. Projects can
 live outside the Mozais repository. See the
 [theme project contract](theme-package.md).
 
-Use `build --theme themes/default --preview` to compile and launch a Linux preview.
-Preview uses demo login state and defaults to debug mode; normal builds use the
-real backend and default to release mode. The command waits until the preview
-window closes. It launches the compiled executable without Flutter hot reload.
+Use `run --theme PATH` to start a complete greeter on a private D-Bus session.
+It compiles and starts the Rust mock backend by default; `--backend real` selects
+production transport. The frontend always uses D-Bus. `run` directly owns the
+selected theme's Flutter session and never invokes `debug-ui.sh`.
+
+Use `preview --theme PATH` to preview the theme with frontend demo state.
+Both commands default to debug mode and reload Dart and asset changes on save.
+Scene JSON edits first run incremental code generation; failed generation keeps
+the last working theme. `r` regenerates and reloads, `R` restarts, and `q` quits.
+Profile/release sessions do not hot reload. Both commands accept `--jobs COUNT`.
+Production `build` defaults to release and compiles both frontend and Rust backend.
 
 `verify` analyzes the shared theme SDK, components, and every project
 discovered under `themes/`. It also runs a theme project's Flutter tests when it
@@ -71,3 +78,7 @@ Production builds also compile the Rust backend. Backend compilation runs alongs
 theme preparation. `build --jobs COUNT` limits Cargo tasks and native C++ compile/link
 jobs through a CMake Ninja pool. Without it, each tool uses its normal multicore default.
 This does not set the Dart compiler's thread count.
+
+Rust mock and production builds use separate stable target directories beneath
+`backend/target/mozais-mock/` and `backend/target/mozais-real/`. Commands sharing a
+theme serialize on a process lock; different themes can build independently.
