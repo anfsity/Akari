@@ -6,8 +6,11 @@ import 'src/theme_host.dart';
 void main(List<String> arguments) {
   if (arguments.length < 2 ||
       arguments.length > 3 ||
-      (arguments.length == 3 && arguments.last != '--preview')) {
-    stderr.writeln('Usage: dart tool/theme_host.dart THEME OUTPUT [--preview]');
+      (arguments.length == 3 &&
+          !const {'--preview', '--studio'}.contains(arguments.last))) {
+    stderr.writeln(
+      'Usage: dart tool/theme_host.dart THEME OUTPUT [--preview|--studio]',
+    );
     exitCode = 2;
     return;
   }
@@ -16,5 +19,6 @@ void main(List<String> arguments) {
     theme: getThemePackage(Directory(arguments[0])),
     output: Directory(arguments[1]),
     preview: arguments.length == 3,
+    studio: arguments.last == '--studio',
   );
 }

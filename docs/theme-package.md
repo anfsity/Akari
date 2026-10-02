@@ -74,6 +74,13 @@ Production consumes generated Dart and compiles theme code and assets into the
 Greeter executable. Runtime installation of new Dart or Flutter code is outside
 this contract.
 
+## Scene Editor
+
+Run `fvm dart run tool/mozais.dart studio --theme PATH` to open the project's
+scene documents in [Theme Studio](theme-studio.md). The editor renders the
+compiled theme and saves validated JSON back to the project. Its shadcn UI
+dependency belongs only to the Studio host.
+
 ## Repository Development
 
 `generate-scenes` and `verify` discover projects under `themes/`, without

@@ -24,12 +24,19 @@ List<RunStep> buildStepsFor(
     case 'build':
     case 'run':
     case 'preview':
+    case 'studio':
+      final studio = command == 'studio';
+      final demo = preview || studio;
       final live = command != 'build';
       final transport = command == 'run' ? backendMode : 'real';
       final theme = selectedTheme!;
-      final hostDirectory = getThemeHostDirectory(theme, preview: preview);
+      final hostDirectory = getThemeHostDirectory(
+        theme,
+        preview: demo,
+        studio: studio,
+      );
       return [
-        if (!preview)
+        if (!demo)
           _step(
             'backend.build',
             [
@@ -60,7 +67,7 @@ List<RunStep> buildStepsFor(
           'tool/theme_host.dart',
           theme.directory.path,
           _join(repoRoot.path, hostDirectory),
-          if (preview) '--preview',
+          if (studio) '--studio' else if (preview) '--preview',
         ]),
         _step('theme.host.pub_get', [
           ...getFlutterCommand(repoRoot),
@@ -75,7 +82,7 @@ List<RunStep> buildStepsFor(
               'build',
               buildTarget,
               '--$buildMode',
-              '--dart-define=MOZAIS_BACKEND=${preview ? 'demo' : 'real'}',
+              '--dart-define=MOZAIS_BACKEND=${demo ? 'demo' : 'real'}',
             ],
             workingDirectory: hostDirectory,
             environment: {if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs'},
@@ -98,7 +105,7 @@ List<RunStep> buildStepsFor(
           _step(
             'theme.$command',
             [
-              if (!preview) ...[
+              if (!demo) ...[
                 'bash',
                 _join(repoRoot.path, 'scripts/debug-dbus.sh'),
               ],
@@ -107,14 +114,14 @@ List<RunStep> buildStepsFor(
               theme.directory.path,
               _join(repoRoot.path, hostDirectory),
               buildMode,
-              preview ? 'demo' : 'real',
+              demo ? 'demo' : 'real',
             ],
             workingDirectory: hostDirectory,
-            dependencies: [if (!preview) 'backend.build', 'theme.host.pub_get'],
+            dependencies: [if (!demo) 'backend.build', 'theme.host.pub_get'],
             interactive: true,
             environment: {
               if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs',
-              if (!preview) ...{
+              if (!demo) ...{
                 'MOZAIS_BACKEND_MODE': backendMode,
                 'MOZAIS_BACKEND_BIN': _join(
                   repoRoot.path,
@@ -285,8 +292,13 @@ List<RunStep> _getThemeVerificationSteps(
   Directory repoRoot,
   List<ThemePackage> themes,
 ) {
-  final packageNames = ['greeter_components', 'theme_sdk'];
+  final packageNames = ['greeter_components', 'theme_sdk', 'theme_studio'];
   return [
+    _step('theme_studio.pub_get', [
+      ...getFlutterCommand(repoRoot),
+      'pub',
+      'get',
+    ], workingDirectory: 'packages/theme_studio'),
     for (final packageName in packageNames)
       ..._getFlutterPackageVerificationSteps(
         repoRoot,
@@ -388,10 +400,14 @@ Map<String, String> artifactPathsFor(
 }) {
   final hostDirectory = selectedTheme == null
       ? null
-      : getThemeHostDirectory(selectedTheme, preview: preview);
+      : getThemeHostDirectory(
+          selectedTheme,
+          preview: preview,
+          studio: command == 'studio',
+        );
   return switch (command) {
-    'build' || 'run' || 'preview' => {
-      if (!preview)
+    'build' || 'run' || 'preview' || 'studio' => {
+      if (!preview && command != 'studio')
         'backend_executable':
             'backend/target/mozais-$backendMode/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
       'host_project': hostDirectory!,

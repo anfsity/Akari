@@ -122,6 +122,11 @@ const cliCommands = [
     options: ['--theme', '--jobs', '--mode'],
   ),
   CliCommand(
+    'studio',
+    'Edit theme scenes with a compiled preview and shadcn controls.',
+    options: ['--theme', '--jobs'],
+  ),
+  CliCommand(
     'verify',
     'Verify shared code, backend, and theme projects.',
     options: ['--theme'],

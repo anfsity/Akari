@@ -37,13 +37,7 @@ ThemePackage getThemePackage(Directory projectDirectory) {
   }
   final libDirectory = Directory(_join(directory.path, 'lib'));
   final entrypoint = File(_join(libDirectory.path, 'theme.dart'));
-  final sceneFiles = libDirectory.existsSync()
-      ? libDirectory
-            .listSync(recursive: true, followLinks: false)
-            .whereType<File>()
-            .where((file) => file.path.endsWith('.scene.json'))
-            .toList()
-      : const <File>[];
+  final sceneFiles = findThemeSceneFiles(directory);
   if (!entrypoint.existsSync() || sceneFiles.isEmpty) {
     throw FormatException(
       '$packageName must contain lib/theme.dart and a .scene.json document.',
@@ -61,6 +55,17 @@ ThemePackage getThemePackage(Directory projectDirectory) {
     builderName: builderName,
     directory: directory,
   );
+}
+
+List<File> findThemeSceneFiles(Directory projectDirectory) {
+  final lib = Directory(_join(projectDirectory.path, 'lib'));
+  if (!lib.existsSync()) return [];
+  return lib
+      .listSync(recursive: true, followLinks: false)
+      .whereType<File>()
+      .where((file) => file.path.endsWith('.scene.json'))
+      .toList()
+    ..sort((left, right) => left.path.compareTo(right.path));
 }
 
 List<ThemePackage> findThemePackages(Directory repoRoot) {
@@ -110,8 +115,16 @@ String getThemeCacheKey(ThemePackage theme) {
   ].join('/');
 }
 
-String getThemeHostDirectory(ThemePackage theme, {required bool preview}) =>
-    'build/tool/hosts/${getThemeCacheKey(theme)}/${preview ? 'demo' : 'real'}';
+String getThemeHostDirectory(
+  ThemePackage theme, {
+  required bool preview,
+  bool studio = false,
+}) =>
+    'build/tool/hosts/${getThemeCacheKey(theme)}/${studio
+        ? 'studio'
+        : preview
+        ? 'demo'
+        : 'real'}';
 
 String getLinuxExecutablePath(String hostDirectory, String buildMode) {
   final architecture = switch (Abi.current()) {

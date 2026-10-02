@@ -55,6 +55,7 @@ Future<void> main(List<String> arguments) async {
               'build',
               'run',
               'preview',
+              'studio',
               'verify-perf',
               'trace-perf',
             }.contains(command))
@@ -64,7 +65,7 @@ Future<void> main(List<String> arguments) async {
             ),
           )
         : null;
-    final preview = command == 'preview';
+    final preview = command == 'preview' || command == 'studio';
     final buildMode =
         options.buildMode ?? (command == 'build' ? 'release' : 'debug');
     final runDirectory = await _createRunDirectory(
