@@ -1,3 +1,5 @@
+/// Shared command grammar for parsing, help, and shell completion. Keep aliases,
+/// accepted options, and enumerated values here so those consumers cannot drift.
 class CliOption {
   const CliOption(
     this.name,
@@ -189,6 +191,8 @@ Map<String, String> getCliOptionValues(
     if (option == null) {
       throw FormatException('Unknown option for ${command.name}: $spelling');
     }
+    // Store by canonical name, making mixed short/long spellings duplicates
+    // rather than two independently accepted values for the same option.
     if (values.containsKey(option.name)) {
       throw FormatException('Duplicate ${option.name} option.');
     }

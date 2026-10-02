@@ -18,6 +18,9 @@ class ThemePackage {
   final Directory directory;
 }
 
+/// Resolves the physical project path and checks its authoring contract before
+/// planning a host build. Canonicalization makes symlink aliases share caches
+/// and locks, while separate projects with the same package name stay distinct.
 ThemePackage getThemePackage(Directory projectDirectory) {
   final directory = Directory(projectDirectory.resolveSymbolicLinksSync());
   final manifest = File(_join(directory.path, 'pubspec.yaml'));

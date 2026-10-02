@@ -5,6 +5,10 @@ import 'package:yaml/yaml.dart';
 
 import 'theme_project.dart';
 
+/// Assembles a reusable executable host with a direct import of one theme.
+/// Shared Dart sources are linked for live edits; native sources and generated
+/// entrypoints are updated only when content changes to retain build caches.
+/// Dependency selection belongs to this host, not the platform's manifest.
 void createThemeHost({
   required Directory repoRoot,
   required ThemePackage theme,
@@ -74,6 +78,8 @@ void main() {
 ''');
 }
 
+// These belong to Flutter in each host. Copying the root's plugin registrants
+// or ephemeral files would substitute another project's dependency/build state.
 const _flutterGeneratedNames = {
   'ephemeral',
   'generated_plugins.cmake',

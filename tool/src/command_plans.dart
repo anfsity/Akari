@@ -5,6 +5,9 @@ import 'run_report.dart';
 import 'theme_project.dart';
 import 'theme_perf.dart';
 
+/// Describes commands without executing them, allowing dry-run to show the same
+/// dependency plan used by the runner. Theme metadata is resolved by the caller;
+/// steps may then trust the selected package's canonical identity.
 List<RunStep> buildStepsFor(
   String command,
   Directory repoRoot,
@@ -78,6 +81,8 @@ List<RunStep> buildStepsFor(
             environment: {if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs'},
           ),
         if (!live && buildTarget == 'linux')
+          // Publishing requires both artifacts. The backend branch can run in
+          // parallel, so the previous frontend step alone is not sufficient.
           _step(
             'build.links',
             [

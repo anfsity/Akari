@@ -31,6 +31,9 @@ List<String> getThemePerfCommand(ThemePackage theme, String operation) {
   return command.cast<String>().toList();
 }
 
+/// Validates the result envelope and artifact containment, leaving metric
+/// formats and thresholds to the theme. Returned paths are canonical files
+/// beneath the output directory, suitable for recording in the run report.
 Future<Map<String, String>> getThemePerfArtifacts(File manifest) async {
   final result = jsonDecode(await manifest.readAsString());
   if (result is! Map<String, dynamic> || result['version'] != 1) {
@@ -61,6 +64,8 @@ Future<Map<String, String>> getThemePerfArtifacts(File manifest) async {
       );
     }
     final file = File('$outputPath/$path');
+    // Lexical checks alone cannot catch a relative path through a symlink to
+    // a file outside the output directory. Resolve before testing containment.
     final resolvedPath = await file.resolveSymbolicLinks();
     if (!resolvedPath.startsWith('$outputPath${Platform.pathSeparator}')) {
       throw FormatException(
