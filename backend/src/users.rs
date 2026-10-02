@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use thiserror::Error;
-use tokio::sync::OnceCell;
+use tokio::sync::Mutex;
 use zbus::{proxy, proxy::CacheProperties, zvariant::OwnedObjectPath};
 
 #[proxy(
@@ -55,15 +55,16 @@ pub struct UserEntry {
 /// Reads login users from AccountsService without parsing NSS or passwd files.
 ///
 /// The system-bus connection is initialized lazily and shared by cloned
-/// catalogs. User properties are fetched asynchronously by zbus.
+/// catalogs. Closed connections are discarded before the next query. User
+/// properties are fetched asynchronously by zbus.
 #[derive(Clone, Debug, Default)]
 pub struct UserCatalog {
-    connection: Arc<OnceCell<zbus::Connection>>,
+    connection: Arc<Mutex<Option<zbus::Connection>>>,
 }
 
 impl UserCatalog {
     pub async fn list(&self) -> Result<Vec<UserEntry>, UserCatalogError> {
-        let connection = self.system_connection().await?;
+        let connection = self.connect_system_bus().await?;
         let accounts = AccountsServiceProxy::new(&connection)
             .await
             .map_err(UserCatalogError::List)?;
@@ -89,17 +90,19 @@ impl UserCatalog {
         Ok(users)
     }
 
-    async fn system_connection(&self) -> Result<zbus::Connection, UserCatalogError> {
-        let connection = self
-            .connection
-            .get_or_try_init(|| async {
-                zbus::Connection::system()
-                    .await
-                    .map_err(UserCatalogError::Connect)
-            })
-            .await?;
-        Ok(connection.clone())
+    async fn connect_system_bus(&self) -> Result<zbus::Connection, UserCatalogError> {
+        let mut cached = self.connection.lock().await;
+        if let Some(connection) = cached.as_ref()
+            && !connection.is_closed()
+        {
+            return Ok(connection.clone());
+        }
+        cached.take();
+        let connection = zbus::Connection::system().await.map_err(UserCatalogError::Connect)?;
+        *cached = Some(connection.clone());
+        Ok(connection)
     }
+
 }
 
 async fn read_user(
