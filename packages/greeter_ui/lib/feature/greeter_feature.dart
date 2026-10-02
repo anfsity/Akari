@@ -16,6 +16,10 @@ const _preferredSessionNames = ['hyprland', 'sway'];
 ///
 /// This is deliberately independent from Scene widgets. D-Bus is represented
 /// by [GreeterGateway] and never accessed directly from this class.
+/// Attempt IDs isolate authentication events; catalog generations isolate
+/// asynchronous reloads. Neither visual state nor slots retain credential
+/// responses. Durable state is projected into region listenables, while focus,
+/// notices, and process exit travel through the one-shot [effects] stream.
 class GreeterFeature {
   // The public parameter names cannot use the library-private field names.
   GreeterFeature({
@@ -122,6 +126,8 @@ class GreeterFeature {
       return;
     }
     _initialized = true;
+    // Subscribe before querying: backend signals may arrive while a method
+    // reply is pending and must not be lost during initial service loading.
     _eventSubscription = _gateway.events.listen(_handleEvent);
     await _loadService();
   }
@@ -131,6 +137,8 @@ class GreeterFeature {
     try {
       final snapshot = await _gateway.getState();
       final users = await _gateway.listUsers();
+      // GetState has no attempt token. An existing conversation cannot be
+      // adopted by this client, so expose recovery instead of inventing one.
       if (snapshot.state != BackendAuthState.idle) {
         _replace(
           _state.copyWith(
@@ -319,6 +327,8 @@ class GreeterFeature {
     _beginInFlight = true;
     _eventsDuringBegin.clear();
     try {
+      // Signals can precede the reply that supplies the attempt ID. Replay
+      // them only after binding that ID, preserving order and stale filtering.
       final attemptId = await _gateway.beginAuthentication(user.id);
       _attemptId = attemptId;
       final pendingEvents = List<GreeterEvent>.from(_eventsDuringBegin);
@@ -383,6 +393,8 @@ class GreeterFeature {
       return;
     }
 
+    // Invalidate locally before awaiting cancellation; late prompts from the
+    // abandoned conversation must no longer be able to restore the input UI.
     _attemptId = null;
     try {
       await _gateway.cancel(attemptId);
@@ -577,6 +589,9 @@ class GreeterFeature {
     if (state == BackendAuthState.failed) {
       _attemptId = null;
     }
+    // Prompt carries the input kind and text; WaitingForInput only confirms
+    // protocol progress. Keeping the current mode avoids undoing that prompt
+    // or a local input error when the following state signal arrives.
     final nextMode = switch (state) {
       BackendAuthState.creatingSession ||
       BackendAuthState.promptPending ||
@@ -627,6 +642,8 @@ class GreeterFeature {
   }
 
   Future<void> _loadSessionCatalog() async {
+    // Both the backend scan and preference read yield. A retry or reconnect
+    // invalidates earlier loads at each await boundary, including their errors.
     final generation = ++_sessionLoadGeneration;
     _replace(
       _state.copyWith(
@@ -675,6 +692,9 @@ class GreeterFeature {
     List<SessionSummary> sessions,
     String? storedSessionId,
   ) {
+    // A refresh preserves the current choice before consulting persistence.
+    // Only IDs present in this catalog may be restored; preferences are hints,
+    // not authority to launch a session that the backend no longer exposes.
     final current = _state.selectedSession;
     if (current != null &&
         sessions.any((candidate) => candidate.id == current.id)) {
@@ -741,6 +761,9 @@ class GreeterFeature {
       return;
     }
     _state = next;
+    // Notify only regions whose semantic content changed. Publishing every
+    // slot on every transition would rebuild unrelated controls and defeat
+    // the scene's independent build boundaries.
     final nextSlots = GreeterSceneSlots.fromState(
       next,
       canSelectUser: _canSelectUser,

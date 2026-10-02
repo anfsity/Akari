@@ -28,6 +28,8 @@ class GreeterSceneSlots {
       service: (mode: state.serviceMode, error: state.serviceError),
       authPrompt: (
         mode: state.authMode,
+        // Account selection belongs to its picker until authentication starts;
+        // hiding it here keeps the prompt region from presenting a partial flow.
         selectedUser: state.authMode == AuthMode.userSelection
             ? null
             : state.selectedUser,

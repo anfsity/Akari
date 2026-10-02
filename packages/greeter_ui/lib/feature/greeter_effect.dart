@@ -1,3 +1,6 @@
+/// Transient UI work that must not replay whenever a state slot rebuilds.
+/// Consumers subscribe before dispatching commands; this broadcast stream
+/// retains no history for later subscribers.
 sealed class FeatureEffect {
   const FeatureEffect();
 }
