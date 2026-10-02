@@ -82,7 +82,7 @@ impl UserCatalog {
                 Ok(Some(user)) => users.push(user),
                 Ok(None) => {}
                 Err(error) => {
-                    tracing::debug!(%error, "skipping unavailable AccountsService user");
+                    tracing::warn!(error = ?error, "skipping unavailable AccountsService user");
                 }
             }
         }
@@ -98,11 +98,12 @@ impl UserCatalog {
             return Ok(connection.clone());
         }
         cached.take();
-        let connection = zbus::Connection::system().await.map_err(UserCatalogError::Connect)?;
+        let connection = zbus::Connection::system()
+            .await
+            .map_err(UserCatalogError::Connect)?;
         *cached = Some(connection.clone());
         Ok(connection)
     }
-
 }
 
 async fn read_user(
@@ -111,7 +112,7 @@ async fn read_user(
 ) -> Result<Option<UserEntry>, UserObjectError> {
     let map_err = |source| UserObjectError {
         path: path.to_string(),
-        source,
+        source: Box::new(source),
     };
 
     let proxy = AccountsServiceUserProxy::builder(connection)
@@ -142,7 +143,7 @@ async fn read_user(
 struct UserObjectError {
     path: String,
     #[source]
-    source: zbus::Error,
+    source: Box<zbus::Error>,
 }
 
 fn make_user_entry(

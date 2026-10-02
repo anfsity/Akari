@@ -18,17 +18,23 @@ type AppResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
 #[tokio::main]
 async fn main() -> AppResult<()> {
-    init_tracing()?;
+    if let Err(error) = init_tracing() {
+        eprintln!("event=startup_failed operation=InitTracing error={error:?}");
+        return Err(error);
+    }
     let result = run().await;
     if let Err(error) = &result {
-        tracing::error!(error = ?error, "backend failed");
+        tracing::error!(event = "backend_failed", error = ?error, "backend failed");
     }
     result
 }
 
 async fn run() -> AppResult<()> {
-    let mut interrupt = signal(SignalKind::interrupt())?;
-    let mut terminate = signal(SignalKind::terminate())?;
+    let (mut interrupt, mut terminate) = (|| -> std::io::Result<_> {
+        Ok((signal(SignalKind::interrupt())?, signal(SignalKind::terminate())?))
+    })().inspect_err(|error| {
+        tracing::error!(event = "startup_failed", operation = "InstallSignalHandlers", error = ?error, "could not install shutdown handlers");
+    })?;
     let handoff = Arc::new(Notify::new());
     let (service, mut actor) = GreeterService::new(Arc::clone(&handoff));
     let connection_result = async {

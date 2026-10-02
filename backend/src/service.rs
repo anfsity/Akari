@@ -57,11 +57,10 @@ impl GreeterService {
     }
 
     async fn list_users(&self) -> fdo::Result<Vec<(String, String, String)>> {
-        let users = self
-            .users
-            .list()
-            .await
-            .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        let users = self.users.list().await.map_err(|error| {
+            tracing::warn!(operation = "ListUsers", error = ?error, "user catalog query failed");
+            fdo::Error::Failed(error.to_string())
+        })?;
         Ok(users
             .into_iter()
             .map(|user| (user.username, user.display_name, user.icon_path))
@@ -72,7 +71,10 @@ impl GreeterService {
         let sessions = self.sessions.clone();
         let sessions = tokio::task::spawn_blocking(move || sessions.list())
             .await
-            .map_err(|error| fdo::Error::Failed(format!("session catalog task failed: {error}")))?
+            .map_err(|error| {
+                tracing::error!(operation = "ListSessions", error = ?error, "session catalog task failed");
+                fdo::Error::Failed(format!("session catalog task failed: {error}"))
+            })?
             .map_err(map_session_error)?;
         Ok(sessions
             .into_iter()
@@ -146,6 +148,7 @@ impl GreeterService {
         let session_result = match session_result {
             Ok(result) => result,
             Err(error) => {
+                tracing::error!(%attempt_id, %caller, operation = "ResolveSession", error = ?error, "session catalog task failed");
                 let detail = format!("session catalog task failed: {error}");
                 self.auth
                     .session_resolution_failed(caller, attempt_id, detail.clone(), emitter)
@@ -163,6 +166,7 @@ impl GreeterService {
                 return Err(fdo::Error::InvalidArgs(detail));
             }
             Err(error) => {
+                tracing::error!(%attempt_id, %caller, operation = "ResolveSession", error = ?error, "session catalog lookup failed");
                 let detail = error.to_string();
                 self.auth
                     .session_resolution_failed(caller, attempt_id, detail.clone(), emitter)
@@ -231,6 +235,7 @@ impl GreeterService {
 }
 
 fn map_session_error(error: SessionCatalogError) -> fdo::Error {
+    tracing::warn!(error = ?error, "session catalog query failed");
     fdo::Error::Failed(error.to_string())
 }
 

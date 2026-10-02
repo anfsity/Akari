@@ -414,3 +414,7 @@ The mock backend implements the complete `io.mozais.Greeter1` interface specific
 4. `Respond()` validates against test credentials (e.g., matching `"password"`) and reproduces accurate success/failure transitions.
 
 The helper scripts establish the execution environment and spawn the Flutter client. Full integration testing executes both the mock backend daemon and the Flutter UI client within the same isolated `dbus-run-session` instance.
+
+### Backend diagnostics
+
+The default backend log level is `info`. Authentication events carry `attempt_id`, operation, caller, and state so begin, prompt progression, credential rejection and retry, cancellation, authentication success, and session launch can be followed together. Transport failures retain their underlying error in backend diagnostics; catalog failures include their source path. D-Bus display text remains bounded and sanitized. Response values and PAM prompt bodies are never logged. Failed prompt delivery is a warning while the attempt and bus remain live, and debug during cancellation or disconnect. Startup failures have an explicit `startup_failed` event.
