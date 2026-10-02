@@ -225,7 +225,7 @@ sys.exit(1)
     },
   );
 
-  test('run owns the backend session without invoking debug-ui', () async {
+  test('run owns the greeter and backend on a private bus', () async {
     final project = await _createThemeProject(tempRoot);
     final result = await _runTool([
       'run',
@@ -246,7 +246,6 @@ sys.exit(1)
     expect(backend['command'], isNot(contains('--release')));
     final session = steps.last;
     expect(session['command'], contains(endsWith('/scripts/debug-dbus.sh')));
-    expect(session['command'].toString(), isNot(contains('debug-ui')));
     expect(session['command'], containsAll(['debug', 'real']));
     expect(
       session['dependencies'],
