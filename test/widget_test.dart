@@ -9,9 +9,55 @@ import 'package:greeter_ui/feature/greeter_state.dart';
 import 'package:greeter_ui/feature/ports/greeter_gateway.dart';
 import 'package:greeter/app/app.dart';
 import 'package:theme_default/theme.dart';
+import 'package:theme_sdk/theme_sdk.dart';
 import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
 
 void main() {
+  testWidgets(
+    'hot reload refreshes theme while retaining authentication and credentials',
+    (tester) async {
+      var selectedSeed = Colors.red;
+      ThemeDefinition buildTheme({Color? seed}) =>
+          buildDefaultTheme(seed: selectedSeed);
+      await tester.pumpWidget(MyApp(themeBuilder: buildTheme));
+      await tester.pumpAndSettle();
+      await _wake(tester);
+      await tester.tap(find.byTooltip('Choose account'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Alice'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'secret');
+      final feature = tester
+          .widget<GreeterSceneAdapter>(find.byType(GreeterSceneAdapter))
+          .feature;
+      final oldColor = tester
+          .widget<MaterialApp>(find.byType(MaterialApp))
+          .theme!
+          .colorScheme
+          .primary;
+      selectedSeed = Colors.blue;
+      unawaited(tester.binding.reassembleApplication());
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<MaterialApp>(find.byType(MaterialApp))
+            .theme!
+            .colorScheme
+            .primary,
+        isNot(oldColor),
+      );
+      expect(
+        tester
+            .widget<GreeterSceneAdapter>(find.byType(GreeterSceneAdapter))
+            .feature,
+        same(feature),
+      );
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.enabled, isTrue);
+      expect(field.controller!.text, 'secret');
+    },
+  );
+
   testWidgets('starts dormant and reveals controls on wake', (tester) async {
     await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
     await tester.pumpAndSettle();

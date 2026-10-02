@@ -25,6 +25,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   late final GreeterFeature _feature;
   late ThemeDefinition _theme;
+  Color? _themeSeed;
 
   @override
   void initState() {
@@ -46,13 +47,24 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _loadThemeSeed() async {
-    final seed = await _theme.findBackgroundSeed();
-    if (!mounted || seed == null) {
+    final theme = _theme;
+    final seed = await theme.findBackgroundSeed();
+    if (!mounted || !identical(theme, _theme) || seed == null) {
       return;
     }
     setState(() {
+      _themeSeed = seed;
       _theme = widget.themeBuilder(seed: seed);
     });
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    // Hot reload preserves initState and authentication state. Recreate only
+    // the theme so changed builders and generated scene getters take effect.
+    _theme = widget.themeBuilder(seed: _themeSeed);
+    unawaited(_loadThemeSeed());
   }
 
   @override
