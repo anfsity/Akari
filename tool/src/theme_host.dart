@@ -12,12 +12,25 @@ void createThemeHost({
   required bool preview,
 }) {
   output.createSync(recursive: true);
-  for (final name in ['lib', 'linux']) {
-    _copyDirectory(
-      Directory('${repoRoot.path}/$name'),
-      Directory('${output.path}/$name'),
-    );
+  final lib = Directory('${output.path}/lib')..createSync(recursive: true);
+  final sources = Directory('${repoRoot.path}/lib')
+      .listSync(followLinks: false);
+  final names = {'main.dart'};
+  for (final source in sources) {
+    final name = source.uri.pathSegments.where((part) => part.isNotEmpty).last;
+    if (name == 'main.dart') continue;
+    names.add(name);
+    final link = Link('${lib.path}/$name');
+    if (!link.existsSync()) link.createSync(source.path);
   }
+  for (final entity in lib.listSync(followLinks: false)) {
+    final name = entity.uri.pathSegments.where((part) => part.isNotEmpty).last;
+    if (!names.contains(name)) entity.deleteSync(recursive: true);
+  }
+  _syncDirectory(
+    Directory('${repoRoot.path}/linux'),
+    Directory('${output.path}/linux'),
+  );
 
   final platform = loadYaml(
     File('${repoRoot.path}/pubspec.yaml').readAsStringSync(),
@@ -36,11 +49,12 @@ void createThemeHost({
     },
     'flutter': {'uses-material-design': true},
   };
-  File('${output.path}/pubspec.yaml').writeAsStringSync(
+  _writeIfChanged(
+    File('${output.path}/pubspec.yaml'),
     '${const JsonEncoder.withIndent('  ').convert(manifest)}\n',
   );
 
-  File('${output.path}/lib/main.dart').writeAsStringSync('''
+  _writeIfChanged(File('${output.path}/lib/main.dart'), '''
 import 'package:flutter/widgets.dart';
 import 'package:${theme.packageName}/theme.dart' show ${theme.builderName};
 
@@ -58,17 +72,49 @@ void main() {
 ''');
 }
 
-void _copyDirectory(Directory source, Directory target) {
+const _flutterGeneratedNames = {
+  'ephemeral',
+  'generated_plugins.cmake',
+  'generated_plugin_registrant.cc',
+  'generated_plugin_registrant.h',
+};
+
+void _syncDirectory(Directory source, Directory target) {
   target.createSync(recursive: true);
+  final names = <String>{};
   for (final entity in source.listSync(followLinks: false)) {
     final name = entity.uri.pathSegments.where((part) => part.isNotEmpty).last;
+    names.add(name);
+    if (_flutterGeneratedNames.contains(name)) continue;
     if (entity is Directory) {
-      // Flutter regenerates SDK-specific files inside the new host project.
-      if (name != 'ephemeral') {
-        _copyDirectory(entity, Directory('${target.path}/$name'));
-      }
+      _syncDirectory(entity, Directory('${target.path}/$name'));
     } else if (entity is File) {
-      entity.copySync('${target.path}/$name');
+      final file = File('${target.path}/$name');
+      final bytes = entity.readAsBytesSync();
+      if (!file.existsSync() ||
+          !_areBytesEqual(bytes, file.readAsBytesSync())) {
+        file.writeAsBytesSync(bytes);
+      }
     }
+  }
+  for (final entity in target.listSync(followLinks: false)) {
+    final name = entity.uri.pathSegments.where((part) => part.isNotEmpty).last;
+    if (!names.contains(name) && !_flutterGeneratedNames.contains(name)) {
+      entity.deleteSync(recursive: true);
+    }
+  }
+}
+
+bool _areBytesEqual(List<int> source, List<int> target) {
+  if (source.length != target.length) return false;
+  for (var index = 0; index < source.length; index++) {
+    if (source[index] != target[index]) return false;
+  }
+  return true;
+}
+
+void _writeIfChanged(File file, String content) {
+  if (!file.existsSync() || file.readAsStringSync() != content) {
+    file.writeAsStringSync(content);
   }
 }

@@ -17,7 +17,7 @@ List<RunStep> buildStepsFor(
   switch (command) {
     case 'build':
       final theme = buildTheme!;
-      final hostDirectory = '$runDirectory/theme_host';
+      final hostDirectory = getThemeHostDirectory(theme, preview: preview);
       return [
         _step('theme.pub_get', [
           ..._flutterCommand(repoRoot),
@@ -48,7 +48,7 @@ List<RunStep> buildStepsFor(
           _step('theme.preview', [
             _join(
               repoRoot.path,
-              getLinuxExecutablePath(runDirectory, buildMode),
+              getLinuxExecutablePath(hostDirectory, buildMode),
             ),
           ], workingDirectory: hostDirectory),
       ];
@@ -322,13 +322,18 @@ Map<String, String> artifactPathsFor(
   String runDirectory, {
   String buildTarget = 'linux',
   String buildMode = 'release',
+  ThemePackage? buildTheme,
+  bool preview = false,
 }) {
+  final hostDirectory = buildTheme == null
+      ? null
+      : getThemeHostDirectory(buildTheme, preview: preview);
   return switch (command) {
     'build' => {
-      'host_project': '$runDirectory/theme_host',
-      'build_directory': '$runDirectory/theme_host/build/$buildTarget',
+      'host_project': hostDirectory!,
+      'build_directory': '$hostDirectory/build/$buildTarget',
       if (buildTarget == 'linux')
-        'executable': getLinuxExecutablePath(runDirectory, buildMode),
+        'executable': getLinuxExecutablePath(hostDirectory, buildMode),
     },
     'verify-perf' => {
       'performance_report': 'build/perf/scene_report.json',
@@ -341,13 +346,13 @@ Map<String, String> artifactPathsFor(
   };
 }
 
-String getLinuxExecutablePath(String runDirectory, String buildMode) {
+String getLinuxExecutablePath(String hostDirectory, String buildMode) {
   final architecture = switch (Abi.current()) {
     Abi.linuxX64 => 'x64',
     Abi.linuxArm64 => 'arm64',
     _ => throw UnsupportedError('Linux builds require an x64 or arm64 host.'),
   };
-  return '$runDirectory/theme_host/build/linux/$architecture/$buildMode/bundle/greeter';
+  return '$hostDirectory/build/linux/$architecture/$buildMode/bundle/greeter';
 }
 
 String _join(String base, String relative) {

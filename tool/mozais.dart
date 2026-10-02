@@ -61,6 +61,8 @@ Future<void> main(List<String> arguments) async {
       runDirectory,
       buildTarget: options.buildTarget,
       buildMode: buildMode,
+      buildTheme: buildTheme,
+      preview: options.preview,
     );
     if (options.dryRun) {
       writeRunPlan(
@@ -74,15 +76,39 @@ Future<void> main(List<String> arguments) async {
       return;
     }
 
-    exitCode = await runDevCommand(
-      command: command,
-      format: options.format,
-      reportPath: options.reportPath,
-      repoRoot: repoRoot,
-      runDirectory: runDirectory,
-      steps: steps,
-      artifactPaths: artifactPaths,
-    );
+    final themes = buildTheme == null
+        ? findThemePackages(repoRoot)
+        : [buildTheme];
+    final locks = <RandomAccessFile>[];
+    try {
+      // Theme generation writes into the source package, so serialize all
+      // commands for that theme, including live previews with a watcher.
+      for (final theme in themes) {
+        final file = File(
+          _join(
+            repoRoot.path,
+            'build/tool/locks/${getThemeCacheKey(theme)}/theme.lock',
+          ),
+        );
+        await file.parent.create(recursive: true);
+        final lock = await file.open(mode: FileMode.append);
+        locks.add(lock);
+        await lock.lock(FileLock.blockingExclusive);
+      }
+      exitCode = await runDevCommand(
+        command: command,
+        format: options.format,
+        reportPath: options.reportPath,
+        repoRoot: repoRoot,
+        runDirectory: runDirectory,
+        steps: steps,
+        artifactPaths: artifactPaths,
+      );
+    } finally {
+      for (final lock in locks.reversed) {
+        await lock.close();
+      }
+    }
   } on FormatException catch (error) {
     stderr.writeln(error.message);
     _writeUsage();
