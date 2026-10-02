@@ -1,40 +1,29 @@
 import 'dart:io';
 
+import 'src/cli_definition.dart';
 import 'src/command_plans.dart';
 import 'src/run_report.dart';
 import 'src/theme_project.dart';
 
-const _commands = {
-  'build',
-  'run',
-  'preview',
-  'verify',
-  'verify-perf',
-  'generate-scenes',
-  'trace-perf',
-};
-
 Future<void> main(List<String> arguments) async {
   try {
-    if (arguments.isEmpty || arguments.first == '--help') {
+    if (arguments.isEmpty || const {'-h', '--help'}.contains(arguments.first)) {
       _writeUsage();
       return;
     }
 
-    final command = arguments.first;
-    if (!_commands.contains(command)) {
-      throw FormatException('Unknown command: $command');
-    }
+    final definition = getCliCommand(arguments.first);
+    final command = definition.name;
     final separator = arguments.indexOf('--');
     final cliArguments = separator < 0 ? arguments : arguments.take(separator);
     if (cliArguments
         .skip(1)
         .any((argument) => argument == '-h' || argument == '--help')) {
-      _writeUsage(command);
+      _writeUsage(definition);
       return;
     }
 
-    final options = _parseOptions(command, arguments.skip(1).toList());
+    final options = _parseOptions(definition, arguments.skip(1).toList());
     final repoRoot = _findRepoRoot();
     final selectedTheme =
         (options.themePath != null ||
@@ -134,109 +123,66 @@ Future<void> main(List<String> arguments) async {
   }
 }
 
-void _writeUsage([String? command]) {
-  stdout.writeln(
-    'Usage: fvm dart run tool/mozais.dart ${command ?? '<command>'} [options]',
-  );
-  stdout.writeln('''
-Commands:
-  build           Build the selected frontend and production Rust backend.
-  run             Run the selected greeter and backend on a private D-Bus session.
-  preview         Run the selected theme with demo login state.
-  verify          Verify shared code, backend, and theme projects.
-  verify-perf     Execute the selected theme's performance gate.
-  generate-scenes Generate theme scene code.
-  trace-perf      Execute the selected theme's performance trace.
-
-Options:
-  --theme PATH        Select a theme project (default: themes/default).
-  --backend mock|real Backend transport for run (default: mock).
-  --jobs COUNT        Limit Cargo and native compile/link parallel jobs.
-  --platform NAME     Flutter target for build (default: linux).
-  --mode MODE         debug, profile, or release (build: release; run/preview: debug).
-  --format text|json  Console output format (default: text).
-  --report PATH       Write the run report to PATH.
-  --dry-run           Print the execution plan without changing files.
-  -h, --help          Show help.
-  -- [arguments]      Forward arguments to the theme perf command.''');
+void _writeUsage([CliCommand? command]) {
+  stdout.writeln('Usage: mozais ${command?.name ?? '<command>'} [options]');
+  if (command == null) {
+    stdout.writeln('\nCommands:');
+    for (final definition in cliCommands) {
+      final names = definition.spellings.join(', ');
+      stdout.writeln('  ${names.padRight(24)} ${definition.description}');
+    }
+  }
+  stdout.writeln('\nOptions:');
+  final options = command == null ? cliOptions.values : getCliOptions(command);
+  for (final option in options) {
+    final label =
+        '${option.spellings.join(', ')}${option.valueName == null ? '' : ' ${option.valueName}'}';
+    stdout.writeln('  ${label.padRight(24)} ${option.description}');
+  }
+  if (command == null || command.forwardsArguments) {
+    stdout.writeln(
+      '  -- [arguments]           Forward arguments to the theme perf command.',
+    );
+  }
 }
 
-_CliOptions _parseOptions(String command, List<String> arguments) {
+_CliOptions _parseOptions(CliCommand command, List<String> arguments) {
   final separator = arguments.indexOf('--');
   final themeArguments = separator < 0
       ? <String>[]
       : arguments.sublist(separator + 1);
-  if (separator >= 0 && command != 'verify-perf' && command != 'trace-perf') {
-    throw FormatException('$command does not accept theme arguments after --.');
+  if (separator >= 0 && !command.forwardsArguments) {
+    throw FormatException(
+      '${command.name} does not accept theme arguments after --.',
+    );
   }
-  arguments = separator < 0 ? arguments : arguments.sublist(0, separator);
-  final values = <String, String>{};
-  var dryRun = false;
-  final specific = switch (command) {
-    'build' => {'--theme', '--jobs', '--mode', '--platform'},
-    'run' => {'--theme', '--jobs', '--mode', '--backend'},
-    'preview' => {'--theme', '--jobs', '--mode'},
-    'verify' ||
-    'generate-scenes' ||
-    'verify-perf' ||
-    'trace-perf' => {'--theme'},
-    _ => <String>{},
-  };
-  final allowed = {'--format', '--report', ...specific};
-  for (var index = 0; index < arguments.length; index++) {
-    final option = arguments[index];
-    if (option == '--dry-run') {
-      if (dryRun) {
-        throw const FormatException('Duplicate --dry-run option.');
-      }
-      dryRun = true;
-      continue;
-    }
-    if (!allowed.contains(option)) {
-      throw FormatException('Unknown option for $command: $option');
-    }
-    if (values.containsKey(option)) {
-      throw FormatException('Duplicate $option option.');
-    }
-    if (index + 1 >= arguments.length ||
-        arguments[index + 1].startsWith('--')) {
-      throw FormatException('Missing value for $option.');
-    }
-    values[option] = arguments[++index];
-  }
-  final format = switch (values['--format'] ?? 'text') {
-    'text' => RunOutputFormat.text,
-    'json' => RunOutputFormat.json,
-    final value => throw FormatException('Unknown output format: $value'),
-  };
+  final values = getCliOptionValues(
+    command,
+    separator < 0 ? arguments : arguments.sublist(0, separator),
+  );
+  final format = values['--format'] == 'json'
+      ? RunOutputFormat.json
+      : RunOutputFormat.text;
   final jobs = values.containsKey('--jobs')
       ? int.tryParse(values['--jobs']!)
       : null;
   if (values.containsKey('--jobs') && (jobs == null || jobs < 1)) {
     throw const FormatException('--jobs must be a positive integer.');
   }
-  final mode = values['--mode'];
-  if (mode != null && !const {'debug', 'profile', 'release'}.contains(mode)) {
-    throw FormatException('Unknown Flutter build mode: $mode');
-  }
   final target = values['--platform'] ?? 'linux';
   if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(target)) {
     throw FormatException('Invalid Flutter build target: $target');
-  }
-  final backend = values['--backend'] ?? 'mock';
-  if (!const {'mock', 'real'}.contains(backend)) {
-    throw FormatException('Unknown backend transport: $backend');
   }
   return _CliOptions(
     format: format,
     themeArguments: themeArguments,
     buildTarget: target,
-    buildMode: mode,
+    buildMode: values['--mode'],
     themePath: values['--theme'],
     reportPath: values['--report'],
-    dryRun: dryRun,
+    dryRun: values.containsKey('--dry-run'),
     jobs: jobs,
-    backendMode: backend,
+    backendMode: values['--backend'] ?? 'mock',
   );
 }
 
