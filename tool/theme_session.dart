@@ -87,6 +87,9 @@ Future<int> startThemeSession({
     reloading = true;
     try {
       while (reloadPending && !stopping) {
+        // Consume this batch before yielding. Saves during generation or reload
+        // set the flags again and are handled by the next iteration instead of
+        // launching overlapping generators or losing the later source change.
         reloadPending = false;
         final generate = generationPending;
         generationPending = false;
@@ -139,6 +142,8 @@ Future<int> startThemeSession({
   void queueReload({bool generate = false, bool restart = false}) {
     if (mode != 'debug' || stopping) return;
     reloadPending = true;
+    // Coalesce with OR: a later Dart-only event must not erase a pending scene
+    // regeneration or turn an explicitly requested restart into a hot reload.
     generationPending |= generate;
     restartPending |= restart;
     debounce?.cancel();
@@ -159,6 +164,8 @@ Future<int> startThemeSession({
             }
             return;
           }
+          // build_runner writes these itself; watching its output as a source
+          // edit would schedule a second reload for every scene regeneration.
           if (event.path.endsWith('.scene.g.dart')) return;
           final dart = event.path.endsWith('.dart');
           final scene = event.path.endsWith('.scene.json');
@@ -265,6 +272,8 @@ Future<int> startThemeSession({
     stopping = true;
     debounce?.cancel();
     generator?.kill();
+    // Closing Flutter must settle requests awaiting machine-protocol replies;
+    // otherwise an in-flight reload/stop would wait forever after process exit.
     for (final request in requests.values) {
       request.complete({'error': 'Flutter session closed.'});
     }

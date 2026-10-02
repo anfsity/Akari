@@ -34,6 +34,8 @@ if [[ "${1:-}" == --inside-private-bus ]]; then
 fi
 
 if [[ "$inside_private_bus" -eq 0 ]]; then
+  # Re-enter after dbus-run-session sets the bus address so backend and client
+  # inherit one isolated bus. The internal flag prevents recursive bus creation.
   if [[ -z "${MOZAIS_LOG_DIR:-}" ]]; then
     export MOZAIS_LOG_DIR="$repo_root/logs/debug-$(date +%Y%m%d-%H%M%S)-$$"
   fi
@@ -63,6 +65,8 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+# Keep EXIT cleanup as the single owner of both children, including failures
+# during readiness checks and termination while the interactive client runs.
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
@@ -118,6 +122,8 @@ fi
 
 export MOZAIS_BUS_MODE=private
 export RUST_LOG="${RUST_LOG:-backend=info,warn}"
+# Non-interactive shells may redirect a background job's stdin to /dev/null.
+# Preserve the caller's descriptor explicitly so reload and quit keys arrive.
 "$@" <&0 &
 command_pid=$!
 wait "$command_pid"
