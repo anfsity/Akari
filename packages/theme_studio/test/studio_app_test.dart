@@ -150,6 +150,112 @@ void main() {
   );
 
   testWidgets(
+    'duplicate applies drafts and updates layers, selection and saved nodes',
+    (tester) async {
+      await openStudio(tester);
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '0.2');
+      await tester.tap(find.text('Duplicate node'));
+      await tester.pumpAndSettle();
+      final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(preview.selectedId, 'panel-copy');
+      expect(preview.document.nodes.map((node) => node.id), [
+        'panel',
+        'panel-copy',
+        'label',
+      ]);
+      expect(preview.document.nodes[0].rect.x, 0.2);
+      expect(preview.document.nodes[1].rect.x, 0.2);
+      expect(find.byKey(const ValueKey('layer-panel-copy')), findsOneWidget);
+      expect(find.text('Unsaved changes'), findsOneWidget);
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('layer-panel-copy')), findsNothing);
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).selectedId,
+        'panel',
+      );
+      await tester.tap(find.text('Redo'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).selectedId,
+        'panel-copy',
+      );
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      expect(
+        decodeSceneDocument(file.readAsStringSync()).nodes[1].id,
+        'panel-copy',
+      );
+      expect(find.text('Saved'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'invalid drafts block duplicate and delete without changing the document',
+    (tester) async {
+      await openStudio(tester);
+      final source = file.readAsStringSync();
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '2');
+      for (final action in ['Duplicate node', 'Delete node']) {
+        await tester.tap(find.text(action));
+        await tester.pumpAndSettle();
+        final preview = tester.widget<StudioPreview>(
+          find.byType(StudioPreview),
+        );
+        expect(preview.selectedId, 'panel');
+        expect(encodeSceneDocument(preview.document), source);
+        expect(find.textContaining('non-normalized rect'), findsOneWidget);
+      }
+      expect(file.readAsStringSync(), source);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'delete supports hidden nodes, restores drafts on undo and protects the last node',
+    (tester) async {
+      await openStudio(tester);
+      await tester.tap(find.text('State: Login'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('layer-label')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '0.6');
+      await tester.tap(find.text('Delete node'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('layer-label')), findsNothing);
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).selectedId,
+        'panel',
+      );
+      expect(
+        tester
+            .widget<OutlineButton>(
+              find.widgetWithText(OutlineButton, 'Delete node'),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(find.text('A scene needs at least one node.'), findsOneWidget);
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      final restored = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(restored.selectedId, 'label');
+      expect(restored.document.nodes.last.rect.x, 0.6);
+      expect(find.byKey(const ValueKey('layer-label')), findsOneWidget);
+      await tester.tap(find.text('Redo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      expect(
+        decodeSceneDocument(file.readAsStringSync()).nodes.single.id,
+        'panel',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'dormant preview respects visibility and hidden nodes remain selectable in layers',
     (tester) async {
       await openStudio(tester);

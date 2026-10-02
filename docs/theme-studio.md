@@ -42,6 +42,17 @@ to explicitly adopt changes made by another editor.
    fields and writes the scene JSON. **Reload from disk** requires an explicit
    discard action and clears history.
 
+Use **Duplicate node** in the layer panel to copy the selected node, including
+its layout, transforms, visibility, motion and properties. The copy is selected
+and receives a unique ID (`<id>-copy`, then `<id>-copy-2`, and so on). It starts
+at the same position; edit its layout in the inspector to move it.
+**Delete node** removes the selected node and selects a neighboring node in
+authoring order. A scene must retain at least one node, so deletion is disabled
+for the last node. Both actions apply valid inspector drafts first and stop on
+invalid fields. They support undo/redo, including restoration of selection;
+undoing a deletion restores the node with its applied draft edits. Changes
+reach disk only when explicitly saved.
+
 Preview renders at the scene's reference resolution and scales to fit the
 workspace. **State: Login / Dormant** switches between two simulated display
 states. Component interactions are intercepted for selection. Node hit testing
@@ -53,11 +64,12 @@ writes a sibling temporary file and renames it over the authoring file only
 after a complete write. It refuses to save when the source changed externally,
 leaving both the external file and the editor's unsaved document available.
 
-This first version edits existing nodes. Creating/removing nodes, dragging or
-resizing on the canvas, editing visibility rules and backgrounds, additional
-preview states, and unsaved-work recovery after closing the application are
-not implemented. Save explicitly before closing the window. Custom property
-names and values remain the responsibility of the compiled component.
+New nodes can currently be created by duplication. Adding an arbitrary
+component, dragging or resizing on the canvas, editing visibility rules and
+backgrounds, additional preview states, and unsaved-work recovery after closing
+the application are not implemented. Save explicitly before closing the window.
+Custom property names and values remain the responsibility of the compiled
+component.
 
 ## Checks
 
