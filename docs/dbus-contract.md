@@ -106,6 +106,10 @@ Authentication is owned by one actor. D-Bus state-changing methods enqueue comma
 
 The actor processes one authentication command at a time, so a greetd request and its state transition cannot overlap with `Respond()`, `Cancel()`, or a replacement `BeginAuthentication()`. Session catalog scans remain outside the actor on blocking worker tasks; their completion is committed only if the attempt ID is still current. This is the stale-result boundary for catalog work and removes the need for backend, operation, transport, and request-gate locks.
 
+The process owns and observes the actor task. SIGINT, SIGTERM, or loss of the greeter D-Bus connection closes the service, interrupts pending greetd I/O, and waits for bounded authentication cleanup. Actor failure closes the service and exits with an error; state queries reject a stopped actor instead of returning a retained snapshot. Actor and disconnect watchers hold weak command senders, so releasing all external handles also triggers cleanup.
+
+A successful `StartSession` response uses zbus response-dispatch notification before requesting process shutdown. `HandingOff` signals may precede the method reply. The backend does not use connection activity or a fixed delay as evidence of reply completion.
+
 ---
 
 ## 2. Interface Specification: `io.mozais.Greeter1`

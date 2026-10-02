@@ -1,10 +1,11 @@
 //! Serialized owner of authentication state and the greetd transaction.
 
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use futures_util::StreamExt;
 use tokio::{
-    sync::{Notify, mpsc, oneshot, watch},
+    sync::{mpsc, oneshot, watch},
+    task::JoinHandle,
     time::timeout,
 };
 use tokio_util::sync::CancellationToken;
@@ -31,31 +32,41 @@ pub(super) struct AuthActorHandle {
 
 impl AuthActorHandle {
     /// Starts the actor and returns the D-Bus-facing command and snapshot handle.
-    pub(super) fn spawn(handoff: Arc<Notify>) -> Self {
+    pub(super) fn spawn() -> (Self, AuthActorTask) {
         let (commands, receiver) = mpsc::channel(COMMAND_BUFFER);
         let (power_releases, release_receiver) = mpsc::unbounded_channel();
         let (snapshot_sender, snapshot) = watch::channel(AuthSnapshot::idle());
         let (control_sender, control) = watch::channel(None);
-        tokio::spawn(run_actor(
+        let shutdown = CancellationToken::new();
+        let task = tokio::spawn(run_actor(
             receiver,
             release_receiver,
             power_releases,
-            commands.clone(),
+            commands.downgrade(),
             snapshot_sender,
             control_sender,
-            handoff,
+            shutdown.clone(),
         ));
-        Self {
-            commands,
-            snapshot,
-            control,
-        }
+        let runtime = AuthActorTask { task, shutdown };
+        (
+            Self {
+                commands,
+                snapshot,
+                control,
+            },
+            runtime,
+        )
     }
 
     /// Returns the latest state without waiting for greetd I/O.
-    pub(super) fn current_state(&self) -> (String, String) {
+    pub(super) fn get_state(&self) -> fdo::Result<(String, String)> {
+        if self.commands.is_closed() {
+            return Err(fdo::Error::Failed(
+                "authentication actor is unavailable".to_owned(),
+            ));
+        }
         let snapshot = self.snapshot.borrow().clone();
-        (snapshot.state, snapshot.detail)
+        Ok((snapshot.state, snapshot.detail))
     }
 
     /// Cancels the current attempt when it still matches `expected_attempt`.
@@ -213,6 +224,25 @@ impl AuthActorHandle {
     }
 }
 
+/// Owned by the process runtime so actor completion and failures are observed.
+#[derive(Debug)]
+pub(crate) struct AuthActorTask {
+    pub(crate) task: JoinHandle<()>,
+    shutdown: CancellationToken,
+}
+
+impl AuthActorTask {
+    pub(crate) fn stop(&self) {
+        self.shutdown.cancel();
+    }
+}
+
+impl Drop for AuthActorTask {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
 /// Enqueues one typed command and waits for the actor's reply.
 async fn send_command<T, Build>(commands: &CommandSender, build: Build) -> fdo::Result<T>
 where
@@ -273,6 +303,8 @@ struct AttemptControl {
 
 /// Commands are serialized so state transitions and greetd I/O share one owner.
 enum AuthCommand {
+    #[cfg(test)]
+    Panic,
     Begin {
         caller: String,
         username: String,
@@ -334,35 +366,40 @@ struct ActorState {
     caller: Option<String>,
     caller_watcher: Option<CancellationToken>,
     power_busy: bool,
+    shutdown: CancellationToken,
 }
 
 async fn run_actor(
     mut commands: mpsc::Receiver<AuthCommand>,
     mut power_releases: mpsc::UnboundedReceiver<()>,
     power_release_sender: mpsc::UnboundedSender<()>,
-    command_sender: CommandSender,
+    command_sender: mpsc::WeakSender<AuthCommand>,
     snapshots: watch::Sender<AuthSnapshot>,
     controls: watch::Sender<Option<AttemptControl>>,
-    handoff: Arc<Notify>,
+    shutdown: CancellationToken,
 ) {
-    let mut actor = ActorState::default();
+    let mut actor = ActorState {
+        shutdown: shutdown.clone(),
+        ..ActorState::default()
+    };
     loop {
         // Process lease releases in the same loop as D-Bus commands so a
         // completed power action cannot leave the actor permanently busy.
         let command = tokio::select! {
-            command = commands.recv() => command,
-            release = power_releases.recv() => {
-                if release.is_some() {
-                    actor.power_busy = false;
-                    continue;
-                }
-                commands.recv().await
+            biased;
+            _ = shutdown.cancelled() => break,
+            _ = power_releases.recv() => {
+                actor.power_busy = false;
+                continue;
             }
+            command = commands.recv() => command,
         };
         let Some(command) = command else {
             break;
         };
         match command {
+            #[cfg(test)]
+            AuthCommand::Panic => panic!("test actor failure"),
             AuthCommand::Begin {
                 caller,
                 username,
@@ -491,7 +528,6 @@ async fn run_actor(
                     emitter,
                     &snapshots,
                     &controls,
-                    &handoff,
                 )
                 .await;
                 let _ = reply.send(result);
@@ -513,7 +549,7 @@ async fn handle_begin(
     emitter: SignalEmitter<'static>,
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
-    commands: &CommandSender,
+    commands: &mpsc::WeakSender<AuthCommand>,
 ) -> fdo::Result<String> {
     if actor.power_busy {
         return Err(fdo::Error::Failed("power action is in progress".to_owned()));
@@ -525,7 +561,7 @@ async fn handle_begin(
     }
     cancel_current(actor, None, None, false, None, snapshots, controls).await?;
 
-    let cancellation = CancellationToken::new();
+    let cancellation = actor.shutdown.child_token();
     let watcher_token = CancellationToken::new();
     let attempt_id = actor
         .auth
@@ -736,7 +772,6 @@ async fn handle_start_session(
     emitter: SignalEmitter<'static>,
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
-    handoff: &Arc<Notify>,
 ) -> fdo::Result<()> {
     validate_attempt(&actor.auth, attempt_id)?;
     require_state(&actor.auth, AuthState::ResolvingSession)?;
@@ -793,7 +828,6 @@ async fn handle_start_session(
             publish_state(&actor.auth, attempt_id, snapshots);
             emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
             detach_resources(actor, controls);
-            notify_handoff_after_reply(emitter.connection().clone(), Arc::clone(handoff));
             Ok(())
         }
         GreetdResponse::Error {
@@ -1287,7 +1321,7 @@ fn spawn_caller_watcher(
     attempt_id: String,
     watcher_token: CancellationToken,
     cancellation: CancellationToken,
-    commands: CommandSender,
+    commands: mpsc::WeakSender<AuthCommand>,
 ) {
     // D-Bus may remove the caller while the original request is blocked in
     // greetd, so this watcher must outlive the initiating method call.
@@ -1330,12 +1364,15 @@ fn spawn_caller_watcher(
 }
 
 async fn cancel_for_caller_disconnect(
-    commands: CommandSender,
+    commands: mpsc::WeakSender<AuthCommand>,
     attempt_id: String,
     caller: String,
     cancellation: CancellationToken,
 ) {
     cancellation.cancel();
+    let Some(commands) = commands.upgrade() else {
+        return;
+    };
     let _ = send_command(&commands, |reply| AuthCommand::Cancel {
         expected_attempt: Some(attempt_id),
         expected_caller: Some(caller),
@@ -1344,14 +1381,6 @@ async fn cancel_for_caller_disconnect(
         reply,
     })
     .await;
-}
-
-fn notify_handoff_after_reply(connection: zbus::Connection, handoff: Arc<Notify>) {
-    let activity = connection.monitor_activity();
-    tokio::spawn(async move {
-        activity.await;
-        handoff.notify_waiters();
-    });
 }
 
 async fn emit_state_best_effort(emitter: Option<&SignalEmitter<'_>>, snapshot: &AuthSnapshot) {
@@ -1511,10 +1540,7 @@ fn map_transition_error(error: crate::state::StateTransitionError) -> fdo::Error
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use tokio::sync::Notify;
-    use tokio::{sync::watch, task::yield_now};
+    use tokio::sync::watch;
 
     use super::{
         ActorState, AuthActorHandle, AuthSnapshot, acquire_power, cancel_current, display_detail,
@@ -1701,14 +1727,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn actor_panic_is_observable_and_queries_fail() {
+        let (actor, mut runtime) = AuthActorHandle::spawn();
+        actor
+            .commands
+            .send(super::AuthCommand::Panic)
+            .await
+            .unwrap();
+        assert!((&mut runtime.task).await.unwrap_err().is_panic());
+        assert!(actor.get_state().is_err());
+        assert!(actor.reserve_power().await.is_err());
+    }
+
+    #[tokio::test]
+    async fn dropping_handles_stops_actor() {
+        let (actor, mut runtime) = AuthActorHandle::spawn();
+        drop(actor);
+        tokio::time::timeout(std::time::Duration::from_secs(1), &mut runtime.task)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn stopping_actor_closes_queries_and_commands() {
+        let (actor, mut runtime) = AuthActorHandle::spawn();
+        runtime.stop();
+        (&mut runtime.task).await.unwrap();
+        assert!(actor.get_state().is_err());
+        assert!(actor.reserve_power().await.is_err());
+    }
+
+    #[tokio::test]
     async fn lease_release_unblocks() {
-        let actor = AuthActorHandle::spawn(Arc::new(Notify::new()));
+        let (actor, mut runtime) = AuthActorHandle::spawn();
         let lease = actor.reserve_power().await.unwrap();
         assert!(actor.reserve_power().await.is_err());
 
         drop(lease);
-        yield_now().await;
 
         assert!(actor.reserve_power().await.is_ok());
+        runtime.stop();
+        (&mut runtime.task).await.unwrap();
     }
 }

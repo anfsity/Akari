@@ -268,6 +268,44 @@ async fn cancel_to_idle() {
 }
 
 #[tokio::test]
+async fn sigterm_cancels_authentication_and_exits() {
+    let _guard = lock().lock().await;
+    let socket = socket_path();
+    let listener = UnixListener::bind(&socket).unwrap();
+    let server = tokio::spawn(fake_cancel(listener));
+    let mut backend = start_backend(&socket);
+    let connection = connect_backend().await;
+    let proxy = make_proxy(&connection).await;
+    let _: String = proxy
+        .call("BeginAuthentication", &("alice",))
+        .await
+        .unwrap();
+    assert!(
+        Command::new("kill")
+            .args(["-TERM", &backend.id().to_string()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    tokio::time::timeout(Duration::from_secs(3), server)
+        .await
+        .unwrap()
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if let Some(status) = backend.try_wait().unwrap() {
+                assert!(status.success());
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("SIGTERM should stop backend after authentication cleanup");
+    let _ = std::fs::remove_file(socket);
+}
+
+#[tokio::test]
 async fn bad_power_action() {
     let _guard = lock().lock().await;
     let socket = socket_path();
@@ -306,10 +344,18 @@ async fn start_session() {
         .await
         .unwrap();
 
-    let state: (String, String) = proxy.call("GetState", &()).await.unwrap();
-    assert_eq!(state.0, "HandingOff");
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if let Some(status) = backend.try_wait().unwrap() {
+                assert!(status.success(), "backend handoff failed: {status}");
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("backend should exit after the StartSession reply");
     server.await.unwrap();
-    stop_backend(&mut backend);
     remove_dir(session_root);
     let _ = std::fs::remove_file(socket);
 }
