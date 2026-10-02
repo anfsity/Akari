@@ -1,8 +1,10 @@
 import 'dart:io';
 
 import 'src/cli_definition.dart';
+import 'src/cli_install.dart';
 import 'src/command_plans.dart';
 import 'src/run_report.dart';
+import 'src/shell_completion.dart';
 import 'src/theme_project.dart';
 
 Future<void> main(List<String> arguments) async {
@@ -23,8 +25,30 @@ Future<void> main(List<String> arguments) async {
       return;
     }
 
-    final options = _parseOptions(definition, arguments.skip(1).toList());
     final repoRoot = _findRepoRoot();
+    if (command == 'install' || command == 'completion') {
+      final values = getCliOptionValues(definition, arguments.skip(1).toList());
+      final shell = values['--shell'] ?? 'zsh';
+      if (command == 'completion') {
+        stdout.write(getShellCompletion(shell));
+        return;
+      }
+      final home = Platform.environment['HOME'];
+      if (home == null) {
+        throw const FormatException('HOME is required for installation.');
+      }
+      final rcDirectory = shell == 'zsh'
+          ? Platform.environment['ZDOTDIR'] ?? home
+          : home;
+      await installCli(
+        repoRoot: repoRoot,
+        prefix: Directory(values['--prefix'] ?? '$home/.local').absolute,
+        rcFile: File(values['--rc'] ?? '$rcDirectory/.${shell}rc').absolute,
+        shell: shell,
+      );
+      return;
+    }
+    final options = _parseOptions(definition, arguments.skip(1).toList());
     final selectedTheme =
         (options.themePath != null ||
             const {
