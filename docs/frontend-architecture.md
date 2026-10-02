@@ -272,7 +272,9 @@ Tests must not assert pixel coordinates or exact visual placement. A small
 number of usability invariants may assert reachability, focus order, hit target
 size, and absence of overflow.
 
-Performance is verified separately with a Linux/Wayland profile integration
+Each theme owns its performance tests and thresholds. The CLI executes declared
+commands through the [theme perf protocol](theme-package.md#performance-protocol).
+The default theme verifies performance with a Linux/Wayland profile integration
 run. Reports record p50/p95 and maximum build, raster, vsync overhead, and total
 frame time by interaction phase, count frames beyond the 16.67 ms budget,
 validate phase matching and sample availability, and check whether a settled

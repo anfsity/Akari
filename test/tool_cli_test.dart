@@ -92,7 +92,6 @@ void main() {
       final project = await _createThemeProject(tempRoot);
       final plan = buildStepsFor(
         'build',
-        3,
         Directory.current,
         'runs/build',
         selectedTheme: getThemePackage(project),
@@ -254,7 +253,7 @@ sys.exit(1)
   test('verification plans discover independent theme projects', () async {
     await _createThemeProject(Directory('${tempRoot.path}/themes'));
 
-    final steps = buildStepsFor('verify', 3, tempRoot, 'runs/verify');
+    final steps = buildStepsFor('verify', tempRoot, 'runs/verify');
 
     expect(
       steps
@@ -516,54 +515,187 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
     },
   );
 
-  test('performance raw reports use a fresh run directory', () async {
-    final firstResult = await _runTool([
-      'verify-perf',
-      '--format',
-      'json',
-      '--dry-run',
-      '--cycles',
-      '3',
-    ]);
-    final firstPlan = jsonDecode(firstResult.stdout) as Map<String, dynamic>;
-    final oldRunPath =
-        '${Directory.current.path}/${firstPlan['run_directory']}';
-    final oldRunDirectory = Directory(oldRunPath);
-    await oldRunDirectory.create(recursive: true);
-    addTearDown(() async {
-      if (oldRunDirectory.existsSync()) {
-        await oldRunDirectory.delete(recursive: true);
-      }
-    });
-
-    final secondResult = await _runTool([
-      'verify-perf',
-      '--format',
-      'json',
-      '--dry-run',
-      '--cycles',
-      '3',
-    ]);
-    expect(secondResult.exitCode, 0, reason: secondResult.stderr);
-    final secondPlan = jsonDecode(secondResult.stdout) as Map<String, dynamic>;
-    expect(secondPlan['run_id'], isNot(firstPlan['run_id']));
-
-    final rawDirectory =
-        (secondPlan['artifacts']
-            as Map<String, dynamic>)['performance_raw_reports'];
-    expect(rawDirectory, startsWith(secondPlan['run_directory']));
-    final driveSteps = (secondPlan['steps'] as List)
-        .cast<Map<String, dynamic>>()
-        .where(
-          (step) => (step['id'] as String).startsWith('performance.drive_'),
+  test(
+    'perf plans select explicit theme commands and forward arguments literally',
+    () async {
+      final project = await _createThemeProject(tempRoot);
+      final manifest = File('${project.path}/pubspec.yaml');
+      await manifest.writeAsString('''
+perf:
+  version: 1
+  verify: [dart, run, "perf/custom.dart"]
+  trace: [python3, "trace with spaces.py"]
+''', mode: FileMode.append);
+      for (final command in ['verify-perf', 'trace-perf']) {
+        final result = await _runTool([
+          command,
+          '--theme',
+          project.path,
+          '--dry-run',
+          '--',
+          '--custom',
+          r'$(touch unexpected)',
+          '--help',
+        ]);
+        expect(result.exitCode, 0, reason: result.stderr);
+        final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+        final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
+        expect(steps.map((step) => step['id']), [
+          'theme.pub_get',
+          'scenes.generate_theme_ocean',
+          command == 'verify-perf' ? 'theme.perf.verify' : 'theme.perf.trace',
+        ]);
+        final perf = steps.last;
+        expect(perf['working_directory'], project.path);
+        expect(
+          (perf['command'] as List).sublist(
+            (perf['command'] as List).length - 3,
+          ),
+          ['--custom', r'$(touch unexpected)', '--help'],
         );
-    expect(driveSteps, hasLength(3));
-    for (final step in driveSteps) {
-      final command = (step['command'] as List).cast<String>();
-      expect(
-        command.any((argument) => argument.contains(rawDirectory)),
-        isTrue,
+        expect(
+          perf['command'],
+          command == 'verify-perf'
+              ? containsAll(['run', 'perf/custom.dart'])
+              : containsAll(['python3', 'trace with spaces.py']),
+        );
+        final output = plan['artifacts']['performance_output'];
+        expect(output, '${plan['run_directory']}/perf');
+        expect(
+          perf['environment']['MOZAIS_PERF_OUTPUT_DIR'],
+          '${Directory.current.path}/$output',
+        );
+        expect(
+          Directory('${Directory.current.path}/${plan['run_directory']}')
+              .existsSync(),
+          isFalse,
+        );
+      }
+    },
+  );
+
+  test(
+    'perf reports collect opaque artifacts and preserve theme exit codes',
+    () async {
+      final project = await _createThemeProject(tempRoot);
+      await File('${project.path}/pubspec.yaml').writeAsString('''
+perf:
+  version: 1
+  verify: [python3, perf.py]
+  trace: [python3, perf.py]
+''', mode: FileMode.append);
+      await File('${project.path}/perf.py').writeAsString('''
+import json, os, pathlib, sys
+output = pathlib.Path(os.environ['MOZAIS_PERF_OUTPUT_DIR'])
+(output / 'custom.txt').write_text(json.dumps(sys.argv[1:]))
+(output / 'result.json').write_text(json.dumps({
+    'version': 1, 'artifacts': [{'name': 'custom', 'path': 'custom.txt'}]
+}))
+print('theme stdout')
+print('theme stderr', file=sys.stderr)
+sys.exit(int(sys.argv[1]))
+''');
+      final sdk = File('${tempRoot.path}/fake-sdk');
+      await sdk.writeAsString('#!/bin/sh\nexit 0\n');
+      expect((await Process.run('chmod', ['+x', sdk.path])).exitCode, 0);
+      final runIds = <String>{};
+      for (final command in ['verify-perf', 'trace-perf']) {
+        for (final code in [0, 17]) {
+          final result = await _runTool(
+            [
+              command,
+              '--theme',
+              project.path,
+              '--format',
+              'json',
+              '--',
+              '$code',
+              'argument with spaces',
+              r'$(touch unexpected)',
+            ],
+            environment: {
+              'MOZAIS_DART_BIN': sdk.path,
+              'MOZAIS_FLUTTER_BIN': sdk.path,
+            },
+          );
+          expect(result.exitCode, code, reason: result.stderr);
+          final report = jsonDecode(result.stdout) as Map<String, dynamic>;
+          final runDirectory = Directory(
+            '${Directory.current.path}/${report['artifacts']['run_directory']}',
+          );
+          addTearDown(() => runDirectory.delete(recursive: true));
+          expect(runIds.add(report['run_id'] as String), isTrue);
+          expect(report['status'], code == 0 ? 'passed' : 'failed');
+          expect(report.containsKey('performance'), isFalse);
+          final artifact = File(
+            '${Directory.current.path}/${report['theme_artifacts']['custom']}',
+          );
+          expect(jsonDecode(await artifact.readAsString()), [
+            '$code',
+            'argument with spaces',
+            r'$(touch unexpected)',
+          ]);
+          final steps = (report['steps'] as List).cast<Map<String, dynamic>>();
+          expect(steps.last['exit_code'], code);
+          expect(
+            await File('${Directory.current.path}/${steps.last['stdout_log']}')
+                .readAsString(),
+            'theme stdout\n',
+          );
+          expect(
+            await File('${Directory.current.path}/${steps.last['stderr_log']}')
+                .readAsString(),
+            'theme stderr\n',
+          );
+          expect(File('${project.path}/unexpected').existsSync(), isFalse);
+        }
+      }
+    },
+  );
+
+  test('perf rejects unsupported operations and requires successful commands to publish a manifest', () async {
+    final project = await _createThemeProject(tempRoot);
+    final unsupported = await _runTool([
+      'verify-perf',
+      '--theme',
+      project.path,
+      '--dry-run',
+    ]);
+    expect(unsupported.exitCode, 2);
+    expect(unsupported.stderr, contains('does not support verify'));
+    await File('${project.path}/pubspec.yaml').writeAsString('''
+perf:
+  version: 1
+  verify: [python3, '-c', 'import sys; sys.exit(int(sys.argv[1]))']
+''', mode: FileMode.append);
+    final sdk = File('${tempRoot.path}/fake-sdk');
+    await sdk.writeAsString('#!/bin/sh\nexit 0\n');
+    expect((await Process.run('chmod', ['+x', sdk.path])).exitCode, 0);
+    for (final code in [0, 19]) {
+      final result = await _runTool(
+        [
+          'verify-perf',
+          '--theme',
+          project.path,
+          '--format',
+          'json',
+          '--',
+          '$code',
+        ],
+        environment: {
+          'MOZAIS_DART_BIN': sdk.path,
+          'MOZAIS_FLUTTER_BIN': sdk.path,
+        },
       );
+      expect(result.exitCode, code == 0 ? 1 : code, reason: result.stderr);
+      final report = jsonDecode(result.stdout) as Map<String, dynamic>;
+      final runDirectory = Directory(
+        '${Directory.current.path}/${report['artifacts']['run_directory']}',
+      );
+      addTearDown(() => runDirectory.delete(recursive: true));
+      expect(report['status'], 'failed');
+      expect(report.containsKey('error'), code == 0);
+      expect(report.containsKey('theme_artifacts'), isFalse);
     }
   });
 

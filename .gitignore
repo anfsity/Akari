@@ -23,10 +23,6 @@
 !/lib/**
 !/test/
 !/test/**
-!/integration_test/
-!/integration_test/**
-!/test_driver/
-!/test_driver/**
 
 # Linux runner and application resources.
 !/linux/
