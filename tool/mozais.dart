@@ -55,6 +55,7 @@ Future<void> main(List<String> arguments) async {
       buildMode: buildMode,
       buildTheme: buildTheme,
       preview: options.preview,
+      jobs: options.jobs,
     );
     final artifactPaths = artifactPathsFor(
       command,
@@ -137,6 +138,7 @@ Options:
   --platform NAME     Flutter build target for build (default: linux).
   --mode MODE         Flutter build mode: debug, profile, or release.
   --theme PATH        Theme project for build (default: themes/default).
+  --jobs COUNT        Limit native compilation and Cargo parallel jobs.
   --preview           Build and launch a Linux preview with demo login state.
   --dry-run           Print the resolved execution plan as JSON.
   -h, --help          Show command help.''');
@@ -164,6 +166,7 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
   String? buildMode;
   String? themePath;
   var preview = false;
+  int? jobs;
   String? reportPath;
   var dryRun = false;
   var formatSeen = false;
@@ -200,6 +203,7 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
       '--platform',
       '--mode',
       '--theme',
+      '--jobs',
     }.contains(option)) {
       throw FormatException('Unknown option: $option');
     }
@@ -209,6 +213,17 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
     }
     final value = arguments[++index];
     switch (option) {
+      case '--jobs':
+        if (command != 'build') {
+          throw const FormatException('--jobs is only valid for build.');
+        }
+        if (jobs != null) {
+          throw const FormatException('Duplicate --jobs option.');
+        }
+        jobs = int.tryParse(value);
+        if (jobs == null || jobs < 1) {
+          throw const FormatException('--jobs must be a positive integer.');
+        }
       case '--theme':
         if (command != 'build') {
           throw const FormatException('--theme is only valid for build.');
@@ -292,6 +307,7 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
     dryRun: dryRun,
     themePath: themePath,
     preview: preview,
+    jobs: jobs,
   );
 }
 
@@ -364,6 +380,7 @@ class _CliOptions {
     required this.dryRun,
     required this.themePath,
     required this.preview,
+    required this.jobs,
   });
 
   final RunOutputFormat format;
@@ -374,4 +391,5 @@ class _CliOptions {
   final bool dryRun;
   final String? themePath;
   final bool preview;
+  final int? jobs;
 }

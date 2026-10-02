@@ -66,3 +66,8 @@ the aggregate report remains at `build/perf/scene_report.json`.
 Host projects retain Flutter and native build caches between runs. Shared application
 source is linked into the host, and Linux runner files are synchronized only when
 they change. Run directories contain logs and reports rather than another build.
+
+Production builds also compile the Rust backend. Backend compilation runs alongside
+theme preparation. `build --jobs COUNT` limits Cargo tasks and native C++ compile/link
+jobs through a CMake Ninja pool. Without it, each tool uses its normal multicore default.
+This does not set the Dart compiler's thread count.
