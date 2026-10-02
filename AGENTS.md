@@ -41,8 +41,9 @@ These rules apply to all changes in this repository.
 
 ## Comments
 
-- Write comments for future readers who need the reasoning behind non-obvious code.
-- Do not add comments merely to narrate the diff or restate what the code already says.
+- Write comments for future readers who need the reasoning behind non-obvious code. For complex classes or methods, explain the rationale behind the design, the consequences of not adopting this approach, and the implementation details.
+
+- Do not add comments merely to narrate the diff, restate the method signature, or explain what the code already clearly expresses.
 
 ## Commits
 
