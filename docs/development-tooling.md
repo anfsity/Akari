@@ -10,6 +10,17 @@ fvm dart run tool/mozais.dart generate-scenes
 fvm dart run tool/mozais.dart trace-perf
 ```
 
+Use `-t`, `-m`, and `-j` for `--theme`, `--mode`, and `--jobs`.
+`perf` aliases `verify-perf`, and `trace` aliases `trace-perf`.
+Long options also accept `--name=value`. Mixing short and long spellings of
+the same option is still a duplicate error. `COMMAND --help` lists only options
+accepted by that command. Arguments after `--` remain literal theme arguments.
+
+```sh
+fvm dart run tool/mozais.dart build -t themes/default -m release -j 4
+fvm dart run tool/mozais.dart perf -t themes/default -- --cycles 5
+```
+
 `build` accepts a theme project with `--theme PATH`, defaulting to
 `themes/default`. It resolves that project's dependencies, generates its scene
 source, and builds a reusable host project under `build/tool/hosts/`. The host imports

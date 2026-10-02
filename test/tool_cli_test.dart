@@ -22,6 +22,67 @@ void main() {
   });
 
   test(
+    'short options reach native build steps and command help is scoped',
+    () async {
+      final result = await _runTool([
+        'build',
+        '-t',
+        'themes/default',
+        '-m',
+        'debug',
+        '-j',
+        '3',
+        '--dry-run',
+      ]);
+      expect(result.exitCode, 0, reason: result.stderr);
+      final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+      expect(plan['command'], 'build');
+      final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
+      expect(steps.first['command'], containsAll(['--jobs', '3']));
+      expect(steps.first['command'], isNot(contains('--release')));
+      expect(
+        steps.singleWhere(
+          (step) => step['id'] == 'flutter.build_linux',
+        )['command'],
+        contains('--debug'),
+      );
+      expect(plan['artifacts']['bundle_link'], 'build/out/default');
+      final help = await _runTool(['verify', '-h']);
+      expect(help.exitCode, 0);
+      expect(help.stdout, contains('-t, --theme'));
+      expect(help.stdout, isNot(contains('--jobs')));
+    },
+  );
+
+  test('perf aliases preserve literal arguments after the separator', () async {
+    final project = await _createThemeProject(tempRoot);
+    final manifest = File('${project.path}/pubspec.yaml');
+    await manifest.writeAsString(
+      'perf:\n  version: 1\n  verify: [dart, perf/run.dart]\n  trace: [dart, perf/trace.dart]\n',
+      mode: FileMode.append,
+    );
+    for (final alias in ['perf', 'trace']) {
+      final result = await _runTool([
+        alias,
+        '-t',
+        project.path,
+        '--dry-run',
+        '--',
+        '-m',
+        '--help',
+        r'$(touch unexpected)',
+      ]);
+      expect(result.exitCode, 0, reason: result.stderr);
+      final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+      expect(plan['command'], alias == 'perf' ? 'verify-perf' : 'trace-perf');
+      expect(
+        (plan['steps'] as List).last['command'],
+        containsAllInOrder(['-m', '--help', r'$(touch unexpected)']),
+      );
+    }
+  });
+
+  test(
     'host synchronization preserves caches and unchanged file timestamps',
     () async {
       final project = await _createThemeProject(tempRoot);
