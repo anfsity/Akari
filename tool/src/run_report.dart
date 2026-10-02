@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -39,6 +40,8 @@ void writeRunPlan({
             'command': redactor.redactCommand(step.command),
             'working_directory': _resolvePath(repoRoot, step.workingDirectory),
             'environment': redactor.redactEnvironment(step.environment),
+            'dependencies': step.dependencies,
+            'interactive': step.interactive,
             'stdout_log': _join(runDirectory, '${step.id}.stdout.log'),
             'stderr_log': _join(runDirectory, '${step.id}.stderr.log'),
           },
@@ -53,12 +56,16 @@ class RunStep {
     required this.command,
     required this.workingDirectory,
     required this.environment,
+    this.dependencies,
+    this.interactive = false,
   });
 
   final String id;
   final List<String> command;
   final String workingDirectory;
   final Map<String, String> environment;
+  final List<String>? dependencies;
+  final bool interactive;
 }
 
 Future<int> runDevCommand({
@@ -82,16 +89,20 @@ Future<int> runDevCommand({
   final stopwatch = Stopwatch()..start();
   final stepResults = <_StepResult>[];
 
-  Future<void> recordEvent(String name, Map<String, Object?> fields) async {
-    events.writeln(
-      jsonEncode({
-        'timestamp': DateTime.now().toUtc().toIso8601String(),
-        'run_id': _lastSegment(runDirectory),
-        'event': name,
-        ...fields,
-      }),
-    );
-    await events.flush();
+  var eventWrites = Future<void>.value();
+  Future<void> recordEvent(String name, Map<String, Object?> fields) {
+    eventWrites = eventWrites.then((_) async {
+      events.writeln(
+        jsonEncode({
+          'timestamp': DateTime.now().toUtc().toIso8601String(),
+          'run_id': _lastSegment(runDirectory),
+          'event': name,
+          ...fields,
+        }),
+      );
+      await events.flush();
+    });
+    return eventWrites;
   }
 
   await recordEvent('run_started', {'command': command});
@@ -99,42 +110,52 @@ Future<int> runDevCommand({
     stderr.writeln('Run ${_lastSegment(runDirectory)}: $command');
   }
 
+  final results = <String, Future<_StepResult?>>{};
   for (var index = 0; index < steps.length; index++) {
     final step = steps[index];
-    final safeCommand = redactor.redactCommand(step.command);
-    await recordEvent('step_started', {
-      'step_id': step.id,
-      'command': safeCommand,
-      'working_directory': step.workingDirectory,
-    });
-    if (format == RunOutputFormat.text) {
-      stderr.writeln('==> ${index + 1}/${steps.length} ${step.id}');
-    }
-
-    final result = await _runStep(
-      step: step,
-      repoRoot: repoRoot,
-      runDirectoryPath: runDirectoryPath,
-      runDirectory: runDirectory,
-      format: format,
-      redactor: redactor,
-    );
-    stepResults.add(result);
-    await recordEvent('step_finished', {
-      'step_id': step.id,
-      'status': result.status,
-      'exit_code': result.exitCode,
-      'duration_ms': result.durationMs,
-    });
-    if (format == RunOutputFormat.text) {
-      stderr.writeln(
-        '<== ${step.id}: ${result.status} (${result.durationMs} ms)',
+    final dependencies =
+        step.dependencies ?? (index == 0 ? <String>[] : [steps[index - 1].id]);
+    final prerequisites = [for (final id in dependencies) results[id]!];
+    results[step.id] = () async {
+      final completed = await Future.wait(prerequisites);
+      if (completed.any(
+        (result) => result == null || result.status == 'failed',
+      )) {
+        return null;
+      }
+      await recordEvent('step_started', {
+        'step_id': step.id,
+        'command': redactor.redactCommand(step.command),
+        'working_directory': step.workingDirectory,
+      });
+      if (format == RunOutputFormat.text) {
+        stderr.writeln('==> ${index + 1}/${steps.length} ${step.id}');
+      }
+      final result = await _runStep(
+        step: step,
+        repoRoot: repoRoot,
+        runDirectoryPath: runDirectoryPath,
+        runDirectory: runDirectory,
+        format: format,
+        redactor: redactor,
       );
-    }
-    if (result.status == 'failed') {
-      break;
-    }
+      await recordEvent('step_finished', {
+        'step_id': step.id,
+        'status': result.status,
+        'exit_code': result.exitCode,
+        'duration_ms': result.durationMs,
+      });
+      if (format == RunOutputFormat.text) {
+        stderr.writeln(
+          '<== ${step.id}: ${result.status} (${result.durationMs} ms)',
+        );
+      }
+      return result;
+    }();
   }
+  stepResults.addAll(
+    (await Future.wait(results.values)).whereType<_StepResult>(),
+  );
 
   stopwatch.stop();
   final finishedAt = DateTime.now().toUtc();
@@ -228,16 +249,35 @@ Future<_StepResult> _runStep({
   final stderrLog = File(stderrPath).openWrite();
   int? processExitCode;
   Object? failure;
+  StreamSubscription<List<int>>? input;
+  final signals = <StreamSubscription<ProcessSignal>>[];
+  final terminal = step.interactive && stdin.hasTerminal;
+  final originalLineMode = terminal ? stdin.lineMode : null;
+  final originalEchoMode = terminal ? stdin.echoMode : null;
 
   try {
     final process = await Process.start(
-      step.command.first,
-      step.command.skip(1).toList(),
+      'setsid',
+      step.command,
       workingDirectory: _resolvePath(repoRoot, step.workingDirectory),
       environment: step.environment.isEmpty
           ? null
           : {...Platform.environment, ...step.environment},
     );
+    for (final signal in [ProcessSignal.sigint, ProcessSignal.sigterm]) {
+      signals.add(
+        signal.watch().listen((_) {
+          Process.killPid(-process.pid, signal);
+        }),
+      );
+    }
+    if (step.interactive) {
+      if (terminal) {
+        stdin.lineMode = false;
+        stdin.echoMode = false;
+      }
+      input = stdin.listen(process.stdin.add, onDone: process.stdin.close);
+    }
     final stdoutCopy = _copyOutput(
       process.stdout,
       stdoutLog,
@@ -261,6 +301,14 @@ Future<_StepResult> _runStep({
       );
     }
   } finally {
+    await input?.cancel();
+    for (final signal in signals) {
+      await signal.cancel();
+    }
+    if (terminal) {
+      stdin.lineMode = originalLineMode!;
+      stdin.echoMode = originalEchoMode!;
+    }
     await Future.wait([stdoutLog.flush(), stderrLog.flush()]);
     await Future.wait([stdoutLog.close(), stderrLog.close()]);
   }
