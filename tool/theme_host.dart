@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'src/theme_catalog.dart';
+import 'src/theme_project.dart';
 import 'src/theme_host.dart';
 
 void main(List<String> arguments) {
