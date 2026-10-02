@@ -155,23 +155,14 @@ itself. The executable entrypoint selects the builder; the host initializes the
 theme and rebuilds it with a sampled background seed when available. Background
 seed extraction belongs to `ThemeDefinition`, so it does not require a catalog.
 
-`theme_catalog` is the repository application's generated compile-time catalog,
-used by its entrypoint and tests. It is a composition-root dependency, not a
-dependency of the SDK or another theme. `tool/theme_catalog.dart` discovers the
-built-in projects under `themes/` and regenerates this development catalog.
-The repository application's theme selection is compile-time:
+The CLI selects one project with `--theme PATH` and generates a separate host
+that directly imports and injects its builder into `MyApp`. Theme discovery
+reads project metadata without requiring specific theme names. Repository tests
+inject builders directly; `tool/dev_main.dart` explicitly selects the default
+theme for debugging. The fallback theme remains an independently selectable
+minimal static theme with no blur or continuous animation.
 
-```text
---dart-define=MOZAIS_THEME=default
-```
-
-`default` selects the reference-like built-in theme. `fallback` is a minimal
-static theme with no blur or continuous animation. An unknown theme name falls
-back to `fallback`; debug builds assert to surface the configuration error.
-
-The CLI build path selects one project with `--theme PATH` and generates a
-separate host that injects its builder into `MyApp`. This host does not depend on
-the catalog. `--preview` builds and launches that same host with demo login state.
+`--preview` builds and launches that same host with demo login state.
 Each theme project owns its scenes, component assembly, tokens, and assets. A
 theme may depend on SDK or explicitly shared component packages, but one theme
 must not import another theme package. Its Dart and Flutter code is compiled

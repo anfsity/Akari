@@ -9,7 +9,7 @@ import 'package:flutter/rendering.dart'
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:greeter/main.dart';
+import 'package:greeter/app/app.dart';
 import 'package:theme_default/theme.dart';
 
 import '../../tool/perf/frame_metrics.dart';

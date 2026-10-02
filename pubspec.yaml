@@ -15,15 +15,12 @@ dependencies:
     path: packages/greeter_ui
   scene:
     path: packages/scene
-  theme_catalog:
-    path: packages/theme_catalog
   theme_sdk:
     path: packages/theme_sdk
 
 dev_dependencies:
   flutter_lints: ^6.0.0
   yaml: ^3.1.3
-  path: ^1.9.1
   theme_default:
     path: themes/default
   flutter_test:

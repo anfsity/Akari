@@ -52,8 +52,8 @@ fvm dart run tool/mozais.dart build --theme /path/to/my_theme --preview --dry-ru
 The CLI resolves the selected theme's dependencies, generates its scene source,
 and creates a host project under `build/tool/runs/<run-id>/theme_host/`. That
 project contains the shared greeter application source, Linux runner, and a
-manifest and entrypoint for the selected theme. It does not depend on the
-platform theme catalog or modify its registry and dependency declarations.
+manifest and entrypoint that directly import the selected theme's builder.
+The platform manifest is not modified during a theme build.
 
 Normal builds default to release mode with the real D-Bus backend. `--preview`
 defaults to debug mode with the demo backend and no session preference
@@ -71,12 +71,11 @@ this contract.
 ## Repository Development
 
 `generate-scenes`, `verify`, and the performance commands discover projects
-under `themes/`. The repository's application and tests retain a built-in theme
-catalog. Regenerate that development catalog with:
+under `themes/`, without requiring specific theme names. Each project is
+identified by its own manifest and builder entrypoint; package names must be
+unique within the repository.
 
-```sh
-fvm dart run tool/theme_catalog.dart --write
-```
-
-An external theme build requires only the selected project; it does not require
-that project to supply `default` or `fallback` themes.
+The root project provides shared application code. Repository tests inject
+theme builders directly, and the debugging entrypoint `tool/dev_main.dart`
+selects the default theme explicitly. Performance fixtures also use that theme.
+An external theme build requires only the selected project.

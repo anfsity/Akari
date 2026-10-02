@@ -2,7 +2,7 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'run_report.dart';
-import 'theme_catalog.dart';
+import 'theme_project.dart';
 
 List<RunStep> buildStepsFor(
   String command,
@@ -229,7 +229,7 @@ List<RunStep> _getThemeVerificationSteps(
   Directory repoRoot,
   List<ThemePackage> themes,
 ) {
-  final packageNames = ['greeter_components', 'theme_sdk', 'theme_catalog'];
+  final packageNames = ['greeter_components', 'theme_sdk'];
   return [
     for (final packageName in packageNames)
       ..._getFlutterPackageVerificationSteps(
