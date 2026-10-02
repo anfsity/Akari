@@ -9,6 +9,7 @@ use tokio::{
     time::timeout,
 };
 use tokio_util::sync::CancellationToken;
+use tracing::Instrument;
 use zbus::{fdo, object_server::SignalEmitter};
 
 use crate::{
@@ -357,6 +358,65 @@ enum AuthCommand {
     },
 }
 
+impl AuthCommand {
+    fn get_operation(&self) -> &'static str {
+        match self {
+            Self::Begin { .. } => "BeginAuthentication",
+            Self::Respond { .. } => "Respond",
+            Self::Cancel { .. } => "Cancel",
+            Self::BeginSessionResolution { .. } => "ResolveSession",
+            Self::SessionUnavailable { .. } => "SessionUnavailable",
+            Self::FailSessionResolution { .. } => "FailSessionResolution",
+            Self::StartSession { .. } => "StartSession",
+            Self::AcquirePower { .. } => "ReservePower",
+            #[cfg(test)]
+            Self::Panic => "TestPanic",
+        }
+    }
+
+    fn get_caller(&self) -> Option<&str> {
+        match self {
+            Self::Begin { caller, .. }
+            | Self::Respond { caller, .. }
+            | Self::BeginSessionResolution { caller, .. }
+            | Self::SessionUnavailable { caller, .. }
+            | Self::FailSessionResolution { caller, .. }
+            | Self::StartSession { caller, .. } => Some(caller),
+            Self::Cancel {
+                expected_caller, ..
+            } => expected_caller.as_deref(),
+            Self::AcquirePower { .. } => None,
+            #[cfg(test)]
+            Self::Panic => None,
+        }
+    }
+
+    fn get_attempt_id(&self) -> Option<&str> {
+        match self {
+            Self::Respond { attempt_id, .. }
+            | Self::BeginSessionResolution { attempt_id, .. }
+            | Self::SessionUnavailable { attempt_id, .. }
+            | Self::FailSessionResolution { attempt_id, .. }
+            | Self::StartSession { attempt_id, .. } => Some(attempt_id),
+            Self::Cancel {
+                expected_attempt, ..
+            } => expected_attempt.as_deref(),
+            Self::Begin { .. } | Self::AcquirePower { .. } => None,
+            #[cfg(test)]
+            Self::Panic => None,
+        }
+    }
+}
+
+fn send_reply<T>(reply: oneshot::Sender<fdo::Result<T>>, result: fdo::Result<T>) {
+    if let Err(error) = &result {
+        tracing::warn!(%error, "authentication operation rejected or failed");
+    }
+    if reply.send(result).is_err() {
+        tracing::debug!("authentication method caller no longer awaiting reply");
+    }
+}
+
 /// Mutable authentication resources owned exclusively by `run_actor`.
 #[derive(Default)]
 struct ActorState {
@@ -426,146 +486,162 @@ async fn run_actor(
         let Some(command) = command else {
             break;
         };
-        match command {
-            #[cfg(test)]
-            AuthCommand::Panic => panic!("test actor failure"),
-            AuthCommand::Begin {
-                caller,
-                username,
-                emitter,
-                reply,
-            } => {
-                let result = handle_begin(
-                    &mut actor,
+        let span = tracing::info_span!(
+            "authentication",
+            operation = command.get_operation(),
+            caller = command.get_caller().unwrap_or("runtime"),
+            attempt_id = command
+                .get_attempt_id()
+                .or_else(|| actor.auth.active_attempt_id())
+                .unwrap_or(""),
+            initial_state = actor.auth.state().as_str(),
+        );
+        async {
+            tracing::debug!("processing authentication operation");
+            match command {
+                #[cfg(test)]
+                AuthCommand::Panic => panic!("test actor failure"),
+                AuthCommand::Begin {
                     caller,
                     username,
                     emitter,
-                    &snapshots,
-                    &controls,
-                    &command_sender,
-                )
-                .await;
-                let _ = reply.send(result);
-            }
-            AuthCommand::Respond {
-                caller,
-                attempt_id,
-                response,
-                emitter,
-                reply,
-            } => {
-                if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                    let _ = reply.send(Err(error));
-                    continue;
+                    reply,
+                } => {
+                    let result = handle_begin(
+                        &mut actor,
+                        caller,
+                        username,
+                        emitter,
+                        &snapshots,
+                        &controls,
+                        &command_sender,
+                    )
+                    .await;
+                    send_reply(reply, result);
                 }
-                let result = handle_respond(
-                    &mut actor,
-                    &attempt_id,
+                AuthCommand::Respond {
+                    caller,
+                    attempt_id,
                     response,
                     emitter,
-                    &snapshots,
-                    &controls,
-                )
-                .await;
-                let _ = reply.send(result);
-            }
-            AuthCommand::Cancel {
-                expected_attempt,
-                expected_caller,
-                allow_after_cleanup,
-                emitter,
-                reply,
-            } => {
-                let result = cancel_current(
-                    &mut actor,
-                    expected_attempt.as_deref(),
-                    expected_caller.as_deref(),
+                    reply,
+                } => {
+                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
+                        send_reply(reply, Err(error));
+                        return;
+                    }
+                    let result = handle_respond(
+                        &mut actor,
+                        &attempt_id,
+                        response,
+                        emitter,
+                        &snapshots,
+                        &controls,
+                    )
+                    .await;
+                    send_reply(reply, result);
+                }
+                AuthCommand::Cancel {
+                    expected_attempt,
+                    expected_caller,
                     allow_after_cleanup,
                     emitter,
-                    &snapshots,
-                    &controls,
-                )
-                .await;
-                let _ = reply.send(result);
-            }
-            AuthCommand::BeginSessionResolution {
-                caller,
-                attempt_id,
-                emitter,
-                reply,
-            } => {
-                if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                    let _ = reply.send(Err(error));
-                    continue;
+                    reply,
+                } => {
+                    let result = cancel_current(
+                        &mut actor,
+                        expected_attempt.as_deref(),
+                        expected_caller.as_deref(),
+                        allow_after_cleanup,
+                        emitter,
+                        &snapshots,
+                        &controls,
+                    )
+                    .await;
+                    send_reply(reply, result);
                 }
-                let result = resolve_session(&mut actor, &attempt_id, &emitter, &snapshots).await;
-                let _ = reply.send(result);
-            }
-            AuthCommand::SessionUnavailable {
-                caller,
-                attempt_id,
-                detail,
-                emitter,
-                reply,
-            } => {
-                if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                    let _ = reply.send(Err(error));
-                    continue;
+                AuthCommand::BeginSessionResolution {
+                    caller,
+                    attempt_id,
+                    emitter,
+                    reply,
+                } => {
+                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
+                        send_reply(reply, Err(error));
+                        return;
+                    }
+                    let result =
+                        resolve_session(&mut actor, &attempt_id, &emitter, &snapshots).await;
+                    send_reply(reply, result);
                 }
-                let result =
-                    session_unavailable(&mut actor, &attempt_id, detail, &emitter, &snapshots)
-                        .await;
-                let _ = reply.send(result);
-            }
-            AuthCommand::FailSessionResolution {
-                caller,
-                attempt_id,
-                detail,
-                emitter,
-                reply,
-            } => {
-                if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                    let _ = reply.send(Err(error));
-                    continue;
-                }
-                let result = session_resolution_failed(
-                    &mut actor,
-                    &attempt_id,
+                AuthCommand::SessionUnavailable {
+                    caller,
+                    attempt_id,
                     detail,
-                    &emitter,
-                    &snapshots,
-                    &controls,
-                )
-                .await;
-                let _ = reply.send(result);
-            }
-            AuthCommand::StartSession {
-                caller,
-                attempt_id,
-                session,
-                emitter,
-                reply,
-            } => {
-                if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                    let _ = reply.send(Err(error));
-                    continue;
+                    emitter,
+                    reply,
+                } => {
+                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
+                        send_reply(reply, Err(error));
+                        return;
+                    }
+                    let result =
+                        session_unavailable(&mut actor, &attempt_id, detail, &emitter, &snapshots)
+                            .await;
+                    send_reply(reply, result);
                 }
-                let result = handle_start_session(
-                    &mut actor,
-                    &attempt_id,
+                AuthCommand::FailSessionResolution {
+                    caller,
+                    attempt_id,
+                    detail,
+                    emitter,
+                    reply,
+                } => {
+                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
+                        send_reply(reply, Err(error));
+                        return;
+                    }
+                    let result = session_resolution_failed(
+                        &mut actor,
+                        &attempt_id,
+                        detail,
+                        &emitter,
+                        &snapshots,
+                        &controls,
+                    )
+                    .await;
+                    send_reply(reply, result);
+                }
+                AuthCommand::StartSession {
+                    caller,
+                    attempt_id,
                     session,
                     emitter,
-                    &snapshots,
-                    &controls,
-                )
-                .await;
-                let _ = reply.send(result);
-            }
-            AuthCommand::AcquirePower { reply } => {
-                let result = acquire_power(&mut actor, power_release_sender.clone());
-                let _ = reply.send(result);
+                    reply,
+                } => {
+                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
+                        send_reply(reply, Err(error));
+                        return;
+                    }
+                    let result = handle_start_session(
+                        &mut actor,
+                        &attempt_id,
+                        session,
+                        emitter,
+                        &snapshots,
+                        &controls,
+                    )
+                    .await;
+                    send_reply(reply, result);
+                }
+                AuthCommand::AcquirePower { reply } => {
+                    let result = acquire_power(&mut actor, power_release_sender.clone());
+                    send_reply(reply, result);
+                }
             }
         }
+        .instrument(span)
+        .await;
     }
 
     let _ = cancel_current(&mut actor, None, None, false, None, &snapshots, &controls).await;
@@ -600,12 +676,14 @@ async fn handle_begin(
         .auth
         .begin_authentication(username.clone())
         .map_err(map_begin_error)?;
+    tracing::Span::current().record("attempt_id", &attempt_id);
     actor.attempt = Some(AttemptResources {
         caller: caller.clone(),
         cancellation: cancellation.clone(),
         caller_watcher: watcher_token.clone(),
         transport: None,
     });
+    tracing::info!(%attempt_id, %caller, state = actor.auth.state().as_str(), "authentication started");
     publish_state(&actor.auth, &attempt_id, snapshots);
     let _ = controls.send(Some(AttemptControl {
         caller: caller.clone(),
@@ -811,6 +889,7 @@ async fn handle_start_session(
     publish_state(&actor.auth, attempt_id, snapshots);
     emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
 
+    tracing::info!(%attempt_id, session_id = %session.session_id, source = %session.source.display(), state = actor.auth.state().as_str(), "starting desktop session");
     let environment = session_environment(&session);
     let response = actor
         .get_transport()
@@ -837,6 +916,7 @@ async fn handle_start_session(
 
     match response {
         GreetdResponse::Success => {
+            tracing::info!(%attempt_id, session_id = %session.session_id, "desktop session accepted by greetd");
             actor
                 .auth
                 .transition(StateEvent::SessionStarted)
@@ -850,6 +930,7 @@ async fn handle_start_session(
             error_type,
             description,
         } => {
+            tracing::error!(%attempt_id, %error_type, state = actor.auth.state().as_str(), "desktop session start failed");
             let detail = display_detail(&format!("{error_type}: {description}"));
             actor
                 .auth
@@ -901,6 +982,7 @@ async fn consume_response(
         }
         match response {
             GreetdResponse::Success => {
+                tracing::info!(%attempt_id, state = actor.auth.state().as_str(), "authentication succeeded");
                 actor
                     .auth
                     .transition(StateEvent::AuthenticationSucceeded)
@@ -919,6 +1001,7 @@ async fn consume_response(
                 // user can answer the prompt again without a new attempt.
                 if error_type == "auth_error" && actor.auth.state() == AuthState::SubmittingResponse
                 {
+                    tracing::info!(%attempt_id, %error_type, state = actor.auth.state().as_str(), "credential rejected; retrying authentication");
                     let username = actor
                         .auth
                         .active_username()
@@ -933,7 +1016,8 @@ async fn consume_response(
                     publish_state(&actor.auth, attempt_id, snapshots);
                     emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id))
                         .await;
-                    emit_prompt_best_effort(&emitter, attempt_id, "error", detail).await;
+                    emit_prompt_best_effort(&emitter, attempt_id, "error", detail, cancellation)
+                        .await;
 
                     actor
                         .attempt
@@ -992,6 +1076,7 @@ async fn consume_response(
                     continue;
                 }
 
+                tracing::warn!(%attempt_id, %error_type, state = actor.auth.state().as_str(), "authentication rejected by greetd");
                 actor
                     .auth
                     .transition(StateEvent::AuthenticationFailed {
@@ -1023,8 +1108,14 @@ async fn consume_response(
                     )
                     .await);
                 }
-                emit_prompt_best_effort(&emitter, attempt_id, &auth_message_type, auth_message)
-                    .await;
+                emit_prompt_best_effort(
+                    &emitter,
+                    attempt_id,
+                    &auth_message_type,
+                    auth_message,
+                    cancellation,
+                )
+                .await;
                 match auth_message_type.as_str() {
                     "visible" | "secret" => {
                         if cancellation.is_cancelled() {
@@ -1141,6 +1232,7 @@ async fn cancel_current(
         .active_attempt_id()
         .expect("active authentication owns an attempt ID")
         .to_owned();
+    tracing::info!(%attempt_id, state = actor.auth.state().as_str(), "cancelling authentication");
     actor
         .auth
         .transition(StateEvent::CancelRequested)
@@ -1177,20 +1269,32 @@ async fn cancel_current(
     emit_state_best_effort(emitter.as_ref(), &snapshot(&actor.auth, &attempt_id)).await;
 
     match cancel_result {
-        Ok(GreetdResponse::Success) => Ok(()),
+        Ok(GreetdResponse::Success) => {
+            tracing::info!(%attempt_id, "authentication cancelled");
+            Ok(())
+        }
         Ok(GreetdResponse::Error {
             error_type,
             description,
-        }) => Err(fdo::Error::Failed(format!(
-            "could not cancel greetd session: {}",
-            display_detail(&format!("{error_type}: {description}"))
-        ))),
-        Ok(GreetdResponse::AuthMessage { .. }) => Err(fdo::Error::Failed(
-            "could not cancel greetd session: unexpected authentication message".to_owned(),
-        )),
-        Err(error) => Err(fdo::Error::Failed(format!(
-            "could not cancel greetd session: {error}"
-        ))),
+        }) => {
+            tracing::warn!(%attempt_id, %error_type, "greetd rejected cancellation; transport closed");
+            Err(fdo::Error::Failed(format!(
+                "could not cancel greetd session: {}",
+                display_detail(&format!("{error_type}: {description}"))
+            )))
+        }
+        Ok(GreetdResponse::AuthMessage { .. }) => {
+            tracing::warn!(%attempt_id, "unexpected authentication message during cancellation; transport closed");
+            Err(fdo::Error::Failed(
+                "could not cancel greetd session: unexpected authentication message".to_owned(),
+            ))
+        }
+        Err(error) => {
+            tracing::warn!(%attempt_id, error = ?error, state = actor.auth.state().as_str(), "greetd cancellation failed; transport closed");
+            Err(fdo::Error::Failed(format!(
+                "could not cancel greetd session: {error}"
+            )))
+        }
     }
 }
 
@@ -1205,6 +1309,7 @@ async fn finish_cancellation(
         actor.auth.is_current_attempt(attempt_id),
         "actor cancels its current attempt"
     );
+    tracing::info!(%attempt_id, state = actor.auth.state().as_str(), "cancelling authentication");
     actor
         .auth
         .transition(StateEvent::CancelRequested)
@@ -1219,6 +1324,7 @@ async fn finish_cancellation(
     publish_state(&actor.auth, attempt_id, snapshots);
     emit_state_best_effort(emitter, &snapshot(&actor.auth, attempt_id)).await;
 
+    tracing::info!(%attempt_id, "authentication cancelled; transport closed");
     cancelled_error()
 }
 
@@ -1230,6 +1336,7 @@ async fn fail_transaction(
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Error {
+    tracing::error!(%attempt_id, error = ?error, state = actor.auth.state().as_str(), "authentication transaction failed");
     let detail = display_detail(&error.to_string());
     assert!(
         actor.auth.is_current_attempt(attempt_id),
@@ -1257,6 +1364,7 @@ fn publish_state(
     attempt_id: &str,
     snapshots: &watch::Sender<AuthSnapshot>,
 ) {
+    tracing::info!(%attempt_id, state = auth.state().as_str(), "authentication state changed");
     let _ = snapshots.send(snapshot(auth, attempt_id));
 }
 
@@ -1278,7 +1386,7 @@ fn spawn_caller_watcher(
         let proxy = match zbus::fdo::DBusProxy::new(&connection).await {
             Ok(proxy) => proxy,
             Err(error) => {
-                tracing::warn!(%error, "could not create D-Bus disconnect watcher");
+                tracing::warn!(%attempt_id, %caller, error = ?error, "could not create D-Bus disconnect watcher");
                 cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await;
                 return;
             }
@@ -1289,18 +1397,15 @@ fn spawn_caller_watcher(
         {
             Ok(stream) => stream,
             Err(error) => {
-                tracing::warn!(%error, "could not subscribe to D-Bus client disconnects");
+                tracing::warn!(%attempt_id, %caller, error = ?error, "could not subscribe to D-Bus client disconnects");
                 cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await;
                 return;
             }
         };
-        let caller_name = match caller.as_str().try_into() {
-            Ok(name) => name,
-            Err(error) => {
-                tracing::warn!(%error, "D-Bus caller name was invalid");
-                return;
-            }
-        };
+        let caller_name = caller
+            .as_str()
+            .try_into()
+            .expect("D-Bus sender is a unique bus name");
         if !proxy.name_has_owner(caller_name).await.unwrap_or(false) {
             cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await;
             return;
@@ -1318,6 +1423,7 @@ async fn cancel_for_caller_disconnect(
     caller: String,
     cancellation: CancellationToken,
 ) {
+    tracing::info!(%attempt_id, %caller, operation = "CallerDisconnected", "cancelling authentication after caller disconnect");
     cancellation.cancel();
     let Some(commands) = commands.upgrade() else {
         return;
@@ -1344,7 +1450,11 @@ async fn emit_state_best_effort(emitter: Option<&SignalEmitter<'_>>, snapshot: &
     )
     .await
     {
-        tracing::debug!(%error, state = %snapshot.state, "could not emit StateChanged");
+        if emitter.connection().is_closed() {
+            tracing::debug!(attempt_id = %snapshot.attempt_id, state = %snapshot.state, %error, "StateChanged skipped on closed bus");
+        } else {
+            tracing::warn!(attempt_id = %snapshot.attempt_id, state = %snapshot.state, %error, "could not emit StateChanged");
+        }
     }
 }
 
@@ -1353,6 +1463,7 @@ async fn emit_prompt_best_effort(
     attempt_id: &str,
     prompt_kind: &str,
     text: String,
+    cancellation: &CancellationToken,
 ) {
     if let Err(error) = crate::service::GreeterService::prompt(
         emitter,
@@ -1362,7 +1473,11 @@ async fn emit_prompt_best_effort(
     )
     .await
     {
-        tracing::debug!(%error, "could not emit Prompt");
+        if cancellation.is_cancelled() || emitter.connection().is_closed() {
+            tracing::debug!(%attempt_id, %prompt_kind, %error, "Prompt delivery interrupted by disconnect or cancellation");
+        } else {
+            tracing::warn!(%attempt_id, %prompt_kind, %error, "could not emit authentication Prompt");
+        }
     }
 }
 
