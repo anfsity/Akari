@@ -21,6 +21,30 @@ fvm dart run tool/mozais.dart build -t themes/default -m release -j 4
 fvm dart run tool/mozais.dart perf -t themes/default -- --cycles 5
 ```
 
+Install a repository-bound `mozais` command and shell completion at user level:
+
+```sh
+fvm dart run tool/mozais.dart install --shell zsh
+# Or, for bash:
+fvm dart run tool/mozais.dart install --shell bash
+```
+
+The launcher is written to `~/.local/bin/mozais` and completion support to
+`~/.local/share/mozais/`. Installation appends one source line to `.zshrc`
+(respecting `ZDOTDIR`) or `.bashrc`; repeating installation does not duplicate it.
+Open a new shell or source the printed environment script to activate it.
+The launcher works from any directory, preserves relative argument paths, and
+uses the repository SDK and its `MOZAIS_*_BIN` overrides. Its repository must
+remain available at the installed path; reinstall after moving the repository.
+`install --prefix PATH --rc PATH` selects installation and startup file locations.
+
+Completion covers commands and aliases, command-specific long and short options,
+enum values, and paths. It stops after `--`, where arguments belong to the theme.
+The parser, help, and generated scripts share `tool/src/cli_definition.dart`.
+Reinstall after changing that definition to refresh installed completion scripts.
+For manual registration, `mozais completion --shell zsh` or `--shell bash` prints
+the corresponding script.
+
 `build` accepts a theme project with `--theme PATH`, defaulting to
 `themes/default`. It resolves that project's dependencies, generates its scene
 source, and builds a reusable host project under `build/tool/hosts/`. The host imports
