@@ -165,6 +165,39 @@ sys.exit(1)
     },
   );
 
+  test('run owns the backend session without invoking debug-ui', () async {
+    final project = await _createThemeProject(tempRoot);
+    final result = await _runTool([
+      'run',
+      '--theme',
+      project.path,
+      '--jobs',
+      '2',
+      '--dry-run',
+    ]);
+    expect(result.exitCode, 0, reason: result.stderr);
+    final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+    final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
+    final backend = steps.singleWhere((step) => step['id'] == 'backend.build');
+    expect(
+      backend['command'],
+      containsAll(['--features', 'mock', '--jobs', '2']),
+    );
+    expect(backend['command'], isNot(contains('--release')));
+    final session = steps.last;
+    expect(session['command'], contains(endsWith('/scripts/debug-dbus.sh')));
+    expect(session['command'].toString(), isNot(contains('debug-ui')));
+    expect(session['command'], containsAll(['debug', 'real']));
+    expect(
+      session['dependencies'],
+      containsAll(['backend.build', 'theme.host.pub_get']),
+    );
+    expect(
+      session['environment']['MOZAIS_BACKEND_BIN'],
+      endsWith('/mozais-mock/debug/backend'),
+    );
+  });
+
   test('discovers themes without required built-in names', () async {
     final themesDirectory = Directory('${tempRoot.path}/themes');
     final project = await _createThemeProject(themesDirectory);
@@ -218,10 +251,9 @@ sys.exit(1)
   test('build plans use theme metadata outside the repository', () async {
     final project = await _createThemeProject(tempRoot);
     final result = await _runTool([
-      'build',
+      'preview',
       '--theme',
       project.path,
-      '--preview',
       '--dry-run',
     ]);
     expect(result.exitCode, 0, reason: result.stderr);
@@ -229,16 +261,11 @@ sys.exit(1)
     final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
     expect(steps.first['working_directory'], project.path);
     expect(steps[1]['id'], 'scenes.generate_theme_ocean');
-    final build = steps.singleWhere(
-      (step) => step['id'] == 'flutter.build_linux',
-    );
-    expect(build['command'], contains('--debug'));
-    expect(build['command'], contains('--dart-define=MOZAIS_BACKEND=demo'));
+    final session = steps.last;
+    expect(session['command'], containsAll(['debug', 'demo']));
+    expect(session['interactive'], isTrue);
     expect(steps.last['id'], 'theme.preview');
-    expect(
-      (steps.last['command'] as List).single,
-      endsWith('/debug/bundle/greeter'),
-    );
+    expect(steps.where((step) => step['id'] == 'backend.build'), isEmpty);
     expect(
       Directory('${Directory.current.path}/${plan['run_directory']}')
           .existsSync(),
@@ -249,7 +276,7 @@ sys.exit(1)
   test('preview options reject unsupported commands and platforms', () async {
     for (final arguments in [
       ['verify', '--preview'],
-      ['build', '--preview', '--platform', 'web'],
+      ['preview', '--platform', 'web'],
       ['build', '--theme', 'themes/default', '--theme', 'themes/fallback'],
     ]) {
       final result = await _runTool(arguments);
@@ -257,79 +284,74 @@ sys.exit(1)
     }
   });
 
-  test(
-    'build launches an external theme using only its selected theme dependency',
-    () async {
-      final project = await _createThemeProject(tempRoot);
-      final platformManifest = File('pubspec.yaml');
-      final manifestBefore = await platformManifest.readAsString();
-      final launchMarker = File('${tempRoot.path}/preview-started');
-      final flutter = File('${tempRoot.path}/flutter');
-      final dart = File('${tempRoot.path}/dart');
-      final preview = File('${tempRoot.path}/preview');
-      await preview.writeAsString(
-        '#!/bin/sh\nprintf launched > ${_shellQuote(launchMarker.path)}\n',
-      );
-      await flutter.writeAsString('''#!/bin/sh
-if [ "\$1" = build ]; then
-  mkdir -p build/linux/x64/debug/bundle
-  cp ${_shellQuote(preview.path)} build/linux/x64/debug/bundle/greeter
+  test('preview launches an external theme using only its selected theme dependency', () async {
+    final project = await _createThemeProject(tempRoot);
+    final platformManifest = File('pubspec.yaml');
+    final manifestBefore = await platformManifest.readAsString();
+    final launchMarker = File('${tempRoot.path}/preview-started');
+    final flutter = File('${tempRoot.path}/flutter');
+    final dart = File('${tempRoot.path}/dart');
+    final preview = File('${tempRoot.path}/preview');
+    await preview.writeAsString(
+      '#!/bin/sh\nprintf launched > ${_shellQuote(launchMarker.path)}\n',
+    );
+    await flutter.writeAsString('''#!/bin/sh
+if [ "\$1" = run ]; then
+  ${_shellQuote(preview.path)}
 fi
 ''');
-      final dartCommand = getDartCommand(Directory.current);
-      await dart.writeAsString('''#!/bin/sh
+    final dartCommand = getDartCommand(Directory.current);
+    await dart.writeAsString('''#!/bin/sh
 if [ "\$1" = run ] && [ "\$2" = build_runner ]; then
   exit 0
 fi
 exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
 ''');
-      final chmod = await Process.run('chmod', [
-        '+x',
-        flutter.path,
-        dart.path,
-        preview.path,
-      ]);
-      expect(chmod.exitCode, 0, reason: chmod.stderr);
-      final result = await _runTool(
-        ['build', '--theme', project.path, '--preview', '--format', 'json'],
-        environment: {
-          'MOZAIS_FLUTTER_BIN': flutter.path,
-          'MOZAIS_DART_BIN': dart.path,
-        },
-      );
-      expect(result.exitCode, 0, reason: result.stderr);
-      final report = jsonDecode(result.stdout) as Map<String, dynamic>;
-      final runDirectory = Directory(
-        '${Directory.current.path}/${report['artifacts']['run_directory']}',
-      );
-      addTearDown(() => runDirectory.delete(recursive: true));
-      expect(report['status'], 'passed');
-      expect(await launchMarker.readAsString(), 'launched');
-      expect(await platformManifest.readAsString(), manifestBefore);
-      final host = Directory(
-        '${Directory.current.path}/${report['artifacts']['host_project']}',
-      );
-      addTearDown(() => host.delete(recursive: true));
-      final hostManifest = jsonDecode(
-        await File('${host.path}/pubspec.yaml').readAsString(),
-      ) as Map<String, dynamic>;
-      expect(hostManifest['dependencies']['theme_ocean']['path'], project.path);
-      expect(
-        hostManifest['dependencies'].keys,
-        unorderedEquals([
-          'flutter',
-          'dbus',
-          'greeter_ui',
-          'theme_sdk',
-          'theme_ocean',
-        ]),
-      );
-      final entrypoint = await File('${host.path}/lib/main.dart')
-          .readAsString();
-      expect(entrypoint, contains('themeBuilder: buildOceanTheme'));
-      expect(entrypoint, isNot(contains('FileSessionStore')));
-    },
-  );
+    final chmod = await Process.run('chmod', [
+      '+x',
+      flutter.path,
+      dart.path,
+      preview.path,
+    ]);
+    expect(chmod.exitCode, 0, reason: chmod.stderr);
+    final result = await _runTool(
+      ['preview', '--theme', project.path, '--format', 'json'],
+      environment: {
+        'MOZAIS_FLUTTER_BIN': flutter.path,
+        'MOZAIS_DART_BIN': dart.path,
+      },
+    );
+    expect(result.exitCode, 0, reason: result.stderr);
+    final report = jsonDecode(result.stdout) as Map<String, dynamic>;
+    final runDirectory = Directory(
+      '${Directory.current.path}/${report['artifacts']['run_directory']}',
+    );
+    addTearDown(() => runDirectory.delete(recursive: true));
+    expect(report['status'], 'passed');
+    expect(await launchMarker.readAsString(), 'launched');
+    expect(await platformManifest.readAsString(), manifestBefore);
+    final host = Directory(
+      '${Directory.current.path}/${report['artifacts']['host_project']}',
+    );
+    addTearDown(() => host.delete(recursive: true));
+    final hostManifest = jsonDecode(
+      await File('${host.path}/pubspec.yaml').readAsString(),
+    ) as Map<String, dynamic>;
+    expect(hostManifest['dependencies']['theme_ocean']['path'], project.path);
+    expect(
+      hostManifest['dependencies'].keys,
+      unorderedEquals([
+        'flutter',
+        'dbus',
+        'greeter_ui',
+        'theme_sdk',
+        'theme_ocean',
+      ]),
+    );
+    final entrypoint = await File('${host.path}/lib/main.dart').readAsString();
+    expect(entrypoint, contains('themeBuilder: buildOceanTheme'));
+    expect(entrypoint, isNot(contains('FileSessionStore')));
+  });
 
   test(
     'json format writes only the machine-readable run report to stdout',

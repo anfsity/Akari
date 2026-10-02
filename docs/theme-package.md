@@ -43,10 +43,10 @@ fvm dart run tool/mozais.dart build
 fvm dart run tool/mozais.dart build --theme /path/to/my_theme --mode release
 
 # Build and launch a Linux preview with simulated login state.
-fvm dart run tool/mozais.dart build --theme themes/default --preview
+fvm dart run tool/mozais.dart preview --theme themes/default
 
 # Inspect the complete execution plan without generating files.
-fvm dart run tool/mozais.dart build --theme /path/to/my_theme --preview --dry-run
+fvm dart run tool/mozais.dart preview --theme /path/to/my_theme --dry-run
 ```
 
 The CLI resolves the selected theme's dependencies, generates its scene source,
@@ -55,11 +55,17 @@ project contains the shared greeter application source, Linux runner, and a
 manifest and entrypoint that directly import the selected theme's builder.
 The platform manifest is not modified during a theme build.
 
-Normal builds default to release mode with the real D-Bus backend. `--preview`
-defaults to debug mode with the demo backend and no session preference
-persistence. Preview launches the built executable and waits until its window
-closes; it does not invoke `flutter run` or provide hot reload. `--mode` can
-explicitly select debug, profile, or release. Preview currently supports Linux.
+`build` defaults to release mode and builds the frontend plus production Rust
+backend. `run --theme PATH` starts a complete greeter on a private D-Bus session
+with a Rust mock backend; `--backend real` selects production transport.
+`preview` runs with frontend demo state and no session preference persistence.
+
+`run` and `preview` use `flutter run`, default to debug, and reload source changes
+on save. Scene JSON edits trigger code generation before reload; a failed
+regeneration retains the running theme. `r` regenerates and reloads, `R` hot
+restarts, and `q` quits. `--mode profile|release` disables hot reload.
+Both commands currently support Linux. `--jobs COUNT` limits native compile/link
+jobs and, when building a backend, Cargo tasks.
 
 The JSON run report lists the generated host project, build directory, and
 Linux executable path. Child process output is recorded in the run logs.
@@ -83,3 +89,7 @@ An external theme build requires only the selected project.
 Host projects retain Flutter and native build caches between runs. Shared application
 source is linked into the host, and Linux runner files are synchronized only when
 they change. Run directories contain logs and reports rather than another build.
+
+Rust mock and production builds use separate stable target directories beneath
+`backend/target/mozais-mock/` and `backend/target/mozais-real/`. Commands sharing a
+theme serialize on a process lock; different themes can build independently.

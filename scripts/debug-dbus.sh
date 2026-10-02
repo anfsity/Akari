@@ -14,12 +14,17 @@ usage() {
     'Environment:' \
     '  MOZAIS_BACKEND_MODE=mock|real   Backend transport (default: mock).' \
     '  MOZAIS_START_BACKEND=0|1        Skip or start the backend (default: 1).' \
+    '  MOZAIS_BACKEND_BIN=PATH         Start an already-built backend.' \
     '  MOZAIS_LOG_DIR=PATH              Reuse an explicit log directory.'
 }
 
 if [[ "${1:-}" == -h || "${1:-}" == --help ]]; then
   usage
   exit 0
+fi
+
+if [[ "$#" -eq 0 ]]; then
+  exec "$script_dir/debug-ui.sh"
 fi
 
 inside_private_bus=0
@@ -44,8 +49,13 @@ fi
 
 log_dir="$(mozais_log_dir "$repo_root")"
 backend_pid=''
+command_pid=''
 
 cleanup() {
+  if [[ -n "$command_pid" ]] && kill -0 "$command_pid" >/dev/null 2>&1; then
+    kill "$command_pid" >/dev/null 2>&1 || true
+    wait "$command_pid" >/dev/null 2>&1 || true
+  fi
   if [[ -n "$backend_pid" ]] && kill -0 "$backend_pid" >/dev/null 2>&1; then
     kill "$backend_pid" >/dev/null 2>&1 || true
   fi
@@ -54,6 +64,8 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 start_backend="${MOZAIS_START_BACKEND:-1}"
 if [[ "$start_backend" != 0 && "$start_backend" != 1 ]]; then
@@ -73,7 +85,12 @@ if [[ "$start_backend" -eq 1 ]]; then
   esac
 
   mozais_require_command busctl
-  "$script_dir/run-backend.sh" "--$backend_mode" >"$log_dir/backend.log" 2>&1 &
+  if [[ -n "${MOZAIS_BACKEND_BIN:-}" ]]; then
+    mozais_require_file "$MOZAIS_BACKEND_BIN" 'built backend executable'
+    "$MOZAIS_BACKEND_BIN" >"$log_dir/backend.log" 2>&1 &
+  else
+    "$script_dir/run-backend.sh" "--$backend_mode" >"$log_dir/backend.log" 2>&1 &
+  fi
   backend_pid=$!
 
   backend_ready=0
@@ -100,10 +117,8 @@ if [[ "$start_backend" -eq 1 ]]; then
   fi
 fi
 
-if [[ "$#" -eq 0 ]]; then
-  set -- "$script_dir/debug-ui.sh"
-fi
-
 export MOZAIS_BUS_MODE=private
 export RUST_LOG="${RUST_LOG:-backend=info,warn}"
-"$@"
+"$@" <&0 &
+command_pid=$!
+wait "$command_pid"
