@@ -26,7 +26,10 @@ void main() {
 }
 ''');
 
-    expect(generated, contains('SceneDocument testSceneDocument'));
+    expect(
+      generated,
+      contains('SceneDocument get testSceneDocument => SceneDocument('),
+    );
     expect(generated, contains('referenceWidth: 2560'));
     expect(generated, contains('referenceHeight: 1440'));
     expect(generated, contains("componentId: 'primaryAction'"));
