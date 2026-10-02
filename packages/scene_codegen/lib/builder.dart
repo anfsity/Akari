@@ -28,7 +28,7 @@ String _generate(SceneDocument document) {
     ..writeln("import 'package:scene/scene.dart';")
     ..writeln()
     ..writeln(
-      'final SceneDocument ${_variableName(document.id)} = SceneDocument(',
+      'SceneDocument get ${_variableName(document.id)} => SceneDocument(',
     )
     ..writeln('  id: ${_dartString(document.id)},')
     ..writeln('  version: ${document.version},')
