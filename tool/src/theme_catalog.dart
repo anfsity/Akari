@@ -83,11 +83,6 @@ List<ThemePackage> findThemePackages(Directory repoRoot) {
       throw StateError('Duplicate theme name: ${theme.themeName}');
     }
   }
-  for (final requiredName in ['default', 'fallback']) {
-    if (!names.contains(requiredName)) {
-      throw StateError('The theme catalog requires theme_$requiredName.');
-    }
-  }
   return themes;
 }
 
