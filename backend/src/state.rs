@@ -301,9 +301,7 @@ impl AuthStateMachine {
             }
             // A rejected credential keeps the attempt alive: the backend
             // restarts the greetd session so the user can try again.
-            (SubmittingResponse, CredentialRejected { detail }) => {
-                (CreatingSession, Some(detail))
-            }
+            (SubmittingResponse, CredentialRejected { detail }) => (CreatingSession, Some(detail)),
 
             (Authenticated, StartSessionRequested) => (ResolvingSession, None),
             (ResolvingSession, SessionUnavailable { detail }) => (Authenticated, Some(detail)),
