@@ -7,6 +7,9 @@ Map<String, String> getBuildLinkPaths(ThemePackage theme) => {
   'backend_link': 'build/out/backend',
 };
 
+/// Publishes convenient paths only after both cached executables exist.
+/// Publication serializes across themes because they share the backend link.
+/// A same-named external project may not take over another theme's bundle link.
 Future<void> updateBuildLinks(
   Directory repoRoot,
   ThemePackage theme,
@@ -32,6 +35,8 @@ Future<void> updateBuildLinks(
       .open(mode: FileMode.append);
   try {
     await lock.lock(FileLock.blockingExclusive);
+    // Check every destination and artifact before changing any link, so a
+    // missing build or ownership conflict preserves the previous publication.
     for (final entry in paths.entries) {
       final linkPath = '${repoRoot.path}/${entry.value}';
       final type = await FileSystemEntity.type(linkPath, followLinks: false);

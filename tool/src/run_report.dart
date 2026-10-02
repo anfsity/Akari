@@ -52,6 +52,9 @@ void writeRunPlan({
   );
 }
 
+/// One argv-based process invocation. Dependencies refer to earlier step IDs:
+/// null follows the preceding step, while an empty list starts independently.
+/// Plans are ordered so every explicit prerequisite already exists in the runner.
 class RunStep {
   const RunStep({
     required this.id,
@@ -96,6 +99,8 @@ Future<int> runDevCommand({
   final stopwatch = Stopwatch()..start();
   final stepResults = <_StepResult>[];
 
+  // Independent branches can finish concurrently. Chain event writes so one
+  // event and its flush complete before the next appends to the shared log.
   var eventWrites = Future<void>.value();
   Future<void> recordEvent(String name, Map<String, Object?> fields) {
     eventWrites = eventWrites.then((_) async {
@@ -118,6 +123,8 @@ Future<int> runDevCommand({
   }
 
   final results = <String, Future<_StepResult?>>{};
+  // Construct futures in plan order, then wait for the whole graph. Awaiting
+  // each step here would accidentally serialize independent build branches.
   for (var index = 0; index < steps.length; index++) {
     final step = steps[index];
     final dependencies =
@@ -279,6 +286,8 @@ Future<_StepResult> _runStep({
   final originalEchoMode = terminal ? stdin.echoMode : null;
 
   try {
+    // A separate process group lets forwarded signals reach shell wrappers and
+    // their descendants, including Flutter/backend processes, not just setsid.
     final process = await Process.start(
       'setsid',
       step.command,
@@ -360,6 +369,8 @@ Future<void> _copyOutput(
   IOSink? mirror,
   _SecretRedactor redactor,
 ) async {
+  // Redact whole lines: a pipe chunk can split a secret across boundaries.
+  // Chunk-local replacement would leak fragments into both logs and mirrors.
   var pending = '';
   await for (final chunk in input.transform(utf8.decoder)) {
     pending += chunk;
@@ -415,6 +426,9 @@ Map<String, String> _resolveArtifactPaths(
 
 String _lastSegment(String path) => path.split(Platform.pathSeparator).last;
 
+/// Masks known sensitive environment values and common credential syntax in
+/// plans, reports, and captured output. This is a logging safeguard, not a
+/// reason for child commands to print arbitrary credentials or PAM payloads.
 class _SecretRedactor {
   _SecretRedactor(this._secretValues);
 
@@ -453,6 +467,8 @@ class _SecretRedactor {
         }
       }
     }
+    // Replace longer values first so a shorter overlapping secret does not
+    // destroy the match and leave the remaining suffix of a longer one exposed.
     final sortedSecrets = secretValues.toList()
       ..sort((left, right) => right.length.compareTo(left.length));
     return _SecretRedactor(sortedSecrets);
