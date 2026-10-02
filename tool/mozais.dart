@@ -14,7 +14,11 @@ Future<void> main(List<String> arguments) async {
       return;
     }
 
-    final definition = getCliCommand(arguments.first);
+    final commandWords = arguments
+        .takeWhile((argument) => !argument.startsWith('-'))
+        .toList();
+    final definition = getCliCommand(commandWords.join(' '));
+    final commandArguments = arguments.skip(commandWords.length).toList();
     final command = definition.name;
     final separator = arguments.indexOf('--');
     final cliArguments = separator < 0 ? arguments : arguments.take(separator);
@@ -27,7 +31,7 @@ Future<void> main(List<String> arguments) async {
 
     final repoRoot = _findRepoRoot();
     if (command == 'install' || command == 'completion') {
-      final values = getCliOptionValues(definition, arguments.skip(1).toList());
+      final values = getCliOptionValues(definition, commandArguments);
       final shell = values['--shell'] ?? 'zsh';
       if (command == 'completion') {
         stdout.write(getShellCompletion(shell));
@@ -48,14 +52,14 @@ Future<void> main(List<String> arguments) async {
       );
       return;
     }
-    final options = _parseOptions(definition, arguments.skip(1).toList());
+    final options = _parseOptions(definition, commandArguments);
     final selectedTheme =
         (options.themePath != null ||
             const {
               'build',
               'run',
               'preview',
-              'studio',
+              'run studio',
               'verify-perf',
               'trace-perf',
             }.contains(command))
@@ -65,7 +69,7 @@ Future<void> main(List<String> arguments) async {
             ),
           )
         : null;
-    final preview = command == 'preview' || command == 'studio';
+    final preview = command == 'preview' || command == 'run studio';
     final buildMode =
         options.buildMode ?? (command == 'build' ? 'release' : 'debug');
     final runDirectory = await _createRunDirectory(
@@ -149,13 +153,29 @@ Future<void> main(List<String> arguments) async {
 }
 
 void _writeUsage([CliCommand? command]) {
-  stdout.writeln('Usage: mozais ${command?.name ?? '<command>'} [options]');
+  final subcommands = command == null
+      ? const <CliCommand>[]
+      : getCliSubcommands(command.name);
+  stdout.writeln(
+    'Usage: mozais ${command?.name ?? '<command>'}${subcommands.isEmpty ? '' : ' [target]'} [options]',
+  );
+  if (command != null) stdout.writeln('\n${command.description}');
   if (command == null) {
     stdout.writeln('\nCommands:');
     for (final definition in cliCommands) {
       final names = definition.spellings.join(', ');
       stdout.writeln('  ${names.padRight(24)} ${definition.description}');
     }
+  }
+  if (subcommands.isNotEmpty) {
+    stdout.writeln('\nTargets:');
+    for (final subcommand in subcommands) {
+      final target = subcommand.name.substring(command!.name.length + 1);
+      stdout.writeln('  ${target.padRight(24)} ${subcommand.description}');
+    }
+    stdout.writeln(
+      '\nUse mozais ${command!.name} <target> --help for target options.',
+    );
   }
   stdout.writeln('\nOptions:');
   final options = command == null ? cliOptions.values : getCliOptions(command);

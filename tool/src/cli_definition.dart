@@ -66,7 +66,7 @@ const cliOptions = {
   ),
   '--backend': CliOption(
     '--backend',
-    'Backend transport for run (default: mock).',
+    'Backend transport for the greeter (default: mock).',
     valueName: 'MODE',
     values: ['mock', 'real'],
   ),
@@ -113,7 +113,7 @@ const cliCommands = [
   ),
   CliCommand(
     'run',
-    'Run the greeter and backend on a private D-Bus session.',
+    'Run the greeter on a private D-Bus session (default), or a selected target.',
     options: ['--theme', '--jobs', '--mode', '--backend'],
   ),
   CliCommand(
@@ -122,8 +122,8 @@ const cliCommands = [
     options: ['--theme', '--jobs', '--mode'],
   ),
   CliCommand(
-    'studio',
-    'Edit theme scenes with a compiled preview and shadcn controls.',
+    'run studio',
+    'Edit theme scenes with a compiled preview and shadcn controls (debug, no backend).',
     options: ['--theme', '--jobs'],
   ),
   CliCommand(
@@ -168,6 +168,11 @@ CliCommand getCliCommand(String spelling) {
   }
   throw FormatException('Unknown command: $spelling');
 }
+
+List<CliCommand> getCliSubcommands(String parent) => [
+  for (final command in cliCommands)
+    if (command.name.startsWith('$parent ')) command,
+];
 
 List<CliOption> getCliOptions(CliCommand command) => [
   for (final name in command.options) cliOptions[name]!,

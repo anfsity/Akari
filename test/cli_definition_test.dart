@@ -23,6 +23,11 @@ void main() {
     expect(getCliCommand('perf').name, 'verify-perf');
     expect(getCliCommand('trace').name, 'trace-perf');
     expect(getCliCommand('perf').forwardsArguments, isTrue);
+    expect(getCliCommand('run studio').name, 'run studio');
+    expect(getCliSubcommands('run').map((command) => command.name), [
+      'run studio',
+    ]);
+    expect(() => getCliCommand('studio'), throwsFormatException);
   });
 
   test('mixed spellings still reject duplicates and missing values', () {
