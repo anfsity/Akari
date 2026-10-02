@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../tool/src/command_plans.dart';
 import '../tool/src/run_report.dart';
 import '../tool/src/theme_project.dart';
+import '../tool/src/theme_host.dart';
 
 void main() {
   late Directory tempRoot;
@@ -19,6 +20,71 @@ void main() {
       await tempRoot.delete(recursive: true);
     }
   });
+
+  test(
+    'host synchronization preserves caches and unchanged file timestamps',
+    () async {
+      final project = await _createThemeProject(tempRoot);
+      final theme = getThemePackage(project);
+      final repository = Directory('${tempRoot.path}/repo');
+      await Directory('${repository.path}/lib/app').create(recursive: true);
+      await File('${repository.path}/lib/app/app.dart').writeAsString('first');
+      await Directory('${repository.path}/linux/flutter')
+          .create(recursive: true);
+      final cmake = File('${repository.path}/linux/CMakeLists.txt');
+      await cmake.writeAsString('cmake');
+      await File('${repository.path}/pubspec.yaml').writeAsString(
+        'version: 1.0.0\nenvironment: {sdk: ^3.13.2}\ndependencies: {dbus: ^0.7.11}\n',
+      );
+      final host = Directory('${tempRoot.path}/host');
+      createThemeHost(
+        repoRoot: repository,
+        theme: theme,
+        output: host,
+        preview: true,
+      );
+      final manifest = File('${host.path}/pubspec.yaml');
+      final originalModified = DateTime.utc(2020);
+      await manifest.setLastModified(originalModified);
+      await Directory('${host.path}/linux/flutter/ephemeral').create();
+      await File('${host.path}/linux/flutter/ephemeral/cache')
+          .writeAsString('cached');
+      await Directory('${host.path}/build').create();
+      await File('${host.path}/build/cache').writeAsString('cached');
+      await File('${host.path}/linux/obsolete.cc').writeAsString('obsolete');
+      await File('${repository.path}/lib/app/app.dart').writeAsString('second');
+      createThemeHost(
+        repoRoot: repository,
+        theme: theme,
+        output: host,
+        preview: true,
+      );
+      expect((await manifest.lastModified()).toUtc(), originalModified);
+      expect(
+        await File('${host.path}/lib/app/app.dart').readAsString(),
+        'second',
+      );
+      expect(File('${host.path}/linux/obsolete.cc').existsSync(), isFalse);
+      expect(await File('${host.path}/build/cache').readAsString(), 'cached');
+      expect(
+        await File('${host.path}/linux/flutter/ephemeral/cache').readAsString(),
+        'cached',
+      );
+      expect(
+        getThemeHostDirectory(theme, preview: true),
+        getThemeHostDirectory(getThemePackage(project), preview: true),
+      );
+      final otherProject = await _createThemeProject(
+        Directory('${tempRoot.path}/other'),
+      );
+      expect(
+        getThemeHostDirectory(theme, preview: true),
+        isNot(
+          getThemeHostDirectory(getThemePackage(otherProject), preview: true),
+        ),
+      );
+    },
+  );
 
   test('discovers themes without required built-in names', () async {
     final themesDirectory = Directory('${tempRoot.path}/themes');
@@ -164,6 +230,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
       final host = Directory(
         '${Directory.current.path}/${report['artifacts']['host_project']}',
       );
+      addTearDown(() => host.delete(recursive: true));
       final hostManifest = jsonDecode(
         await File('${host.path}/pubspec.yaml').readAsString(),
       ) as Map<String, dynamic>;

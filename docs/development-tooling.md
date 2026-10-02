@@ -12,7 +12,7 @@ fvm dart run tool/mozais.dart trace-perf
 
 `build` accepts a theme project with `--theme PATH`, defaulting to
 `themes/default`. It resolves that project's dependencies, generates its scene
-source, and builds a separate host project in the run directory. The host imports
+source, and builds a reusable host project under `build/tool/hosts/`. The host imports
 only the selected theme. Projects can
 live outside the Mozais repository. See the
 [theme project contract](theme-package.md).
@@ -62,3 +62,7 @@ The performance gate runs three measurement cycles by default. Additional
 cycles can be requested with `--cycles COUNT`, where `COUNT` must be at least
 three. Each cycle writes its raw report into that run's artifact directory;
 the aggregate report remains at `build/perf/scene_report.json`.
+
+Host projects retain Flutter and native build caches between runs. Shared application
+source is linked into the host, and Linux runner files are synchronized only when
+they change. Run directories contain logs and reports rather than another build.
