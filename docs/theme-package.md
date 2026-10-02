@@ -76,7 +76,7 @@ this contract.
 
 ## Scene Editor
 
-Run `fvm dart run tool/mozais.dart studio --theme PATH` to open the project's
+Run `fvm dart run tool/mozais.dart run studio --theme PATH` to open the project's
 scene documents in [Theme Studio](theme-studio.md). The editor renders the
 compiled theme and saves validated JSON back to the project. Its shadcn UI
 dependency belongs only to the Studio host.
