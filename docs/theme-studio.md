@@ -5,15 +5,16 @@ controls use `shadcn_flutter`; the preview renders the selected theme's own
 components, tokens and assets through `SceneRuntime`.
 
 ```sh
-mozais studio --theme themes/default
+mozais run studio --theme themes/default
 # Without the installed launcher:
-fvm dart run tool/mozais.dart studio --theme themes/default
+fvm dart run tool/mozais.dart run studio --theme themes/default
 # External theme packages work the same way.
-fvm dart run tool/mozais.dart studio --theme /path/to/theme --jobs 2
+fvm dart run tool/mozais.dart run studio --theme /path/to/theme --jobs 2
 ```
 
-`studio` is a top-level command. If an existing shell does not complete it,
-refresh the installed scripts with `mozais install --shell zsh`, then run
+`studio` is a `run` target. `mozais run --help` lists it, and
+`mozais run studio --help` shows its options. If an existing shell does not
+complete it, refresh the installed scripts with `mozais install --shell zsh`, then run
 `. ~/.local/share/mozais/env.zsh` in that shell. For bash, use `--shell bash`
 and source `~/.local/share/mozais/env.bash` instead.
 

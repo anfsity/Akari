@@ -22,9 +22,10 @@ void main() {
   });
 
   test(
-    'studio plans a separate editor host without backend transport',
+    'run studio plans a separate editor host without backend transport',
     () async {
       final result = await _runTool([
+        'run',
         'studio',
         '-t',
         'themes/default',
@@ -34,6 +35,7 @@ void main() {
       ]);
       expect(result.exitCode, 0, reason: result.stderr);
       final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+      expect(plan['command'], 'run studio');
       final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
       expect(steps.map((step) => step['id']), isNot(contains('backend.build')));
       expect(
@@ -47,6 +49,41 @@ void main() {
       expect(steps.last['environment']['MOZAIS_BUILD_JOBS'], '2');
       expect(plan['artifacts']['host_project'], endsWith('/studio'));
       expect(plan['artifacts'], isNot(contains('backend_executable')));
+    },
+  );
+
+  test('help exposes the Studio run target and its scoped options', () async {
+    final help = await _runTool(['--help']);
+    expect(help.exitCode, 0);
+    expect(help.stdout, contains('run studio'));
+    final runHelp = await _runTool(['run', '--help']);
+    expect(runHelp.exitCode, 0);
+    expect(runHelp.stdout, contains('Usage: mozais run [target] [options]'));
+    expect(runHelp.stdout, contains('Targets:'));
+    expect(runHelp.stdout, contains('studio'));
+    expect(runHelp.stdout, contains('mozais run <target> --help'));
+    final studioHelp = await _runTool(['run', 'studio', '--help']);
+    expect(studioHelp.exitCode, 0);
+    expect(studioHelp.stdout, contains('Usage: mozais run studio [options]'));
+    expect(studioHelp.stdout, contains('debug, no backend'));
+    expect(studioHelp.stdout, contains('-t, --theme'));
+    expect(studioHelp.stdout, contains('-j, --jobs'));
+    expect(studioHelp.stdout, isNot(contains('--backend')));
+    expect(studioHelp.stdout, isNot(contains('--mode')));
+  });
+
+  test(
+    'run studio rejects greeter options and obsolete top-level invocation',
+    () async {
+      for (final arguments in [
+        ['run', 'studio', '--backend', 'mock', '--dry-run'],
+        ['run', 'studio', '--mode', 'release', '--dry-run'],
+        ['run', 'unknown', '--dry-run'],
+        ['studio', '--dry-run'],
+      ]) {
+        final result = await _runTool(arguments);
+        expect(result.exitCode, 2, reason: '$arguments: ${result.stderr}');
+      }
     },
   );
 

@@ -12,6 +12,7 @@ _mozais() {
     local -a commands=(
 ''');
   for (final command in cliCommands) {
+    if (command.name.contains(' ')) continue;
     for (final spelling in command.spellings) {
       script.writeln(
         '      ${encodeShellArgument('$spelling:${command.description}')}',
@@ -22,10 +23,44 @@ _mozais() {
     _describe 'command' commands
     return
   fi
+  local command="$words[2]" command_words=1''');
+  for (final parent in cliCommands) {
+    final subcommands = getCliSubcommands(parent.name);
+    if (subcommands.isEmpty) continue;
+    script.writeln(
+      '  if [[ "\$words[2]" == ${encodeShellArgument(parent.name)} ]]; then',
+    );
+    script.writeln(
+      r'''    if (( CURRENT == 3 )) && [[ "$words[CURRENT]" != -* ]]; then
+      local -a targets=(''',
+    );
+    for (final command in subcommands) {
+      final target = command.name.substring(parent.name.length + 1);
+      script.writeln(
+        '        ${encodeShellArgument('$target:${command.description}')}',
+      );
+    }
+    script.writeln(r'''      )
+      _describe 'run target' targets
+      return
+    fi
+  fi''');
+  }
+  script.writeln('  case "\$words[2] \$words[3]" in');
+  for (final command in cliCommands.where(
+    (command) => command.name.contains(' '),
+  )) {
+    script.writeln(
+      '    ${encodeShellArgument(command.name)}) command=${encodeShellArgument(command.name)}; command_words=2;;',
+    );
+  }
+  script.writeln(r'''  esac
   local -a options
-  case "$words[2]" in''');
+  case "$command" in''');
   for (final command in cliCommands) {
-    script.writeln('    ${command.spellings.join('|')})');
+    script.writeln(
+      '    ${command.spellings.map(encodeShellArgument).join('|')})',
+    );
     script.writeln('      options=(');
     for (final option in getCliOptions(command)) {
       final group = '(${option.spellings.join(' ')})';
@@ -54,9 +89,9 @@ _mozais() {
   }
   script.writeln(r'''    *) return 0;;
   esac
-  # Remove the subcommand before _arguments parses the command's options.
-  words=("$words[1]" "${words[@]:2}")
-  (( CURRENT-- ))
+  # Parse options after removing the command words, including a selected target.
+  words=("$words[1]" "${words[@]:$((command_words + 1))}")
+  (( CURRENT -= command_words ))
   _arguments -s "${options[@]}"
 }
 compdef _mozais mozais''');
@@ -72,12 +107,39 @@ String _getBashCompletion() {
   done
   if (( COMP_CWORD == 1 )); then
 ''');
-  final commands = [for (final command in cliCommands) ...command.spellings];
+  final commands = [
+    for (final command in cliCommands)
+      if (!command.name.contains(' ')) ...command.spellings,
+  ];
   script.writeln(
     '    mapfile -t COMPREPLY < <(compgen -W ${encodeShellArgument(commands.join(' '))} -- "\$cur")',
   );
   script.writeln(r'''    return 0
   fi
+  local command="${COMP_WORDS[1]}"''');
+  for (final parent in cliCommands) {
+    final subcommands = getCliSubcommands(parent.name);
+    if (subcommands.isEmpty) continue;
+    final targets = subcommands
+        .map((command) => command.name.substring(parent.name.length + 1))
+        .join(' ');
+    script.writeln(
+      '  if (( COMP_CWORD == 2 )) && [[ "\$command" == ${encodeShellArgument(parent.name)} && "\$cur" != -* ]]; then',
+    );
+    script.writeln(
+      '    mapfile -t COMPREPLY < <(compgen -W ${encodeShellArgument(targets)} -- "\$cur")',
+    );
+    script.writeln('    return 0\n  fi');
+  }
+  script.writeln(r'''  case "${COMP_WORDS[1]} ${COMP_WORDS[2]}" in''');
+  for (final command in cliCommands.where(
+    (command) => command.name.contains(' '),
+  )) {
+    script.writeln(
+      '    ${encodeShellArgument(command.name)}) command=${encodeShellArgument(command.name)};;',
+    );
+  }
+  script.writeln(r'''  esac
   local option="$prev" value="$cur" prefix='' candidate options
   if [[ "$cur" == -*=* ]]; then
     option="${cur%%=*}"
@@ -88,9 +150,11 @@ String _getBashCompletion() {
   elif [[ "$cur" == '=' ]]; then
     value=''
   fi
-  case "${COMP_WORDS[1]}" in''');
+  case "$command" in''');
   for (final command in cliCommands) {
-    script.writeln('    ${command.spellings.join('|')})');
+    script.writeln(
+      '    ${command.spellings.map(encodeShellArgument).join('|')})',
+    );
     final options = getCliOptions(command);
     script.writeln(
       '      options=${encodeShellArgument([for (final option in options) ...option.spellings].join(' '))}',

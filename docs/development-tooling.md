@@ -4,6 +4,7 @@ Run project checks through the Dart tool entry point:
 
 ```sh
 fvm dart run tool/mozais.dart build
+fvm dart run tool/mozais.dart run studio
 fvm dart run tool/mozais.dart verify
 fvm dart run tool/mozais.dart verify-perf
 fvm dart run tool/mozais.dart generate-scenes
@@ -64,9 +65,11 @@ the last working theme. `r` regenerates and reloads, `R` restarts, and `q` quits
 Profile/release sessions do not hot reload. Both commands accept `--jobs COUNT`.
 Production `build` defaults to release and compiles both frontend and Rust backend.
 
-Use `studio --theme PATH` to edit scene JSON with a shadcn inspector, compiled
+Use `run studio --theme PATH` to edit scene JSON with a shadcn inspector, compiled
 theme preview, node selection, undo/redo, and explicit saving. Studio runs in a
 separate debug host with simulated data. See [Theme Studio](theme-studio.md).
+`run --help` lists the Studio target; `run studio --help` lists its options.
+Studio always uses debug mode and accepts no `--mode` or `--backend` option.
 
 `verify` analyzes shared code, the backend, and every project discovered under
 `themes/`. With `--theme PATH`, it checks only the selected theme alongside shared
@@ -85,7 +88,8 @@ fvm flutter run -d linux --target tool/dev_main.dart
 
 Use the CLI for build, run, verification, scene generation, and performance
 workflows. After installing the launcher, use `mozais build`, `mozais run`,
-`mozais verify`, `mozais generate-scenes`, `mozais perf`, and `mozais trace`.
+`mozais run studio`, `mozais verify`, `mozais generate-scenes`, `mozais perf`,
+and `mozais trace`.
 Shell scripts handle toolchain setup and checks, standalone backend startup,
 and Linux session work such as private D-Bus and Sway. `scripts/debug-dbus.sh`
 accepts a command to run with the backend on a private bus; without a command,

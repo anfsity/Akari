@@ -38,8 +38,15 @@ printf '%s\\0' "\${COMPREPLY[@]}"
 
   test('bash completes commands, scoped options and enum values', () async {
     expect(await completeBashWords(['mozais', 'tr']), ['trace-perf', 'trace']);
-    expect(await completeBashWords(['mozais', 'st']), ['studio']);
-    final studioOptions = await completeBashWords(['mozais', 'studio', '']);
+    expect(await completeBashWords(['mozais', 'st']), isEmpty);
+    expect(await completeBashWords(['mozais', 'run', 'st']), ['studio']);
+    expect(await completeBashWords(['mozais', 'run', '']), ['studio']);
+    final studioOptions = await completeBashWords([
+      'mozais',
+      'run',
+      'studio',
+      '',
+    ]);
     expect(studioOptions, containsAll(['-t', '--theme', '-j', '--jobs']));
     expect(studioOptions, isNot(contains('--backend')));
     expect(studioOptions, isNot(contains('--mode')));
@@ -76,6 +83,10 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       '--theme=theme with spaces',
     ]);
     expect(
+      await completeBashWords(['mozais', 'run', 'studio', '--theme=theme']),
+      ['--theme=theme with spaces'],
+    );
+    expect(
       await completeBashWords(['mozais', 'verify', '--report', 'report']),
       ['report with spaces.json'],
     );
@@ -104,7 +115,12 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       'mozais perf -- --mode pr',
       'mozais build --mode=profile',
     ]);
-    expect(buffers[5].trimRight(), 'mozais studio');
+    expect(buffers[5].trimRight(), 'mozais run studio');
+    expect(buffers[6].trimRight(), 'mozais run studio --theme=');
+    expect(
+      buffers[7].trimRight(),
+      r'mozais run studio -t theme\ with\ spaces/',
+    );
     expect(buffers.last.trimRight(), r'mozais build -t theme\ with\ spaces/');
   });
 
@@ -145,7 +161,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect((plan['steps'] as List)[1]['working_directory'], project.path);
     final studio = await Process.run(
       '${prefix.path}/bin/mozais',
-      ['studio', '-t', 'relative theme', '--dry-run'],
+      ['run', 'studio', '-t', 'relative theme', '--dry-run'],
       workingDirectory: temp.path,
       environment: {
         'MOZAIS_DART_BIN':
@@ -155,7 +171,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(studio.exitCode, 0, reason: studio.stderr);
     final studioPlan =
         jsonDecode(studio.stdout as String) as Map<String, dynamic>;
-    expect(studioPlan['command'], 'studio');
+    expect(studioPlan['command'], 'run studio');
     expect((studioPlan['steps'] as List).last['id'], 'theme.studio');
     expect(studioPlan['artifacts']['host_project'], endsWith('/studio'));
     final activation = await Process.run('bash', [

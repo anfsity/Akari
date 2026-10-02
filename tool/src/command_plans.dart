@@ -24,8 +24,8 @@ List<RunStep> buildStepsFor(
     case 'build':
     case 'run':
     case 'preview':
-    case 'studio':
-      final studio = command == 'studio';
+    case 'run studio':
+      final studio = command == 'run studio';
       final demo = preview || studio;
       final live = command != 'build';
       final transport = command == 'run' ? backendMode : 'real';
@@ -103,7 +103,7 @@ List<RunStep> buildStepsFor(
           ),
         if (live)
           _step(
-            'theme.$command',
+            'theme.${studio ? 'studio' : command}',
             [
               if (!demo) ...[
                 'bash',
@@ -403,11 +403,11 @@ Map<String, String> artifactPathsFor(
       : getThemeHostDirectory(
           selectedTheme,
           preview: preview,
-          studio: command == 'studio',
+          studio: command == 'run studio',
         );
   return switch (command) {
-    'build' || 'run' || 'preview' || 'studio' => {
-      if (!preview && command != 'studio')
+    'build' || 'run' || 'preview' || 'run studio' => {
+      if (!preview && command != 'run studio')
         'backend_executable':
             'backend/target/mozais-$backendMode/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
       'host_project': hostDirectory!,
