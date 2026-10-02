@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../tool/src/command_plans.dart';
 import '../tool/src/run_report.dart';
+import '../tool/src/theme_catalog.dart';
 
 void main() {
   late Directory tempRoot;
@@ -17,6 +18,17 @@ void main() {
     if (tempRoot.existsSync()) {
       await tempRoot.delete(recursive: true);
     }
+  });
+
+  test('discovers themes without required built-in names', () async {
+    final themesDirectory = Directory('${tempRoot.path}/themes');
+    final project = await _createThemeProject(themesDirectory);
+
+    final themes = findThemePackages(tempRoot);
+
+    expect(themes, hasLength(1));
+    expect(themes.single.packageName, 'theme_ocean');
+    expect(themes.single.directory.path, project.path);
   });
 
   test('build plans use theme metadata outside the repository', () async {
