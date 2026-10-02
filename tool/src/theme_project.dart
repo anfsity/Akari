@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:yaml/yaml.dart';
@@ -108,3 +109,12 @@ String getThemeCacheKey(ThemePackage theme) {
 
 String getThemeHostDirectory(ThemePackage theme, {required bool preview}) =>
     'build/tool/hosts/${getThemeCacheKey(theme)}/${preview ? 'demo' : 'real'}';
+
+String getLinuxExecutablePath(String hostDirectory, String buildMode) {
+  final architecture = switch (Abi.current()) {
+    Abi.linuxX64 => 'x64',
+    Abi.linuxArm64 => 'arm64',
+    _ => throw UnsupportedError('Linux builds require an x64 or arm64 host.'),
+  };
+  return '$hostDirectory/build/linux/$architecture/$buildMode/bundle/greeter';
+}

@@ -241,6 +241,10 @@ Future<int> runDevCommand({
       'Run $status. Report: ${_relativePath(repoRoot, reportFile.path)}',
     );
     stderr.writeln('Logs: ${_relativePath(repoRoot, runDirectoryPath)}');
+    if (status == 'passed' && resolvedArtifacts.containsKey('bundle_link')) {
+      stderr.writeln('Frontend: ${resolvedArtifacts['bundle_link']}/greeter');
+      stderr.writeln('Backend: ${resolvedArtifacts['backend_link']}');
+    }
   }
   if (status == 'passed') return 0;
   if (performanceResultPath != null) {
