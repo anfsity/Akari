@@ -361,12 +361,41 @@ enum AuthCommand {
 #[derive(Default)]
 struct ActorState {
     auth: AuthStateMachine,
-    transport: Option<GreetdTransport>,
-    cancellation: Option<CancellationToken>,
-    caller: Option<String>,
-    caller_watcher: Option<CancellationToken>,
+    attempt: Option<AttemptResources>,
     power_busy: bool,
     shutdown: CancellationToken,
+}
+
+/// Caller and cancellation resources exist together throughout an active attempt.
+/// Transport is absent only while connecting or reconnecting after rejection.
+struct AttemptResources {
+    caller: String,
+    cancellation: CancellationToken,
+    caller_watcher: CancellationToken,
+    transport: Option<GreetdTransport>,
+}
+
+impl Drop for AttemptResources {
+    fn drop(&mut self) {
+        self.cancellation.cancel();
+        self.caller_watcher.cancel();
+    }
+}
+
+impl ActorState {
+    fn get_attempt(&self) -> &AttemptResources {
+        self.attempt
+            .as_ref()
+            .expect("active authentication owns attempt resources")
+    }
+    fn get_transport(&mut self) -> &mut GreetdTransport {
+        self.attempt
+            .as_mut()
+            .expect("active authentication owns attempt resources")
+            .transport
+            .as_mut()
+            .expect("connected authentication owns greetd transport")
+    }
 }
 
 async fn run_actor(
@@ -554,7 +583,11 @@ async fn handle_begin(
     if actor.power_busy {
         return Err(fdo::Error::Failed("power action is in progress".to_owned()));
     }
-    if actor.caller.as_deref().is_some_and(|owner| owner != caller) {
+    if actor
+        .attempt
+        .as_ref()
+        .is_some_and(|attempt| attempt.caller != caller)
+    {
         return Err(fdo::Error::AccessDenied(
             "authentication belongs to another D-Bus caller".to_owned(),
         ));
@@ -567,9 +600,12 @@ async fn handle_begin(
         .auth
         .begin_authentication(username.clone())
         .map_err(map_begin_error)?;
-    actor.cancellation = Some(cancellation.clone());
-    actor.caller = Some(caller.clone());
-    actor.caller_watcher = Some(watcher_token.clone());
+    actor.attempt = Some(AttemptResources {
+        caller: caller.clone(),
+        cancellation: cancellation.clone(),
+        caller_watcher: watcher_token.clone(),
+        transport: None,
+    });
     publish_state(&actor.auth, &attempt_id, snapshots);
     let _ = controls.send(Some(AttemptControl {
         caller: caller.clone(),
@@ -606,9 +642,16 @@ async fn handle_begin(
             );
         }
     };
-    actor.transport = Some(transport);
+    actor
+        .attempt
+        .as_mut()
+        .expect("active authentication owns attempt resources")
+        .transport = Some(transport);
 
-    let response = request_create_session(actor, &username, &cancellation).await;
+    let response = actor
+        .get_transport()
+        .create_session(&username, &cancellation)
+        .await;
     let response = match response {
         Ok(response) => response,
         Err(GreetdError::Cancelled) => {
@@ -622,7 +665,6 @@ async fn handle_begin(
             .await);
         }
         Err(error) => {
-            actor.transport.take();
             return Err(
                 fail_transaction(actor, &attempt_id, error, &emitter, snapshots, controls).await,
             );
@@ -650,29 +692,20 @@ async fn handle_respond(
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<()> {
-    validate_attempt(&actor.auth, attempt_id)?;
     require_state(&actor.auth, AuthState::WaitingForInput)?;
-    let cancellation = actor
-        .cancellation
-        .as_ref()
-        .ok_or_else(|| {
-            fdo::Error::Failed("authentication cancellation token is unavailable".to_owned())
-        })?
-        .clone();
-    if actor.transport.is_none() {
-        return Err(fdo::Error::Failed(
-            "greetd transport is unavailable".to_owned(),
-        ));
-    }
+    let cancellation = actor.get_attempt().cancellation.clone();
 
     actor
         .auth
         .transition(StateEvent::ResponseSubmitted)
-        .map_err(map_transition_error)?;
+        .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, attempt_id, snapshots);
     emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
 
-    let result = request_post_response(actor, Some(response.as_str()), &cancellation).await;
+    let result = actor
+        .get_transport()
+        .post_auth_message_response(Some(response.as_str()), &cancellation)
+        .await;
     drop(response);
     let next_response = match result {
         Ok(response) => response,
@@ -687,7 +720,6 @@ async fn handle_respond(
             .await);
         }
         Err(error) => {
-            actor.transport.take();
             return Err(
                 fail_transaction(actor, attempt_id, error, &emitter, snapshots, controls).await,
             );
@@ -704,7 +736,6 @@ async fn handle_respond(
         controls,
     )
     .await
-    .map(|_| ())
 }
 
 async fn resolve_session(
@@ -713,12 +744,11 @@ async fn resolve_session(
     emitter: &SignalEmitter<'static>,
     snapshots: &watch::Sender<AuthSnapshot>,
 ) -> fdo::Result<()> {
-    validate_attempt(&actor.auth, attempt_id)?;
     require_state(&actor.auth, AuthState::Authenticated)?;
     actor
         .auth
         .transition(StateEvent::StartSessionRequested)
-        .map_err(map_transition_error)?;
+        .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, attempt_id, snapshots);
     emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, attempt_id)).await;
     Ok(())
@@ -731,12 +761,11 @@ async fn session_unavailable(
     emitter: &SignalEmitter<'static>,
     snapshots: &watch::Sender<AuthSnapshot>,
 ) -> fdo::Result<()> {
-    validate_attempt(&actor.auth, attempt_id)?;
     require_state(&actor.auth, AuthState::ResolvingSession)?;
     actor
         .auth
         .transition(StateEvent::SessionUnavailable { detail })
-        .map_err(map_transition_error)?;
+        .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, attempt_id, snapshots);
     emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, attempt_id)).await;
     Ok(())
@@ -750,7 +779,6 @@ async fn session_resolution_failed(
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<()> {
-    validate_attempt(&actor.auth, attempt_id)?;
     require_state(&actor.auth, AuthState::ResolvingSession)?;
     let detail = display_detail(&detail);
     actor
@@ -758,7 +786,7 @@ async fn session_resolution_failed(
         .transition(StateEvent::ProtocolFailure {
             detail: detail.clone(),
         })
-        .map_err(map_transition_error)?;
+        .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, attempt_id, snapshots);
     emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, attempt_id)).await;
     detach_resources(actor, controls);
@@ -773,30 +801,21 @@ async fn handle_start_session(
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<()> {
-    validate_attempt(&actor.auth, attempt_id)?;
     require_state(&actor.auth, AuthState::ResolvingSession)?;
-    let cancellation = actor
-        .cancellation
-        .as_ref()
-        .ok_or_else(|| {
-            fdo::Error::Failed("authentication cancellation token is unavailable".to_owned())
-        })?
-        .clone();
-    if actor.transport.is_none() {
-        return Err(fdo::Error::Failed(
-            "greetd transport is unavailable".to_owned(),
-        ));
-    }
+    let cancellation = actor.get_attempt().cancellation.clone();
 
     actor
         .auth
         .transition(StateEvent::SessionResolved)
-        .map_err(map_transition_error)?;
+        .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, attempt_id, snapshots);
     emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
 
     let environment = session_environment(&session);
-    let response = request_start_session(actor, &session.exec, &environment, &cancellation).await;
+    let response = actor
+        .get_transport()
+        .start_session(&session.exec, &environment, &cancellation)
+        .await;
     let response = match response {
         Ok(response) => response,
         Err(GreetdError::Cancelled) => {
@@ -810,7 +829,6 @@ async fn handle_start_session(
             .await);
         }
         Err(error) => {
-            actor.transport.take();
             return Err(
                 fail_transaction(actor, attempt_id, error, &emitter, snapshots, controls).await,
             );
@@ -819,12 +837,10 @@ async fn handle_start_session(
 
     match response {
         GreetdResponse::Success => {
-            validate_attempt(&actor.auth, attempt_id)?;
-            require_state(&actor.auth, AuthState::StartingSession)?;
             actor
                 .auth
                 .transition(StateEvent::SessionStarted)
-                .map_err(map_transition_error)?;
+                .expect("authentication event matches the actor phase");
             publish_state(&actor.auth, attempt_id, snapshots);
             emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
             detach_resources(actor, controls);
@@ -840,26 +856,23 @@ async fn handle_start_session(
                 .transition(StateEvent::SessionStartFailed {
                     detail: detail.clone(),
                 })
-                .map_err(map_transition_error)?;
+                .expect("authentication event matches the actor phase");
             publish_state(&actor.auth, attempt_id, snapshots);
             emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
             detach_resources(actor, controls);
             Err(fdo::Error::Failed(detail))
         }
-        GreetdResponse::AuthMessage { .. } => {
-            actor.transport.take();
-            Err(fail_transaction(
-                actor,
-                attempt_id,
-                GreetdError::UnexpectedResponse(
-                    "greetd returned an authentication message while starting a session".to_owned(),
-                ),
-                &emitter,
-                snapshots,
-                controls,
-            )
-            .await)
-        }
+        GreetdResponse::AuthMessage { .. } => Err(fail_transaction(
+            actor,
+            attempt_id,
+            GreetdError::UnexpectedResponse(
+                "greetd returned an authentication message while starting a session".to_owned(),
+            ),
+            &emitter,
+            snapshots,
+            controls,
+        )
+        .await),
     }
 }
 
@@ -871,7 +884,7 @@ async fn consume_response(
     cancellation: &CancellationToken,
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
-) -> fdo::Result<AuthenticationOutcome> {
+) -> fdo::Result<()> {
     // One greetd response can require several follow-up frames: visible and
     // secret prompts wait for the UI, while informational messages are
     // acknowledged automatically and continue the same transaction.
@@ -888,14 +901,13 @@ async fn consume_response(
         }
         match response {
             GreetdResponse::Success => {
-                validate_attempt(&actor.auth, attempt_id)?;
                 actor
                     .auth
                     .transition(StateEvent::AuthenticationSucceeded)
-                    .map_err(map_transition_error)?;
+                    .expect("authentication event matches the actor phase");
                 publish_state(&actor.auth, attempt_id, snapshots);
                 emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
-                return Ok(AuthenticationOutcome::Authenticated);
+                return Ok(());
             }
             GreetdResponse::Error {
                 error_type,
@@ -910,22 +922,26 @@ async fn consume_response(
                     let username = actor
                         .auth
                         .active_username()
-                        .ok_or_else(|| {
-                            fdo::Error::Failed("authentication attempt is unavailable".to_owned())
-                        })?
+                        .expect("active authentication owns a username")
                         .to_owned();
                     actor
                         .auth
                         .transition(StateEvent::CredentialRejected {
                             detail: detail.clone(),
                         })
-                        .map_err(map_transition_error)?;
+                        .expect("authentication event matches the actor phase");
                     publish_state(&actor.auth, attempt_id, snapshots);
                     emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id))
                         .await;
                     emit_prompt_best_effort(&emitter, attempt_id, "error", detail).await;
 
-                    actor.transport.take();
+                    actor
+                        .attempt
+                        .as_mut()
+                        .expect("active authentication owns attempt resources")
+                        .transport
+                        .take();
+
                     let transport = match GreetdTransport::connect(cancellation).await {
                         Ok(transport) => transport,
                         Err(GreetdError::Cancelled) => {
@@ -945,8 +961,16 @@ async fn consume_response(
                             .await);
                         }
                     };
-                    actor.transport = Some(transport);
-                    response = match request_create_session(actor, &username, cancellation).await {
+                    actor
+                        .attempt
+                        .as_mut()
+                        .expect("active authentication owns attempt resources")
+                        .transport = Some(transport);
+                    response = match actor
+                        .get_transport()
+                        .create_session(&username, cancellation)
+                        .await
+                    {
                         Ok(response) => response,
                         Err(GreetdError::Cancelled) => {
                             return Err(finish_cancellation(
@@ -959,7 +983,6 @@ async fn consume_response(
                             .await);
                         }
                         Err(error) => {
-                            actor.transport.take();
                             return Err(fail_transaction(
                                 actor, attempt_id, error, &emitter, snapshots, controls,
                             )
@@ -974,7 +997,7 @@ async fn consume_response(
                     .transition(StateEvent::AuthenticationFailed {
                         detail: detail.clone(),
                     })
-                    .map_err(map_transition_error)?;
+                    .expect("authentication event matches the actor phase");
                 publish_state(&actor.auth, attempt_id, snapshots);
                 emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
                 detach_resources(actor, controls);
@@ -984,11 +1007,10 @@ async fn consume_response(
                 auth_message_type,
                 auth_message,
             } => {
-                validate_attempt(&actor.auth, attempt_id)?;
                 actor
                     .auth
                     .transition(StateEvent::AuthMessage)
-                    .map_err(map_transition_error)?;
+                    .expect("authentication event matches the actor phase");
                 publish_state(&actor.auth, attempt_id, snapshots);
                 emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
                 if cancellation.is_cancelled() {
@@ -1018,7 +1040,7 @@ async fn consume_response(
                         actor
                             .auth
                             .transition(StateEvent::PromptNeedsInput)
-                            .map_err(map_transition_error)?;
+                            .expect("authentication event matches the actor phase");
                         publish_state(&actor.auth, attempt_id, snapshots);
                         emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id))
                             .await;
@@ -1032,26 +1054,21 @@ async fn consume_response(
                             )
                             .await);
                         }
-                        return Ok(AuthenticationOutcome::WaitingForInput);
+                        return Ok(());
                     }
                     "info" | "error" => {
                         actor
                             .auth
                             .transition(StateEvent::PromptAutoResponse)
-                            .map_err(map_transition_error)?;
+                            .expect("authentication event matches the actor phase");
                         publish_state(&actor.auth, attempt_id, snapshots);
                         emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id))
                             .await;
-                        let cancellation = actor
-                            .cancellation
-                            .as_ref()
-                            .ok_or_else(|| {
-                                fdo::Error::Failed(
-                                    "authentication cancellation token is unavailable".to_owned(),
-                                )
-                            })?
-                            .clone();
-                        response = match request_post_response(actor, None, &cancellation).await {
+                        response = match actor
+                            .get_transport()
+                            .post_auth_message_response(None, cancellation)
+                            .await
+                        {
                             Ok(response) => response,
                             Err(GreetdError::Cancelled) => {
                                 return Err(finish_cancellation(
@@ -1064,7 +1081,6 @@ async fn consume_response(
                                 .await);
                             }
                             Err(error) => {
-                                actor.transport.take();
                                 return Err(fail_transaction(
                                     actor, attempt_id, error, &emitter, snapshots, controls,
                                 )
@@ -1073,7 +1089,6 @@ async fn consume_response(
                         };
                     }
                     _ => {
-                        actor.transport.take();
                         return Err(fail_transaction(
                             actor,
                             attempt_id,
@@ -1092,12 +1107,6 @@ async fn consume_response(
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum AuthenticationOutcome {
-    WaitingForInput,
-    Authenticated,
-}
-
 async fn cancel_current(
     actor: &mut ActorState,
     expected_attempt: Option<&str>,
@@ -1111,7 +1120,10 @@ async fn cancel_current(
     // cancellation commands are then harmless after cleanup completes.
     validate_cancel_target(&actor.auth, expected_attempt, allow_after_cleanup)?;
     if let Some(expected_caller) = expected_caller
-        && actor.caller.as_deref() != Some(expected_caller)
+        && actor
+            .attempt
+            .as_ref()
+            .is_none_or(|attempt| attempt.caller != expected_caller)
     {
         if allow_after_cleanup && actor.auth.state() == AuthState::Idle {
             return Ok(());
@@ -1120,30 +1132,31 @@ async fn cancel_current(
             "authentication belongs to another D-Bus caller".to_owned(),
         ));
     }
-    if !auth_in_progress(actor.auth.state()) || actor.auth.state() == AuthState::Cancelling {
+    if !actor.auth.state().is_active() {
         return Ok(());
     }
 
     let attempt_id = actor
         .auth
         .active_attempt_id()
-        .unwrap_or_default()
+        .expect("active authentication owns an attempt ID")
         .to_owned();
     actor
         .auth
         .transition(StateEvent::CancelRequested)
-        .map_err(map_transition_error)?;
+        .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, &attempt_id, snapshots);
     if let Some(emitter) = emitter.as_ref() {
         emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, &attempt_id)).await;
     }
-    if let Some(token) = actor.cancellation.as_ref() {
-        token.cancel();
-    }
-    if let Some(token) = actor.caller_watcher.as_ref() {
-        token.cancel();
-    }
-    let cancel_result = if let Some(mut transport) = actor.transport.take() {
+    let mut resources = actor
+        .attempt
+        .take()
+        .expect("active authentication owns attempt resources");
+    resources.cancellation.cancel();
+    resources.caller_watcher.cancel();
+    let _ = controls.send(None);
+    let cancel_result = if let Some(mut transport) = resources.transport.take() {
         match timeout(
             CANCEL_TIMEOUT,
             transport.cancel_session(&CancellationToken::new()),
@@ -1156,21 +1169,12 @@ async fn cancel_current(
     } else {
         Ok(GreetdResponse::Success)
     };
-    actor.cancellation.take();
-    actor.caller_watcher.take();
-    actor.caller.take();
-    let _ = controls.send(None);
-
-    if actor.auth.state() == AuthState::Cancelling {
-        actor
-            .auth
-            .transition(StateEvent::CancellationFinished)
-            .map_err(map_transition_error)?;
-        publish_state(&actor.auth, &attempt_id, snapshots);
-        if let Some(emitter) = emitter.as_ref() {
-            emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, &attempt_id)).await;
-        }
-    }
+    actor
+        .auth
+        .transition(StateEvent::CancellationFinished)
+        .expect("cancellation completes from Cancelling");
+    publish_state(&actor.auth, &attempt_id, snapshots);
+    emit_state_best_effort(emitter.as_ref(), &snapshot(&actor.auth, &attempt_id)).await;
 
     match cancel_result {
         Ok(GreetdResponse::Success) => Ok(()),
@@ -1197,25 +1201,23 @@ async fn finish_cancellation(
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Error {
-    if actor.auth.is_current_attempt(attempt_id) && actor.auth.state().is_active() {
-        if let Err(error) = actor.auth.transition(StateEvent::CancelRequested) {
-            tracing::warn!(%error, "could not enter cancellation state after transport cancellation");
-        } else {
-            publish_state(&actor.auth, attempt_id, snapshots);
-            emit_state_best_effort(emitter, &snapshot(&actor.auth, attempt_id)).await;
-        }
-    }
-
+    assert!(
+        actor.auth.is_current_attempt(attempt_id),
+        "actor cancels its current attempt"
+    );
+    actor
+        .auth
+        .transition(StateEvent::CancelRequested)
+        .expect("transport cancellation occurs during active authentication");
+    publish_state(&actor.auth, attempt_id, snapshots);
+    emit_state_best_effort(emitter, &snapshot(&actor.auth, attempt_id)).await;
     detach_resources(actor, controls);
-
-    if actor.auth.state() == AuthState::Cancelling {
-        if let Err(error) = actor.auth.transition(StateEvent::CancellationFinished) {
-            tracing::warn!(%error, "could not finish cancellation after transport cancellation");
-        } else {
-            publish_state(&actor.auth, attempt_id, snapshots);
-            emit_state_best_effort(emitter, &snapshot(&actor.auth, attempt_id)).await;
-        }
-    }
+    actor
+        .auth
+        .transition(StateEvent::CancellationFinished)
+        .expect("cancellation completes from Cancelling");
+    publish_state(&actor.auth, attempt_id, snapshots);
+    emit_state_best_effort(emitter, &snapshot(&actor.auth, attempt_id)).await;
 
     cancelled_error()
 }
@@ -1228,79 +1230,26 @@ async fn fail_transaction(
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Error {
-    if matches!(error, GreetdError::Cancelled) {
-        return finish_cancellation(actor, attempt_id, Some(emitter), snapshots, controls).await;
-    }
     let detail = display_detail(&error.to_string());
-    if actor.auth.is_current_attempt(attempt_id) {
-        let _ = actor.auth.transition(StateEvent::ProtocolFailure {
+    assert!(
+        actor.auth.is_current_attempt(attempt_id),
+        "actor fails its current attempt"
+    );
+    actor
+        .auth
+        .transition(StateEvent::ProtocolFailure {
             detail: detail.clone(),
-        });
-        publish_state(&actor.auth, attempt_id, snapshots);
-        emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, attempt_id)).await;
-        detach_resources(actor, controls);
-    }
+        })
+        .expect("protocol failure occurs during active authentication");
+    publish_state(&actor.auth, attempt_id, snapshots);
+    emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, attempt_id)).await;
+    detach_resources(actor, controls);
     fdo::Error::Failed(detail)
 }
 
 fn detach_resources(actor: &mut ActorState, controls: &watch::Sender<Option<AttemptControl>>) {
-    // Dropping the transport closes the protocol session; cancelling both
-    // tokens also stops the caller watcher and any pending greetd operation.
-    actor.transport.take();
-    if let Some(token) = actor.cancellation.take() {
-        token.cancel();
-    }
-    if let Some(token) = actor.caller_watcher.take() {
-        token.cancel();
-    }
-    actor.caller.take();
+    actor.attempt.take();
     let _ = controls.send(None);
-}
-
-async fn request_create_session(
-    actor: &mut ActorState,
-    username: &str,
-    cancellation: &CancellationToken,
-) -> Result<GreetdResponse, GreetdError> {
-    actor
-        .transport
-        .as_mut()
-        .ok_or_else(|| {
-            GreetdError::UnexpectedResponse("greetd transport is unavailable".to_owned())
-        })?
-        .create_session(username, cancellation)
-        .await
-}
-
-async fn request_post_response(
-    actor: &mut ActorState,
-    response: Option<&str>,
-    cancellation: &CancellationToken,
-) -> Result<GreetdResponse, GreetdError> {
-    actor
-        .transport
-        .as_mut()
-        .ok_or_else(|| {
-            GreetdError::UnexpectedResponse("greetd transport is unavailable".to_owned())
-        })?
-        .post_auth_message_response(response, cancellation)
-        .await
-}
-
-async fn request_start_session(
-    actor: &mut ActorState,
-    command: &[String],
-    environment: &[String],
-    cancellation: &CancellationToken,
-) -> Result<GreetdResponse, GreetdError> {
-    actor
-        .transport
-        .as_mut()
-        .ok_or_else(|| {
-            GreetdError::UnexpectedResponse("greetd transport is unavailable".to_owned())
-        })?
-        .start_session(command, environment, cancellation)
-        .await
 }
 
 fn publish_state(
@@ -1419,7 +1368,7 @@ async fn emit_prompt_best_effort(
 
 fn validate_owned_attempt(actor: &ActorState, attempt_id: &str, caller: &str) -> fdo::Result<()> {
     validate_attempt(&actor.auth, attempt_id)?;
-    if actor.caller.as_deref() != Some(caller) {
+    if actor.get_attempt().caller != caller {
         return Err(fdo::Error::AccessDenied(
             "authentication belongs to another D-Bus caller".to_owned(),
         ));
@@ -1462,20 +1411,6 @@ fn require_state(auth: &AuthStateMachine, expected: AuthState) -> fdo::Result<()
     }
 }
 
-fn auth_in_progress(state: AuthState) -> bool {
-    matches!(
-        state,
-        AuthState::CreatingSession
-            | AuthState::PromptPending
-            | AuthState::WaitingForInput
-            | AuthState::SubmittingResponse
-            | AuthState::Authenticated
-            | AuthState::ResolvingSession
-            | AuthState::StartingSession
-            | AuthState::Cancelling
-    )
-}
-
 fn acquire_power(
     actor: &mut ActorState,
     release: mpsc::UnboundedSender<()>,
@@ -1484,7 +1419,7 @@ fn acquire_power(
         Err(fdo::Error::Failed(
             "power action is already in progress".to_owned(),
         ))
-    } else if auth_in_progress(actor.auth.state()) {
+    } else if actor.auth.state().is_active() {
         Err(fdo::Error::Failed(
             "power action rejected while authentication is active".to_owned(),
         ))
@@ -1532,10 +1467,6 @@ fn map_begin_error(error: BeginAuthenticationError) -> fdo::Error {
         BeginAuthenticationError::InvalidState(_)
         | BeginAuthenticationError::AttemptIdExhausted => fdo::Error::Failed(detail),
     }
-}
-
-fn map_transition_error(error: crate::state::StateTransitionError) -> fdo::Error {
-    fdo::Error::Failed(error.to_string())
 }
 
 #[cfg(test)]
@@ -1656,6 +1587,12 @@ mod tests {
     async fn cancel_after_cleanup_keeps_idle() {
         let mut actor = ActorState::default();
         let attempt_id = actor.auth.begin_authentication("alice".to_owned()).unwrap();
+        actor.attempt = Some(super::AttemptResources {
+            caller: ":1.1".to_owned(),
+            cancellation: tokio_util::sync::CancellationToken::new(),
+            caller_watcher: tokio_util::sync::CancellationToken::new(),
+            transport: None,
+        });
         let (snapshots, _) = watch::channel(AuthSnapshot::idle());
         let (controls, _) = watch::channel(None);
 
