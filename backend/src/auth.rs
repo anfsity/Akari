@@ -1,4 +1,10 @@
 //! Serialized owner of authentication state and the greetd transaction.
+//!
+//! Commands serialize protocol I/O with state changes, avoiding separate locks
+//! whose ordering could let a response mutate a replacement attempt. Watch
+//! channels expose snapshots and cancellation handles without sharing mutable
+//! transport ownership. Cancellation interrupts I/O outside the queue; cleanup
+//! and replies still run through the actor, even when that queue is full.
 
 use std::time::Duration;
 
@@ -260,6 +266,8 @@ where
 }
 
 /// Reservation held by a power action while it performs the system D-Bus call.
+/// Dropping it queues a release rather than awaiting actor work, so errors and
+/// cancellation of the logind call cannot leave the reservation permanently held.
 pub(super) struct PowerLease {
     release: mpsc::UnboundedSender<()>,
 }
@@ -467,6 +475,9 @@ async fn run_actor(
     controls: watch::Sender<Option<AttemptControl>>,
     shutdown: CancellationToken,
 ) {
+    // Only external handles keep the command channel alive. Disconnect watchers
+    // use weak senders so releasing the service can reach the final cleanup even
+    // if an attempt watcher is still waiting for a bus event.
     let mut actor = ActorState {
         shutdown: shutdown.clone(),
         ..ActorState::default()
@@ -1249,6 +1260,8 @@ async fn cancel_current(
     resources.caller_watcher.cancel();
     let _ = controls.send(None);
     let cancel_result = if let Some(mut transport) = resources.transport.take() {
+        // The attempt token is already cancelled. A fresh token permits a
+        // bounded graceful cancel exchange before the socket is dropped.
         match timeout(
             CANCEL_TIMEOUT,
             transport.cancel_session(&CancellationToken::new()),
@@ -1305,6 +1318,9 @@ async fn finish_cancellation(
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Error {
+    // Interrupted framing may leave unread response bytes or a partial request.
+    // Close this transport instead of sending another request over a socket
+    // whose next frame boundary is no longer known.
     assert!(
         actor.auth.is_current_attempt(attempt_id),
         "actor cancels its current attempt"
@@ -1406,6 +1422,8 @@ fn spawn_caller_watcher(
             .as_str()
             .try_into()
             .expect("D-Bus sender is a unique bus name");
+        // Subscribe before checking ownership: checking first would miss a
+        // caller that disconnects between the check and signal registration.
         if !proxy.name_has_owner(caller_name).await.unwrap_or(false) {
             cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await;
             return;
@@ -1504,6 +1522,9 @@ fn validate_cancel_target(
     expected_attempt: Option<&str>,
     allow_after_cleanup: bool,
 ) -> fdo::Result<()> {
+    // An explicit Cancel that already interrupted its owned token may arrive
+    // after I/O cleanup returned to Idle. Only that acknowledged interruption
+    // permits success here; a delayed watcher must still reject a stale target.
     if let Some(expected_attempt) = expected_attempt
         && !auth.is_current_attempt(expected_attempt)
     {

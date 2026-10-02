@@ -1,3 +1,7 @@
+//! Process lifetime for the D-Bus service and its authentication actor.
+//! A stopped actor cannot leave a live service answering stale snapshots;
+//! runtime observes task completion as well as signals, bus loss, and handoff.
+
 mod greetd;
 mod service;
 mod session_catalog;

@@ -271,6 +271,9 @@ fn unescape_desktop_value(value: &str) -> String {
 /// This implements the small command-line grammar needed for these desktop
 /// entries; field-code substitutions are rejected by the caller. Unclosed
 /// quotes and trailing escapes return `Err(())`.
+/// The result goes directly to greetd as argv, without a shell. Quotes group
+/// arguments; shell expansion, pipelines, and redirections are not interpreted
+/// by this tokenizer.
 fn tokenize_exec(value: &str) -> Result<Vec<String>, ()> {
     let mut tokens = Vec::new();
     let mut token = String::new();

@@ -69,6 +69,9 @@ impl GreeterService {
 
     async fn list_sessions(&self) -> fdo::Result<Vec<(String, String, Vec<String>)>> {
         let sessions = self.sessions.clone();
+        // Filesystem scans and executable checks are synchronous. Keep them
+        // off the async executor and outside the authentication actor so state
+        // queries and cancellation remain responsive during catalog work.
         let sessions = tokio::task::spawn_blocking(move || sessions.list())
             .await
             .map_err(|error| {
@@ -180,6 +183,9 @@ impl GreeterService {
         self.auth
             .start_session(caller, attempt_id, session, emitter)
             .await?;
+        // HandingOff can be signalled before this method reply. Shutdown must
+        // wait for zbus to dispatch the reply, otherwise a successful launch
+        // can look like a disconnected/failed call to the frontend.
         let (response, dispatched) = ResponseDispatchNotifier::new(());
         let handoff = Arc::clone(&self.handoff);
         tokio::spawn(async move {
@@ -198,6 +204,8 @@ impl GreeterService {
                 )));
             }
         };
+        // logind runs outside the actor, but the lease blocks new authentication
+        // until this call completes and releases on every return/error path.
         let _power_lease = self.auth.reserve_power().await?;
 
         let connection = zbus::Connection::system().await.map_err(|error| {
