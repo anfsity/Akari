@@ -55,7 +55,7 @@ live outside the Mozais repository. See the
 Use `run --theme PATH` to start a complete greeter on a private D-Bus session.
 It compiles and starts the Rust mock backend by default; `--backend real` selects
 production transport. The frontend always uses D-Bus. `run` directly owns the
-selected theme's Flutter session and never invokes `debug-ui.sh`.
+selected theme's Flutter session.
 
 Use `preview --theme PATH` to preview the theme with frontend demo state.
 Both commands default to debug mode and reload Dart and asset changes on save.
@@ -72,19 +72,20 @@ also runs a theme project's Flutter tests when it contains `*_test.dart` files u
 The root project contains shared application code and repository tests. The CLI
 generates the executable entrypoint for each selected theme. For repository
 debugging, `tool/dev_main.dart` explicitly injects the default theme;
-`scripts/debug-sway.sh` uses this entrypoint. `scripts/debug-ui.sh` delegates to
-`run` and accepts the same CLI options. To run it
-directly with demo login state after generating scenes:
+`scripts/debug-sway.sh` uses this entrypoint. To run it directly with demo login
+state after generating scenes:
 
 ```sh
 fvm flutter run -d linux --target tool/dev_main.dart
 ```
 
-The `scripts/build.sh`, `scripts/verify.sh`, `scripts/verify-perf.sh`,
-`scripts/generate-scenes.sh`,
-and `scripts/trace-perf-builds.sh` commands remain as shell entry points for
-existing workflows. They delegate to the Dart CLI. Shell scripts continue to
-own toolchain setup and Linux session work such as private D-Bus and Sway.
+Use the CLI for build, run, verification, scene generation, and performance
+workflows. After installing the launcher, use `mozais build`, `mozais run`,
+`mozais verify`, `mozais generate-scenes`, `mozais perf`, and `mozais trace`.
+Shell scripts handle toolchain setup and checks, standalone backend startup,
+and Linux session work such as private D-Bus and Sway. `scripts/debug-dbus.sh`
+accepts a command to run with the backend on a private bus; without a command,
+it invokes the CLI's `run` command directly.
 
 Use `--format json` for a machine-readable report on stdout. Every run also
 writes a report and event log beneath `build/tool/runs/<run-id>/`. Each command
