@@ -60,6 +60,60 @@ async fn auth_roundtrip() {
 }
 
 #[tokio::test]
+async fn other_callers_cannot_control_or_replace_an_attempt() {
+    let _guard = lock().lock().await;
+    let socket = socket_path();
+    let listener = UnixListener::bind(&socket).unwrap();
+    let server = tokio::spawn(fake_auth(listener));
+    let mut backend = start_backend(&socket);
+    let owner_connection = connect_backend().await;
+    let owner = make_proxy(&owner_connection).await;
+    let other_connection = zbus::Connection::session().await.unwrap();
+    let other = make_proxy(&other_connection).await;
+    let attempt: String = owner
+        .call("BeginAuthentication", &("alice",))
+        .await
+        .unwrap();
+
+    for result in [
+        other
+            .call::<_, _, ()>("Respond", &(attempt.clone(), "intruder"))
+            .await,
+        other.call::<_, _, ()>("Cancel", &(attempt.clone(),)).await,
+        other
+            .call::<_, _, ()>("StartSession", &(attempt.clone(), "wayland:test"))
+            .await,
+        other
+            .call::<_, _, String>("BeginAuthentication", &("bob",))
+            .await
+            .map(|_| ()),
+    ] {
+        assert!(
+            matches!(result, Err(zbus::Error::MethodError(ref name, _, _))
+            if name.as_str() == "org.freedesktop.DBus.Error.AccessDenied")
+        );
+    }
+    let state: (String, String) = owner.call("GetState", &()).await.unwrap();
+    assert_eq!(state.0, "WaitingForInput");
+    owner
+        .call::<_, _, ()>("Respond", &(attempt.clone(), "password"))
+        .await
+        .unwrap();
+    let result = other
+        .call::<_, _, ()>("StartSession", &(attempt, "wayland:test"))
+        .await;
+    assert!(
+        matches!(result, Err(zbus::Error::MethodError(ref name, _, _))
+        if name.as_str() == "org.freedesktop.DBus.Error.AccessDenied")
+    );
+    let state: (String, String) = owner.call("GetState", &()).await.unwrap();
+    assert_eq!(state.0, "Authenticated");
+    server.await.unwrap();
+    stop_backend(&mut backend);
+    let _ = std::fs::remove_file(socket);
+}
+
+#[tokio::test]
 async fn blank_username_is_rejected() {
     let _guard = lock().lock().await;
     let socket = socket_path();
