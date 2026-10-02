@@ -61,6 +61,17 @@ executable. SDK commands use the repository's configured Flutter SDK even when
 the selected theme project lives outside the repository. `MOZAIS_FLUTTER_BIN`
 and `MOZAIS_DART_BIN` can override those binaries.
 
+Successful Linux builds publish relative symlinks at `build/out/<theme-name>`
+(the entire frontend bundle) and `build/out/backend` (the production backend).
+For example, run `build/out/default/greeter` or `build/out/backend`.
+The report records `bundle_link` and `backend_link` and text output prints these
+short paths. Links update only after both builds succeed. They point into build
+caches, so rebuilding can change their contents and cleaning caches breaks them;
+they do not preserve a previous successful build. The backend link follows the
+latest successful build. A frontend link cannot be claimed by another project
+with the same theme name; remove that link explicitly to switch projects.
+The theme name `backend` is reserved for the backend output link.
+
 Run reports use schema version 1. They include the command, run status and
 timing, generated artifact paths, and an ordered list of command steps with
 their arguments, working directories, exit codes, timing, and log paths. The
