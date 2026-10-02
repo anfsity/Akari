@@ -65,6 +65,7 @@ try:
         "mozais run --backend re",
         "mozais perf -- --mode pr",
         "mozais build --mode=pr",
+        "mozais st",
         "mozais build -t theme",
     ]
     for index, probe in enumerate(probes):

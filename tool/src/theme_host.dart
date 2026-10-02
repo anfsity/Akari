@@ -14,12 +14,14 @@ void createThemeHost({
   required ThemePackage theme,
   required Directory output,
   required bool preview,
+  bool studio = false,
   Map<String, Object?> devDependencies = const {},
 }) {
   output.createSync(recursive: true);
   final lib = Directory('${output.path}/lib')..createSync(recursive: true);
-  final sources = Directory('${repoRoot.path}/lib')
-      .listSync(followLinks: false);
+  final sources = studio
+      ? const <FileSystemEntity>[]
+      : Directory('${repoRoot.path}/lib').listSync(followLinks: false);
   final names = {'main.dart'};
   for (final source in sources) {
     final name = source.uri.pathSegments.where((part) => part.isNotEmpty).last;
@@ -47,8 +49,12 @@ void createThemeHost({
     'environment': platform['environment'],
     'dependencies': {
       'flutter': {'sdk': 'flutter'},
-      'dbus': platform['dependencies']['dbus'],
-      'greeter_ui': {'path': '${repoRoot.path}/packages/greeter_ui'},
+      if (!studio) ...{
+        'dbus': platform['dependencies']['dbus'],
+        'greeter_ui': {'path': '${repoRoot.path}/packages/greeter_ui'},
+      },
+      if (studio)
+        'theme_studio': {'path': '${repoRoot.path}/packages/theme_studio'},
       'theme_sdk': {'path': '${repoRoot.path}/packages/theme_sdk'},
       theme.packageName: {'path': theme.directory.path},
     },
@@ -59,6 +65,23 @@ void createThemeHost({
     File('${output.path}/pubspec.yaml'),
     '${const JsonEncoder.withIndent('  ').convert(manifest)}\n',
   );
+
+  if (studio) {
+    final scenes = findThemeSceneFiles(theme.directory);
+    _writeIfChanged(File('${output.path}/lib/main.dart'), '''
+import 'package:flutter/widgets.dart';
+import 'package:theme_studio/theme_studio.dart';
+import 'package:${theme.packageName}/theme.dart' show ${theme.builderName};
+
+void main() {
+  runApp(ThemeStudioApp(
+    themeBuilder: ${theme.builderName},
+    scenePaths: [${scenes.map((file) => jsonEncode(file.path).replaceAll(r'$', r'\$')).join(', ')}],
+  ));
+}
+''');
+    return;
+  }
 
   _writeIfChanged(File('${output.path}/lib/main.dart'), '''
 import 'package:flutter/widgets.dart';

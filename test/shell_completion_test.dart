@@ -38,6 +38,11 @@ printf '%s\\0' "\${COMPREPLY[@]}"
 
   test('bash completes commands, scoped options and enum values', () async {
     expect(await completeBashWords(['mozais', 'tr']), ['trace-perf', 'trace']);
+    expect(await completeBashWords(['mozais', 'st']), ['studio']);
+    final studioOptions = await completeBashWords(['mozais', 'studio', '']);
+    expect(studioOptions, containsAll(['-t', '--theme', '-j', '--jobs']));
+    expect(studioOptions, isNot(contains('--backend')));
+    expect(studioOptions, isNot(contains('--mode')));
     final options = await completeBashWords(['mozais', 'verify', '']);
     expect(options, containsAll(['-t', '--theme', '--format']));
     expect(options, isNot(contains('--mode')));
@@ -99,6 +104,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       'mozais perf -- --mode pr',
       'mozais build --mode=profile',
     ]);
+    expect(buffers[5].trimRight(), 'mozais studio');
     expect(buffers.last.trimRight(), r'mozais build -t theme\ with\ spaces/');
   });
 
@@ -137,6 +143,21 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
     expect(plan['command'], 'build');
     expect((plan['steps'] as List)[1]['working_directory'], project.path);
+    final studio = await Process.run(
+      '${prefix.path}/bin/mozais',
+      ['studio', '-t', 'relative theme', '--dry-run'],
+      workingDirectory: temp.path,
+      environment: {
+        'MOZAIS_DART_BIN':
+            '${Directory.current.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
+      },
+    );
+    expect(studio.exitCode, 0, reason: studio.stderr);
+    final studioPlan =
+        jsonDecode(studio.stdout as String) as Map<String, dynamic>;
+    expect(studioPlan['command'], 'studio');
+    expect((studioPlan['steps'] as List).last['id'], 'theme.studio');
+    expect(studioPlan['artifacts']['host_project'], endsWith('/studio'));
     final activation = await Process.run('bash', [
       '--noprofile',
       '--norc',
