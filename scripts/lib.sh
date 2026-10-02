@@ -52,6 +52,10 @@ mozais_run_dev_cli() {
     exec "$dart_bin" "$repo_root/tool/mozais.dart" "$@"
   fi
 
+  if [[ -x "$repo_root/.fvm/flutter_sdk/bin/dart" ]]; then
+    exec "$repo_root/.fvm/flutter_sdk/bin/dart" "$repo_root/tool/mozais.dart" "$@"
+  fi
+
   cd -- "$repo_root"
   exec fvm dart run tool/mozais.dart "$@"
 }

@@ -5,6 +5,7 @@ class CliOption {
     this.short,
     this.valueName,
     this.values = const [],
+    this.directory = false,
   });
 
   final String name;
@@ -12,6 +13,7 @@ class CliOption {
   final String? short;
   final String? valueName;
   final List<String> values;
+  final bool directory;
 
   List<String> get spellings => [?short, name];
 }
@@ -40,6 +42,7 @@ const cliOptions = {
     'Select a theme project (default: themes/default).',
     short: '-t',
     valueName: 'PATH',
+    directory: true,
   ),
   '--jobs': CliOption(
     '--jobs',
@@ -81,6 +84,23 @@ const cliOptions = {
     'Print the execution plan without changing files.',
   ),
   '--help': CliOption('--help', 'Show help.', short: '-h'),
+  '--shell': CliOption(
+    '--shell',
+    'Shell for completion (install default: zsh).',
+    valueName: 'SHELL',
+    values: ['zsh', 'bash'],
+  ),
+  '--prefix': CliOption(
+    '--prefix',
+    'Installation prefix (default: ~/.local).',
+    valueName: 'PATH',
+    directory: true,
+  ),
+  '--rc': CliOption(
+    '--rc',
+    'Shell startup file for command and completion registration.',
+    valueName: 'PATH',
+  ),
 };
 
 const cliCommands = [
@@ -123,6 +143,16 @@ const cliCommands = [
     options: ['--theme'],
     forwardsArguments: true,
   ),
+  CliCommand(
+    'install',
+    'Install the mozais launcher and shell completion.',
+    options: ['--shell', '--prefix', '--rc'],
+  ),
+  CliCommand(
+    'completion',
+    'Print a shell completion script.',
+    options: ['--shell'],
+  ),
 ];
 
 CliCommand getCliCommand(String spelling) {
@@ -134,9 +164,11 @@ CliCommand getCliCommand(String spelling) {
 
 List<CliOption> getCliOptions(CliCommand command) => [
   for (final name in command.options) cliOptions[name]!,
-  cliOptions['--format']!,
-  cliOptions['--report']!,
-  cliOptions['--dry-run']!,
+  if (command.name != 'install' && command.name != 'completion') ...[
+    cliOptions['--format']!,
+    cliOptions['--report']!,
+    cliOptions['--dry-run']!,
+  ],
   cliOptions['--help']!,
 ];
 
