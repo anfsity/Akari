@@ -248,7 +248,10 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
       'width': node.rect.width,
       'height': node.rect.height,
     },
-    if (!node.transform.isIdentity) 'transform': _encodeTransform(node.transform),
+    if (!node.transform.isIdentity ||
+        node.transform.pivotX != 0.5 ||
+        node.transform.pivotY != 0.5)
+      'transform': _encodeTransform(node.transform),
     if (node.z != 0) 'z': node.z,
     if (node.renderOrder != 0) 'renderOrder': node.renderOrder,
     if (node.focusOrder != 0) 'focusOrder': node.focusOrder,

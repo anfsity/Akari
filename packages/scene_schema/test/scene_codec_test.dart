@@ -29,6 +29,20 @@ const _scene = '''
 ''';
 
 void main() {
+  test('preserves authored pivots before a transform is applied', () {
+    final document = decodeSceneDocument(_scene);
+    final updated = document.copyWith(
+      nodes: [
+        document.nodes.single.copyWith(
+          transform: const SceneTransform(pivotX: 0.2, pivotY: 0.8),
+        ),
+      ],
+    );
+    final restored = decodeSceneDocument(encodeSceneDocument(updated));
+    expect(restored.nodes.single.transform.pivotX, 0.2);
+    expect(restored.nodes.single.transform.pivotY, 0.8);
+  });
+
   test('decodes every field of a scene document', () {
     final document = decodeSceneDocument(_scene);
 
