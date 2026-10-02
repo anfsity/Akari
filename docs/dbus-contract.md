@@ -169,7 +169,7 @@ This discovery step identifies available session candidates; it does not guarant
 ##### `BeginAuthentication(String username) -> String attempt_id`
 * **Description**: Initiates a PAM authentication transaction for the specified `username`.
 * **Behavior**:
-  * Invalidates any existing active authentication attempts.
+  * Replaces an active attempt only when the same D-Bus unique sender owns it. Other callers receive `AccessDenied`.
   * Connects to the underlying `greetd` socket and transmits `create_session`.
   * Generates and returns a unique `attempt_id` (UUID v4 or monotonic token).
 
@@ -244,8 +244,9 @@ sequenceDiagram
 ```
 
 ### Protocol Invariants
-1. **Single Active Transaction**: The backend permits **exactly one** active `attempt_id` at a time. Executing `BeginAuthentication` while another attempt is active automatically cancels the previous attempt.
-2. **Stale Token Rejection**: Any `Respond()`, `Cancel()`, or `StartSession()` invocation carrying a mismatched or expired `attempt_id` is rejected immediately without forwarding commands to `greetd`.
+1. **Single Active Transaction**: The backend permits **exactly one** active `attempt_id` at a time. Executing `BeginAuthentication` while another attempt is active cancels it only for its original D-Bus unique sender; other callers receive `AccessDenied`.
+2. **Caller Ownership**: `Respond()`, `Cancel()`, and `StartSession()` require the original D-Bus unique sender. Attempt IDs identify transactions and are not authorization credentials. Disconnecting the owner cancels and releases its attempt.
+3. **Stale Token Rejection**: Any `Respond()`, `Cancel()`, or `StartSession()` invocation carrying a mismatched or expired `attempt_id` is rejected immediately without forwarding commands to `greetd`.
 
 ---
 

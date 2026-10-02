@@ -87,10 +87,7 @@ impl GreeterService {
                 "username must not be empty".to_owned(),
             ));
         }
-        let caller = header
-            .sender()
-            .map(ToString::to_string)
-            .ok_or_else(|| fdo::Error::Failed("D-Bus caller has no unique name".to_owned()))?;
+        let caller = get_caller(&header)?;
         self.auth
             .begin(caller, username, Self::owned_emitter(emitter))
             .await
@@ -98,12 +95,15 @@ impl GreeterService {
 
     async fn respond(
         &self,
+        #[zbus(header)] header: Header<'_>,
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         attempt_id: String,
         response: String,
     ) -> fdo::Result<()> {
+        let caller = get_caller(&header)?;
         self.auth
             .respond(
+                caller,
                 attempt_id,
                 zeroize::Zeroizing::new(response),
                 Self::owned_emitter(emitter),
@@ -113,23 +113,27 @@ impl GreeterService {
 
     async fn cancel(
         &self,
+        #[zbus(header)] header: Header<'_>,
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         attempt_id: String,
     ) -> fdo::Result<()> {
+        let caller = get_caller(&header)?;
         self.auth
-            .cancel(attempt_id, Self::owned_emitter(emitter))
+            .cancel(caller, attempt_id, Self::owned_emitter(emitter))
             .await
     }
 
     async fn start_session(
         &self,
+        #[zbus(header)] header: Header<'_>,
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         attempt_id: String,
         session_id: String,
     ) -> fdo::Result<()> {
+        let caller = get_caller(&header)?;
         let emitter = Self::owned_emitter(emitter);
         self.auth
-            .resolve_session(attempt_id.clone(), emitter.clone())
+            .resolve_session(caller.clone(), attempt_id.clone(), emitter.clone())
             .await?;
 
         let sessions = self.sessions.clone();
@@ -140,7 +144,7 @@ impl GreeterService {
             Err(error) => {
                 let detail = format!("session catalog task failed: {error}");
                 self.auth
-                    .session_resolution_failed(attempt_id, detail.clone(), emitter)
+                    .session_resolution_failed(caller, attempt_id, detail.clone(), emitter)
                     .await?;
                 return Err(fdo::Error::Failed(detail));
             }
@@ -150,14 +154,14 @@ impl GreeterService {
             Ok(None) => {
                 let detail = format!("session {session_id} is unavailable");
                 self.auth
-                    .session_unavailable(attempt_id, detail.clone(), emitter)
+                    .session_unavailable(caller, attempt_id, detail.clone(), emitter)
                     .await?;
                 return Err(fdo::Error::InvalidArgs(detail));
             }
             Err(error) => {
                 let detail = error.to_string();
                 self.auth
-                    .session_resolution_failed(attempt_id, detail.clone(), emitter)
+                    .session_resolution_failed(caller, attempt_id, detail.clone(), emitter)
                     .await?;
                 return Err(map_session_error(error));
             }
@@ -165,7 +169,9 @@ impl GreeterService {
 
         // The actor revalidates the attempt after the blocking catalog lookup,
         // so a stale lookup cannot start a session for a newer transaction.
-        self.auth.start_session(attempt_id, session, emitter).await
+        self.auth
+            .start_session(caller, attempt_id, session, emitter)
+            .await
     }
 
     async fn power_action(&self, action: String) -> fdo::Result<()> {
@@ -215,4 +221,11 @@ impl GreeterService {
 
 fn map_session_error(error: SessionCatalogError) -> fdo::Error {
     fdo::Error::Failed(error.to_string())
+}
+
+fn get_caller(header: &Header<'_>) -> fdo::Result<String> {
+    header
+        .sender()
+        .map(ToString::to_string)
+        .ok_or_else(|| fdo::Error::AccessDenied("D-Bus caller has no unique name".to_owned()))
 }
