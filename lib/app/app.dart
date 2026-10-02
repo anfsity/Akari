@@ -6,6 +6,9 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import '../infrastructure/dbus/greeter_dbus_gateway.dart';
 
+/// Application lifetime owner of the feature and selected compiled theme.
+/// The entrypoint injects the theme builder so preview and production use the
+/// same host without discovering or loading theme code at runtime.
 class MyApp extends StatefulWidget {
   const MyApp({
     required this.themeBuilder,
@@ -49,6 +52,8 @@ class _MyAppState extends State<MyApp> {
   Future<void> _loadThemeSeed() async {
     final theme = _theme;
     final seed = await theme.findBackgroundSeed();
+    // A hot reload can replace the theme while asset decoding is pending.
+    // Applying that old seed would overwrite the newly assembled theme.
     if (!mounted || !identical(theme, _theme) || seed == null) {
       return;
     }

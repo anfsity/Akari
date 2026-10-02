@@ -58,6 +58,11 @@ Set<ScenePredicate> activeScenePredicates({
   };
 }
 
+/// UI lifetime boundary between feature state and compiled theme components.
+///
+/// Owns focus, wake animation, and transient credential text because these are
+/// presentation concerns. The cached scene receives predicate notifications
+/// and local slot updates, avoiding a full scene rebuild for each backend event.
 class GreeterSceneAdapter extends StatefulWidget {
   const GreeterSceneAdapter({
     required this.feature,
@@ -304,6 +309,8 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       return false;
     }
     final codeUnit = character.codeUnitAt(0);
+    // Typeahead accepts printable ASCII only. Input methods and composed text
+    // belong to the native TextField once focused, not to this key-event buffer.
     if (codeUnit < 0x21 || codeUnit > 0x7e) {
       return false;
     }
@@ -339,6 +346,8 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
 
   void _respondToPrompt() {
     final response = _credentialController.text;
+    // Clear before asynchronous dispatch so a pending request or failure does
+    // not leave the submitted secret visible or available for a second submit.
     _credentialController.clear();
     _dispatch(RespondToPromptCommand(response));
   }
@@ -360,6 +369,8 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
           _flushTypeaheadAndFocus();
         }
       case ShowNoticeEffect(:final message, :final isError):
+        // Slot listeners may emit effects during a widget update. Defer the
+        // messenger mutation until build completes, then recheck its owner.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || !identical(widget.feature, source)) {
             return;
