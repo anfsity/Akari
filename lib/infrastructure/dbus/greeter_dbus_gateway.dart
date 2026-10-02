@@ -69,6 +69,8 @@ class DBusGreeterGateway implements GreeterGateway {
       replySignature: DBusSignature('a(ssas)'),
     );
     return response.returnValues.single.asArray().map((value) {
+      // DesktopNames describe the backend's launch environment. The picker
+      // needs only identity and label; it never constructs a session command.
       final [id, name, ...] = value.asStruct();
       return (id: id.asString(), name: name.asString());
     }).toList();
@@ -121,6 +123,8 @@ class DBusGreeterGateway implements GreeterGateway {
     );
   }
 
+  // Reply signatures validate wire shape at this boundary. Normalize failures
+  // here so feature recovery and theme notices never depend on D-Bus types.
   Future<DBusMethodSuccessResponse> _call(
     String method, {
     Iterable<DBusValue> values = const [],
@@ -180,6 +184,8 @@ class DBusGreeterGateway implements GreeterGateway {
         ),
       );
     } on Object {
+      // Malformed protocol input leaves the conversation unusable. Report
+      // loss of service rather than guessing how to answer a prompt.
       _events.add(const BackendDisconnected());
     }
   }
@@ -248,6 +254,8 @@ class DBusGreeterGateway implements GreeterGateway {
   }
 
   String _getDisplayError(Object error) {
+    // Backend method messages are display-safe under the Greeter1 contract.
+    // Other exception strings may contain transport internals or payloads.
     if (error is DBusErrorException && error.message.isNotEmpty) {
       return error.message;
     }
