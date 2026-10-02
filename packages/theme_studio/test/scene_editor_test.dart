@@ -73,6 +73,99 @@ void main() {
     expect(editor.isDirty, isFalse);
   });
 
+  test(
+    'duplicate preserves node configuration and restores selection in history',
+    () {
+      editor.updateNode(
+        editor.selectedNode.copyWith(
+          z: 4,
+          renderOrder: 2,
+          focusOrder: 3,
+          motion: SceneMotionPreset.fade,
+          interactive: true,
+          visibleWhen: const ScenePredicateCondition(ScenePredicate.isDormant),
+        ),
+      );
+      final original = editor.selectedNode;
+      editor.duplicateSelectedNode();
+      expect(editor.selectedId, 'panel-copy');
+      expect(editor.document.nodes.map((node) => node.id), [
+        'panel',
+        'panel-copy',
+      ]);
+      expect(
+        encodeSceneDocument(
+          editor.document.copyWith(
+            nodes: [editor.selectedNode.copyWith(id: original.id)],
+          ),
+        ),
+        encodeSceneDocument(editor.document.copyWith(nodes: [original])),
+      );
+      editor.undo();
+      expect(editor.document.nodes, hasLength(1));
+      expect(editor.selectedId, 'panel');
+      editor.redo();
+      expect(editor.selectedId, 'panel-copy');
+      editor.save();
+      expect(decodeSceneDocument(file.readAsStringSync()).nodes, hasLength(2));
+      expect(editor.isDirty, isFalse);
+    },
+  );
+
+  test('duplicate allocates unique ids and new edits clear redo', () {
+    editor.duplicateSelectedNode();
+    editor.selectNode('panel');
+    editor.duplicateSelectedNode();
+    expect(editor.selectedId, 'panel-copy-2');
+    editor.selectNode('panel');
+    editor.duplicateSelectedNode();
+    expect(editor.selectedId, 'panel-copy-3');
+    editor.undo();
+    expect(editor.selectedId, 'panel');
+    editor.duplicateSelectedNode();
+    expect(editor.selectedId, 'panel-copy-3');
+    expect(editor.canRedo, isFalse);
+  });
+
+  test('delete selects a neighbor and undo restores the deleted node', () {
+    editor.duplicateSelectedNode();
+    editor.selectNode('panel');
+    editor.duplicateSelectedNode();
+    editor.deleteSelectedNode();
+    expect(editor.selectedId, 'panel-copy');
+    expect(editor.document.nodes.map((node) => node.id), [
+      'panel',
+      'panel-copy',
+    ]);
+    editor.undo();
+    expect(editor.selectedId, 'panel-copy-2');
+    expect(editor.document.nodes, hasLength(3));
+    editor.redo();
+    expect(editor.selectedId, 'panel-copy');
+    editor.deleteSelectedNode();
+    expect(editor.selectedId, 'panel');
+    expect(editor.canDeleteNode, isFalse);
+    expect(editor.isDirty, isFalse);
+    editor.undo();
+    expect(editor.selectedId, 'panel-copy');
+    editor.selectNode('panel');
+    editor.deleteSelectedNode();
+    expect(editor.selectedId, 'panel-copy');
+    editor.save();
+    expect(
+      decodeSceneDocument(file.readAsStringSync()).nodes.single.id,
+      'panel-copy',
+    );
+  });
+
+  test('the last node cannot be deleted and rejection adds no history', () {
+    expect(editor.canDeleteNode, isFalse);
+    expect(editor.deleteSelectedNode, throwsStateError);
+    expect(editor.selectedNode.id, 'panel');
+    expect(editor.canUndo, isFalse);
+    expect(editor.isDirty, isFalse);
+  });
+
   test('saving detects external edits and keeps unsaved work', () {
     editor.updateNode(editor.selectedNode.copyWith(z: 3));
     file.writeAsStringSync('external edit');
