@@ -17,8 +17,12 @@ const SESSION_COMMAND_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
 /// Errors encountered while reading a configured session directory.
 #[derive(Debug, Error)]
 pub enum SessionCatalogError {
-    #[error("could not read session directory")]
-    ReadDirectory(#[source] io::Error),
+    #[error("could not read session directory {path}")]
+    ReadDirectory {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
 }
 
 /// A validated desktop-session candidate and the command used to launch it.
@@ -99,14 +103,22 @@ impl SessionCatalog {
             let entries = match fs::read_dir(root) {
                 Ok(entries) => entries,
                 Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
-                Err(error) => return Err(SessionCatalogError::ReadDirectory(error)),
+                Err(source) => {
+                    return Err(SessionCatalogError::ReadDirectory {
+                        path: root.clone(),
+                        source,
+                    });
+                }
             };
 
             for entry in entries {
                 // One broken desktop file should not hide otherwise usable sessions.
                 let entry = match entry {
                     Ok(entry) => entry,
-                    Err(_) => continue,
+                    Err(error) => {
+                        tracing::warn!(path = %root.display(), %error, "could not read session directory entry");
+                        continue;
+                    }
                 };
                 let path = entry.path();
                 if path.extension().and_then(|extension| extension.to_str()) != Some("desktop") {
@@ -136,7 +148,13 @@ impl SessionCatalog {
 
 /// Parses and validates one desktop entry before it can reach the launch path.
 fn parse_session_file(path: &Path, session_type: SessionType) -> Option<SessionEntry> {
-    let contents = fs::read_to_string(path).ok()?;
+    let contents = match fs::read_to_string(path) {
+        Ok(contents) => contents,
+        Err(error) => {
+            tracing::warn!(path = %path.display(), %error, "could not read session desktop entry");
+            return None;
+        }
+    };
     let fields = parse_desktop_entry(&contents);
 
     if fields.get("Type").map(String::as_str) != Some("Application")
@@ -458,6 +476,19 @@ mod tests {
         assert!(!is_safe_env_value("name\nvalue"));
         assert!(!is_safe_env_value("name\0value"));
         assert!(!is_safe_env_value(""));
+    }
+
+    #[test]
+    fn directory_errors_retain_path_and_source() {
+        use std::error::Error;
+        let root = test_root();
+        let file = root.join("not-a-directory");
+        fs::write(&file, "file").unwrap();
+        let catalog = SessionCatalog::from_roots(file.clone(), root.clone());
+        let error = catalog.list().unwrap_err();
+        assert!(error.to_string().contains(file.to_str().unwrap()));
+        assert!(error.source().is_some());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
