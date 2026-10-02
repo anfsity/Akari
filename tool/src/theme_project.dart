@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:yaml/yaml.dart';
@@ -89,3 +90,21 @@ String _getBuilderName(String themeName) {
 String _join(String base, String relative) {
   return '$base${Platform.pathSeparator}${relative.replaceAll('/', Platform.pathSeparator)}';
 }
+
+// Encode the canonical path without hashing so same-named external themes
+// cannot share a host. Split long paths to stay below filesystem name limits.
+String getThemeCacheKey(ThemePackage theme) {
+  final encoded = base64Url
+      .encode(utf8.encode(theme.directory.path))
+      .replaceAll('=', '');
+  return [
+    for (var start = 0; start < encoded.length; start += 120)
+      encoded.substring(
+        start,
+        start + 120 < encoded.length ? start + 120 : encoded.length,
+      ),
+  ].join('/');
+}
+
+String getThemeHostDirectory(ThemePackage theme, {required bool preview}) =>
+    'build/tool/hosts/${getThemeCacheKey(theme)}/${preview ? 'demo' : 'real'}';

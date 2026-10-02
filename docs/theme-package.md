@@ -50,7 +50,7 @@ fvm dart run tool/mozais.dart build --theme /path/to/my_theme --preview --dry-ru
 ```
 
 The CLI resolves the selected theme's dependencies, generates its scene source,
-and creates a host project under `build/tool/runs/<run-id>/theme_host/`. That
+and creates a host project under `build/tool/hosts/<encoded-canonical-theme-path>/<demo-or-real>/`. That
 project contains the shared greeter application source, Linux runner, and a
 manifest and entrypoint that directly import the selected theme's builder.
 The platform manifest is not modified during a theme build.
@@ -79,3 +79,7 @@ The root project provides shared application code. Repository tests inject
 theme builders directly, and the debugging entrypoint `tool/dev_main.dart`
 selects the default theme explicitly. Performance fixtures also use that theme.
 An external theme build requires only the selected project.
+
+Host projects retain Flutter and native build caches between runs. Shared application
+source is linked into the host, and Linux runner files are synchronized only when
+they change. Run directories contain logs and reports rather than another build.
