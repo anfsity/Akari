@@ -71,6 +71,67 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets(
+    'drag uses canvas scale, stays in bounds and creates one undo step',
+    (tester) async {
+      await openStudio(tester);
+      final target = find.byKey(const ValueKey('preview-panel'));
+      final gesture = await tester.startGesture(tester.getCenter(target));
+      await gesture.moveBy(const Offset(40, 20));
+      await tester.pump();
+      await gesture.moveBy(const Offset(2000, 2000));
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+      final moved = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(moved.document.nodes.first.rect.x, closeTo(0.7, 0.00001));
+      expect(moved.document.nodes.first.rect.y, closeTo(0.6, 0.00001));
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<StudioPreview>(find.byType(StudioPreview))
+            .document
+            .nodes
+            .first
+            .rect
+            .x,
+        0.1,
+      );
+      expect(find.text('Saved'), findsOneWidget);
+      await tester.tap(find.text('Redo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      expect(
+        decodeSceneDocument(file.readAsStringSync()).nodes.first.rect.x,
+        closeTo(0.7, 0.00001),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('invalid inspector drafts block dragging', (tester) async {
+    await openStudio(tester);
+    await tester.enterText(find.byKey(const ValueKey('field-Width')), '2');
+    await tester.drag(
+      find.byKey(const ValueKey('preview-panel')),
+      const Offset(80, 40),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .nodes
+          .first
+          .rect
+          .x,
+      0.1,
+    );
+    expect(find.textContaining('non-normalized rect'), findsOneWidget);
+  });
+
   testWidgets('select, edit, undo, redo and save through shadcn controls', (
     tester,
   ) async {

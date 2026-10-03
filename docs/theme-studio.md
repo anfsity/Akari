@@ -45,7 +45,7 @@ to explicitly adopt changes made by another editor.
 Use **Duplicate node** in the layer panel to copy the selected node, including
 its layout, transforms, visibility, motion and properties. The copy is selected
 and receives a unique ID (`<id>-copy`, then `<id>-copy-2`, and so on). It starts
-at the same position; edit its layout in the inspector to move it.
+at the same position; edit its layout in the inspector or drag it on the canvas to move it.
 **Delete node** removes the selected node and selects a neighboring node in
 authoring order. A scene must retain at least one node, so deletion is disabled
 for the last node. Both actions apply valid inspector drafts first and stop on
@@ -56,7 +56,11 @@ reach disk only when explicitly saved.
 Preview renders at the scene's reference resolution and scales to fit the
 workspace. **State: Login / Dormant** switches between two simulated display
 states. Component interactions are intercepted for selection. Node hit testing
-uses the runtime's transforms and visibility rules. Animations are disabled in
+uses the runtime's transforms and visibility rules. Drag a visible node to move it within the canvas. A completed drag creates one
+undo entry; invalid inspector drafts block dragging until corrected. Movement
+follows canvas coordinates even when a node is rotated or scaled.
+
+Animations are disabled in
 the editing canvas so selection and property inspection remain stable.
 
 The codec used by code generation also validates edited documents. Saving
@@ -65,7 +69,7 @@ after a complete write. It refuses to save when the source changed externally,
 leaving both the external file and the editor's unsaved document available.
 
 New nodes can currently be created by duplication. Adding an arbitrary
-component, dragging or resizing on the canvas, editing visibility rules and
+component, resizing on the canvas, editing visibility rules and
 backgrounds, additional preview states, and unsaved-work recovery after closing
 the application are not implemented. Save explicitly before closing the window.
 Custom property names and values remain the responsibility of the compiled

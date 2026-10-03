@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
@@ -11,6 +12,8 @@ class StudioPreview extends StatefulWidget {
     required this.selectedId,
     required this.dormant,
     required this.onSelect,
+    required this.onStartDrag,
+    required this.onMove,
     super.key,
   });
 
@@ -19,12 +22,62 @@ class StudioPreview extends StatefulWidget {
   final String selectedId;
   final bool dormant;
   final ValueChanged<String> onSelect;
+  final SceneNode? Function(String id) onStartDrag;
+  final ValueChanged<SceneNode> onMove;
 
   @override
   State<StudioPreview> createState() => _StudioPreviewState();
 }
 
 class _StudioPreviewState extends State<StudioPreview> {
+  final _canvas = GlobalKey();
+  SceneNode? _dragSource;
+  SceneNode? _dragPreview;
+  Offset _dragStart = Offset.zero;
+
+  void _startDrag(String id, DragStartDetails details) {
+    final node = widget.onStartDrag(id);
+    if (node == null) return;
+    final canvas = _canvas.currentContext!.findRenderObject()! as RenderBox;
+    setState(() {
+      _dragSource = node;
+      _dragPreview = node;
+      _dragStart = canvas.globalToLocal(details.globalPosition);
+    });
+  }
+
+  void _updateDrag(DragUpdateDetails details) {
+    final node = _dragSource;
+    if (node == null) return;
+    // Convert through the canvas, not the transformed node: rotation, scale
+    // and fit-to-workspace must not change the direction or speed of a drag.
+    final canvas = _canvas.currentContext!.findRenderObject()! as RenderBox;
+    final delta = canvas.globalToLocal(details.globalPosition) - _dragStart;
+    setState(() {
+      _dragPreview = node.copyWith(
+        rect: node.rect.copyWith(
+          x: (node.rect.x + delta.dx / canvas.size.width).clamp(
+            0.0,
+            1.0 - node.rect.width,
+          ),
+          y: (node.rect.y + delta.dy / canvas.size.height).clamp(
+            0.0,
+            1.0 - node.rect.height,
+          ),
+        ),
+      );
+    });
+  }
+
+  void _stopDrag({required bool commit}) {
+    final node = _dragPreview;
+    setState(() {
+      _dragSource = null;
+      _dragPreview = null;
+    });
+    if (commit && node != null) widget.onMove(node);
+  }
+
   static const _user = UserSummary(id: 'alice', displayName: 'Alice');
   final _service = ValueNotifier<ServiceSlots>((
     mode: ServiceMode.ready,
@@ -81,7 +134,15 @@ class _StudioPreviewState extends State<StudioPreview> {
 
   @override
   Widget build(BuildContext context) {
-    final document = widget.document;
+    final dragged = _dragPreview;
+    final document = dragged == null
+        ? widget.document
+        : widget.document.copyWith(
+            nodes: [
+              for (final node in widget.document.nodes)
+                if (node.id == dragged.id) dragged else node,
+            ],
+          );
     final size = Size(
       document.canvas.referenceWidth.toDouble(),
       document.canvas.referenceHeight.toDouble(),
@@ -93,6 +154,7 @@ class _StudioPreviewState extends State<StudioPreview> {
       child: FittedBox(
         fit: BoxFit.contain,
         child: SizedBox.fromSize(
+          key: _canvas,
           size: size,
           // Material belongs to the theme preview alone; the editor's controls
           // use shadcn. This also provides localization for theme components.
@@ -119,6 +181,11 @@ class _StudioPreviewState extends State<StudioPreview> {
                     key: ValueKey('preview-${node.id}'),
                     behavior: HitTestBehavior.opaque,
                     onTap: () => widget.onSelect(node.id),
+                    dragStartBehavior: DragStartBehavior.down,
+                    onPanStart: (details) => _startDrag(node.id, details),
+                    onPanUpdate: _updateDrag,
+                    onPanEnd: (_) => _stopDrag(commit: true),
+                    onPanCancel: () => _stopDrag(commit: false),
                     child: DecoratedBox(
                       position: DecorationPosition.foreground,
                       decoration: BoxDecoration(
