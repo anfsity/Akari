@@ -1,0 +1,88 @@
+import 'dart:math' as math;
+
+import 'package:shadcn_flutter/shadcn_flutter.dart';
+
+/// Workspace layout owns panel sizing and scrolling. Its slots keep editor
+/// actions and panel contents out of the responsive layout tree.
+class StudioWorkspace extends StatelessWidget {
+  const StudioWorkspace({
+    required this.toolbar,
+    required this.sidebar,
+    required this.canvas,
+    required this.inspector,
+    required this.statusBar,
+    super.key,
+  });
+
+  final Widget toolbar;
+  final Widget sidebar;
+  final Widget canvas;
+  final Widget inspector;
+  final Widget statusBar;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    child: _WorkspaceViewport(
+      child: Column(
+        children: [
+          toolbar,
+          const Divider(),
+          Expanded(
+            child: _WorkspacePanels(
+              sidebar: sidebar,
+              canvas: canvas,
+              inspector: inspector,
+            ),
+          ),
+          const Divider(),
+          statusBar,
+        ],
+      ),
+    ),
+  );
+}
+
+class _WorkspaceViewport extends StatelessWidget {
+  const _WorkspaceViewport({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SizedBox(
+        width: math.max(1100, constraints.maxWidth),
+        height: constraints.maxHeight,
+        child: child,
+      ),
+    ),
+  );
+}
+
+class _WorkspacePanels extends StatelessWidget {
+  const _WorkspacePanels({
+    required this.sidebar,
+    required this.canvas,
+    required this.inspector,
+  });
+
+  final Widget sidebar;
+  final Widget canvas;
+  final Widget inspector;
+
+  @override
+  Widget build(BuildContext context) {
+    final border = Theme.of(context).colorScheme.border;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(width: 220, child: sidebar),
+        VerticalDivider(color: border),
+        Expanded(child: canvas),
+        VerticalDivider(color: border),
+        SizedBox(width: 300, child: inspector),
+      ],
+    );
+  }
+}

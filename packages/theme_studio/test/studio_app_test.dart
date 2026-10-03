@@ -169,6 +169,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('inspector drafts only rebuild controls that observe drafts', (
+    tester,
+  ) async {
+    await openStudio(tester);
+    final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+    await tester.enterText(find.byKey(const ValueKey('field-X')), '0.2');
+    await tester.pump();
+    expect(find.text('Unsaved changes'), findsOneWidget);
+    expect(
+      tester.widget<StudioPreview>(find.byType(StudioPreview)),
+      same(preview),
+    );
+    await tester.tap(find.text('Apply to preview'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .nodes
+          .first
+          .rect
+          .x,
+      0.2,
+    );
+  });
+
   testWidgets('settings validate, cancel, apply and undo scene changes', (
     tester,
   ) async {
