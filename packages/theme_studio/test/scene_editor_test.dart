@@ -114,6 +114,29 @@ void main() {
     expect(editor.isDirty, isFalse);
   });
 
+  test(
+    'draft parsing rejects non-finite numbers, invalid integers and properties',
+    () {
+      for (final value in ['NaN', 'Infinity', 'not a number']) {
+        editor.inspector.getField('X').text = value;
+        expect(editor.applyDraft(), isFalse);
+        expect(editor.inspector.error, 'X must be a finite number.');
+      }
+      editor.inspector.getField('X').text = '0.1';
+      editor.inspector.getField('Depth').text = '1.5';
+      expect(editor.applyDraft(), isFalse);
+      expect(editor.inspector.error, 'Depth must be an integer.');
+      editor.inspector.getField('Depth').text = '0';
+      for (final value in ['[]', '{"variant":42}', '{"variant":""}']) {
+        editor.inspector.getField('Properties').text = value;
+        expect(editor.applyDraft(), isFalse);
+        expect(editor.inspector.error, contains('non-empty strings'));
+      }
+      expect(editor.isDirty, isFalse);
+      expect(editor.canUndo, isFalse);
+    },
+  );
+
   test('invalid geometry leaves the working scene and history intact', () {
     expect(
       () => editor.updateNode(
