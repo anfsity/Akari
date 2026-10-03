@@ -44,6 +44,7 @@ void writeRunPlan({
             'environment': redactor.redactEnvironment(step.environment),
             'dependencies': step.dependencies,
             'interactive': step.interactive,
+            if (step.action != null) 'in_process': true,
             'stdout_log': _join(runDirectory, '${step.id}.stdout.log'),
             'stderr_log': _join(runDirectory, '${step.id}.stderr.log'),
           },
@@ -52,7 +53,10 @@ void writeRunPlan({
   );
 }
 
-/// One argv-based process invocation. Dependencies refer to earlier step IDs:
+/// One process invocation or silent internal action. For an internal action,
+/// command retains its standalone equivalent for plans and reports, avoiding
+/// another Dart VM startup while sharing error handling and dependency ordering.
+/// Dependencies refer to earlier step IDs:
 /// null follows the preceding step, while an empty list starts independently.
 /// Plans are ordered so every explicit prerequisite already exists in the runner.
 class RunStep {
@@ -63,6 +67,7 @@ class RunStep {
     required this.environment,
     this.dependencies,
     this.interactive = false,
+    this.action,
   });
 
   final String id;
@@ -71,6 +76,7 @@ class RunStep {
   final Map<String, String> environment;
   final List<String>? dependencies;
   final bool interactive;
+  final FutureOr<void> Function()? action;
 }
 
 Future<int> runDevCommand({
@@ -141,6 +147,7 @@ Future<int> runDevCommand({
         'step_id': step.id,
         'command': redactor.redactCommand(step.command),
         'working_directory': step.workingDirectory,
+        if (step.action != null) 'in_process': true,
       });
       if (format == RunOutputFormat.text) {
         stderr.writeln('==> ${index + 1}/${steps.length} ${step.id}');
@@ -286,44 +293,49 @@ Future<_StepResult> _runStep({
   final originalEchoMode = terminal ? stdin.echoMode : null;
 
   try {
-    // A separate process group lets forwarded signals reach shell wrappers and
-    // their descendants, including Flutter/backend processes, not just setsid.
-    final process = await Process.start(
-      'setsid',
-      step.command,
-      workingDirectory: _resolvePath(repoRoot, step.workingDirectory),
-      environment: step.environment.isEmpty
-          ? null
-          : {...Platform.environment, ...step.environment},
-    );
-    for (final signal in [ProcessSignal.sigint, ProcessSignal.sigterm]) {
-      signals.add(
-        signal.watch().listen((_) {
-          Process.killPid(-process.pid, signal);
-        }),
+    if (step.action case final action?) {
+      await action();
+      processExitCode = 0;
+    } else {
+      // A separate process group lets forwarded signals reach shell wrappers and
+      // their descendants, including Flutter/backend processes, not just setsid.
+      final process = await Process.start(
+        'setsid',
+        step.command,
+        workingDirectory: _resolvePath(repoRoot, step.workingDirectory),
+        environment: step.environment.isEmpty
+            ? null
+            : {...Platform.environment, ...step.environment},
       );
-    }
-    if (step.interactive) {
-      if (terminal) {
-        stdin.lineMode = false;
-        stdin.echoMode = false;
+      for (final signal in [ProcessSignal.sigint, ProcessSignal.sigterm]) {
+        signals.add(
+          signal.watch().listen((_) {
+            Process.killPid(-process.pid, signal);
+          }),
+        );
       }
-      input = stdin.listen(process.stdin.add, onDone: process.stdin.close);
+      if (step.interactive) {
+        if (terminal) {
+          stdin.lineMode = false;
+          stdin.echoMode = false;
+        }
+        input = stdin.listen(process.stdin.add, onDone: process.stdin.close);
+      }
+      final stdoutCopy = _copyOutput(
+        process.stdout,
+        stdoutLog,
+        format == RunOutputFormat.text ? stdout : null,
+        redactor,
+      );
+      final stderrCopy = _copyOutput(
+        process.stderr,
+        stderrLog,
+        format == RunOutputFormat.text ? stderr : null,
+        redactor,
+      );
+      processExitCode = await process.exitCode;
+      await Future.wait([stdoutCopy, stderrCopy]);
     }
-    final stdoutCopy = _copyOutput(
-      process.stdout,
-      stdoutLog,
-      format == RunOutputFormat.text ? stdout : null,
-      redactor,
-    );
-    final stderrCopy = _copyOutput(
-      process.stderr,
-      stderrLog,
-      format == RunOutputFormat.text ? stderr : null,
-      redactor,
-    );
-    processExitCode = await process.exitCode;
-    await Future.wait([stdoutCopy, stderrCopy]);
   } catch (error) {
     failure = error;
     stderrLog.writeln('Could not complete step: ${redactor.redact('$error')}');
@@ -360,6 +372,7 @@ Future<_StepResult> _runStep({
     stdoutLog: _join(runDirectory, '$logName.stdout.log'),
     stderrLog: _join(runDirectory, '$logName.stderr.log'),
     error: failure == null ? null : redactor.redact('$failure'),
+    inProcess: step.action != null,
   );
 }
 
@@ -529,6 +542,7 @@ class _StepResult {
     required this.stdoutLog,
     required this.stderrLog,
     required this.error,
+    required this.inProcess,
   });
 
   final String id;
@@ -542,10 +556,12 @@ class _StepResult {
   final String stdoutLog;
   final String stderrLog;
   final String? error;
+  final bool inProcess;
 
   Map<String, Object?> toJson() => {
     'id': id,
     'command': command,
+    if (inProcess) 'in_process': true,
     'working_directory': workingDirectory,
     'status': status,
     'exit_code': exitCode,

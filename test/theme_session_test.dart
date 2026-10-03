@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../tool/src/command_plans.dart';
+import '../tool/src/sdk_commands.dart';
 
 void main() {
   test(
@@ -74,6 +74,7 @@ exit 17
       final flutter = File('${temporary.path}/flutter');
       await flutter.writeAsString('''#!/usr/bin/env python3
 import json, pathlib, sys
+assert '--no-pub' in sys.argv
 print(json.dumps([{'event':'app.start', 'params':{'appId':'test'}}]), flush=True)
 print(json.dumps([{'event':'app.started', 'params':{'appId':'test'}}]), flush=True)
 for line in sys.stdin:

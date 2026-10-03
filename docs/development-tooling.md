@@ -151,6 +151,13 @@ logs and report. JSON console output remains a single CLI report.
 Host projects retain Flutter and native build caches between runs. Shared application
 source is linked into the host, and Linux runner files are synchronized only when
 they change. Run directories contain logs and reports rather than another build.
+Host synchronization and build-link publication run inside the CLI process to
+avoid extra Dart VM startups. Their plan/report entries retain the equivalent
+standalone command and include `in_process: true`; failures still produce step
+logs and stop dependent steps.
+After resolving host dependencies, builds and sessions pass `--no-pub` to
+Flutter to avoid repeating that check. The reload controller loads only SDK
+resolution and session code to reduce its startup work.
 
 Production builds also compile the Rust backend. Backend compilation runs alongside
 theme preparation. `build --jobs COUNT` limits Cargo tasks and native C++ compile/link

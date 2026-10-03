@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../tool/src/command_plans.dart';
 import '../tool/src/run_report.dart';
+import '../tool/src/sdk_commands.dart';
 import '../tool/src/theme_project.dart';
 import '../tool/src/theme_host.dart';
 
@@ -264,6 +265,11 @@ void main() {
         (step) => step.id == 'flutter.build_linux',
       );
       expect(flutter.environment['MOZAIS_BUILD_JOBS'], '4');
+      expect(flutter.command, contains('--no-pub'));
+      expect(
+        plan.singleWhere((step) => step.id == 'theme.host.pub_get').command,
+        containsAllInOrder(['pub', 'get']),
+      );
       expect(backend.dependencies, isEmpty);
       expect(
         plan.singleWhere((step) => step.id == 'theme.pub_get').dependencies,
@@ -271,6 +277,59 @@ void main() {
       );
     },
   );
+
+  test('internal actions wait for prerequisites and report failures without spawning', () async {
+    final prepared = File('${tempRoot.path}/prepared');
+    final status = await runDevCommand(
+      command: 'build',
+      format: RunOutputFormat.json,
+      reportPath: null,
+      repoRoot: tempRoot,
+      runDirectory: 'runs/internal',
+      steps: [
+        RunStep(
+          id: 'prepare',
+          command: ['unused-standalone-command'],
+          workingDirectory: '.',
+          environment: const {},
+          action: () async {
+            await prepared.writeAsString('ready');
+          },
+        ),
+        RunStep(
+          id: 'publish',
+          command: ['unused-standalone-command'],
+          workingDirectory: '.',
+          environment: const {},
+          action: () {
+            expect(prepared.readAsStringSync(), 'ready');
+            throw StateError('publication failed');
+          },
+        ),
+        RunStep(
+          id: 'must.not.run',
+          command: ['unused-standalone-command'],
+          workingDirectory: '.',
+          environment: const {},
+          action: () => fail('Dependent action ran after failure'),
+        ),
+      ],
+      artifactPaths: const {},
+    );
+    expect(status, 1);
+    final report = jsonDecode(
+      File('${tempRoot.path}/runs/internal/report.json').readAsStringSync(),
+    );
+    final steps = (report['steps'] as List).cast<Map<String, dynamic>>();
+    expect(steps.map((step) => step['id']), ['prepare', 'publish']);
+    expect(steps.every((step) => step['in_process'] == true), isTrue);
+    expect(steps.first['exit_code'], 0);
+    expect(steps.last['error'], contains('publication failed'));
+    expect(
+      File('${tempRoot.path}/${steps.last['stderr_log']}').readAsStringSync(),
+      contains('publication failed'),
+    );
+  });
 
   test(
     'independent steps overlap and dependents wait for both branches',
@@ -495,6 +554,9 @@ fi
 if [ "\$1" = run ] && [ "\$2" = build_runner ]; then
   exit 0
 fi
+if [ "\$1" = tool/theme_host.dart ]; then
+  exit 99
+fi
 exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
 ''');
     final chmod = await Process.run('chmod', [
@@ -518,6 +580,12 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
     );
     addTearDown(() => runDirectory.delete(recursive: true));
     expect(report['status'], 'passed');
+    expect(
+      (report['steps'] as List).singleWhere(
+        (step) => step['id'] == 'theme.host.generate',
+      )['in_process'],
+      isTrue,
+    );
     expect(await launchMarker.readAsString(), 'launched');
     expect(await platformManifest.readAsString(), manifestBefore);
     final host = Directory(
