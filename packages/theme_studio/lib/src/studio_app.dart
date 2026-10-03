@@ -171,7 +171,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         allowedExtensions: ['json'],
       );
       if (!mounted || file == null) return;
-      _switchScene(file.path!);
+      _switchScene(File.fromUri(file.uri).path);
     } on Object catch (error) {
       if (mounted) setState(() => _error = '$error');
     } finally {
@@ -184,7 +184,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     try {
       final picked = await FilePicker.pickFile(dialogTitle: 'Import asset');
       if (!mounted || picked == null) return;
-      final path = _assets.importFile(File(picked.path!));
+      final path = _assets.importFile(File.fromUri(picked.uri));
       setState(() {
         _assetPaths = _assets.getAssets();
         _error = null;
