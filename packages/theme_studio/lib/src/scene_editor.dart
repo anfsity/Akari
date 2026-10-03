@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:scene/scene.dart';
 
+import 'node_inspector_controller.dart';
+
 /// Owns one authoring session. Only validated documents enter history, and
 /// saving refuses to replace a file modified outside this session.
 class SceneEditor extends ChangeNotifier {
@@ -11,9 +13,11 @@ class SceneEditor extends ChangeNotifier {
     _document = decodeSceneDocument(_source);
     _savedDocument = encodeSceneDocument(_document);
     _selectedId = _document.nodes.first.id;
+    inspector = NodeInspectorController(selectedNode);
   }
 
   final File file;
+  late final NodeInspectorController inspector;
   late String _source;
   late String _savedDocument;
   late SceneDocument _document;
@@ -30,10 +34,26 @@ class SceneEditor extends ChangeNotifier {
   bool get canRedo => _redo.isNotEmpty;
   bool get canDeleteNode => _document.nodes.length > 1;
 
-  void selectNode(String id) {
+  bool applyDraft() {
+    if (!inspector.hasDraft) return true;
+    try {
+      updateNode(inspector.getUpdatedNode());
+      if (inspector.hasDraft) inspector.resetNode(selectedNode);
+      return true;
+    } on FormatException catch (error) {
+      inspector.showError(error.message);
+      return false;
+    }
+  }
+
+  bool selectNode(String id) {
+    if (!applyDraft()) return false;
     _document.nodes.firstWhere((node) => node.id == id);
+    if (_selectedId == id) return true;
     _selectedId = id;
+    inspector.resetNode(selectedNode);
     notifyListeners();
+    return true;
   }
 
   void updateNode(SceneNode node) {
@@ -45,6 +65,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void updateScene({SceneCanvas? canvas, SceneBackground? background}) {
+    if (!applyDraft()) return;
     _updateDocument(
       _document.copyWith(canvas: canvas, background: background),
       selectedId: _selectedId,
@@ -52,6 +73,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void duplicateSelectedNode() {
+    if (!applyDraft()) return;
     final node = selectedNode;
     final ids = _document.nodes.map((entry) => entry.id).toSet();
     var id = '${node.id}-copy';
@@ -65,6 +87,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void deleteSelectedNode() {
+    if (!applyDraft()) return;
     if (!canDeleteNode) {
       throw StateError('A scene must contain at least one node.');
     }
@@ -86,28 +109,32 @@ class SceneEditor extends ChangeNotifier {
     _redo.clear();
     _document = updated;
     _selectedId = selectedId;
+    inspector.resetNode(selectedNode);
     notifyListeners();
   }
 
   void undo() {
-    if (!canUndo) return;
+    if (!applyDraft() || !canUndo) return;
     _redo.add((document: _document, selectedId: _selectedId));
     final previous = _undo.removeLast();
     _document = previous.document;
     _selectedId = previous.selectedId;
+    inspector.resetNode(selectedNode);
     notifyListeners();
   }
 
   void redo() {
-    if (!canRedo) return;
+    if (!applyDraft() || !canRedo) return;
     _undo.add((document: _document, selectedId: _selectedId));
     final next = _redo.removeLast();
     _document = next.document;
     _selectedId = next.selectedId;
+    inspector.resetNode(selectedNode);
     notifyListeners();
   }
 
-  void save() {
+  bool save() {
+    if (!applyDraft()) return false;
     if (file.readAsStringSync() != _source) {
       throw const FileSystemException(
         'The scene changed on disk. Reload it before saving.',
@@ -128,6 +155,7 @@ class SceneEditor extends ChangeNotifier {
     _source = source;
     _savedDocument = encoded;
     notifyListeners();
+    return true;
   }
 
   void reload() {
@@ -141,6 +169,13 @@ class SceneEditor extends ChangeNotifier {
     }
     _undo.clear();
     _redo.clear();
+    inspector.resetNode(selectedNode);
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    inspector.dispose();
+    super.dispose();
   }
 }
