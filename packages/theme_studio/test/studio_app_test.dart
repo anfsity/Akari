@@ -238,6 +238,44 @@ void main() {
     },
   );
 
+  testWidgets(
+    'inspector keeps long names and errors within resizable sections',
+    (tester) async {
+      final longId = List.filled(30, 'long-node-name').join('-');
+      file.writeAsStringSync(
+        encodeSceneDocument(
+          _document.copyWith(
+            nodes: [_document.nodes.first.copyWith(id: longId)],
+          ),
+        ),
+      );
+      await openStudio(tester);
+      final inspector = tester
+          .widget<NodeInspector>(find.byType(NodeInspector))
+          .controller;
+      inspector.showError(List.filled(50, 'Invalid property value.').join(' '));
+      await tester.pumpAndSettle();
+      final actionPane = find.byWidgetPredicate(
+        (widget) =>
+            widget is ResizablePane &&
+            widget.key == const ValueKey('inspector-actions-pane'),
+      );
+      final scroll = find.descendant(
+        of: actionPane,
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Apply to preview'),
+        100,
+        scrollable: scroll,
+      );
+      await tester.tap(find.text('Apply to preview'));
+      await tester.pumpAndSettle();
+      expect(inspector.node.id, longId);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('preview dependencies survive edits and refresh on hot reload', (
     tester,
   ) async {
