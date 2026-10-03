@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import 'studio_preferences.dart';
+import 'studio_preview_host.dart';
 
 /// Renders the compiled theme at its authored resolution. Selection wraps each
 /// component inside SceneRuntime so hit testing follows its actual transform,
@@ -35,28 +36,32 @@ class StudioPreview extends StatefulWidget {
 
 class _StudioPreviewState extends State<StudioPreview> {
   final _canvas = GlobalKey();
-  SceneNode? _dragSource;
+  ({SceneNode source, RenderBox canvas, Offset start})? _drag;
   SceneNode? _dragPreview;
-  Offset _dragStart = Offset.zero;
 
   void _startDrag(String id, DragStartDetails details) {
     final node = widget.onStartDrag(id);
     if (node == null) return;
-    final canvas = _canvas.currentContext!.findRenderObject()! as RenderBox;
+    final canvas = _canvas.currentContext?.findRenderObject();
+    if (canvas is! RenderBox) return;
     setState(() {
-      _dragSource = node;
+      _drag = (
+        source: node,
+        canvas: canvas,
+        start: canvas.globalToLocal(details.globalPosition),
+      );
       _dragPreview = node;
-      _dragStart = canvas.globalToLocal(details.globalPosition);
     });
   }
 
   void _updateDrag(DragUpdateDetails details) {
-    final node = _dragSource;
-    if (node == null) return;
+    final drag = _drag;
+    if (drag == null) return;
+    final node = drag.source;
     // Convert through the canvas, not the transformed node: rotation, scale
     // and fit-to-workspace must not change the direction or speed of a drag.
-    final canvas = _canvas.currentContext!.findRenderObject()! as RenderBox;
-    final delta = canvas.globalToLocal(details.globalPosition) - _dragStart;
+    final canvas = drag.canvas;
+    final delta = canvas.globalToLocal(details.globalPosition) - drag.start;
     final grid = widget.preferences.gridSize;
     var x = node.rect.x * canvas.size.width + delta.dx;
     var y = node.rect.y * canvas.size.height + delta.dy;
@@ -76,54 +81,15 @@ class _StudioPreviewState extends State<StudioPreview> {
 
   void _stopDrag({required bool commit}) {
     final node = _dragPreview;
+    if (node == null) return;
     setState(() {
-      _dragSource = null;
+      _drag = null;
       _dragPreview = null;
     });
-    if (commit && node != null) widget.onMove(node);
+    if (commit) widget.onMove(node);
   }
 
-  static const _user = UserSummary(id: 'alice', displayName: 'Alice');
-  final _service = ValueNotifier<ServiceSlots>((
-    mode: ServiceMode.ready,
-    error: null,
-  ));
-  final _auth = ValueNotifier<AuthPromptSlots>((
-    mode: AuthMode.prompting,
-    selectedUser: _user,
-    prompt: (kind: PromptKind.secret, text: 'Password'),
-    error: null,
-    promptError: null,
-  ));
-  final _account = ValueNotifier(
-    AccountPickerSlots(users: [_user], selected: _user),
-  );
-  final _session = ValueNotifier(
-    SessionPickerSlots(
-      mode: CatalogMode.ready,
-      sessions: const [(id: 'wayland:sway', name: 'Sway')],
-      selected: (id: 'wayland:sway', name: 'Sway'),
-      error: null,
-    ),
-  );
-  final _power = ValueNotifier<PowerSlots>((mode: PowerMode.idle, error: null));
-  final _credential = TextEditingController();
-  final _focus = FocusNode();
-  late final _host = GreeterHost(
-    serviceSlots: _service,
-    authPromptSlots: _auth,
-    accountPickerSlots: _account,
-    sessionPickerSlots: _session,
-    powerSlots: _power,
-    credentialController: _credential,
-    credentialFocusNode: _focus,
-    onSelectUser: (_) {},
-    onSelectSession: (_) {},
-    onRequestPowerAction: (_) {},
-    onRetry: (_) {},
-    onRetrySessionCatalog: () {},
-    onRespondToPrompt: () {},
-  );
+  final _simulation = StudioPreviewHost();
 
   late GreeterThemeComponents _components;
 
@@ -143,103 +109,182 @@ class _StudioPreviewState extends State<StudioPreview> {
 
   void _updateComponents() {
     _components = widget.theme.components(
-      GreeterThemeContext(host: _host, tokens: widget.theme.tokens),
+      GreeterThemeContext(host: _simulation.host, tokens: widget.theme.tokens),
     );
   }
 
   @override
   void dispose() {
-    _service.dispose();
-    _auth.dispose();
-    _account.dispose();
-    _session.dispose();
-    _power.dispose();
-    _credential.dispose();
-    _focus.dispose();
+    _simulation.dispose();
     super.dispose();
+  }
+
+  SceneDocument _getPreviewDocument() {
+    final dragged = _dragPreview;
+    if (dragged == null) return widget.document;
+    return widget.document.copyWith(
+      nodes: [
+        for (final node in widget.document.nodes)
+          if (node.id == dragged.id) dragged else node,
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final dragged = _dragPreview;
-    final document = dragged == null
-        ? widget.document
-        : widget.document.copyWith(
-            nodes: [
-              for (final node in widget.document.nodes)
-                if (node.id == dragged.id) dragged else node,
-            ],
-          );
-    final size = Size(
+    final document = _getPreviewDocument();
+    final referenceSize = Size(
       document.canvas.referenceWidth.toDouble(),
       document.canvas.referenceHeight.toDouble(),
     );
-    return ClipRect(
-      child: FittedBox(
-        fit: BoxFit.contain,
-        child: SizedBox.fromSize(
-          key: _canvas,
-          size: size,
-          // Material belongs to the theme preview alone; the editor's controls
-          // use shadcn. This also provides localization for theme components.
-          child: CustomPaint(
-            foregroundPainter: widget.preferences.showGrid
-                ? _GridPainter(widget.preferences.gridSize)
-                : null,
-            child: MaterialApp(
-              debugShowCheckedModeBanner: false,
-              theme: widget.theme.materialTheme,
-              home: MediaQuery(
-                data: MediaQueryData(size: size, disableAnimations: true),
-                child: Scaffold(
-                  body: SceneRuntime(
-                    document: document,
-                    theme: widget.theme.bundle,
-                    backgroundBlurSigma: AlwaysStoppedAnimation(
-                      widget.dormant ? 0 : document.background.blurSigma,
-                    ),
-                    activePredicates: {
-                      ScenePredicate.isServiceReady,
-                      ScenePredicate.isAuthPrompting,
-                      ScenePredicate.hasSelectedUser,
-                      ScenePredicate.isSessionReady,
-                      if (widget.dormant) ScenePredicate.isDormant,
-                    },
-                    nodeBuilder: (context, node) => GestureDetector(
-                      key: ValueKey('preview-${node.id}'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => widget.onSelect(node.id),
-                      dragStartBehavior: DragStartBehavior.down,
-                      onPanStart: (details) => _startDrag(node.id, details),
-                      onPanUpdate: _updateDrag,
-                      onPanEnd: (_) => _stopDrag(commit: true),
-                      onPanCancel: () => _stopDrag(commit: false),
-                      child: DecoratedBox(
-                        position: DecorationPosition.foreground,
-                        decoration: BoxDecoration(
-                          border: node.id == widget.selectedId
-                              ? Border.all(
-                                  color: const Color(0xffa78bfa),
-                                  width: 3,
-                                )
-                              : null,
-                        ),
-                        child: ExcludeFocus(
-                          child: IgnorePointer(
-                            child: _components.build(context, node),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+    return _PreviewViewport(
+      canvasKey: _canvas,
+      size: referenceSize,
+      preferences: widget.preferences,
+      child: _PreviewScene(
+        theme: widget.theme,
+        document: document,
+        referenceSize: referenceSize,
+        dormant: widget.dormant,
+        nodeBuilder: _buildInteractiveNode,
       ),
     );
   }
+
+  Widget _buildInteractiveNode(BuildContext context, SceneNode node) =>
+      _PreviewNode(
+        nodeId: node.id,
+        selected: node.id == widget.selectedId,
+        onSelect: () => widget.onSelect(node.id),
+        onStartDrag: (details) => _startDrag(node.id, details),
+        onUpdateDrag: _updateDrag,
+        onStopDrag: (_) => _stopDrag(commit: true),
+        onCancelDrag: () => _stopDrag(commit: false),
+        child: _components.build(context, node),
+      );
+}
+
+class _PreviewViewport extends StatelessWidget {
+  const _PreviewViewport({
+    required this.canvasKey,
+    required this.size,
+    required this.preferences,
+    required this.child,
+  });
+
+  final Key canvasKey;
+  final Size size;
+  final StudioPreferences preferences;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ClipRect(
+    child: FittedBox(
+      fit: BoxFit.contain,
+      child: SizedBox.fromSize(
+        key: canvasKey,
+        size: size,
+        child: CustomPaint(
+          foregroundPainter: preferences.showGrid
+              ? _GridPainter(preferences.gridSize)
+              : null,
+          child: child,
+        ),
+      ),
+    ),
+  );
+}
+
+/// Material and localization belong to the compiled theme preview. Editor
+/// controls keep using shadcn; reduced motion keeps authoring hit tests stable.
+class _PreviewScene extends StatelessWidget {
+  const _PreviewScene({
+    required this.theme,
+    required this.document,
+    required this.referenceSize,
+    required this.dormant,
+    required this.nodeBuilder,
+  });
+
+  final ThemeDefinition theme;
+  final SceneDocument document;
+  final bool dormant;
+  final SceneNodeBuilder nodeBuilder;
+  final Size referenceSize;
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    theme: theme.materialTheme,
+    home: MediaQuery(
+      data: MediaQueryData(size: referenceSize, disableAnimations: true),
+      child: Scaffold(
+        body: SceneRuntime(
+          document: document,
+          theme: theme.bundle,
+          backgroundBlurSigma: AlwaysStoppedAnimation(
+            dormant ? 0 : document.background.blurSigma,
+          ),
+          activePredicates: {
+            ScenePredicate.isServiceReady,
+            ScenePredicate.isAuthPrompting,
+            ScenePredicate.hasSelectedUser,
+            ScenePredicate.isSessionReady,
+            if (dormant) ScenePredicate.isDormant,
+          },
+          nodeBuilder: nodeBuilder,
+        ),
+      ),
+    ),
+  );
+}
+
+class _PreviewNode extends StatelessWidget {
+  const _PreviewNode({
+    required this.nodeId,
+    required this.selected,
+    required this.onSelect,
+    required this.onStartDrag,
+    required this.onUpdateDrag,
+    required this.onStopDrag,
+    required this.onCancelDrag,
+    required this.child,
+  });
+
+  final String nodeId;
+  final bool selected;
+  final VoidCallback onSelect;
+  final GestureDragStartCallback onStartDrag;
+  final GestureDragUpdateCallback onUpdateDrag;
+  final GestureDragEndCallback onStopDrag;
+  final GestureDragCancelCallback onCancelDrag;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    // Flutter reports an accepted pan's pointer cancellation as onPanEnd.
+    // Clear the draft first so a cancelled pointer cannot commit a move.
+    onPointerCancel: (_) => onCancelDrag(),
+    child: GestureDetector(
+      key: ValueKey('preview-$nodeId'),
+      behavior: HitTestBehavior.opaque,
+      onTap: onSelect,
+      dragStartBehavior: DragStartBehavior.down,
+      onPanStart: onStartDrag,
+      onPanUpdate: onUpdateDrag,
+      onPanEnd: onStopDrag,
+      onPanCancel: onCancelDrag,
+      child: DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          border: selected
+              ? Border.all(color: const Color(0xffa78bfa), width: 3)
+              : null,
+        ),
+        child: ExcludeFocus(child: IgnorePointer(child: child)),
+      ),
+    ),
+  );
 }
 
 class _GridPainter extends CustomPainter {
