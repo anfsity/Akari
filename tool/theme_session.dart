@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'src/command_plans.dart';
+import 'src/sdk_commands.dart';
 
 Future<void> main(List<String> arguments) async {
   if (arguments.length != 4) {
@@ -39,6 +39,7 @@ Future<int> startThemeSession({
     '-d',
     'linux',
     '--$mode',
+    '--no-pub',
     '--machine',
     '--dart-define=MOZAIS_BACKEND=$backend',
   ], workingDirectory: host.path);
