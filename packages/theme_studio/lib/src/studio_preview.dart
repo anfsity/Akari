@@ -125,6 +125,28 @@ class _StudioPreviewState extends State<StudioPreview> {
     onRespondToPrompt: () {},
   );
 
+  late GreeterThemeComponents _components;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateComponents();
+  }
+
+  @override
+  void didUpdateWidget(StudioPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.theme, widget.theme)) {
+      _updateComponents();
+    }
+  }
+
+  void _updateComponents() {
+    _components = widget.theme.components(
+      GreeterThemeContext(host: _host, tokens: widget.theme.tokens),
+    );
+  }
+
   @override
   void dispose() {
     _service.dispose();
@@ -151,9 +173,6 @@ class _StudioPreviewState extends State<StudioPreview> {
     final size = Size(
       document.canvas.referenceWidth.toDouble(),
       document.canvas.referenceHeight.toDouble(),
-    );
-    final components = widget.theme.components(
-      GreeterThemeContext(host: _host, tokens: widget.theme.tokens),
     );
     return ClipRect(
       child: FittedBox(
@@ -207,7 +226,7 @@ class _StudioPreviewState extends State<StudioPreview> {
                         ),
                         child: ExcludeFocus(
                           child: IgnorePointer(
-                            child: components.build(context, node),
+                            child: _components.build(context, node),
                           ),
                         ),
                       ),
