@@ -88,6 +88,7 @@ class StudioEnumSelect<T extends Enum> extends StatelessWidget {
     required this.values,
     required this.onChanged,
     this.label,
+    this.formatValue,
     super.key,
   });
 
@@ -95,20 +96,24 @@ class StudioEnumSelect<T extends Enum> extends StatelessWidget {
   final Iterable<T> values;
   final ValueChanged<T> onChanged;
   final String? label;
+  final String Function(T)? formatValue;
+
+  String _getLabel(T value) => formatValue?.call(value) ?? value.name;
 
   @override
   Widget build(BuildContext context) => Select<T>(
+    theme: const SelectTheme(adaptiveOverlay: false),
     value: value,
     onChanged: (value) {
       if (value != null) onChanged(value);
     },
     itemBuilder: (context, value) =>
-        Text(label == null ? value.name : '$label: ${value.name}'),
+        Text(label == null ? _getLabel(value) : '$label: ${_getLabel(value)}'),
     popup: SelectPopup(
       items: SelectItemList(
         children: [
           for (final value in values)
-            SelectItemButton(value: value, child: Text(value.name)),
+            SelectItemButton(value: value, child: Text(_getLabel(value))),
         ],
       ),
     ).call,
