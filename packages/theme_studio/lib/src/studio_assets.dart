@@ -12,39 +12,61 @@ class StudioAssets {
   final String packageName;
 
   String importFile(File source) {
-    final name = source.uri.pathSegments.last;
+    final target = _getAvailableAssetFile(source.uri.pathSegments.last);
+    final relative = 'assets/${target.uri.pathSegments.last}';
+    final manifest = File('${directory.path}/pubspec.yaml');
+    final original = manifest.readAsStringSync();
+    final updated = _getRegisteredManifest(original, relative);
+    target.parent.createSync();
+    _writeImport(source, target, manifest, original, updated);
+    return 'packages/$packageName/$relative';
+  }
+
+  File _getAvailableAssetFile(String name) {
     if (name.contains('..')) {
       throw const FormatException('Asset names cannot contain "..".');
     }
-    final manifest = File('${directory.path}/pubspec.yaml');
-    final original = manifest.readAsStringSync();
+    final dot = name.lastIndexOf('.');
+    final stem = dot > 0 ? name.substring(0, dot) : name;
+    final extension = dot > 0 ? name.substring(dot) : '';
+    final assets = '${directory.path}/assets';
+    var target = File('$assets/$name');
+    var suffix = 2;
+    while (FileSystemEntity.typeSync(target.path) !=
+        FileSystemEntityType.notFound) {
+      target = File('$assets/$stem-${suffix++}$extension');
+    }
+    return target;
+  }
+
+  String _getRegisteredManifest(String original, String relative) {
     final yaml = YamlEditor(original);
     final root = yaml.parseAt([]).value as Map;
     final flutter = root['flutter'] as Map?;
     final entries = (flutter?['assets'] as List?) ?? [];
-    final assets = Directory('${directory.path}/assets')..createSync();
-    final dot = name.lastIndexOf('.');
-    final stem = dot > 0 ? name.substring(0, dot) : name;
-    final extension = dot > 0 ? name.substring(dot) : '';
-    var target = File('${assets.path}/$name');
-    var suffix = 2;
-    while (FileSystemEntity.typeSync(target.path) !=
-        FileSystemEntityType.notFound) {
-      target = File('${assets.path}/$stem-${suffix++}$extension');
+    if (entries.contains('assets/') || entries.contains(relative)) {
+      return original;
     }
-    final relative = 'assets/${target.uri.pathSegments.last}';
-    if (!entries.contains('assets/') && !entries.contains(relative)) {
-      if (flutter == null) {
-        yaml.update(
-          ['flutter'],
-          {
-            'assets': [relative],
-          },
-        );
-      } else {
-        yaml.update(['flutter', 'assets'], [...entries, relative]);
-      }
+    if (flutter == null) {
+      yaml.update(
+        ['flutter'],
+        {
+          'assets': [relative],
+        },
+      );
+    } else {
+      yaml.update(['flutter', 'assets'], [...entries, relative]);
     }
+    return yaml.toString();
+  }
+
+  void _writeImport(
+    File source,
+    File target,
+    File manifest,
+    String originalManifest,
+    String updatedManifest,
+  ) {
     // Stage both writes before exposing either destination. If manifest update
     // fails, remove our new asset rather than leave an unregistered import.
     final staging = directory.createTempSync('.studio-import-');
@@ -52,22 +74,23 @@ class StudioAssets {
     try {
       final stagedAsset = source.copySync('${staging.path}/asset');
       final stagedManifest = File('${staging.path}/pubspec.yaml')
-        ..writeAsStringSync(yaml.toString(), flush: true);
-      if (manifest.readAsStringSync() != original) {
+        ..writeAsStringSync(updatedManifest, flush: true);
+      if (manifest.readAsStringSync() != originalManifest) {
         throw const FileSystemException(
           'Theme manifest changed during import.',
         );
       }
       stagedAsset.renameSync(target.path);
       copied = true;
-      if (yaml.toString() != original) stagedManifest.renameSync(manifest.path);
+      if (updatedManifest != originalManifest) {
+        stagedManifest.renameSync(manifest.path);
+      }
     } on Object {
       if (copied) target.deleteSync();
       rethrow;
     } finally {
       staging.deleteSync(recursive: true);
     }
-    return 'packages/$packageName/$relative';
   }
 
   List<String> getAssets() {
