@@ -354,11 +354,21 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                                             child: Text('Unable to open scene'),
                                           )
                                         : StudioPreview(
+                                            key: ObjectKey(editor),
                                             theme: _theme,
                                             document: editor.document,
                                             selectedId: editor.selectedId,
                                             dormant: _dormant,
                                             onSelect: _selectNode,
+                                            onStartDrag: (id) {
+                                              if (!_inspector.currentState!
+                                                  .apply()) {
+                                                return null;
+                                              }
+                                              editor.selectNode(id);
+                                              return editor.selectedNode;
+                                            },
+                                            onMove: editor.updateNode,
                                           ),
                                   ),
                                 ),
@@ -367,7 +377,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                                   child: Text(
                                     editor == null
                                         ? 'Choose a valid scene document.'
-                                        : '${editor.document.canvas.referenceWidth} × ${editor.document.canvas.referenceHeight}  ·  Click a node to inspect  ·  Simulated data',
+                                        : '${editor.document.canvas.referenceWidth} × ${editor.document.canvas.referenceHeight}  ·  Drag nodes to move  ·  Simulated data',
                                     textAlign: TextAlign.center,
                                   ).small().muted(),
                                 ),
