@@ -877,6 +877,196 @@ void main() {
     expect(find.textContaining('non-normalized rect'), findsOneWidget);
   });
 
+  for (final (tool, fields) in [
+    (StudioCanvasTool.scale, ['Scale X', 'Scale Y']),
+    (StudioCanvasTool.rotate, ['Rotate Z']),
+    (StudioCanvasTool.rotate3d, ['Rotate X', 'Rotate Y']),
+  ]) {
+    testWidgets('${tool.label} drag previews, cancels, commits and saves', (
+      tester,
+    ) async {
+      await openStudio(tester);
+      await tester.tap(find.text(tool.label));
+      await tester.pumpAndSettle();
+      final inspector = tester
+          .widget<NodeInspector>(find.byType(NodeInspector))
+          .controller;
+      final original = encodeSceneDocument(_document);
+      final target = find.byKey(const ValueKey('preview-panel'));
+      final canvas = tester.getRect(find.byType(SceneRuntime));
+      var inspectorNotifications = 0;
+      inspector.addListener(() => inspectorNotifications++);
+      final gesture = await tester.startGesture(tester.getCenter(target));
+      await gesture.moveBy(const Offset(40, 20));
+      await tester.pump();
+      final first = double.parse(inspector.getField(fields.first).text);
+      await gesture.moveBy(const Offset(20, 10));
+      await tester.pump();
+      expect(double.parse(inspector.getField(fields.first).text), isNot(first));
+      expect(inspectorNotifications, 0);
+      expect(inspector.hasDraft, isFalse);
+      expect(find.text('Saved'), findsOneWidget);
+      expect(
+        encodeSceneDocument(
+          tester.widget<SceneRuntime>(find.byType(SceneRuntime)).document,
+        ),
+        isNot(original),
+      );
+      expect(
+        encodeSceneDocument(
+          tester.widget<StudioPreview>(find.byType(StudioPreview)).document,
+        ),
+        original,
+      );
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(
+        encodeSceneDocument(
+          tester.widget<SceneRuntime>(find.byType(SceneRuntime)).document,
+        ),
+        original,
+      );
+      for (final field in fields) {
+        expect(
+          inspector.getField(field).text,
+          tool == StudioCanvasTool.scale ? '1.0' : '0.0',
+        );
+      }
+      expect(find.text('Saved'), findsOneWidget);
+      expect(inspector.hasDraft, isFalse);
+
+      await tester.drag(target, const Offset(60, 30));
+      await tester.pumpAndSettle();
+      final node = tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .nodes
+          .first;
+      expect(node.rect.x, 0.1);
+      expect(node.rect.y, 0.1);
+      expect(node.rect.width, 0.3);
+      expect(node.rect.height, 0.4);
+      expect(
+        node.transform.scaleX,
+        closeTo(
+          tool == StudioCanvasTool.scale ? 1 + 180 / canvas.width : 1,
+          0.00001,
+        ),
+      );
+      expect(
+        node.transform.scaleY,
+        closeTo(
+          tool == StudioCanvasTool.scale ? 1 + 90 / canvas.height : 1,
+          0.00001,
+        ),
+      );
+      expect(
+        node.transform.rotationZ,
+        closeTo(
+          tool == StudioCanvasTool.rotate ? 21600 / canvas.width : 0,
+          0.00001,
+        ),
+      );
+      expect(
+        node.transform.rotationX,
+        closeTo(
+          tool == StudioCanvasTool.rotate3d ? -5400 / canvas.height : 0,
+          0.00001,
+        ),
+      );
+      expect(
+        node.transform.rotationY,
+        closeTo(
+          tool == StudioCanvasTool.rotate3d ? 10800 / canvas.width : 0,
+          0.00001,
+        ),
+      );
+      final changed = encodeSceneDocument(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).document,
+      );
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Saved'), findsOneWidget);
+      expect(
+        encodeSceneDocument(
+          tester.widget<StudioPreview>(find.byType(StudioPreview)).document,
+        ),
+        original,
+      );
+      expect(
+        tester
+            .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Undo'))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.text('Redo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      expect(
+        encodeSceneDocument(decodeSceneDocument(file.readAsStringSync())),
+        changed,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('scaling preserves mirrored axes and authored transforms', (
+    tester,
+  ) async {
+    const transform = SceneTransform(
+      scaleX: -1.2,
+      scaleY: 0.8,
+      rotationX: 10,
+      rotationY: 15,
+      rotationZ: 20,
+      translateX: 12,
+      translateY: 6,
+      pivotX: 0.4,
+      pivotY: 0.6,
+      perspective: 0.0007,
+    );
+    final document = _document.copyWith(
+      nodes: [
+        _document.nodes.first.copyWith(transform: transform),
+        _document.nodes.last,
+      ],
+    );
+    file.writeAsStringSync(encodeSceneDocument(document));
+    await openStudio(tester);
+    await tester.tap(find.text('Scale'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('preview-panel')),
+      const Offset(-2000, -2000),
+    );
+    await tester.pumpAndSettle();
+    final node = tester
+        .widget<StudioPreview>(find.byType(StudioPreview))
+        .document
+        .nodes
+        .first;
+    expect(node.transform.scaleX, -0.01);
+    expect(node.transform.scaleY, 0.01);
+    expect(
+      encodeSceneDocument(
+        document.copyWith(
+          nodes: [
+            node.copyWith(
+              transform: node.transform.copyWith(
+                scaleX: transform.scaleX,
+                scaleY: transform.scaleY,
+              ),
+            ),
+            document.nodes.last,
+          ],
+        ),
+      ),
+      encodeSceneDocument(document),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('select, edit, undo, redo and save through shadcn controls', (
     tester,
   ) async {

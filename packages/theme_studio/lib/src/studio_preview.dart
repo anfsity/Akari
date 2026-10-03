@@ -5,6 +5,18 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'studio_preferences.dart';
 import 'studio_preview_host.dart';
 
+enum StudioCanvasTool {
+  move('Move', 'Drag to move'),
+  scale('Scale', 'Drag horizontally / vertically to scale X / Y'),
+  rotate('Rotate', 'Drag horizontally to rotate Z'),
+  rotate3d('3D rotate', 'Drag horizontally / vertically to rotate Y / X');
+
+  const StudioCanvasTool(this.label, this.hint);
+
+  final String label;
+  final String hint;
+}
+
 /// Renders the compiled theme at its authored resolution. Selection wraps each
 /// component inside SceneRuntime so hit testing follows its actual transform,
 /// paint order and visibility instead of a second approximation of layout.
@@ -16,9 +28,10 @@ class StudioPreview extends StatefulWidget {
     required this.dormant,
     required this.onSelect,
     required this.onStartDrag,
-    required this.onMove,
-    required this.onDragPositionChanged,
+    required this.onCommitDrag,
+    required this.onDragNodeChanged,
     required this.preferences,
+    required this.tool,
     super.key,
   });
 
@@ -27,10 +40,11 @@ class StudioPreview extends StatefulWidget {
   final String selectedId;
   final bool dormant;
   final StudioPreferences preferences;
+  final StudioCanvasTool tool;
   final ValueChanged<String> onSelect;
   final SceneNode? Function(String id) onStartDrag;
-  final ValueChanged<SceneNode> onMove;
-  final ValueChanged<SceneRect> onDragPositionChanged;
+  final ValueChanged<SceneNode> onCommitDrag;
+  final ValueChanged<SceneNode> onDragNodeChanged;
 
   @override
   State<StudioPreview> createState() => _StudioPreviewState();
@@ -38,7 +52,8 @@ class StudioPreview extends StatefulWidget {
 
 class _StudioPreviewState extends State<StudioPreview> {
   final _canvas = GlobalKey();
-  ({SceneNode source, RenderBox canvas, Offset start})? _drag;
+  ({SceneNode source, RenderBox canvas, Offset start, StudioCanvasTool tool})?
+  _drag;
   SceneNode? _dragPreview;
 
   void _startDrag(String id, DragStartDetails details) {
@@ -51,6 +66,7 @@ class _StudioPreviewState extends State<StudioPreview> {
         source: node,
         canvas: canvas,
         start: canvas.globalToLocal(details.globalPosition),
+        tool: widget.tool,
       );
       _dragPreview = node;
     });
@@ -64,33 +80,79 @@ class _StudioPreviewState extends State<StudioPreview> {
     // and fit-to-workspace must not change the direction or speed of a drag.
     final canvas = drag.canvas;
     final delta = canvas.globalToLocal(details.globalPosition) - drag.start;
+    final updated = switch (drag.tool) {
+      StudioCanvasTool.move => node.copyWith(
+        rect: _calculateMovedRect(node.rect, canvas.size, delta),
+      ),
+      StudioCanvasTool.scale => node.copyWith(
+        transform: node.transform.copyWith(
+          scaleX: _calculateScale(
+            node.transform.scaleX,
+            delta.dx / canvas.size.width,
+          ),
+          scaleY: _calculateScale(
+            node.transform.scaleY,
+            delta.dy / canvas.size.height,
+          ),
+        ),
+      ),
+      StudioCanvasTool.rotate => node.copyWith(
+        transform: node.transform.copyWith(
+          rotationZ:
+              node.transform.rotationZ + 360 * delta.dx / canvas.size.width,
+        ),
+      ),
+      StudioCanvasTool.rotate3d => node.copyWith(
+        transform: node.transform.copyWith(
+          rotationX:
+              node.transform.rotationX - 180 * delta.dy / canvas.size.height,
+          rotationY:
+              node.transform.rotationY + 180 * delta.dx / canvas.size.width,
+        ),
+      ),
+    };
+    final previous = _dragPreview!;
+    if (updated.rect.x == previous.rect.x &&
+        updated.rect.y == previous.rect.y &&
+        updated.transform.scaleX == previous.transform.scaleX &&
+        updated.transform.scaleY == previous.transform.scaleY &&
+        updated.transform.rotationX == previous.transform.rotationX &&
+        updated.transform.rotationY == previous.transform.rotationY &&
+        updated.transform.rotationZ == previous.transform.rotationZ) {
+      return;
+    }
+    setState(() => _dragPreview = updated);
+    widget.onDragNodeChanged(updated);
+  }
+
+  // Retain mirrored axes and keep a dragged scale usable even at the canvas
+  // edge. Scaling changes the transform, never the component's layout rect.
+  double _calculateScale(double source, double delta) =>
+      (source < 0 ? -1 : 1) * (source.abs() + delta * 3).clamp(0.01, 100.0);
+
+  SceneRect _calculateMovedRect(SceneRect rect, Size size, Offset delta) {
     final grid = widget.preferences.gridSize;
-    var x = node.rect.x * canvas.size.width + delta.dx;
-    var y = node.rect.y * canvas.size.height + delta.dy;
+    var x = rect.x * size.width + delta.dx;
+    var y = rect.y * size.height + delta.dy;
     if (widget.preferences.snapToGrid) {
       x = (x / grid).round() * grid.toDouble();
       y = (y / grid).round() * grid.toDouble();
     }
-    final rect = node.rect.copyWith(
-      x: (x / canvas.size.width).clamp(0.0, 1.0 - node.rect.width),
-      y: (y / canvas.size.height).clamp(0.0, 1.0 - node.rect.height),
+    return rect.copyWith(
+      x: (x / size.width).clamp(0.0, 1.0 - rect.width),
+      y: (y / size.height).clamp(0.0, 1.0 - rect.height),
     );
-    if (rect.x == _dragPreview!.rect.x && rect.y == _dragPreview!.rect.y) {
-      return;
-    }
-    setState(() => _dragPreview = node.copyWith(rect: rect));
-    widget.onDragPositionChanged(rect);
   }
 
   void _stopDrag({required bool commit}) {
     final node = _dragPreview;
     if (node == null) return;
-    if (!commit) widget.onDragPositionChanged(_drag!.source.rect);
+    if (!commit) widget.onDragNodeChanged(_drag!.source);
     setState(() {
       _drag = null;
       _dragPreview = null;
     });
-    if (commit) widget.onMove(node);
+    if (commit) widget.onCommitDrag(node);
   }
 
   final _simulation = StudioPreviewHost();

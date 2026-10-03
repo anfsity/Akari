@@ -5,7 +5,7 @@ import 'scene_editor.dart';
 import 'studio_preferences.dart';
 import 'studio_preview.dart';
 
-class StudioCanvas extends StatelessWidget {
+class StudioCanvas extends StatefulWidget {
   const StudioCanvas({
     required this.editor,
     required this.theme,
@@ -22,16 +22,43 @@ class StudioCanvas extends StatelessWidget {
   final VoidCallback onToggleDormant;
 
   @override
+  State<StudioCanvas> createState() => _StudioCanvasState();
+}
+
+class _StudioCanvasState extends State<StudioCanvas> {
+  StudioCanvasTool _tool = StudioCanvasTool.move;
+
+  @override
   Widget build(BuildContext context) => ColoredBox(
     color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.3),
     child: ListenableBuilder(
-      listenable: Listenable.merge([editor]),
+      listenable: Listenable.merge([widget.editor]),
       builder: (context, _) {
-        final session = editor;
+        final session = widget.editor;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _PreviewHeader(dormant: dormant, onToggleDormant: onToggleDormant),
+            _PreviewHeader(
+              dormant: widget.dormant,
+              onToggleDormant: widget.onToggleDormant,
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final tool in StudioCanvasTool.values)
+                    Button(
+                      style: tool == _tool
+                          ? const ButtonStyle.primary()
+                          : const ButtonStyle.outline(),
+                      onPressed: () => setState(() => _tool = tool),
+                      child: Text(tool.label),
+                    ),
+                ],
+              ),
+            ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -42,18 +69,18 @@ class StudioCanvas extends StatelessWidget {
                     ? const Center(child: Text('Unable to open scene'))
                     : StudioPreview(
                         key: ObjectKey(session),
-                        theme: theme,
+                        theme: widget.theme,
                         document: session.document,
                         selectedId: session.selectedId,
-                        dormant: dormant,
-                        preferences: preferences,
+                        dormant: widget.dormant,
+                        preferences: widget.preferences,
+                        tool: _tool,
                         onSelect: session.selectNode,
                         onStartDrag: (id) => session.selectNode(id)
                             ? session.selectedNode
                             : null,
-                        onMove: session.updateNode,
-                        onDragPositionChanged:
-                            session.inspector.updatePreviewPosition,
+                        onCommitDrag: session.updateNode,
+                        onDragNodeChanged: session.inspector.updatePreviewNode,
                       ),
               ),
             ),
@@ -62,7 +89,7 @@ class StudioCanvas extends StatelessWidget {
               child: Text(
                 session == null
                     ? 'Choose a valid scene document.'
-                    : '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}  ·  Drag nodes to move  ·  Simulated data',
+                    : '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}  ·  ${_tool.hint}  ·  Simulated data',
                 textAlign: TextAlign.center,
               ).small().muted(),
             ),
