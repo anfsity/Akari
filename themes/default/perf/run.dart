@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import '../../../tool/src/command_plans.dart';
+import '../../../tool/src/sdk_commands.dart';
 import '../../../tool/src/theme_host.dart';
 import '../../../tool/src/theme_project.dart';
 

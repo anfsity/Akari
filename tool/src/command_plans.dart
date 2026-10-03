@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'build_links.dart';
 import 'run_report.dart';
+import 'sdk_commands.dart';
+import 'theme_host.dart';
 import 'theme_project.dart';
 import 'theme_perf.dart';
 
@@ -62,13 +65,23 @@ List<RunStep> buildStepsFor(
           dependencies: const [],
         ),
         ..._sceneGenerationSteps(repoRoot, [theme]),
-        _step('theme.host.generate', [
-          ...getDartCommand(repoRoot),
-          'tool/theme_host.dart',
-          theme.directory.path,
-          _join(repoRoot.path, hostDirectory),
-          if (studio) '--studio' else if (preview) '--preview',
-        ]),
+        _step(
+          'theme.host.generate',
+          [
+            ...getDartCommand(repoRoot),
+            'tool/theme_host.dart',
+            theme.directory.path,
+            _join(repoRoot.path, hostDirectory),
+            if (studio) '--studio' else if (preview) '--preview',
+          ],
+          action: () => createThemeHost(
+            repoRoot: repoRoot,
+            theme: theme,
+            output: Directory(_join(repoRoot.path, hostDirectory)),
+            preview: demo,
+            studio: studio,
+          ),
+        ),
         _step('theme.host.pub_get', [
           ...getFlutterCommand(repoRoot),
           'pub',
@@ -82,6 +95,7 @@ List<RunStep> buildStepsFor(
               'build',
               buildTarget,
               '--$buildMode',
+              '--no-pub',
               '--dart-define=MOZAIS_BACKEND=${demo ? 'demo' : 'real'}',
             ],
             workingDirectory: hostDirectory,
@@ -100,6 +114,7 @@ List<RunStep> buildStepsFor(
               buildMode,
             ],
             dependencies: const ['backend.build', 'flutter.build_linux'],
+            action: () => updateBuildLinks(repoRoot, theme, buildMode),
           ),
         if (live)
           _step(
@@ -348,6 +363,7 @@ RunStep _step(
   Map<String, String> environment = const {},
   List<String>? dependencies,
   bool interactive = false,
+  FutureOr<void> Function()? action,
 }) {
   return RunStep(
     id: id,
@@ -356,37 +372,8 @@ RunStep _step(
     environment: environment,
     dependencies: dependencies,
     interactive: interactive,
+    action: action,
   );
-}
-
-List<String> getFlutterCommand(Directory repoRoot) {
-  final customFlutter = Platform.environment['MOZAIS_FLUTTER_BIN'];
-  if (customFlutter != null && customFlutter.isNotEmpty) {
-    return [_resolveSdkBinary(customFlutter, repoRoot)];
-  }
-  final localFlutter = File(
-    _join(repoRoot.path, '.fvm/flutter_sdk/bin/flutter'),
-  );
-  return localFlutter.existsSync() ? [localFlutter.path] : ['fvm', 'flutter'];
-}
-
-List<String> getDartCommand(Directory repoRoot) {
-  final customDart = Platform.environment['MOZAIS_DART_BIN'];
-  if (customDart != null && customDart.isNotEmpty) {
-    return [_resolveSdkBinary(customDart, repoRoot)];
-  }
-  final customFlutter = Platform.environment['MOZAIS_FLUTTER_BIN'];
-  if (customFlutter != null && customFlutter.isNotEmpty) {
-    final flutterPath = _resolveSdkBinary(customFlutter, repoRoot);
-    return [_join(File(flutterPath).parent.path, 'dart')];
-  }
-  final localDart = File(_join(repoRoot.path, '.fvm/flutter_sdk/bin/dart'));
-  return localDart.existsSync() ? [localDart.path] : ['fvm', 'dart'];
-}
-
-String _resolveSdkBinary(String binary, Directory repoRoot) {
-  final file = File(binary);
-  return file.isAbsolute ? binary : _join(repoRoot.path, binary);
 }
 
 Map<String, String> artifactPathsFor(
