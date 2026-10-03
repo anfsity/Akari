@@ -10,6 +10,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_studio/theme_studio.dart';
 import 'package:theme_studio/src/studio_preview.dart';
 import 'package:theme_studio/src/node_inspector.dart';
+import 'package:theme_studio/src/studio_canvas.dart';
 
 const _document = SceneDocument(
   id: 'test',
@@ -119,6 +120,43 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'preview header preserves original alignment and surface styling',
+    (tester) async {
+      await openStudio(tester);
+      for (final width in [1100.0, 1400.0, 1800.0]) {
+        tester.view.physicalSize = Size(width, 900);
+        await tester.pumpAndSettle();
+        for (final state in ['Login', 'Dormant']) {
+          final canvas = find.byType(StudioCanvas);
+          final canvasRect = tester.getRect(canvas);
+          final title = find.text('Preview');
+          final button = find.widgetWithText(OutlineButton, 'State: $state');
+          expect(title, findsOneWidget);
+          final titleRect = tester.getRect(title);
+          final buttonRect = tester.getRect(button);
+          expect(titleRect.left, canvasRect.left + 16);
+          expect(buttonRect.right, canvasRect.right - 16);
+          expect(buttonRect.top, canvasRect.top + 16);
+          expect(titleRect.center.dy, buttonRect.center.dy);
+          final surface = tester.widget<ColoredBox>(
+            find
+                .descendant(of: canvas, matching: find.byType(ColoredBox))
+                .first,
+          );
+          expect(
+            surface.color,
+            Theme.of(tester.element(canvas)).colorScheme.muted
+                .withValues(alpha: 0.3),
+          );
+          await tester.tap(button);
+          await tester.pumpAndSettle();
+        }
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('preview dependencies survive edits and refresh on hot reload', (
     tester,
