@@ -79,6 +79,20 @@ the application are not implemented. Save explicitly before closing the window.
 Custom property names and values remain the responsibility of the compiled
 component.
 
+## Importing assets
+
+**Import asset** copies a file into the compiled theme's `assets/` directory,
+chooses a new name when needed, and registers it in the theme's `pubspec.yaml`
+while preserving existing entries and comments. Imports are written immediately;
+scene undo does not delete files. The package asset reference is copied to the
+clipboard; click an asset name to copy it again for component properties.
+
+**Use image** validates that an asset can be decoded and applies it as the scene
+background. This scene edit supports undo/redo and needs **Save scene** to reach
+disk. Studio resolves the theme's image backgrounds directly from disk so new
+images appear immediately. Other component asset references still follow their
+compiled implementation; restart Studio if a new bundle asset is not available.
+
 ## Checks
 
 `mozais verify` includes Studio dependency resolution, analysis and tests.

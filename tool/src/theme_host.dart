@@ -76,6 +76,8 @@ import 'package:${theme.packageName}/theme.dart' show ${theme.builderName};
 void main() {
   runApp(ThemeStudioApp(
     themeBuilder: ${theme.builderName},
+    themeDirectory: ${jsonEncode(theme.directory.path).replaceAll(r'$', r'\$')},
+    themePackageName: ${jsonEncode(theme.packageName)},
     scenePaths: [${scenes.map((file) => jsonEncode(file.path).replaceAll(r'$', r'\$')).join(', ')}],
   ));
 }

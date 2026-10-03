@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' as material;
@@ -88,6 +89,7 @@ void main() {
     picker = _FilePicker();
     FilePickerPlatform.instance = picker;
     directory = Directory.systemTemp.createTempSync('studio-ui-');
+    File('${directory.path}/pubspec.yaml').writeAsStringSync('name: test\n');
     file = File('${directory.path}/test.scene.json')
       ..writeAsStringSync(encodeSceneDocument(_document));
   });
@@ -102,10 +104,60 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      ThemeStudioApp(themeBuilder: _buildTheme, scenePaths: [file.path]),
+      ThemeStudioApp(
+        themeBuilder: _buildTheme,
+        scenePaths: [file.path],
+        themeDirectory: directory.path,
+        themePackageName: 'test',
+      ),
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('imported image previews immediately and background edits undo', (
+    tester,
+  ) async {
+    final source = File('${directory.path}/wallpaper.png');
+    await tester.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.drawColor(const Color(0xff123456), BlendMode.src);
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(2, 2);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      source.writeAsBytesSync(bytes!.buffer.asUint8List());
+      image.dispose();
+      picture.dispose();
+    });
+    await openStudio(tester);
+    picker.selected = _PickedFile(source);
+    await tester.tap(find.text('Import asset'));
+    await tester.pumpAndSettle();
+    expect(File('${directory.path}/assets/wallpaper.png').existsSync(), isTrue);
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Use image'));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pumpAndSettle();
+    final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+    expect(
+      preview.document.background.asset,
+      'packages/test/assets/wallpaper.png',
+    );
+    expect(preview.document.background.kind, SceneBackgroundKind.image);
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .background
+          .kind,
+      SceneBackgroundKind.solid,
+    );
+    expect(File('${directory.path}/assets/wallpaper.png').existsSync(), isTrue);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'load JSON handles cancellation, invalid files and unsaved edits',

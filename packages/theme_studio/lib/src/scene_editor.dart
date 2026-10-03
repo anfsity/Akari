@@ -44,6 +44,13 @@ class SceneEditor extends ChangeNotifier {
     _updateDocument(_document.copyWith(nodes: nodes), selectedId: _selectedId);
   }
 
+  void updateScene({SceneCanvas? canvas, SceneBackground? background}) {
+    _updateDocument(
+      _document.copyWith(canvas: canvas, background: background),
+      selectedId: _selectedId,
+    );
+  }
+
   void duplicateSelectedNode() {
     final node = selectedNode;
     final ids = _document.nodes.map((entry) => entry.id).toSet();
