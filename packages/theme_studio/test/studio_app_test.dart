@@ -100,14 +100,17 @@ void main() {
     directory.deleteSync(recursive: true);
   });
 
-  Future<void> openStudio(WidgetTester tester) async {
+  Future<void> openStudio(
+    WidgetTester tester, {
+    ThemeBuilder themeBuilder = _buildTheme,
+  }) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       ThemeStudioApp(
-        themeBuilder: _buildTheme,
+        themeBuilder: themeBuilder,
         scenePaths: [file.path],
         themeDirectory: directory.path,
         themePackageName: 'test',
@@ -115,6 +118,56 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('preview dependencies survive edits and refresh on hot reload', (
+    tester,
+  ) async {
+    var componentCreations = 0;
+    await openStudio(
+      tester,
+      themeBuilder: ({Color? seed}) {
+        final theme = _buildTheme(seed: seed);
+        return ThemeDefinition(
+          id: theme.id,
+          document: theme.document,
+          bundle: theme.bundle,
+          components: (_) {
+            componentCreations++;
+            return _Components();
+          },
+        );
+      },
+    );
+    final theme = tester
+        .widget<StudioPreview>(find.byType(StudioPreview))
+        .theme;
+    await tester.enterText(find.byKey(const ValueKey('field-X')), '0.2');
+    await tester.tap(find.text('Apply to preview'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Redo'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('State: Login'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('preview-panel')),
+      const Offset(20, 10),
+    );
+    await tester.pumpAndSettle();
+    final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+    expect(preview.theme, same(theme));
+    expect(componentCreations, 1);
+
+    final reload = tester.binding.reassembleApplication();
+    await tester.pumpAndSettle();
+    await reload;
+    final refreshed = tester.widget<StudioPreview>(find.byType(StudioPreview));
+    expect(refreshed.theme, isNot(same(theme)));
+    expect(refreshed.document, same(preview.document));
+    expect(componentCreations, 2);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('settings validate, cancel, apply and undo scene changes', (
     tester,
