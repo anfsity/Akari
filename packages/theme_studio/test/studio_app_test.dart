@@ -159,6 +159,85 @@ void main() {
     },
   );
 
+  testWidgets(
+    'workspace and sidebar boundaries resize without replacing editor state',
+    (tester) async {
+      await openStudio(tester);
+      final inspector = tester
+          .widget<NodeInspector>(find.byType(NodeInspector))
+          .controller;
+      final source = file.readAsStringSync();
+      final columns = find.byWidgetPredicate(
+        (widget) =>
+            widget is MouseRegion &&
+            widget.cursor == SystemMouseCursors.resizeColumn,
+      );
+      final rows = find.byWidgetPredicate(
+        (widget) =>
+            widget is MouseRegion &&
+            widget.cursor == SystemMouseCursors.resizeRow,
+      );
+      Finder pane(String name) => find.byWidgetPredicate(
+        (widget) => widget is ResizablePane && widget.key == ValueKey(name),
+      );
+      final left = pane('sidebar-pane');
+      final right = pane('inspector-pane');
+      final scenes = pane('scenes-pane');
+      final assets = pane('assets-pane');
+      expect(columns, findsNWidgets(2));
+      expect(rows, findsNWidgets(4));
+      final leftWidth = tester.getSize(left).width;
+      await tester.drag(columns.first, const Offset(70, 0));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(left).width, greaterThan(leftWidth));
+      final rightWidth = tester.getSize(right).width;
+      await tester.drag(columns.last, const Offset(-70, 0));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(right).width, greaterThan(rightWidth));
+      final sceneHeight = tester.getSize(scenes).height;
+      await tester.drag(rows.first, const Offset(0, 50));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(scenes).height, greaterThan(sceneHeight));
+      final assetHeight = tester.getSize(assets).height;
+      await tester.drag(rows.at(1), const Offset(0, -50));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(assets).height, greaterThan(assetHeight));
+      final header = pane('inspector-header-pane');
+      final headerHeight = tester.getSize(header).height;
+      await tester.drag(rows.at(2), const Offset(0, 30));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(header).height, greaterThan(headerHeight));
+      final actions = pane('inspector-actions-pane');
+      final actionsHeight = tester.getSize(actions).height;
+      await tester.drag(rows.last, const Offset(0, -40));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(actions).height, greaterThan(actionsHeight));
+      final resized = tester.getSize(left);
+      await tester.tap(find.text('State: Login'));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(left), resized);
+      expect(
+        tester.widget<NodeInspector>(find.byType(NodeInspector)).controller,
+        same(inspector),
+      );
+      expect(find.text('Saved'), findsOneWidget);
+      expect(file.readAsStringSync(), source);
+      await tester.drag(columns.first, const Offset(2000, 0));
+      await tester.pumpAndSettle();
+      await tester.drag(columns.last, const Offset(-2000, 0));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(left).width, lessThanOrEqualTo(360));
+      expect(tester.getSize(right).width, lessThanOrEqualTo(420));
+      tester.view.physicalSize = const Size(900, 600);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byType(StudioCanvas)).width,
+        greaterThanOrEqualTo(300),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('preview dependencies survive edits and refresh on hot reload', (
     tester,
   ) async {

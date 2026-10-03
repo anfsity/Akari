@@ -33,30 +33,73 @@ class StudioSidebar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SidebarHeading('SCENES'),
-        _SceneList(
-          paths: scenePaths,
-          loadingFile: loadingFile,
-          onLoadJson: onLoadJson,
-          onSwitchScene: onSwitchScene,
-        ),
-        const Gap(16),
-        const Divider(),
-        const _SidebarHeading('LAYERS'),
-        if (session != null) Expanded(child: _LayerList(editor: session)),
-        const Divider(),
-        Padding(
-          padding: const EdgeInsets.all(8),
-          child: OutlineButton(
-            onPressed: loadingFile ? null : onImportAsset,
-            child: const Text('Import asset'),
+        Expanded(
+          child: ResizablePanel.vertical(
+            key: const ValueKey('sidebar-panels'),
+            draggerThickness: 10,
+            children: [
+              ResizablePane.flex(
+                key: const ValueKey('scenes-pane'),
+                initialFlex: 0.3,
+                minSize: 128,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _SidebarHeading('SCENES'),
+                    Expanded(
+                      child: _SceneList(
+                        paths: scenePaths,
+                        loadingFile: loadingFile,
+                        onLoadJson: onLoadJson,
+                        onSwitchScene: onSwitchScene,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ResizablePane.flex(
+                key: const ValueKey('layers-pane'),
+                initialFlex: 0.4,
+                minSize: 100,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _SidebarHeading('LAYERS'),
+                    if (session != null)
+                      Expanded(child: _LayerList(editor: session)),
+                  ],
+                ),
+              ),
+              ResizablePane.flex(
+                key: const ValueKey('assets-pane'),
+                initialFlex: 0.3,
+                minSize: 128,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _SidebarHeading('ASSETS'),
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: OutlineButton(
+                        onPressed: loadingFile ? null : onImportAsset,
+                        child: const Text('Import asset'),
+                      ),
+                    ),
+                    Expanded(
+                      child: _AssetList(
+                        paths: assetPaths,
+                        onApplyBackground: session == null
+                            ? null
+                            : onApplyBackground,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        if (assetPaths.isNotEmpty)
-          _AssetList(
-            paths: assetPaths,
-            onApplyBackground: session == null ? null : onApplyBackground,
-          ),
+        const Divider(),
         if (session != null) _NodeActions(editor: session),
       ],
     );
@@ -100,10 +143,8 @@ class _SceneList extends StatelessWidget {
         ),
       ),
       const Gap(8),
-      ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 160),
+      Expanded(
         child: ListView.builder(
-          shrinkWrap: true,
           itemCount: paths.length,
           itemBuilder: (context, index) {
             final path = paths[index];
@@ -133,33 +174,29 @@ class _AssetList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final applyBackground = onApplyBackground;
-    return SizedBox(
-      height: 140,
-      child: ListView.builder(
-        itemCount: paths.length,
-        itemBuilder: (context, index) {
-          final asset = paths[index];
-          return Row(
-            children: [
-              Expanded(
-                child: GhostButton(
-                  onPressed: () =>
-                      Clipboard.setData(ClipboardData(text: asset)),
-                  child: Text(
-                    asset.split('/').last,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+    return ListView.builder(
+      itemCount: paths.length,
+      itemBuilder: (context, index) {
+        final asset = paths[index];
+        return Row(
+          children: [
+            Expanded(
+              child: GhostButton(
+                onPressed: () => Clipboard.setData(ClipboardData(text: asset)),
+                child: Text(
+                  asset.split('/').last,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (applyBackground != null)
-                GhostButton(
-                  onPressed: () => applyBackground(asset),
-                  child: const Text('Use image'),
-                ),
-            ],
-          );
-        },
-      ),
+            ),
+            if (applyBackground != null)
+              GhostButton(
+                onPressed: () => applyBackground(asset),
+                child: const Text('Use image'),
+              ),
+          ],
+        );
+      },
     );
   }
 }

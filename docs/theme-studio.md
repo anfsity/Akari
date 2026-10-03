@@ -30,6 +30,13 @@ to explicitly adopt changes made by another editor.
 
 ## Editing a scene
 
+Drag the boundaries beside the left sidebar or right inspector to resize their
+width. Drag the horizontal boundaries between **Scenes**, **Layers** and
+**Assets**, or between the inspector's header, fields and actions, to redistribute
+panel space. Each list scrolls independently;
+minimum sizes keep controls usable. Panel sizes survive settings changes and
+scene switches within the current session. Small windows scroll the workspace.
+
 1. Select a scene from the left panel. Save or discard changes before switching.
    **Load JSON** opens any scene JSON through the system file picker and adds
    it to the scene list for this session. It uses the current compiled theme's

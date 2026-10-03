@@ -50,11 +50,13 @@ class _WorkspaceViewport extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) => SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: math.max(1100, constraints.maxWidth),
-        height: constraints.maxHeight,
-        child: child,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: math.max(1100, constraints.maxWidth),
+          height: math.max(720, constraints.maxHeight),
+          child: child,
+        ),
       ),
     ),
   );
@@ -72,17 +74,25 @@ class _WorkspacePanels extends StatelessWidget {
   final Widget inspector;
 
   @override
-  Widget build(BuildContext context) {
-    final border = Theme.of(context).colorScheme.border;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(width: 220, child: sidebar),
-        VerticalDivider(color: border),
-        Expanded(child: canvas),
-        VerticalDivider(color: border),
-        SizedBox(width: 300, child: inspector),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => ResizablePanel.horizontal(
+    key: const ValueKey('workspace-panels'),
+    draggerThickness: 10,
+    children: [
+      ResizablePane(
+        key: const ValueKey('sidebar-pane'),
+        initialSize: 220,
+        minSize: 200,
+        maxSize: 360,
+        child: sidebar,
+      ),
+      ResizablePane.flex(minSize: 300, child: canvas),
+      ResizablePane(
+        key: const ValueKey('inspector-pane'),
+        initialSize: 300,
+        minSize: 280,
+        maxSize: 420,
+        child: inspector,
+      ),
+    ],
+  );
 }
