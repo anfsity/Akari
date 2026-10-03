@@ -17,6 +17,7 @@ class StudioPreview extends StatefulWidget {
     required this.onSelect,
     required this.onStartDrag,
     required this.onMove,
+    required this.onDragPositionChanged,
     required this.preferences,
     super.key,
   });
@@ -29,6 +30,7 @@ class StudioPreview extends StatefulWidget {
   final ValueChanged<String> onSelect;
   final SceneNode? Function(String id) onStartDrag;
   final ValueChanged<SceneNode> onMove;
+  final ValueChanged<SceneRect> onDragPositionChanged;
 
   @override
   State<StudioPreview> createState() => _StudioPreviewState();
@@ -69,19 +71,21 @@ class _StudioPreviewState extends State<StudioPreview> {
       x = (x / grid).round() * grid.toDouble();
       y = (y / grid).round() * grid.toDouble();
     }
-    setState(() {
-      _dragPreview = node.copyWith(
-        rect: node.rect.copyWith(
-          x: (x / canvas.size.width).clamp(0.0, 1.0 - node.rect.width),
-          y: (y / canvas.size.height).clamp(0.0, 1.0 - node.rect.height),
-        ),
-      );
-    });
+    final rect = node.rect.copyWith(
+      x: (x / canvas.size.width).clamp(0.0, 1.0 - node.rect.width),
+      y: (y / canvas.size.height).clamp(0.0, 1.0 - node.rect.height),
+    );
+    if (rect.x == _dragPreview!.rect.x && rect.y == _dragPreview!.rect.y) {
+      return;
+    }
+    setState(() => _dragPreview = node.copyWith(rect: rect));
+    widget.onDragPositionChanged(rect);
   }
 
   void _stopDrag({required bool commit}) {
     final node = _dragPreview;
     if (node == null) return;
+    if (!commit) widget.onDragPositionChanged(_drag!.source.rect);
     setState(() {
       _drag = null;
       _dragPreview = null;
