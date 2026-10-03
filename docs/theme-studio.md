@@ -67,12 +67,23 @@ reach disk only when explicitly saved.
 Preview renders at the scene's reference resolution and scales to fit the
 workspace. **State: Login / Dormant** switches between two simulated display
 states. Component interactions are intercepted for selection. Node hit testing
-uses the runtime's transforms and visibility rules. Drag a visible node to move it within the canvas. A completed drag creates one
-undo entry; invalid inspector drafts block dragging until corrected. Movement
-follows canvas coordinates even when a node is rotated or scaled.
-The inspector's X/Y fields follow the live drag position. Movement updates only
-those inputs, without rebuilding the inspector or recording intermediate scene
-revisions. Cancelling a drag restores both the canvas and its displayed position.
+uses the runtime's transforms and visibility rules. Choose a canvas tool, then
+drag a visible node:
+
+- **Move** changes the layout X/Y within the canvas.
+- **Scale** changes Scale X with horizontal movement and Scale Y with vertical
+  movement, retaining the layout size and pivot. Mirrored axes retain their sign;
+  dragged scale magnitudes stay between 0.01 and 100.
+- **Rotate** changes Rotate Z with horizontal movement, around the authored pivot.
+- **3D rotate** changes Rotate Y with horizontal movement and Rotate X with
+  vertical movement. The authored perspective is preserved; edit **Perspective**
+  in the inspector to adjust projection.
+
+A completed drag creates one undo entry; invalid inspector drafts block dragging
+until corrected. All tools follow canvas coordinates even when a node is rotated
+or scaled. The inspector's position, scale and rotation fields follow the live
+preview without rebuilding the inspector or recording intermediate scene
+revisions. Cancelling a drag restores both the canvas and its displayed values.
 
 Animations are disabled in
 the editing canvas so selection and property inspection remain stable.
@@ -83,7 +94,7 @@ after a complete write. It refuses to save when the source changed externally,
 leaving both the external file and the editor's unsaved document available.
 
 New nodes can currently be created by duplication. Adding an arbitrary
-component, resizing on the canvas, editing visibility rules,
+component, resizing layout bounds on the canvas, editing visibility rules,
 additional preview states, and unsaved-work recovery after closing
 the application are not implemented. Save explicitly before closing the window.
 Custom property names and values remain the responsibility of the compiled

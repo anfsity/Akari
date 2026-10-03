@@ -43,12 +43,12 @@ class NodeInspectorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Drag positions are transient, not inspector drafts. Suppress draft
-  // tracking and update only the two observing inputs, avoiding a rebuild of
+  // Drag values are transient, not inspector drafts. Suppress draft
+  // tracking and update only changed inputs, avoiding a rebuild of
   // every inspector section on each move.
-  void updatePreviewPosition(SceneRect rect) {
+  void updatePreviewNode(SceneNode node) {
     _updatingFields = true;
-    for (final entry in {'X': rect.x, 'Y': rect.y}.entries) {
+    for (final entry in _getPreviewValues(node).entries) {
       final field = getField(entry.key);
       final text = '${entry.value}';
       if (field.text != text) field.text = text;
@@ -56,13 +56,22 @@ class NodeInspectorController extends ChangeNotifier {
     _updatingFields = false;
   }
 
+  Map<String, double> _getPreviewValues(SceneNode node) => {
+    'X': node.rect.x,
+    'Y': node.rect.y,
+    'Scale X': node.transform.scaleX,
+    'Scale Y': node.transform.scaleY,
+    'Rotate X': node.transform.rotationX,
+    'Rotate Y': node.transform.rotationY,
+    'Rotate Z': node.transform.rotationZ,
+  };
+
   void resetNode(SceneNode node) {
     _updatingFields = true;
     _node = node;
     final transform = node.transform;
     final values = <String, Object>{
-      'X': node.rect.x,
-      'Y': node.rect.y,
+      ..._getPreviewValues(node),
       'Width': node.rect.width,
       'Height': node.rect.height,
       'Depth': node.z,
@@ -70,11 +79,6 @@ class NodeInspectorController extends ChangeNotifier {
       'Focus order': node.focusOrder,
       'Translate X': transform.translateX,
       'Translate Y': transform.translateY,
-      'Scale X': transform.scaleX,
-      'Scale Y': transform.scaleY,
-      'Rotate X': transform.rotationX,
-      'Rotate Y': transform.rotationY,
-      'Rotate Z': transform.rotationZ,
       'Pivot X': transform.pivotX,
       'Pivot Y': transform.pivotY,
       'Perspective': transform.perspective,
