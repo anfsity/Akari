@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
@@ -28,6 +29,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   SceneEditor? _editor;
   late ThemeDefinition _theme;
   late String _path;
+  late final List<String> _scenePaths;
+  bool _loadingFile = false;
   String? _error;
   bool _dormant = false;
   bool _hasDraft = false;
@@ -37,7 +40,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   void initState() {
     super.initState();
     _theme = widget.themeBuilder();
-    _path = widget.scenePaths.first;
+    _scenePaths = [...widget.scenePaths];
+    _path = _scenePaths.first;
     _openScene(_path);
     unawaited(_loadSeed());
   }
@@ -62,11 +66,41 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       _editor?.dispose();
       _editor = editor..addListener(() => setState(() {}));
       _path = path;
+      if (!_scenePaths.contains(path)) _scenePaths.add(path);
       _error = null;
       _confirmReload = false;
       _hasDraft = false;
     } on Object catch (error) {
       _error = '$error';
+    }
+  }
+
+  void _switchScene(String path) {
+    if (_inspector.currentState?.apply() == false) return;
+    if (_editor?.isDirty == true) {
+      setState(
+        () => _error = 'Save or reload your changes before switching scenes.',
+      );
+      return;
+    }
+    setState(() => _openScene(path));
+  }
+
+  Future<void> _loadJson() async {
+    setState(() => _loadingFile = true);
+    try {
+      final file = await FilePicker.pickFile(
+        dialogTitle: 'Load scene JSON',
+        initialDirectory: File(_path).parent.path,
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (!mounted || file == null) return;
+      _switchScene(file.path!);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _loadingFile = false);
     }
   }
 
@@ -203,25 +237,23 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                                 padding: const EdgeInsets.all(16),
                                 child: const Text('SCENES').small().muted(),
                               ),
-                              for (final path in widget.scenePaths)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                child: OutlineButton(
+                                  onPressed: _loadingFile ? null : _loadJson,
+                                  child: const Text('Load JSON'),
+                                ),
+                              ),
+                              const Gap(8),
+                              for (final path in _scenePaths)
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,
                                   ),
                                   child: GhostButton(
-                                    onPressed: () {
-                                      if (_inspector.currentState?.apply() ==
-                                          false) {
-                                        return;
-                                      }
-                                      if (_editor?.isDirty == true) {
-                                        setState(
-                                          () => _error = 'Save or reload your changes before switching scenes.',
-                                        );
-                                        return;
-                                      }
-                                      setState(() => _openScene(path));
-                                    },
+                                    onPressed: () => _switchScene(path),
                                     child: Text(
                                       File(path).uri.pathSegments.last,
                                       overflow: TextOverflow.ellipsis,

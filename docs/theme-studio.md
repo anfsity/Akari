@@ -31,6 +31,10 @@ to explicitly adopt changes made by another editor.
 ## Editing a scene
 
 1. Select a scene from the left panel. Save or discard changes before switching.
+   **Load JSON** opens any scene JSON through the system file picker and adds
+   it to the scene list for this session. It uses the current compiled theme's
+   components. Invalid files retain the previous scene; unsaved edits must be
+   saved or discarded first. Subsequent saves write to the opened file.
 2. Select a node on the canvas or in the layer list. The list also includes
    nodes hidden by the current preview state, ordered from front to back.
 3. Edit normalized position/size, depth, paint/focus order, transforms, motion,

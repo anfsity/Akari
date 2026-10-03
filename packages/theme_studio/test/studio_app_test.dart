@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -50,15 +51,50 @@ ThemeDefinition _buildTheme({Color? seed}) => ThemeDefinition(
   ),
 );
 
+final class _PickedFile extends PlatformFile {
+  _PickedFile(File file) : uri = file.uri;
+  @override
+  final Uri uri;
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FilePicker extends FilePickerPlatform {
+  PlatformFile? selected;
+
+  @override
+  Future<PlatformFile?> pickFile({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Function(FilePickerStatus)? onFileLoading,
+    int compressionQuality = 0,
+    AndroidOptions androidOptions = const AndroidOptions(),
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    DarwinOptions darwinOptions = const DarwinOptions(),
+    WebOptions webOptions = const WebOptions(),
+  }) async => selected;
+}
+
 void main() {
   late Directory directory;
   late File file;
+  late _FilePicker picker;
+  late FilePickerPlatform originalPicker;
   setUp(() {
+    originalPicker = FilePickerPlatform.instance;
+    picker = _FilePicker();
+    FilePickerPlatform.instance = picker;
     directory = Directory.systemTemp.createTempSync('studio-ui-');
     file = File('${directory.path}/test.scene.json')
       ..writeAsStringSync(encodeSceneDocument(_document));
   });
-  tearDown(() => directory.deleteSync(recursive: true));
+  tearDown(() {
+    FilePickerPlatform.instance = originalPicker;
+    directory.deleteSync(recursive: true);
+  });
 
   Future<void> openStudio(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1400, 900);
@@ -70,6 +106,54 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'load JSON handles cancellation, invalid files and unsaved edits',
+    (tester) async {
+      await openStudio(tester);
+      await tester.tap(find.text('Load JSON'));
+      await tester.pumpAndSettle();
+      expect(find.text('Saved'), findsOneWidget);
+      final imported = File('${directory.path}/imported.json')
+        ..writeAsStringSync('invalid');
+      picker.selected = _PickedFile(imported);
+      await tester.tap(find.text('Load JSON'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('FormatException'), findsOneWidget);
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).document.id,
+        'test',
+      );
+      imported.writeAsStringSync(
+        encodeSceneDocument(_document.copyWith(id: 'imported')),
+      );
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '0.2');
+      await tester.tap(find.text('Load JSON'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Save or reload'), findsOneWidget);
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Load JSON'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).document.id,
+        'imported',
+      );
+      expect(find.text('imported.json'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '0.3');
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      expect(
+        decodeSceneDocument(imported.readAsStringSync()).nodes.first.rect.x,
+        0.3,
+      );
+      expect(
+        decodeSceneDocument(file.readAsStringSync()).nodes.first.rect.x,
+        0.2,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'drag uses canvas scale, stays in bounds and creates one undo step',
