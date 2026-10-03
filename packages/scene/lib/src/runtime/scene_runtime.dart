@@ -127,7 +127,7 @@ class SceneRuntime extends StatelessWidget {
       safeArea: safeArea,
       minHitTarget: theme.tokens.minHitTarget,
     );
-    Widget transformed = RepaintBoundary(
+    final contentBoundary = RepaintBoundary(
       child: node.interactive
           // Keyboard order is authored separately from paint order; raising a
           // visual layer must not silently reorder navigation between controls.
@@ -137,18 +137,17 @@ class SceneRuntime extends StatelessWidget {
             )
           : content,
     );
-    if (!node.transform.isIdentity) {
-      transformed = Transform(
-        transform: sceneNodeTransformMatrix(node.transform, rect.size),
-        child: transformed,
-      );
-    }
+    // Keep the subtree mounted when a live edit leaves or returns to identity.
+    // Adding/removing this wrapper would reset component state and active drags.
     return Positioned(
       left: rect.left,
       top: rect.top,
       width: rect.width,
       height: rect.height,
-      child: transformed,
+      child: Transform(
+        transform: sceneNodeTransformMatrix(node.transform, rect.size),
+        child: contentBoundary,
+      ),
     );
   }
 }
