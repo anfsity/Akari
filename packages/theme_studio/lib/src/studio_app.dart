@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/services.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -9,16 +12,21 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'node_inspector.dart';
 import 'scene_editor.dart';
 import 'studio_preview.dart';
+import 'studio_assets.dart';
 
 class ThemeStudioApp extends StatefulWidget {
   const ThemeStudioApp({
     required this.themeBuilder,
     required this.scenePaths,
+    required this.themeDirectory,
+    required this.themePackageName,
     super.key,
   });
 
   final ThemeBuilder themeBuilder;
   final List<String> scenePaths;
+  final String themeDirectory;
+  final String themePackageName;
 
   @override
   State<ThemeStudioApp> createState() => _ThemeStudioAppState();
@@ -31,6 +39,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   late String _path;
   late final List<String> _scenePaths;
   bool _loadingFile = false;
+  late final StudioAssets _assets;
+  List<String> _assetPaths = [];
   String? _error;
   bool _dormant = false;
   bool _hasDraft = false;
@@ -40,6 +50,11 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   void initState() {
     super.initState();
     _theme = widget.themeBuilder();
+    _assets = StudioAssets(
+      directory: Directory(widget.themeDirectory),
+      packageName: widget.themePackageName,
+    );
+    _assetPaths = _assets.getAssets();
     _scenePaths = [...widget.scenePaths];
     _path = _scenePaths.first;
     _openScene(_path);
@@ -101,6 +116,46 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       if (mounted) setState(() => _error = '$error');
     } finally {
       if (mounted) setState(() => _loadingFile = false);
+    }
+  }
+
+  Future<void> _importAsset() async {
+    setState(() => _loadingFile = true);
+    try {
+      final picked = await FilePicker.pickFile(dialogTitle: 'Import asset');
+      if (!mounted || picked == null) return;
+      final path = _assets.importFile(File(picked.path!));
+      setState(() {
+        _assetPaths = _assets.getAssets();
+        _error = null;
+      });
+      await Clipboard.setData(ClipboardData(text: path));
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _loadingFile = false);
+    }
+  }
+
+  Future<void> _applyBackground(String asset) async {
+    if (!_inspector.currentState!.apply()) return;
+    final editor = _editor!;
+    try {
+      final provider = _assets.getImageProvider(asset) as FileImage;
+      final codec = await ui.instantiateImageCodec(
+        await provider.file.readAsBytes(),
+      );
+      codec.dispose();
+      if (!mounted || !identical(editor, _editor)) return;
+      editor.updateScene(
+        background: editor.document.background.copyWith(
+          kind: SceneBackgroundKind.image,
+          asset: asset,
+        ),
+      );
+      setState(() => _error = null);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = 'Cannot use image: $error');
     }
   }
 
@@ -309,6 +364,48 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                                     ],
                                   ),
                                 ),
+                              const Divider(),
+                              Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: OutlineButton(
+                                  onPressed: _loadingFile ? null : _importAsset,
+                                  child: const Text('Import asset'),
+                                ),
+                              ),
+                              if (_assetPaths.isNotEmpty)
+                                SizedBox(
+                                  height: 140,
+                                  child: ListView(
+                                    children: [
+                                      for (final asset in _assetPaths)
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: GhostButton(
+                                                onPressed: () =>
+                                                    Clipboard.setData(
+                                                      ClipboardData(
+                                                        text: asset,
+                                                      ),
+                                                    ),
+                                                child: Text(
+                                                  asset.split('/').last,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ),
+                                            if (editor != null)
+                                              GhostButton(
+                                                onPressed: () =>
+                                                    _applyBackground(asset),
+                                                child: const Text('Use image'),
+                                              ),
+                                          ],
+                                        ),
+                                    ],
+                                  ),
+                                ),
                               if (editor != null)
                                 Padding(
                                   padding: const EdgeInsets.all(12),
@@ -387,7 +484,18 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                                           )
                                         : StudioPreview(
                                             key: ObjectKey(editor),
-                                            theme: _theme,
+                                            theme: _theme.copyWith(
+                                              bundle: _theme.bundle.copyWith(
+                                                backgrounds: {
+                                                  ..._theme.bundle.backgrounds,
+                                                  SceneBackgroundKind.image:
+                                                      ImageBackgroundRenderer(
+                                                        resolveImage: _assets
+                                                            .getImageProvider,
+                                                      ),
+                                                },
+                                              ),
+                                            ),
                                             document: editor.document,
                                             selectedId: editor.selectedId,
                                             dormant: _dormant,
