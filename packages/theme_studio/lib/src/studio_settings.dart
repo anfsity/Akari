@@ -3,6 +3,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import 'studio_preferences.dart';
 import 'studio_form.dart';
+import 'studio_form_values.dart';
 
 class StudioSettings extends StatefulWidget {
   const StudioSettings({
@@ -57,52 +58,47 @@ class _StudioSettingsState extends State<StudioSettings> {
     _snapToGrid = preferences.snapToGrid;
   }
 
-  int _getInteger(String field) {
-    final value = int.tryParse(_fields[field]!.text);
-    if (value == null) throw FormatException('$field must be an integer.');
-    return value;
+  int _getInteger(String label) => getIntegerInput(label, _fields[label]!.text);
+
+  double _getNumber(String label) =>
+      getFiniteNumberInput(label, _fields[label]!.text);
+
+  SceneCanvas _getCanvas() => widget.document.canvas.copyWith(
+    referenceWidth: _getInteger('Canvas width'),
+    referenceHeight: _getInteger('Canvas height'),
+    fit: _fit,
+    useSafeArea: _safeArea,
+  );
+
+  SceneBackground _getBackground() {
+    final asset = _fields['Background asset']!.text.trim();
+    if (_background == SceneBackgroundKind.image && asset.isEmpty) {
+      throw const FormatException('Choose or import a background image first.');
+    }
+    return SceneBackground(
+      kind: _background,
+      asset: asset.isEmpty ? null : asset,
+      color: decodeSceneColor(_fields['Background color']!.text.trim()),
+      blurSigma: _getNumber('Background blur'),
+      scrimOpacity: _getNumber('Scrim opacity'),
+      rendererId: widget.document.background.rendererId,
+    );
   }
 
-  double _getNumber(String field) {
-    final value = double.tryParse(_fields[field]!.text);
-    if (value == null || !value.isFinite) {
-      throw FormatException('$field must be a finite number.');
-    }
-    return value;
+  StudioPreferences _getPreferences() {
+    final gridSize = _getInteger('Grid size (pixels)');
+    StudioPreferences.validateGridSize(gridSize);
+    return StudioPreferences(
+      darkMode: _darkMode,
+      showGrid: _showGrid,
+      snapToGrid: _snapToGrid,
+      gridSize: gridSize,
+    );
   }
 
   void _apply() {
     try {
-      final gridSize = _getInteger('Grid size (pixels)');
-      StudioPreferences.validateGridSize(gridSize);
-      final asset = _fields['Background asset']!.text.trim();
-      if (_background == SceneBackgroundKind.image && asset.isEmpty) {
-        throw const FormatException(
-          'Choose or import a background image first.',
-        );
-      }
-      widget.onApply(
-        widget.document.canvas.copyWith(
-          referenceWidth: _getInteger('Canvas width'),
-          referenceHeight: _getInteger('Canvas height'),
-          fit: _fit,
-          useSafeArea: _safeArea,
-        ),
-        SceneBackground(
-          kind: _background,
-          asset: asset.isEmpty ? null : asset,
-          color: decodeSceneColor(_fields['Background color']!.text.trim()),
-          blurSigma: _getNumber('Background blur'),
-          scrimOpacity: _getNumber('Scrim opacity'),
-          rendererId: widget.document.background.rendererId,
-        ),
-        StudioPreferences(
-          darkMode: _darkMode,
-          showGrid: _showGrid,
-          snapToGrid: _snapToGrid,
-          gridSize: gridSize,
-        ),
-      );
+      widget.onApply(_getCanvas(), _getBackground(), _getPreferences());
       Navigator.of(context).pop();
     } on FormatException catch (error) {
       setState(() => _error = error.message);

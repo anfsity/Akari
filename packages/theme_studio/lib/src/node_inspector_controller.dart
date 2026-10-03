@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:scene/scene.dart';
 
+import 'studio_form_values.dart';
+
 /// Owns drafts independently of the inspector widget's mount lifecycle. The
 /// editor commits them at document-command boundaries; the view only edits
 /// fields and observes validation results.
@@ -78,53 +80,50 @@ class NodeInspectorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  double _getNumber(String label) {
-    final value = double.tryParse(_fields[label]!.text);
-    if (value == null || !value.isFinite) {
-      throw FormatException('$label must be a finite number.');
-    }
-    return value;
-  }
+  double _getNumber(String label) =>
+      getFiniteNumberInput(label, getField(label).text);
 
-  int _getInteger(String label) {
-    final value = int.tryParse(_fields[label]!.text);
-    if (value == null) throw FormatException('$label must be an integer.');
-    return value;
-  }
+  int _getInteger(String label) => getIntegerInput(label, getField(label).text);
 
-  SceneNode getUpdatedNode() {
-    final properties = jsonDecode(_fields['Properties']!.text);
+  SceneNode getUpdatedNode() => _node.copyWith(
+    rect: _getRect(),
+    z: _getInteger('Depth'),
+    renderOrder: _getInteger('Paint order'),
+    focusOrder: _getInteger('Focus order'),
+    motion: _motion,
+    transform: _getTransform(),
+    properties: _getProperties(),
+  );
+
+  SceneRect _getRect() => SceneRect(
+    x: _getNumber('X'),
+    y: _getNumber('Y'),
+    width: _getNumber('Width'),
+    height: _getNumber('Height'),
+  );
+
+  SceneTransform _getTransform() => SceneTransform(
+    translateX: _getNumber('Translate X'),
+    translateY: _getNumber('Translate Y'),
+    scaleX: _getNumber('Scale X'),
+    scaleY: _getNumber('Scale Y'),
+    rotationX: _getNumber('Rotate X'),
+    rotationY: _getNumber('Rotate Y'),
+    rotationZ: _getNumber('Rotate Z'),
+    pivotX: _getNumber('Pivot X'),
+    pivotY: _getNumber('Pivot Y'),
+    perspective: _getNumber('Perspective'),
+  );
+
+  Map<String, String> _getProperties() {
+    final properties = jsonDecode(getField('Properties').text);
     if (properties is! Map<String, dynamic> ||
         properties.values.any((value) => value is! String || value.isEmpty)) {
       throw const FormatException(
         'Properties must be an object of non-empty strings.',
       );
     }
-    return _node.copyWith(
-      rect: SceneRect(
-        x: _getNumber('X'),
-        y: _getNumber('Y'),
-        width: _getNumber('Width'),
-        height: _getNumber('Height'),
-      ),
-      z: _getInteger('Depth'),
-      renderOrder: _getInteger('Paint order'),
-      focusOrder: _getInteger('Focus order'),
-      motion: _motion,
-      transform: SceneTransform(
-        translateX: _getNumber('Translate X'),
-        translateY: _getNumber('Translate Y'),
-        scaleX: _getNumber('Scale X'),
-        scaleY: _getNumber('Scale Y'),
-        rotationX: _getNumber('Rotate X'),
-        rotationY: _getNumber('Rotate Y'),
-        rotationZ: _getNumber('Rotate Z'),
-        pivotX: _getNumber('Pivot X'),
-        pivotY: _getNumber('Pivot Y'),
-        perspective: _getNumber('Perspective'),
-      ),
-      properties: properties.cast<String, String>(),
-    );
+    return properties.cast<String, String>();
   }
 
   @override
