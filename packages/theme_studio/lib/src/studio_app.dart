@@ -35,7 +35,6 @@ class ThemeStudioApp extends StatefulWidget {
 }
 
 class _ThemeStudioAppState extends State<ThemeStudioApp> {
-  final _inspector = GlobalKey<NodeInspectorState>();
   SceneEditor? _editor;
   late ThemeDefinition _theme;
   late String _path;
@@ -47,7 +46,6 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   StudioPreferences _preferences = const StudioPreferences();
   bool _preferencesReady = false;
   bool _dormant = false;
-  bool _hasDraft = false;
   bool _confirmReload = false;
 
   @override
@@ -88,15 +86,16 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   }
 
   void _openSettings(BuildContext context) {
-    if (!_inspector.currentState!.apply()) return;
+    final editor = _editor;
+    if (editor == null || !editor.applyDraft()) return;
     showOverlay<void>(
       context,
       const DialogConfiguration(),
       builder: (context) => StudioSettings(
-        document: _editor!.document,
+        document: editor.document,
         preferences: _preferences,
         onApply: (canvas, background, preferences) {
-          _editor!.updateScene(canvas: canvas, background: background);
+          editor.updateScene(canvas: canvas, background: background);
           setState(() {
             _preferences = preferences;
             _error = null;
@@ -125,19 +124,19 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     try {
       final editor = SceneEditor(File(path));
       _editor?.dispose();
-      _editor = editor..addListener(() => setState(() {}));
+      _editor = editor..addListener(_refreshWorkspace);
+      editor.inspector.addListener(_refreshWorkspace);
       _path = path;
       if (!_scenePaths.contains(path)) _scenePaths.add(path);
       _error = null;
       _confirmReload = false;
-      _hasDraft = false;
     } on Object catch (error) {
       _error = '$error';
     }
   }
 
   void _switchScene(String path) {
-    if (_inspector.currentState?.apply() == false) return;
+    if (_editor?.applyDraft() == false) return;
     if (_editor?.isDirty == true) {
       setState(
         () => _error = 'Save or reload your changes before switching scenes.',
@@ -184,8 +183,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   }
 
   Future<void> _applyBackground(String asset) async {
-    if (!_inspector.currentState!.apply()) return;
-    final editor = _editor!;
+    final editor = _editor;
+    if (editor == null || !editor.applyDraft()) return;
     try {
       final provider = _assets.getImageProvider(asset) as FileImage;
       final codec = await ui.instantiateImageCodec(
@@ -206,9 +205,10 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   }
 
   void _save() {
-    if (_inspector.currentState?.apply() != true) return;
+    final editor = _editor;
+    if (editor == null) return;
     try {
-      _editor!.save();
+      if (!editor.save()) return;
       setState(() {
         _error = null;
         _confirmReload = false;
@@ -232,7 +232,6 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       try {
         editor.reload();
         _error = null;
-        _hasDraft = false;
         _confirmReload = false;
       } on Object catch (error) {
         _error = '$error';
@@ -241,9 +240,10 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   }
 
   void _selectNode(String id) {
-    if (_inspector.currentState?.apply() != true) return;
-    _editor!.selectNode(id);
+    _editor?.selectNode(id);
   }
+
+  void _refreshWorkspace() => setState(() {});
 
   @override
   void dispose() {
@@ -300,31 +300,24 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                         ),
                         const Gap(16),
                         Text(
-                          _hasDraft || editor?.isDirty == true
+                          editor?.inspector.hasDraft == true ||
+                                  editor?.isDirty == true
                               ? 'Unsaved changes'
                               : 'Saved',
                         ).small().muted(),
                         const Gap(16),
                         OutlineButton(
-                          onPressed: _hasDraft || editor?.canUndo == true
-                              ? () {
-                                  if (_inspector.currentState?.apply() ==
-                                      true) {
-                                    editor!.undo();
-                                  }
-                                }
+                          onPressed:
+                              editor?.inspector.hasDraft == true ||
+                                  editor?.canUndo == true
+                              ? editor?.undo
                               : null,
                           child: const Text('Undo'),
                         ),
                         const Gap(8),
                         OutlineButton(
                           onPressed: editor?.canRedo == true
-                              ? () {
-                                  if (_inspector.currentState?.apply() ==
-                                      true) {
-                                    editor!.redo();
-                                  }
-                                }
+                              ? editor?.redo
                               : null,
                           child: const Text('Redo'),
                         ),
@@ -472,23 +465,13 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                                         CrossAxisAlignment.stretch,
                                     children: [
                                       OutlineButton(
-                                        onPressed: () {
-                                          if (_inspector.currentState!
-                                              .apply()) {
-                                            editor.duplicateSelectedNode();
-                                          }
-                                        },
+                                        onPressed: editor.duplicateSelectedNode,
                                         child: const Text('Duplicate node'),
                                       ),
                                       const Gap(8),
                                       OutlineButton(
                                         onPressed: editor.canDeleteNode
-                                            ? () {
-                                                if (_inspector.currentState!
-                                                    .apply()) {
-                                                  editor.deleteSelectedNode();
-                                                }
-                                              }
+                                            ? editor.deleteSelectedNode
                                             : null,
                                         child: const Text('Delete node'),
                                       ),
@@ -560,11 +543,9 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                                             preferences: _preferences,
                                             onSelect: _selectNode,
                                             onStartDrag: (id) {
-                                              if (!_inspector.currentState!
-                                                  .apply()) {
+                                              if (!editor.selectNode(id)) {
                                                 return null;
                                               }
-                                              editor.selectNode(id);
                                               return editor.selectedNode;
                                             },
                                             onMove: editor.updateNode,
@@ -590,11 +571,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                           child: editor == null
                               ? const SizedBox()
                               : NodeInspector(
-                                  key: _inspector,
-                                  node: editor.selectedNode,
-                                  onUpdate: editor.updateNode,
-                                  onDraftChanged: (value) =>
-                                      setState(() => _hasDraft = value),
+                                  controller: editor.inspector,
+                                  onApply: editor.applyDraft,
                                 ),
                         ),
                       ],
