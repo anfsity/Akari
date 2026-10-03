@@ -12,6 +12,7 @@ dependencies:
   scene:
     path: ../scene
   yaml_edit: ^2.2.4
+  shared_preferences: ^2.5.5
   shadcn_flutter: ^0.0.55
   theme_sdk:
     path: ../theme_sdk

@@ -73,11 +73,24 @@ after a complete write. It refuses to save when the source changed externally,
 leaving both the external file and the editor's unsaved document available.
 
 New nodes can currently be created by duplication. Adding an arbitrary
-component, resizing on the canvas, editing visibility rules and
-backgrounds, additional preview states, and unsaved-work recovery after closing
+component, resizing on the canvas, editing visibility rules,
+additional preview states, and unsaved-work recovery after closing
 the application are not implemented. Save explicitly before closing the window.
 Custom property names and values remain the responsibility of the compiled
 component.
+
+## Settings
+
+**Settings** edits the canvas reference width/height, fit and safe-area policy,
+plus background kind, asset, color, blur and scrim opacity. These changes are
+validated together, support undo/redo and require **Save scene**. Cancel leaves
+settings unchanged. Video/custom backgrounds keep the theme's compiled renderer.
+
+Editor preferences include dark/light appearance, a visible canvas grid, snap
+to grid, and grid spacing (4–512 reference pixels). Preferences are saved
+separately and restored on the next launch; they do not mark the scene dirty.
+Snapping applies to a dragged node's layout origin, with canvas edges taking
+precedence so the node remains inside the canvas.
 
 ## Importing assets
 

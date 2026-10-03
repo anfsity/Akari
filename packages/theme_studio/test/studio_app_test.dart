@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_studio/theme_studio.dart';
 import 'package:theme_studio/src/studio_preview.dart';
@@ -85,6 +86,7 @@ void main() {
   late _FilePicker picker;
   late FilePickerPlatform originalPicker;
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     originalPicker = FilePickerPlatform.instance;
     picker = _FilePicker();
     FilePickerPlatform.instance = picker;
@@ -113,6 +115,130 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('settings validate, cancel, apply and undo scene changes', (
+    tester,
+  ) async {
+    await openStudio(tester);
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('setting-Canvas width')),
+      '0',
+    );
+    await tester.tap(find.text('Apply settings'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('between 1 and 16384'), findsOneWidget);
+    expect(
+      tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .canvas
+          .referenceWidth,
+      1280,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('setting-Canvas width')),
+      '1600',
+    );
+    await tester.tap(find.text('Apply settings'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .canvas
+          .referenceWidth,
+      1600,
+    );
+    await tester.tap(find.text('Save scene'));
+    await tester.pumpAndSettle();
+    expect(
+      decodeSceneDocument(file.readAsStringSync()).canvas.referenceWidth,
+      1600,
+    );
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .canvas
+          .referenceWidth,
+      1280,
+    );
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('setting-Canvas width')),
+      '800',
+    );
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .canvas
+          .referenceWidth,
+      1280,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'appearance, grid and snapping apply and persist across remounts',
+    (tester) async {
+      await openStudio(tester);
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('setting-Grid size (pixels)')),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('settings-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dark appearance'));
+      await tester.tap(find.text('Show grid'));
+      await tester.tap(find.text('Snap to grid'));
+      await tester.enterText(
+        find.byKey(const ValueKey('setting-Grid size (pixels)')),
+        '32',
+      );
+      await tester.tap(find.text('Apply settings'));
+      await tester.pumpAndSettle();
+      final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(preview.preferences.darkMode, isFalse);
+      expect(preview.preferences.showGrid, isTrue);
+      expect(preview.preferences.snapToGrid, isTrue);
+      expect(find.text('Saved'), findsOneWidget);
+      await tester.drag(
+        find.byKey(const ValueKey('preview-panel')),
+        const Offset(50, 30),
+      );
+      await tester.pumpAndSettle();
+      final rect = tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .nodes
+          .first
+          .rect;
+      expect((rect.x * 1280) % 32, closeTo(0, 0.00001));
+      expect((rect.y * 720) % 32, closeTo(0, 0.00001));
+      await tester.pumpWidget(const SizedBox());
+      await openStudio(tester);
+      final restored = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(restored.preferences.darkMode, isFalse);
+      expect(restored.preferences.showGrid, isTrue);
+      expect(restored.preferences.gridSize, 32);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('imported image previews immediately and background edits undo', (
     tester,
