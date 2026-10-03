@@ -70,6 +70,9 @@ states. Component interactions are intercepted for selection. Node hit testing
 uses the runtime's transforms and visibility rules. Drag a visible node to move it within the canvas. A completed drag creates one
 undo entry; invalid inspector drafts block dragging until corrected. Movement
 follows canvas coordinates even when a node is rotated or scaled.
+The inspector's X/Y fields follow the live drag position. Movement updates only
+those inputs, without rebuilding the inspector or recording intermediate scene
+revisions. Cancelling a drag restores both the canvas and its displayed position.
 
 Animations are disabled in
 the editing canvas so selection and property inspection remain stable.
