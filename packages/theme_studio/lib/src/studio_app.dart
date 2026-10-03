@@ -13,6 +13,8 @@ import 'node_inspector.dart';
 import 'scene_editor.dart';
 import 'studio_preview.dart';
 import 'studio_assets.dart';
+import 'studio_preferences.dart';
+import 'studio_settings.dart';
 
 class ThemeStudioApp extends StatefulWidget {
   const ThemeStudioApp({
@@ -42,6 +44,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   late final StudioAssets _assets;
   List<String> _assetPaths = [];
   String? _error;
+  StudioPreferences _preferences = const StudioPreferences();
+  bool _preferencesReady = false;
   bool _dormant = false;
   bool _hasDraft = false;
   bool _confirmReload = false;
@@ -59,6 +63,48 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     _path = _scenePaths.first;
     _openScene(_path);
     unawaited(_loadSeed());
+    unawaited(_loadPreferences());
+  }
+
+  Future<void> _loadPreferences() async {
+    try {
+      final preferences = await StudioPreferences.load();
+      if (mounted) setState(() => _preferences = preferences);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _preferencesReady = true);
+    }
+  }
+
+  Future<void> _savePreferences(StudioPreferences preferences) async {
+    try {
+      await preferences.save();
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _error = 'Preferences were not saved: $error');
+      }
+    }
+  }
+
+  void _openSettings(BuildContext context) {
+    if (!_inspector.currentState!.apply()) return;
+    showOverlay<void>(
+      context,
+      const DialogConfiguration(),
+      builder: (context) => StudioSettings(
+        document: _editor!.document,
+        preferences: _preferences,
+        onApply: (canvas, background, preferences) {
+          _editor!.updateScene(canvas: canvas, background: background);
+          setState(() {
+            _preferences = preferences;
+            _error = null;
+          });
+          unawaited(_savePreferences(preferences));
+        },
+      ),
+    );
   }
 
   Future<void> _loadSeed() async {
@@ -210,7 +256,12 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     return ShadcnApp(
       title: 'Mozais Theme Studio',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorScheme: ColorSchemes.darkZinc, radius: 0.5),
+      theme: ThemeData(
+        colorScheme: _preferences.darkMode
+            ? ColorSchemes.darkZinc
+            : ColorSchemes.lightZinc,
+        radius: 0.5,
+      ),
       home: Builder(builder: _buildWorkspace),
     );
   }
@@ -241,6 +292,13 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                         const Gap(16),
                         Text(_theme.id).muted(),
                         const Spacer(),
+                        OutlineButton(
+                          onPressed: editor != null && _preferencesReady
+                              ? () => _openSettings(context)
+                              : null,
+                          child: const Text('Settings'),
+                        ),
+                        const Gap(16),
                         Text(
                           _hasDraft || editor?.isDirty == true
                               ? 'Unsaved changes'
@@ -499,6 +557,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                                             document: editor.document,
                                             selectedId: editor.selectedId,
                                             dormant: _dormant,
+                                            preferences: _preferences,
                                             onSelect: _selectNode,
                                             onStartDrag: (id) {
                                               if (!_inspector.currentState!
