@@ -17,16 +17,28 @@ class NodeInspector extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller,
-    builder: (context, _) => Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    builder: (context, _) => ResizablePanel.vertical(
+      key: const ValueKey('inspector-panels'),
+      draggerThickness: 10,
       children: [
-        _InspectorHeader(node: controller.node),
-        const Divider(),
-        Expanded(
+        ResizablePane(
+          key: const ValueKey('inspector-header-pane'),
+          initialSize: 80,
+          minSize: 80,
+          maxSize: 140,
+          child: _InspectorHeader(node: controller.node),
+        ),
+        ResizablePane.flex(
+          minSize: 200,
           child: _InspectorForm(controller: controller, onApply: onApply),
         ),
-        const Divider(),
-        _InspectorActions(error: controller.error, onApply: onApply),
+        ResizablePane(
+          key: const ValueKey('inspector-actions-pane'),
+          initialSize: 120,
+          minSize: 120,
+          maxSize: 180,
+          child: _InspectorActions(error: controller.error, onApply: onApply),
+        ),
       ],
     ),
   );
