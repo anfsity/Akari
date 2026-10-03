@@ -51,11 +51,11 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   @override
   void initState() {
     super.initState();
-    _theme = widget.themeBuilder();
     _assets = StudioAssets(
       directory: Directory(widget.themeDirectory),
       packageName: widget.themePackageName,
     );
+    _updateTheme(widget.themeBuilder());
     _assetPaths = _assets.getAssets();
     _scenePaths = [...widget.scenePaths];
     _path = _scenePaths.first;
@@ -106,17 +106,30 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     );
   }
 
+  void _updateTheme(ThemeDefinition theme) {
+    _theme = theme.copyWith(
+      bundle: theme.bundle.copyWith(
+        backgrounds: {
+          ...theme.bundle.backgrounds,
+          SceneBackgroundKind.image: ImageBackgroundRenderer(
+            resolveImage: _assets.getImageProvider,
+          ),
+        },
+      ),
+    );
+  }
+
   Future<void> _loadSeed() async {
     final theme = _theme;
     final seed = await theme.findBackgroundSeed();
     if (!mounted || !identical(theme, _theme) || seed == null) return;
-    setState(() => _theme = widget.themeBuilder(seed: seed));
+    setState(() => _updateTheme(widget.themeBuilder(seed: seed)));
   }
 
   @override
   void reassemble() {
     super.reassemble();
-    _theme = widget.themeBuilder();
+    _updateTheme(widget.themeBuilder());
     unawaited(_loadSeed());
   }
 
@@ -525,18 +538,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                                           )
                                         : StudioPreview(
                                             key: ObjectKey(editor),
-                                            theme: _theme.copyWith(
-                                              bundle: _theme.bundle.copyWith(
-                                                backgrounds: {
-                                                  ..._theme.bundle.backgrounds,
-                                                  SceneBackgroundKind.image:
-                                                      ImageBackgroundRenderer(
-                                                        resolveImage: _assets
-                                                            .getImageProvider,
-                                                      ),
-                                                },
-                                              ),
-                                            ),
+                                            theme: _theme,
                                             document: editor.document,
                                             selectedId: editor.selectedId,
                                             dormant: _dormant,
