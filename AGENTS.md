@@ -17,6 +17,11 @@ These rules apply to all changes in this repository.
 
 ## Abstraction and Refactoring
 
+- Organize code around cohesive responsibilities. Choose boundaries by meaning and reasons to change, not by line count or superficial similarity.
+- Keep each function at a consistent level of abstraction. Composition should reveal intent and relationships while delegating implementation details to the units that own them.
+- Make state and resource ownership explicit. Their lifetime should follow the responsibility they serve, rather than incidental execution or presentation details.
+- Keep the effects of change proportional to its meaning. A local change should not trigger unrelated work, recreate unrelated state, or require coordination across the whole system.
+- Preserve observable behavior during structural refactoring. Intentional behavior changes should be independently reviewable.
 - Do not generalize speculatively. Without a second real caller, do not add an abstraction layer.
 - If a class has one implementation and is unlikely to be replaceable soon, call the implementation directly instead of introducing an interface.
 - If a method has one caller and consists of one operation, inline it.
