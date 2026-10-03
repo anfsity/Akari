@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_studio/theme_studio.dart';
 import 'package:theme_studio/src/studio_preview.dart';
+import 'package:theme_studio/src/node_inspector.dart';
 
 const _document = SceneDocument(
   id: 'test',
@@ -193,6 +194,40 @@ void main() {
           .x,
       0.2,
     );
+  });
+
+  testWidgets('lazy inspector sections preserve fields while scrolling', (
+    tester,
+  ) async {
+    await openStudio(tester);
+    final inspectorScroll = find
+        .descendant(
+          of: find.byType(NodeInspector),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('field-Properties')),
+      200,
+      scrollable: inspectorScroll,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('field-Properties')),
+      '{"variant":"wide"}',
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('field-X')),
+      -200,
+      scrollable: inspectorScroll,
+    );
+    await tester.enterText(find.byKey(const ValueKey('field-X')), '0.2');
+    await tester.tap(find.text('Save scene'));
+    await tester.pumpAndSettle();
+    final node = decodeSceneDocument(file.readAsStringSync()).nodes.first;
+    expect(node.rect.x, 0.2);
+    expect(node.properties, {'variant': 'wide'});
+    expect(find.text('Saved'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('settings validate, cancel, apply and undo scene changes', (
