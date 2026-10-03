@@ -55,8 +55,12 @@ class _InspectorHeader extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(node.id).semiBold(),
-        Text(node.componentId).muted().small(),
+        Text(node.id, maxLines: 1, overflow: TextOverflow.ellipsis).semiBold(),
+        Text(
+          node.componentId,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ).muted().small(),
       ],
     ),
   );
@@ -144,20 +148,22 @@ class _InspectorActions extends StatelessWidget {
   final VoidCallback onApply;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (error case final message?) ...[
-          StudioFormError(message),
-          const Gap(12),
+  Widget build(BuildContext context) => SingleChildScrollView(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (error case final message?) ...[
+            StudioFormError(message),
+            const Gap(12),
+          ],
+          PrimaryButton(
+            onPressed: onApply,
+            child: const Text('Apply to preview'),
+          ),
         ],
-        PrimaryButton(
-          onPressed: onApply,
-          child: const Text('Apply to preview'),
-        ),
-      ],
+      ),
     ),
   );
 }
