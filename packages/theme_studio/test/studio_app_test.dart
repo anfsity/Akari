@@ -11,6 +11,7 @@ import 'package:theme_studio/theme_studio.dart';
 import 'package:theme_studio/src/studio_preview.dart';
 import 'package:theme_studio/src/node_inspector.dart';
 import 'package:theme_studio/src/studio_canvas.dart';
+import 'package:theme_studio/src/studio_theme.dart';
 
 const _document = SceneDocument(
   id: 'test',
@@ -377,18 +378,36 @@ void main() {
       await openStudio(tester);
       await tester.tap(find.text('Settings'));
       await tester.pumpAndSettle();
+      final settingsScroll = find
+          .descendant(
+            of: find.byKey(const ValueKey('settings-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.text('Appearance: Follow system'),
+        150,
+        scrollable: settingsScroll,
+      );
+      await tester.tap(find.text('Appearance: Follow system'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Light').last);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Color theme: Zinc'),
+        100,
+        scrollable: settingsScroll,
+      );
+      await tester.tap(find.text('Color theme: Zinc'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Violet').last);
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('setting-Grid size (pixels)')),
-        200,
-        scrollable: find
-            .descendant(
-              of: find.byKey(const ValueKey('settings-list')),
-              matching: find.byType(Scrollable),
-            )
-            .first,
+        100,
+        scrollable: settingsScroll,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Dark appearance'));
       await tester.tap(find.text('Show grid'));
       await tester.tap(find.text('Snap to grid'));
       await tester.enterText(
@@ -398,7 +417,8 @@ void main() {
       await tester.tap(find.text('Apply settings'));
       await tester.pumpAndSettle();
       final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
-      expect(preview.preferences.darkMode, isFalse);
+      expect(preview.preferences.themeMode, ThemeMode.light);
+      expect(preview.preferences.palette, StudioPalette.violet);
       expect(preview.preferences.showGrid, isTrue);
       expect(preview.preferences.snapToGrid, isTrue);
       expect(find.text('Saved'), findsOneWidget);
@@ -418,9 +438,37 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await openStudio(tester);
       final restored = tester.widget<StudioPreview>(find.byType(StudioPreview));
-      expect(restored.preferences.darkMode, isFalse);
+      expect(restored.preferences.themeMode, ThemeMode.light);
+      expect(restored.preferences.palette, StudioPalette.violet);
       expect(restored.preferences.showGrid, isTrue);
       expect(restored.preferences.gridSize, 32);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'system appearance reacts without changing scene or preview theme',
+    (tester) async {
+      tester.binding.platformDispatcher.platformBrightnessTestValue =
+          Brightness.light;
+      addTearDown(
+        tester.binding.platformDispatcher.clearPlatformBrightnessTestValue,
+      );
+      await openStudio(tester);
+      final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      final canvas = find.byType(StudioCanvas);
+      expect(Theme.of(tester.element(canvas)).brightness, Brightness.light);
+      tester.binding.platformDispatcher.platformBrightnessTestValue =
+          Brightness.dark;
+      await tester.pumpAndSettle();
+      final darkScheme = Theme.of(tester.element(canvas)).colorScheme;
+      expect(darkScheme.brightness, Brightness.dark);
+      expect(darkScheme.background, isNot(ColorSchemes.darkZinc.background));
+      expect(darkScheme.card, isNot(darkScheme.background));
+      final updated = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(updated.document, same(preview.document));
+      expect(updated.theme, same(preview.theme));
+      expect(find.text('Saved'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

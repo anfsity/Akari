@@ -86,7 +86,12 @@ plus background kind, asset, color, blur and scrim opacity. These changes are
 validated together, support undo/redo and require **Save scene**. Cancel leaves
 settings unchanged. Video/custom backgrounds keep the theme's compiled renderer.
 
-Editor preferences include dark/light appearance, a visible canvas grid, snap
+Editor preferences include light, dark or **Follow system** appearance, plus
+shadcn color presets (Zinc, Neutral, Slate, Stone, Blue, Rose and Violet).
+Dark presets use softened background and elevated card/popover surfaces.
+Appearance changes style the editor; the compiled theme keeps its own preview
+colors. Existing dark/light preferences migrate without losing the saved choice.
+Other preferences include a visible canvas grid, snap
 to grid, and grid spacing (4–512 reference pixels). Preferences are saved
 separately and restored on the next launch; they do not mark the scene dirty.
 Snapping applies to a dragged node's layout origin, with canvas edges taking

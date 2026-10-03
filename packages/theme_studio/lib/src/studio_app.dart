@@ -266,11 +266,14 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       title: 'Mozais Theme Studio',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: _preferences.darkMode
-            ? ColorSchemes.darkZinc
-            : ColorSchemes.lightZinc,
+        colorScheme: _preferences.palette.getColorScheme(Brightness.light),
         radius: 0.5,
       ),
+      darkTheme: ThemeData(
+        colorScheme: _preferences.palette.getColorScheme(Brightness.dark),
+        radius: 0.5,
+      ),
+      themeMode: _preferences.themeMode,
       home: Builder(builder: _buildWorkspace),
     );
   }

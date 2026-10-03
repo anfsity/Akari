@@ -4,6 +4,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'studio_preferences.dart';
 import 'studio_form.dart';
 import 'studio_form_values.dart';
+import 'studio_theme.dart';
 
 class StudioSettings extends StatefulWidget {
   const StudioSettings({
@@ -28,7 +29,8 @@ class _StudioSettingsState extends State<StudioSettings> {
   late SceneCanvasFit _fit;
   late SceneBackgroundKind _background;
   late bool _safeArea;
-  late bool _darkMode;
+  late ThemeMode _themeMode;
+  late StudioPalette _palette;
   late bool _showGrid;
   late bool _snapToGrid;
   String? _error;
@@ -53,7 +55,8 @@ class _StudioSettingsState extends State<StudioSettings> {
     _fit = scene.canvas.fit;
     _safeArea = scene.canvas.useSafeArea;
     _background = scene.background.kind;
-    _darkMode = preferences.darkMode;
+    _themeMode = preferences.themeMode;
+    _palette = preferences.palette;
     _showGrid = preferences.showGrid;
     _snapToGrid = preferences.snapToGrid;
   }
@@ -89,7 +92,8 @@ class _StudioSettingsState extends State<StudioSettings> {
     final gridSize = _getInteger('Grid size (pixels)');
     StudioPreferences.validateGridSize(gridSize);
     return StudioPreferences(
-      darkMode: _darkMode,
+      themeMode: _themeMode,
+      palette: _palette,
       showGrid: _showGrid,
       snapToGrid: _snapToGrid,
       gridSize: gridSize,
@@ -191,10 +195,24 @@ class _StudioSettingsState extends State<StudioSettings> {
   Widget _buildPreferencesSection() => StudioFormSection(
     title: 'Editor preferences',
     children: [
-      Switch(
-        value: _darkMode,
-        onChanged: (value) => setState(() => _darkMode = value),
-        trailing: const Text('Dark appearance'),
+      StudioEnumSelect(
+        label: 'Appearance',
+        value: _themeMode,
+        values: ThemeMode.values,
+        formatValue: (mode) => switch (mode) {
+          ThemeMode.system => 'Follow system',
+          ThemeMode.light => 'Light',
+          ThemeMode.dark => 'Dark',
+        },
+        onChanged: (value) => setState(() => _themeMode = value),
+      ),
+      const Gap(12),
+      StudioEnumSelect(
+        label: 'Color theme',
+        value: _palette,
+        values: StudioPalette.values,
+        formatValue: (palette) => palette.label,
+        onChanged: (value) => setState(() => _palette = value),
       ),
       const Gap(12),
       Switch(
