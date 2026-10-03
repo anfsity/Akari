@@ -23,20 +23,15 @@ class StudioCanvas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ColoredBox(
-    color: Theme.of(context).colorScheme.muted,
+    color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.3),
     child: ListenableBuilder(
       listenable: Listenable.merge([editor]),
       builder: (context, _) {
         final session = editor;
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: OutlineButton(
-                onPressed: onToggleDormant,
-                child: Text(dormant ? 'State: Dormant' : 'State: Login'),
-              ),
-            ),
+            _PreviewHeader(dormant: dormant, onToggleDormant: onToggleDormant),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -72,6 +67,28 @@ class StudioCanvas extends StatelessWidget {
           ],
         );
       },
+    ),
+  );
+}
+
+class _PreviewHeader extends StatelessWidget {
+  const _PreviewHeader({required this.dormant, required this.onToggleDormant});
+
+  final bool dormant;
+  final VoidCallback onToggleDormant;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(16),
+    child: Row(
+      children: [
+        const Text('Preview').semiBold(),
+        const Spacer(),
+        OutlineButton(
+          onPressed: onToggleDormant,
+          child: Text(dormant ? 'State: Dormant' : 'State: Login'),
+        ),
+      ],
     ),
   );
 }
