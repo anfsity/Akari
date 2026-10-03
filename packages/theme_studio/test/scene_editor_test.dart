@@ -59,6 +59,61 @@ void main() {
     expect(directory.listSync(), hasLength(1));
   });
 
+  test('draft commands work without a mounted inspector', () {
+    editor.inspector.getField('X').text = '0.2';
+    editor.undo();
+    expect(editor.selectedNode.rect.x, 0.1);
+    expect(editor.inspector.hasDraft, isFalse);
+    editor.redo();
+    expect(editor.selectedNode.rect.x, 0.2);
+
+    editor.inspector.getField('X').text = '0.3';
+    editor.duplicateSelectedNode();
+    expect(editor.document.nodes.map((node) => node.rect.x), [0.3, 0.3]);
+    editor.inspector.getField('X').text = '0.4';
+    editor.selectNode('panel');
+    expect(editor.document.nodes.last.rect.x, 0.4);
+    expect(editor.inspector.getField('X').text, '0.3');
+
+    editor.inspector.getField('X').text = '0.2';
+    expect(editor.save(), isTrue);
+    expect(
+      decodeSceneDocument(file.readAsStringSync()).nodes.first.rect.x,
+      0.2,
+    );
+  });
+
+  test('invalid drafts block document commands and reload clears them', () {
+    editor.duplicateSelectedNode();
+    final document = editor.document;
+    final source = file.readAsStringSync();
+    editor.inspector.getField('Width').text = '2';
+    editor.undo();
+    editor.redo();
+    editor.duplicateSelectedNode();
+    editor.deleteSelectedNode();
+    editor.updateScene(canvas: const SceneCanvas(referenceWidth: 1600));
+    expect(editor.selectNode('panel'), isFalse);
+    expect(editor.save(), isFalse);
+    expect(editor.document, same(document));
+    expect(editor.selectedId, 'panel-copy');
+    expect(file.readAsStringSync(), source);
+    expect(editor.inspector.error, contains('non-normalized rect'));
+
+    editor.reload();
+    expect(editor.inspector.hasDraft, isFalse);
+    expect(editor.inspector.error, isNull);
+    expect(editor.inspector.getField('Width').text, '0.5');
+  });
+
+  test('equivalent drafts clear without creating history', () {
+    editor.inspector.getField('X').text = '0.10';
+    expect(editor.applyDraft(), isTrue);
+    expect(editor.inspector.hasDraft, isFalse);
+    expect(editor.canUndo, isFalse);
+    expect(editor.isDirty, isFalse);
+  });
+
   test('invalid geometry leaves the working scene and history intact', () {
     expect(
       () => editor.updateNode(
