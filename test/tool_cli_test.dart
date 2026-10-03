@@ -108,6 +108,8 @@ void main() {
     expect(manifest['dependencies']['greeter_ui'], isNull);
     final entrypoint = File('${host.path}/lib/main.dart').readAsStringSync();
     expect(entrypoint, contains('ThemeStudioApp('));
+    expect(entrypoint, contains('themeDirectory:'));
+    expect(entrypoint, contains('themePackageName:'));
     expect(entrypoint, contains(r'\$dollar'));
     expect(entrypoint, contains('buildOceanTheme'));
     expect(entrypoint, isNot(contains('MyApp')));
