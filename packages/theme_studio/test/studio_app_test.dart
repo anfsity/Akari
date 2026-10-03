@@ -230,6 +230,39 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'failed initial load disables editor actions and reload recovers',
+    (tester) async {
+      file.writeAsStringSync('invalid scene');
+      await openStudio(tester);
+      expect(find.byType(StudioPreview), findsNothing);
+      expect(find.byType(NodeInspector), findsNothing);
+      for (final label in ['Settings', 'Undo', 'Redo']) {
+        expect(
+          tester
+              .widget<OutlineButton>(find.widgetWithText(OutlineButton, label))
+              .onPressed,
+          isNull,
+        );
+      }
+      expect(
+        tester
+            .widget<PrimaryButton>(
+              find.widgetWithText(PrimaryButton, 'Save scene'),
+            )
+            .onPressed,
+        isNull,
+      );
+      file.writeAsStringSync(encodeSceneDocument(_document));
+      await tester.tap(find.text('Reload from disk'));
+      await tester.pumpAndSettle();
+      expect(find.byType(StudioPreview), findsOneWidget);
+      expect(find.byType(NodeInspector), findsOneWidget);
+      expect(find.text('Saved'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('settings validate, cancel, apply and undo scene changes', (
     tester,
   ) async {
