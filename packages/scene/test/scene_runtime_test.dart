@@ -4,6 +4,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scene/scene.dart';
 
 void main() {
+  testWidgets('keeps node elements mounted across identity transforms', (
+    tester,
+  ) async {
+    const node = SceneNode(
+      id: 'editable',
+      componentId: 'decoration',
+      rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
+    );
+    await tester.pumpWidget(_runtime(_document(nodes: [node])));
+    final element = tester.element(find.byKey(const ValueKey('editable')));
+    for (final transform in const [
+      SceneTransform(scaleX: 1.2, rotationY: 25, rotationZ: 40),
+      SceneTransform(),
+    ]) {
+      await tester.pumpWidget(
+        _runtime(_document(nodes: [node.copyWith(transform: transform)])),
+      );
+      expect(
+        tester.element(find.byKey(const ValueKey('editable'))),
+        same(element),
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('isolates each scene node behind its own repaint boundary', (
     tester,
   ) async {
