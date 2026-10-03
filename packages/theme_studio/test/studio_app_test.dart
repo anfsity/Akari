@@ -487,6 +487,67 @@ void main() {
     },
   );
 
+  testWidgets('dragging a transformed node follows canvas coordinates', (
+    tester,
+  ) async {
+    file.writeAsStringSync(
+      encodeSceneDocument(
+        _document.copyWith(
+          nodes: [
+            _document.nodes.first.copyWith(
+              transform: const SceneTransform(
+                rotationZ: 0.6,
+                scaleX: 1.2,
+                scaleY: 0.8,
+              ),
+            ),
+            _document.nodes.last,
+          ],
+        ),
+      ),
+    );
+    await openStudio(tester);
+    final canvasRect = tester.getRect(find.byType(SceneRuntime));
+    await tester.drag(
+      find.byKey(const ValueKey('preview-panel')),
+      const Offset(60, 30),
+    );
+    await tester.pumpAndSettle();
+    final node = tester
+        .widget<StudioPreview>(find.byType(StudioPreview))
+        .document
+        .nodes
+        .first;
+    expect(node.rect.x, closeTo(0.1 + 60 / canvasRect.width, 0.00001));
+    expect(node.rect.y, closeTo(0.1 + 30 / canvasRect.height, 0.00001));
+    expect(node.transform.rotationZ, 0.6);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('cancelled drags preserve the scene and history', (tester) async {
+    await openStudio(tester);
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const ValueKey('preview-panel'))),
+    );
+    await gesture.moveBy(const Offset(60, 30));
+    await tester.pump();
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+    final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+    expect(
+      encodeSceneDocument(preview.document),
+      encodeSceneDocument(_document),
+    );
+    expect(find.text('Saved'), findsOneWidget);
+    expect(
+      tester
+          .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Undo'))
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('invalid inspector drafts block dragging', (tester) async {
     await openStudio(tester);
     await tester.enterText(find.byKey(const ValueKey('field-Width')), '2');
