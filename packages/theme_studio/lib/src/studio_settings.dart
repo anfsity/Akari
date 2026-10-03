@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import 'studio_preferences.dart';
+import 'studio_form.dart';
 
 class StudioSettings extends StatefulWidget {
   const StudioSettings({
@@ -18,6 +19,8 @@ class StudioSettings extends StatefulWidget {
   @override
   State<StudioSettings> createState() => _StudioSettingsState();
 }
+
+enum _SettingsSection { canvas, background, preferences }
 
 class _StudioSettingsState extends State<StudioSettings> {
   final _fields = <String, TextEditingController>{};
@@ -115,133 +118,111 @@ class _StudioSettingsState extends State<StudioSettings> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Studio settings'),
-      content: SizedBox(
-        width: 480,
-        height: 480,
-        child: ListView(
-          key: const ValueKey('settings-list'),
-          children: [
-            const Text('Canvas').semiBold(),
-            const Gap(12),
-            Row(
-              children: [
-                Expanded(child: _buildField('Canvas width')),
-                const Gap(12),
-                Expanded(child: _buildField('Canvas height')),
-              ],
-            ),
-            Select<SceneCanvasFit>(
-              value: _fit,
-              onChanged: (value) => setState(() => _fit = value!),
-              itemBuilder: (context, value) =>
-                  Text('Canvas fit: ${value.name}'),
-              popup: SelectPopup(
-                items: SelectItemList(
-                  children: [
-                    for (final value in SceneCanvasFit.values)
-                      SelectItemButton(value: value, child: Text(value.name)),
-                  ],
-                ),
-              ).call,
-            ),
-            const Gap(12),
-            Switch(
-              value: _safeArea,
-              onChanged: (value) => setState(() => _safeArea = value),
-              trailing: const Text('Respect safe area'),
-            ),
-            const Gap(20),
-            const Text('Background').semiBold(),
-            const Gap(12),
-            Select<SceneBackgroundKind>(
-              value: _background,
-              onChanged: (value) => setState(() => _background = value!),
-              itemBuilder: (context, value) =>
-                  Text('Background: ${value.name}'),
-              popup: SelectPopup(
-                items: SelectItemList(
-                  children: [
-                    // Keep custom compiled renderers selectable when already in use.
-                    for (final value in {
-                      SceneBackgroundKind.solid,
-                      SceneBackgroundKind.image,
-                      widget.document.background.kind,
-                    })
-                      SelectItemButton(value: value, child: Text(value.name)),
-                  ],
-                ),
-              ).call,
-            ),
-            const Gap(12),
-            _buildField('Background color'),
-            _buildField('Background asset'),
-            Row(
-              children: [
-                Expanded(child: _buildField('Background blur')),
-                const Gap(12),
-                Expanded(child: _buildField('Scrim opacity')),
-              ],
-            ),
-            const Gap(8),
-            const Text('Editor preferences').semiBold(),
-            const Gap(12),
-            Switch(
-              value: _darkMode,
-              onChanged: (value) => setState(() => _darkMode = value),
-              trailing: const Text('Dark appearance'),
-            ),
-            const Gap(12),
-            Switch(
-              value: _showGrid,
-              onChanged: (value) => setState(() => _showGrid = value),
-              trailing: const Text('Show grid'),
-            ),
-            const Gap(12),
-            Switch(
-              value: _snapToGrid,
-              onChanged: (value) => setState(() => _snapToGrid = value),
-              trailing: const Text('Snap to grid'),
-            ),
-            const Gap(12),
-            _buildField('Grid size (pixels)'),
-            const Text(
-              'Scene settings use Undo and Save scene. Editor preferences are saved automatically.',
-            ).small().muted(),
-          ],
-        ),
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Studio settings'),
+    content: SizedBox(
+      width: 480,
+      height: 480,
+      child: ListView.separated(
+        key: const ValueKey('settings-list'),
+        itemCount: _SettingsSection.values.length,
+        separatorBuilder: (context, index) => Gap(index == 0 ? 20 : 8),
+        itemBuilder: (context, index) =>
+            switch (_SettingsSection.values[index]) {
+              _SettingsSection.canvas => _buildCanvasSection(),
+              _SettingsSection.background => _buildBackgroundSection(),
+              _SettingsSection.preferences => _buildPreferencesSection(),
+            },
       ),
-      actions: [
-        if (_error != null)
-          SizedBox(
-            width: 260,
-            child: Text(
-              _error!,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.destructive,
-              ),
-            ).small(),
-          ),
-        OutlineButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        PrimaryButton(onPressed: _apply, child: const Text('Apply settings')),
-      ],
-    );
-  }
-
-  Widget _buildField(String label) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(label).small().muted(),
-        const Gap(6),
-        TextField(key: ValueKey('setting-$label'), controller: _fields[label]),
-      ],
     ),
+    actions: [
+      if (_error case final error?)
+        SizedBox(width: 260, child: StudioFormError(error)),
+      OutlineButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Cancel'),
+      ),
+      PrimaryButton(onPressed: _apply, child: const Text('Apply settings')),
+    ],
+  );
+
+  Widget _buildCanvasSection() => StudioFormSection(
+    title: 'Canvas',
+    children: [
+      StudioFieldRow(
+        left: _buildField('Canvas width'),
+        right: _buildField('Canvas height'),
+      ),
+      StudioEnumSelect(
+        label: 'Canvas fit',
+        value: _fit,
+        values: SceneCanvasFit.values,
+        onChanged: (value) => setState(() => _fit = value),
+      ),
+      const Gap(12),
+      Switch(
+        value: _safeArea,
+        onChanged: (value) => setState(() => _safeArea = value),
+        trailing: const Text('Respect safe area'),
+      ),
+    ],
+  );
+
+  Widget _buildBackgroundSection() => StudioFormSection(
+    title: 'Background',
+    children: [
+      StudioEnumSelect(
+        label: 'Background',
+        value: _background,
+        // Preserve custom compiled renderers already used by the document.
+        values: {
+          SceneBackgroundKind.solid,
+          SceneBackgroundKind.image,
+          widget.document.background.kind,
+        },
+        onChanged: (value) => setState(() => _background = value),
+      ),
+      const Gap(12),
+      _buildField('Background color'),
+      _buildField('Background asset'),
+      StudioFieldRow(
+        left: _buildField('Background blur'),
+        right: _buildField('Scrim opacity'),
+      ),
+    ],
+  );
+
+  Widget _buildPreferencesSection() => StudioFormSection(
+    title: 'Editor preferences',
+    children: [
+      Switch(
+        value: _darkMode,
+        onChanged: (value) => setState(() => _darkMode = value),
+        trailing: const Text('Dark appearance'),
+      ),
+      const Gap(12),
+      Switch(
+        value: _showGrid,
+        onChanged: (value) => setState(() => _showGrid = value),
+        trailing: const Text('Show grid'),
+      ),
+      const Gap(12),
+      Switch(
+        value: _snapToGrid,
+        onChanged: (value) => setState(() => _snapToGrid = value),
+        trailing: const Text('Snap to grid'),
+      ),
+      const Gap(12),
+      _buildField('Grid size (pixels)'),
+      const Text(
+        'Scene settings use Undo and Save scene. Editor preferences are saved automatically.',
+      ).small().muted(),
+    ],
+  );
+
+  Widget _buildField(String label) => StudioFormField(
+    label: label,
+    inputKey: ValueKey('setting-$label'),
+    controller: _fields[label]!,
   );
 }
