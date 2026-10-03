@@ -43,6 +43,19 @@ class NodeInspectorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Drag positions are transient, not inspector drafts. Suppress draft
+  // tracking and update only the two observing inputs, avoiding a rebuild of
+  // every inspector section on each move.
+  void updatePreviewPosition(SceneRect rect) {
+    _updatingFields = true;
+    for (final entry in {'X': rect.x, 'Y': rect.y}.entries) {
+      final field = getField(entry.key);
+      final text = '${entry.value}';
+      if (field.text != text) field.text = text;
+    }
+    _updatingFields = false;
+  }
+
   void resetNode(SceneNode node) {
     _updatingFields = true;
     _node = node;

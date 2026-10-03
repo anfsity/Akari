@@ -52,6 +52,8 @@ class StudioCanvas extends StatelessWidget {
                             ? session.selectedNode
                             : null,
                         onMove: session.updateNode,
+                        onDragPositionChanged:
+                            session.inspector.updatePreviewPosition,
                       ),
               ),
             ),

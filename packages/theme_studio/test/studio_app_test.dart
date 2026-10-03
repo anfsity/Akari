@@ -685,6 +685,71 @@ void main() {
     },
   );
 
+  testWidgets(
+    'live drag updates position inputs without rebuilding inspector or committing revisions',
+    (tester) async {
+      await openStudio(tester);
+      final inspector = tester
+          .widget<NodeInspector>(find.byType(NodeInspector))
+          .controller;
+      final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      final form = find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == '_InspectorForm',
+      );
+      final formWidget = tester.widget(form);
+      final widthController = inspector.getField('Width');
+      var inspectorNotifications = 0;
+      var widthNotifications = 0;
+      inspector.addListener(() => inspectorNotifications++);
+      widthController.addListener(() => widthNotifications++);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('preview-panel'))),
+      );
+      await gesture.moveBy(const Offset(40, 20));
+      await tester.pump();
+      final firstX = double.parse(inspector.getField('X').text);
+      expect(firstX, greaterThan(0.1));
+      await gesture.moveBy(const Offset(30, 15));
+      await tester.pump();
+      expect(double.parse(inspector.getField('X').text), greaterThan(firstX));
+      expect(double.parse(inspector.getField('Y').text), greaterThan(0.1));
+      expect(inspector.hasDraft, isFalse);
+      expect(inspectorNotifications, 0);
+      expect(widthNotifications, 0);
+      expect(tester.widget(form), same(formWidget));
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)),
+        same(preview),
+      );
+      expect(preview.document.nodes.first.rect.x, 0.1);
+      expect(find.text('Saved'), findsOneWidget);
+      expect(
+        tester
+            .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Undo'))
+            .onPressed,
+        isNull,
+      );
+      final liveX = double.parse(inspector.getField('X').text);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<StudioPreview>(find.byType(StudioPreview))
+            .document
+            .nodes
+            .first
+            .rect
+            .x,
+        liveX,
+      );
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(inspector.getField('X').text, '0.1');
+      expect(find.text('Saved'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('dragging a transformed node follows canvas coordinates', (
     tester,
   ) async {
@@ -729,6 +794,10 @@ void main() {
     );
     await gesture.moveBy(const Offset(60, 30));
     await tester.pump();
+    final inspector = tester
+        .widget<NodeInspector>(find.byType(NodeInspector))
+        .controller;
+    expect(double.parse(inspector.getField('X').text), greaterThan(0.1));
     await gesture.cancel();
     await tester.pumpAndSettle();
     final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
@@ -736,6 +805,9 @@ void main() {
       encodeSceneDocument(preview.document),
       encodeSceneDocument(_document),
     );
+    expect(inspector.getField('X').text, '0.1');
+    expect(inspector.getField('Y').text, '0.1');
+    expect(inspector.hasDraft, isFalse);
     expect(find.text('Saved'), findsOneWidget);
     expect(
       tester
