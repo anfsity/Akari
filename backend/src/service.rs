@@ -204,25 +204,29 @@ impl GreeterService {
                 )));
             }
         };
-        // logind runs outside the actor, but the lease blocks new authentication
-        // until this call completes and releases on every return/error path.
-        let _power_lease = self.auth.reserve_power().await?;
-
-        let connection = zbus::Connection::system().await.map_err(|error| {
-            fdo::Error::Failed(format!("could not connect to system D-Bus: {error}"))
-        })?;
-        let proxy = zbus::Proxy::new(
-            &connection,
-            "org.freedesktop.login1",
-            "/org/freedesktop/login1",
-            "org.freedesktop.login1.Manager",
-        )
-        .await
-        .map_err(|error| fdo::Error::Failed(format!("could not access logind: {error}")))?;
-        proxy
-            .call::<_, _, ()>(method, &(true,))
+        #[cfg(feature = "mock-power")]
+        {
+            tracing::info!(action = method, mocked = true, "power action simulated");
+            Ok(())
+        }
+        #[cfg(not(feature = "mock-power"))]
+        {
+            let connection = zbus::Connection::system().await.map_err(|error| {
+                fdo::Error::Failed(format!("could not connect to system D-Bus: {error}"))
+            })?;
+            let proxy = zbus::Proxy::new(
+                &connection,
+                "org.freedesktop.login1",
+                "/org/freedesktop/login1",
+                "org.freedesktop.login1.Manager",
+            )
             .await
-            .map_err(|error| fdo::Error::Failed(format!("power action failed: {error}")))
+            .map_err(|error| fdo::Error::Failed(format!("could not access logind: {error}")))?;
+            proxy
+                .call::<_, _, ()>(method, &(true,))
+                .await
+                .map_err(|error| fdo::Error::Failed(format!("power action failed: {error}")))
+        }
     }
 
     #[zbus(signal)]
