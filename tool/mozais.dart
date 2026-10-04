@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'src/cli_definition.dart';
@@ -73,6 +74,7 @@ Future<void> main(List<String> arguments) async {
             const {
               'build',
               'run',
+              'run sway',
               'preview',
               'run studio',
               'verify-perf',
@@ -87,6 +89,35 @@ Future<void> main(List<String> arguments) async {
     final preview = command == 'preview' || command == 'run studio';
     final buildMode =
         options.buildMode ?? (command == 'build' ? 'release' : 'debug');
+    Map<String, Object?>? displayProfile;
+    if (command == 'run sway') {
+      final stateHome = Platform.environment['XDG_STATE_HOME'];
+      final state = stateHome != null && stateHome.isNotEmpty
+          ? stateHome
+          : '${Platform.environment['HOME'] ?? (throw const FormatException('HOME or XDG_STATE_HOME is required.'))}/.local/state';
+      final result = await Process.run('python3', [
+        _join(repoRoot.path, 'scripts/greetd-test/display_profile.py'),
+        '--reference',
+        _join(repoRoot.path, 'config/sway/reference.json'),
+        '--state',
+        '$state/mozais/display-profiles',
+        '--display-profile',
+        options.displayProfile,
+        if (options.resolution != null) ...[
+          '--resolution',
+          options.resolution!,
+        ],
+        if (options.scale != null) ...['--scale', options.scale!],
+        if (options.dryRun) '--dry-run',
+      ]);
+      if ((result.stderr as String).isNotEmpty) stderr.write(result.stderr);
+      if (result.exitCode != 0) {
+        exitCode = result.exitCode;
+        return;
+      }
+      displayProfile = (jsonDecode(result.stdout as String) as Map)
+          .cast<String, Object?>();
+    }
     final runDirectory = await _createRunDirectory(
       repoRoot,
       reserve: !options.dryRun,
@@ -102,6 +133,8 @@ Future<void> main(List<String> arguments) async {
       jobs: options.jobs,
       backendMode: options.backendMode,
       themeArguments: options.themeArguments,
+      displayProfile: displayProfile,
+      swayBackend: options.swayBackend,
     );
     final artifactPaths = artifactPathsFor(
       command,
@@ -110,7 +143,9 @@ Future<void> main(List<String> arguments) async {
       buildMode: buildMode,
       selectedTheme: selectedTheme,
       preview: preview,
-      backendMode: command == 'run' ? options.backendMode : 'real',
+      backendMode: command == 'run' || command == 'run sway'
+          ? options.backendMode
+          : 'real',
     );
     if (options.dryRun) {
       writeRunPlan(
@@ -120,6 +155,7 @@ Future<void> main(List<String> arguments) async {
         runDirectory: runDirectory,
         steps: steps,
         artifactPaths: artifactPaths,
+        displayProfile: displayProfile,
       );
       return;
     }
@@ -151,6 +187,7 @@ Future<void> main(List<String> arguments) async {
         runDirectory: runDirectory,
         steps: steps,
         artifactPaths: artifactPaths,
+        displayProfile: displayProfile,
       );
     } finally {
       for (final lock in locks.reversed) {
@@ -243,6 +280,10 @@ _CliOptions _parseOptions(CliCommand command, List<String> arguments) {
     dryRun: values.containsKey('--dry-run'),
     jobs: jobs,
     backendMode: values['--backend'] ?? 'mock',
+    displayProfile: values['--display-profile'] ?? 'auto',
+    resolution: values['--resolution'],
+    scale: values['--scale'],
+    swayBackend: values['--sway-backend'] ?? 'wayland',
   );
 }
 
@@ -316,6 +357,10 @@ class _CliOptions {
     required this.themePath,
     required this.jobs,
     required this.backendMode,
+    required this.displayProfile,
+    required this.resolution,
+    required this.scale,
+    required this.swayBackend,
   });
   final RunOutputFormat format;
   final List<String> themeArguments;
@@ -326,4 +371,8 @@ class _CliOptions {
   final String? themePath;
   final int? jobs;
   final String backendMode;
+  final String displayProfile;
+  final String? resolution;
+  final String? scale;
+  final String swayBackend;
 }

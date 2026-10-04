@@ -91,14 +91,103 @@ This opt-in check requires Sway, wtype, and grim. It starts an isolated headless
 compositor with mixed output scales, tests hotplug and both window modes, and
 retains screenshots and logs in the printed temporary directory.
 
-A preview on Hyprland inherits that output's scale. The standalone Sway test has
-its own output scale, so the same physical resolution can produce a different
-logical viewport and layout. For visual comparison, use the standalone login as
-the reference and adapt the local desktop preview to its logical viewport; keep
-personal compositor settings outside the production renderer.
-`scripts/debug-sway.sh` is an explicit nested Sway diagnostic, not the preview
-entry point; nesting can add another scaling
-stage and does not reproduce a standalone DRM session.
+A preview on Hyprland inherits that output's scale. Use `run sway` to apply
+the standalone greeter's scale in a nested compositor:
+
+```sh
+mozais run sway
+mozais run sway --display-profile reference
+mozais run sway --display-profile login
+mozais run sway --resolution 1920x1080 --scale 1.6
+mozais run sway --display-profile reference --sway-backend headless
+```
+
+The selected theme, build mode, build jobs, mock/real backend and reload keys
+follow `run`. `scripts/debug-sway.sh` forwards to this same CLI entry point.
+The session requires Python 3, Sway, swaymsg and grim. The default Wayland backend
+opens virtual outputs in the current Wayland desktop; headless needs no desktop.
+Neither switches the display manager. The session owns its private D-Bus,
+backend, compositor, frontend process group and temporary runtime directory.
+Quitting or a failure cleans them up and retains logs.
+
+`--display-profile` accepts `auto` (default), `login` and `reference`. Auto imports
+the newest complete, marked DRM login snapshot from
+`/opt/mozais-test/current-run/greeter/session-*/`, or keeps a newer saved login
+profile. Without one, it uses `config/sway/reference.json`: one output,
+1920×1080 pixels, scale 1, logical viewport 1920×1080. `login` reports an error
+when no valid login profile exists. `reference` bypasses login discovery and
+import, allowing consistent team comparisons. Reinstall the greetd harness to
+produce marked snapshots; older unmarked `outputs.json` files remain diagnostics.
+
+Imported profiles live at
+`${XDG_STATE_HOME:-~/.local/state}/mozais/display-profiles/login.json`, with
+atomic replacement and owner-only access. They retain mode including refresh,
+scale, transform, logical rectangle, display identity, capture time, original
+snapshot path and test/session provenance. Failed attempts, partial or corrupt
+snapshots, and nested/headless outputs cannot replace a valid login record.
+Raw login logs stay at their original paths; the saved profile remains usable
+after those logs are removed. Dry-run resolves defaults without importing files
+or creating run directories.
+
+Resolution and scale come from one base profile before explicit overrides.
+`--resolution WIDTHxHEIGHT` means reference output pixels; `--scale NUMBER`
+is the intended standalone scale and must be positive. Headless outputs enforce
+that resolution: at 1920×1080 and scale 1.6 the logical viewport is 1200×675.
+On Hyprland, the outer compositor determines the actual output dimensions. Either
+option can override a single output while preserving the other base values;
+the complete resulting target is reported as customized. Multi-output profiles
+reject these global overrides; select `reference` for a single-output override.
+Multiple login displays map in top-to-bottom, then left-to-right order to
+`WL-1`, `WL-2`, … or `HEADLESS-1`, `HEADLESS-2`, … while retaining each display's
+reference mode, scale, transform and logical position. Reports keep their original names.
+
+Startup prints the source, complete targets, actual outputs, and log/screenshot
+locations. `--format json` includes this information in the run report's
+`display` field. Sway artifacts live under `build/tool/runs/<run-id>/sway/`:
+`display-report.json`, raw `outputs.json`, `sway.log`, `flutter.log`, generated
+configuration and `screenshots/<virtual-output>.png`. Screenshots are taken
+inside Sway after all greeter windows appear, at each output's own pixel scale.
+Virtual backends choose refresh rates independently; reports retain physical
+refresh as provenance. Fixed geometry verifies mode dimensions, scale, transform
+and rect; Hyprland geometry verifies the settings described below.
+
+On Hyprland, windows stay under the desktop's normal tiling and fullscreen
+management. The session reads each owned window's monitor and applies
+`inner scale = selected standalone scale / Hyprland monitor scale`. For example,
+TTY scale 1 on a monitor with Hyprland scale 1.6 uses inner scale 0.625. When
+fullscreen on the same monitor and physical mode, the logical viewport and
+content size match standalone TTY Sway. Fullscreen dimensions come from the
+monitor rather than the profile's reference resolution. Use your normal
+Hyprland fullscreen key to compare with TTY.
+
+Resizing, entering or leaving fullscreen updates the viewport without stopping
+the theme. Moving the window to another monitor recalculates its scale. The
+session only reads Hyprland IPC and changes its own inner Sway outputs; it
+requires no floating rules, fixed window sizes, or desktop configuration edits.
+Reports retain the original `target`, the compensated `effective_target`
+(including host monitor and scale), and `actual`. `matched` checks the effective
+output settings for compositor-managed geometry. Inner screenshots use the
+adopted output's scale and dimensions, so they may differ in pixel dimensions
+from TTY captures even when the displayed content size matches.
+
+Headless sessions keep fixed-profile verification and fail on output drift.
+Other outer compositors still require windows that accept the requested profile
+sizes. Use headless for fixed-resolution screenshots. Nested/headless tests do
+not replace DRM hardware or standalone TTY tests.
+
+Run the native nested regression matrix against a built greeter and mock backend:
+
+```sh
+python3 test/support/sway_native_workflow_test.py \
+  --app build/out/default/greeter \
+  --backend backend/target/mozais-mock/debug/backend
+```
+
+This creates an isolated headless outer Sway at scales 1 and 1.6, then tests
+inner scales 1 and 1.6. It retains target/actual reports and checks 1920×1080
+inner screenshot dimensions for all four combinations. It does not alter the
+developer's desktop configuration or certify Hyprland-specific placement.
+
 Production `build` defaults to release and compiles both frontend and Rust backend.
 
 Use `run studio --theme PATH` to edit scene JSON with a shadcn inspector, compiled
@@ -115,8 +204,8 @@ also runs a theme project's Flutter tests when it contains `*_test.dart` files u
 The root project contains shared application code and repository tests. The CLI
 generates the executable entrypoint for each selected theme. For repository
 debugging, `tool/dev_main.dart` explicitly injects the default theme;
-`scripts/debug-sway.sh` uses this entrypoint. To run it directly with demo login
-state after generating scenes:
+the CLI and Sway wrapper use the selected theme's generated host. To run the
+repository entrypoint directly with demo login state after generating scenes:
 
 ```sh
 fvm flutter run -d linux --target tool/dev_main.dart

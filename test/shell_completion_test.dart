@@ -40,7 +40,22 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(await completeBashWords(['mozais', 'tr']), ['trace-perf', 'trace']);
     expect(await completeBashWords(['mozais', 'st']), isEmpty);
     expect(await completeBashWords(['mozais', 'run', 'st']), ['studio']);
-    expect(await completeBashWords(['mozais', 'run', '']), ['studio']);
+    expect(await completeBashWords(['mozais', 'run', '']), ['sway', 'studio']);
+    expect(await completeBashWords(['mozais', 'run', 'sw']), ['sway']);
+    expect(
+      await completeBashWords([
+        'mozais',
+        'run',
+        'sway',
+        '--display-profile',
+        'r',
+      ]),
+      ['reference'],
+    );
+    expect(
+      await completeBashWords(['mozais', 'run', 'sway', '--sway-backend=h']),
+      ['--sway-backend=headless'],
+    );
     expect(await completeBashWords(['mozais', 'greetd-test', '']), [
       'install',
       'start',
@@ -139,6 +154,12 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(buffers[9].trimRight(), 'mozais greetd-test restore');
     expect(buffers[10].trimRight(), 'mozais greetd-test start --log-dir=');
     expect(buffers[11].trimRight(), 'mozais greetd-test logs --run current');
+    expect(buffers[12].trimRight(), 'mozais run sway');
+    expect(
+      buffers[13].trimRight(),
+      'mozais run sway --display-profile reference',
+    );
+    expect(buffers[14].trimRight(), 'mozais run sway --sway-backend=headless');
   });
 
   test('installation preserves startup content and works outside the repository', () async {
