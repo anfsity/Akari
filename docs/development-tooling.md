@@ -72,9 +72,11 @@ windowed greeter. Exit live sessions with `q` in the launching terminal.
 
 A preview on Hyprland inherits that output's scale. The standalone Sway test has
 its own output scale, so the same physical resolution can produce a different
-logical viewport and layout. For visual comparison, use fullscreen and match
-both resolution and output scale. `scripts/debug-sway.sh` is an explicit nested
-Sway diagnostic, not the preview entry point; nesting can add another scaling
+logical viewport and layout. For visual comparison, use the standalone login as
+the reference and adapt the local desktop preview to its logical viewport; keep
+personal compositor settings outside the production renderer.
+`scripts/debug-sway.sh` is an explicit nested Sway diagnostic, not the preview
+entry point; nesting can add another scaling
 stage and does not reproduce a standalone DRM session.
 Production `build` defaults to release and compiles both frontend and Rust backend.
 
