@@ -3,117 +3,212 @@
   "version": 2,
   "canvas": {
     "fit": "cover",
-    "useSafeArea": true
+    "useSafeArea": true,
+    "referenceWidth": 1920,
+    "referenceHeight": 1080
   },
   "background": {
     "kind": "image",
-    "asset": "packages/theme_default/assets/(139810879)年越し三人娘 『OIOI × 東方Project』.jpg",
+    "asset": "packages/theme_default/assets/(58024056)-Dimension tripper!!!!-.jpg",
     "color": "#000000",
     "scrimOpacity": 0.44,
-    "blurSigma": 14
+    "blurSigma": 14.0
   },
   "nodes": [
     {
       "id": "clock",
       "component": "dateTime",
-      "rect": {"x": 0.035, "y": 0.05, "width": 0.24, "height": 0.045},
+      "rect": {
+        "x": 0.035,
+        "y": 0.05,
+        "width": 0.24,
+        "height": 0.045
+      },
       "renderOrder": 10,
-      "focusOrder": 0,
       "motion": "fade",
-      "properties": {"variant": "date"}
+      "properties": {
+        "variant": "date"
+      }
     },
     {
       "id": "clock_time",
       "component": "dateTime",
-      "rect": {"x": 0.30, "y": 0.42, "width": 0.40, "height": 0.16},
+      "rect": {
+        "x": 0.3,
+        "y": 0.42,
+        "width": 0.4,
+        "height": 0.16
+      },
       "renderOrder": 10,
-      "focusOrder": 0,
       "motion": "fade",
       "visibleWhen": "isDormant",
-      "properties": {"variant": "time"}
+      "properties": {
+        "variant": "time"
+      }
     },
     {
       "id": "power_actions",
       "component": "powerActions",
-      "rect": {"x": 0.87, "y": 0.035, "width": 0.095, "height": 0.04},
+      "rect": {
+        "x": 0.87,
+        "y": 0.035,
+        "width": 0.095,
+        "height": 0.04
+      },
       "renderOrder": 20,
       "focusOrder": 30,
       "motion": "fade",
       "interactive": true,
-      "properties": {"variant": "icon-row"}
+      "properties": {
+        "variant": "icon-row"
+      }
     },
     {
       "id": "glass_panel",
       "component": "glassPanel",
-      "rect": {"x": 0.32, "y": 0.18, "width": 0.36, "height": 0.64},
+      "rect": {
+        "x": 0.32,
+        "y": 0.18,
+        "width": 0.36,
+        "height": 0.64
+      },
+      "transform": {
+        "translateX": 0.0,
+        "translateY": 0.0,
+        "scaleX": 0.9421182328031864,
+        "scaleY": 1.0358358034148443,
+        "rotationX": 0.0,
+        "rotationY": 0.0,
+        "rotationZ": 0.0,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "perspective": 0.0
+      },
       "renderOrder": 30,
-      "focusOrder": 0,
       "motion": "fadeScale",
-      "visibleWhen": {"not": "isDormant"},
-      "properties": {"variant": "soft-glass"}
+      "visibleWhen": {
+        "not": "isDormant"
+      },
+      "properties": {
+        "variant": "soft-glass"
+      }
     },
     {
       "id": "avatar",
       "component": "avatar",
-      "rect": {"x": 0.45, "y": 0.225, "width": 0.1, "height": 0.16},
+      "rect": {
+        "x": 0.45,
+        "y": 0.225,
+        "width": 0.1,
+        "height": 0.16
+      },
       "renderOrder": 40,
       "focusOrder": 10,
       "motion": "fadeScale",
+      "visibleWhen": {
+        "not": "isDormant"
+      },
       "interactive": true,
-      "visibleWhen": {"not": "isDormant"},
-      "properties": {"variant": "circle"}
+      "properties": {
+        "variant": "circle"
+      }
     },
     {
       "id": "account_name",
       "component": "accountName",
-      "rect": {"x": 0.36, "y": 0.39, "width": 0.28, "height": 0.06},
+      "rect": {
+        "x": 0.36,
+        "y": 0.39,
+        "width": 0.28,
+        "height": 0.06
+      },
       "renderOrder": 40,
-      "focusOrder": 0,
       "motion": "fade",
-      "visibleWhen": {"not": "isDormant"},
-      "properties": {"variant": "center"}
+      "visibleWhen": {
+        "not": "isDormant"
+      },
+      "properties": {
+        "variant": "center"
+      }
     },
     {
       "id": "session_picker",
       "component": "sessionPicker",
-      "rect": {"x": 0.37, "y": 0.48, "width": 0.26, "height": 0.065},
+      "rect": {
+        "x": 0.37,
+        "y": 0.48,
+        "width": 0.26,
+        "height": 0.065
+      },
       "renderOrder": 40,
       "focusOrder": 20,
       "motion": "fade",
+      "visibleWhen": {
+        "not": "isDormant"
+      },
       "interactive": true,
-      "visibleWhen": {"not": "isDormant"},
-      "properties": {"variant": "pill"}
+      "properties": {
+        "variant": "pill"
+      }
     },
     {
       "id": "credential_field",
       "component": "credentialField",
-      "rect": {"x": 0.35, "y": 0.585, "width": 0.3, "height": 0.06},
+      "rect": {
+        "x": 0.35,
+        "y": 0.585,
+        "width": 0.3,
+        "height": 0.06
+      },
       "renderOrder": 40,
       "focusOrder": 40,
       "motion": "fade",
+      "visibleWhen": {
+        "not": "isDormant"
+      },
       "interactive": true,
-      "visibleWhen": {"not": "isDormant"},
-      "properties": {"variant": "outline"}
+      "properties": {
+        "variant": "outline"
+      }
     },
     {
       "id": "primary_action",
       "component": "primaryAction",
-      "rect": {"x": 0.47, "y": 0.685, "width": 0.06, "height": 0.08},
+      "rect": {
+        "x": 0.47,
+        "y": 0.685,
+        "width": 0.06,
+        "height": 0.08
+      },
       "renderOrder": 40,
       "focusOrder": 50,
       "motion": "hoverLift",
+      "visibleWhen": {
+        "any": [
+          "isAuthPrompting",
+          "isAuthSubmitting",
+          "isAuthError"
+        ]
+      },
       "interactive": true,
-      "visibleWhen": {"any": ["isAuthPrompting", "isAuthSubmitting", "isAuthError"]},
-      "properties": {"variant": "round-arrow"}
+      "properties": {
+        "variant": "round-arrow"
+      }
     },
     {
       "id": "status",
       "component": "status",
-      "rect": {"x": 0.35, "y": 0.765, "width": 0.3, "height": 0.035},
+      "rect": {
+        "x": 0.35,
+        "y": 0.765,
+        "width": 0.3,
+        "height": 0.035
+      },
       "renderOrder": 40,
-      "focusOrder": 0,
       "motion": "fade",
-      "properties": {"variant": "inline"}
+      "properties": {
+        "variant": "inline"
+      }
     }
   ]
 }
