@@ -6,5 +6,5 @@ switch = true
 source_profile = false
 
 [default_session]
-command = "/opt/mozais-test/launch.sh"
+command = "@TEST_ROOT@/launch.sh"
 user = "greeter"
