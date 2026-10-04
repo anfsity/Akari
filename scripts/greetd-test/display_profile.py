@@ -226,12 +226,15 @@ def get_virtual_outputs(profile, backend):
             for index, output in enumerate(profile['outputs'], 1)]
 
 
-def get_output_commands(outputs):
-    return [f'output {json.dumps(output["name"])} mode '
-            f'{output["mode"]["width"]}x{output["mode"]["height"]} '
-            f'scale {output["scale"]} transform {output["transform"]} '
-            f'position {output["rect"]["x"]} {output["rect"]["y"]}'
-            for output in outputs]
+def get_output_commands(outputs, configure_mode=True):
+    commands = []
+    for output in outputs:
+        command = f'output {json.dumps(output["name"])} '
+        if configure_mode:
+            command += f'mode {output["mode"]["width"]}x{output["mode"]["height"]} '
+        commands.append(command + f'scale {output["scale"]} transform {output["transform"]} '
+                        f'position {output["rect"]["x"]} {output["rect"]["y"]}')
+    return commands
 
 
 def get_output_differences(target, actual):

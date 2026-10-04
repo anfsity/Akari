@@ -107,8 +107,25 @@ const cliOptions = {
   ),
   '--scale': CliOption(
     '--scale',
-    'Standalone Sway output scale (default: 1).',
+    'Standalone Sway scale (default: 1; nested Hyprland compensates host scale).',
     valueName: 'NUMBER',
+  ),
+  '--resolution': CliOption(
+    '--resolution',
+    'Override reference pixel size (enforced headless; Hyprland controls window size).',
+    valueName: 'WIDTHxHEIGHT',
+  ),
+  '--display-profile': CliOption(
+    '--display-profile',
+    'Display defaults: latest valid login, or project reference (default: auto).',
+    valueName: 'PROFILE',
+    values: ['auto', 'login', 'reference'],
+  ),
+  '--sway-backend': CliOption(
+    '--sway-backend',
+    'Sway backend (default: wayland; headless for fixed screenshots).',
+    valueName: 'BACKEND',
+    values: ['wayland', 'headless'],
   ),
   '--log-dir': CliOption(
     '--log-dir',
@@ -160,6 +177,20 @@ const cliCommands = [
     'preview',
     'Run the selected theme with demo login state.',
     options: ['--theme', '--jobs', '--mode'],
+  ),
+  CliCommand(
+    'run sway',
+    'Run the selected greeter in isolated Sway with verified display defaults.',
+    options: [
+      '--theme',
+      '--jobs',
+      '--mode',
+      '--backend',
+      '--display-profile',
+      '--resolution',
+      '--scale',
+      '--sway-backend',
+    ],
   ),
   CliCommand(
     'run studio',

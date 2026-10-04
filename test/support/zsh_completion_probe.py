@@ -72,6 +72,9 @@ try:
         "mozais greetd-test re",
         "mozais greetd-test start --log-d",
         "mozais greetd-test logs --run c",
+        "mozais run sw",
+        "mozais run sway --display-profile re",
+        "mozais run sway --sway-backend=h",
     ]
     for index, probe in enumerate(probes):
         os.write(master, (probe + "\t").encode())

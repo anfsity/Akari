@@ -104,6 +104,25 @@ Each greeter launch retains `backend.log`, `flutter.log`, `sway.log`,
 returning from the desktop does not overwrite earlier logs. Recovery saves the
 test and SDDM journal plus its own timestamp/result.
 
+After initial output arrangement, the launch also publishes `display-profile.json`
+with normalized active outputs, DRM login provenance, run/session paths, capture
+time and a checksum of the original `outputs.json`. Publication is atomic and
+follows the raw snapshot. This is the startup state; hotplug keeps rearranging
+outputs but does not update this snapshot. Re-run the test to capture a changed
+display combination. Sessions without a saved arrangement use Sway's initial
+positions and the same snapshot capture path.
+
+Back on the desktop, `mozais run sway` automatically imports the newest valid
+marked snapshot into the developer's local state. It ignores incomplete,
+damaged or unmarked captures and keeps any existing valid local profile.
+`--display-profile reference` uses the project's 1920×1080, scale 1
+reference (fixed resolution for headless); `--display-profile login` requires
+a valid login capture.
+See [Development Tooling](development-tooling.md) for overrides, multi-output
+mapping, actual-output checks and inner screenshots. Reinstall the harness to
+enable these source-marked captures; login processes never write to a
+developer's home directory.
+
 Inspect the latest startup attempt or the test used by recovery:
 
 ```sh
@@ -140,15 +159,20 @@ the directly readable `journal.log` is saved during recovery. Reinstall the
 scripts to make these changes available in `/opt/mozais-test`. Existing logs in
 the old `/opt/mozais-test/test-runs/` directory remain there.
 
-The standalone login environment is the visual reference. Its output scale
+The standalone login environment supplies the local visual reference. Its output scale
 remains 1 by default. `mozais greetd-test start --scale NUMBER` explicitly
-overrides it; Sway records the actual output mode and scale in `outputs.json`. Personal Hyprland development settings should make the Mozais
-preview match this login environment. Do not change the login output scale to
-follow a developer's desktop settings. Desktop scaling compatibility belongs to
-that developer's local preview setup, outside the production renderer.
+overrides it; Sway records the actual output mode and scale in `outputs.json`.
+`mozais run sway` compensates for the outer Hyprland monitor scale, so a
+fullscreen nested window on the same monitor and mode has the same logical
+viewport and content size as TTY. The inner scale is the selected login scale
+divided by the Hyprland monitor scale; monitor settings remain untouched.
+Headless tests reproduce the selected profile's fixed resolution and scale.
 
 Validate harness control flow without root or live system changes:
 
 ```sh
 python3 test/support/greetd_test_workflow_test.py
+python3 test/support/display_profile_test.py
+python3 test/support/display_layout_test.py
+python3 test/support/sway_session_test.py
 ```
