@@ -9,7 +9,7 @@ uses mock authentication and mock power by default.
 Build and install while no previous test or timer is active:
 
 ```sh
-sudo bash scripts/greetd-test/install.sh
+sudo bash scripts/greetd-test/install.sh /opt/mozais-test
 ```
 
 The installer first builds the current repository's default theme and production
@@ -88,13 +88,15 @@ tail -n 100 /var/tmp/mozais-greetd-test-$(id -u)/current/greeter/session-*/backe
 Set an absolute custom location when starting a test:
 
 ```sh
-sudo MOZAIS_TEST_LOG_DIR=/var/tmp/my-mozais-test /opt/mozais-test/start.sh
+sudo /opt/mozais-test/start.sh --log-dir /var/tmp/my-mozais-test
 ```
 
 The greeter must be able to traverse the parent directories of a custom location;
 startup checks access before stopping SDDM. A private home directory usually
-prevents this, so use a location beneath `/var/tmp`. Recovery resolves the saved
-pointer automatically and does not require the custom setting again.
+prevents this, so use a location beneath `/var/tmp`. The installation also retains a per-caller `latest-run-<uid>` pointer, including
+failed preflight attempts. Recovery resolves the saved `current-run` pointer
+automatically and does not require the custom setting again. Each armed test
+saves its scale and log root in `config.json`.
 
 For live system service output, use `sudo journalctl -u mozais-test.service -f`;
 the directly readable `journal.log` is saved during recovery. Reinstall the
@@ -102,7 +104,7 @@ scripts to make these changes available in `/opt/mozais-test`. Existing logs in
 the old `/opt/mozais-test/test-runs/` directory remain there.
 
 The standalone login environment is the visual reference. Its output scale
-remains 1 by default and Sway records the actual output mode and scale in
+remains 1 by default (`start.sh --scale NUMBER` explicitly overrides it) and Sway records the actual output mode and scale in
 `outputs.json`. Personal Hyprland development settings should make the Mozais
 preview match this login environment. Do not change the login output scale to
 follow a developer's desktop settings. Desktop scaling compatibility belongs to
