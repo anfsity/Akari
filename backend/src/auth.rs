@@ -41,14 +41,11 @@ impl AuthActorHandle {
     /// Starts the actor and returns the D-Bus-facing command and snapshot handle.
     pub(super) fn spawn() -> (Self, AuthActorTask) {
         let (commands, receiver) = mpsc::channel(COMMAND_BUFFER);
-        let (power_releases, release_receiver) = mpsc::unbounded_channel();
         let (snapshot_sender, snapshot) = watch::channel(AuthSnapshot::idle());
         let (control_sender, control) = watch::channel(None);
         let shutdown = CancellationToken::new();
         let task = tokio::spawn(run_actor(
             receiver,
-            release_receiver,
-            power_releases,
             commands.downgrade(),
             snapshot_sender,
             control_sender,
@@ -216,12 +213,6 @@ impl AuthActorHandle {
         .await
     }
 
-    /// Reserves the actor while a power action uses the system D-Bus.
-    pub(super) async fn reserve_power(&self) -> fdo::Result<PowerLease> {
-        self.send_with(|reply| AuthCommand::AcquirePower { reply })
-            .await
-    }
-
     /// Builds, enqueues, and awaits one typed command reply.
     async fn send_with<T, Build>(&self, build: Build) -> fdo::Result<T>
     where
@@ -263,19 +254,6 @@ where
     receiver
         .await
         .map_err(|_| fdo::Error::Failed("authentication actor stopped".to_owned()))?
-}
-
-/// Reservation held by a power action while it performs the system D-Bus call.
-/// Dropping it queues a release rather than awaiting actor work, so errors and
-/// cancellation of the logind call cannot leave the reservation permanently held.
-pub(super) struct PowerLease {
-    release: mpsc::UnboundedSender<()>,
-}
-
-impl Drop for PowerLease {
-    fn drop(&mut self) {
-        let _ = self.release.send(());
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -361,9 +339,6 @@ enum AuthCommand {
         emitter: SignalEmitter<'static>,
         reply: oneshot::Sender<fdo::Result<()>>,
     },
-    AcquirePower {
-        reply: oneshot::Sender<fdo::Result<PowerLease>>,
-    },
 }
 
 impl AuthCommand {
@@ -376,7 +351,6 @@ impl AuthCommand {
             Self::SessionUnavailable { .. } => "SessionUnavailable",
             Self::FailSessionResolution { .. } => "FailSessionResolution",
             Self::StartSession { .. } => "StartSession",
-            Self::AcquirePower { .. } => "ReservePower",
             #[cfg(test)]
             Self::Panic => "TestPanic",
         }
@@ -393,7 +367,6 @@ impl AuthCommand {
             Self::Cancel {
                 expected_caller, ..
             } => expected_caller.as_deref(),
-            Self::AcquirePower { .. } => None,
             #[cfg(test)]
             Self::Panic => None,
         }
@@ -409,7 +382,7 @@ impl AuthCommand {
             Self::Cancel {
                 expected_attempt, ..
             } => expected_attempt.as_deref(),
-            Self::Begin { .. } | Self::AcquirePower { .. } => None,
+            Self::Begin { .. } => None,
             #[cfg(test)]
             Self::Panic => None,
         }
@@ -430,7 +403,6 @@ fn send_reply<T>(reply: oneshot::Sender<fdo::Result<T>>, result: fdo::Result<T>)
 struct ActorState {
     auth: AuthStateMachine,
     attempt: Option<AttemptResources>,
-    power_busy: bool,
     shutdown: CancellationToken,
 }
 
@@ -468,8 +440,6 @@ impl ActorState {
 
 async fn run_actor(
     mut commands: mpsc::Receiver<AuthCommand>,
-    mut power_releases: mpsc::UnboundedReceiver<()>,
-    power_release_sender: mpsc::UnboundedSender<()>,
     command_sender: mpsc::WeakSender<AuthCommand>,
     snapshots: watch::Sender<AuthSnapshot>,
     controls: watch::Sender<Option<AttemptControl>>,
@@ -483,15 +453,9 @@ async fn run_actor(
         ..ActorState::default()
     };
     loop {
-        // Process lease releases in the same loop as D-Bus commands so a
-        // completed power action cannot leave the actor permanently busy.
         let command = tokio::select! {
             biased;
             _ = shutdown.cancelled() => break,
-            _ = power_releases.recv() => {
-                actor.power_busy = false;
-                continue;
-            }
             command = commands.recv() => command,
         };
         let Some(command) = command else {
@@ -645,10 +609,6 @@ async fn run_actor(
                     .await;
                     send_reply(reply, result);
                 }
-                AuthCommand::AcquirePower { reply } => {
-                    let result = acquire_power(&mut actor, power_release_sender.clone());
-                    send_reply(reply, result);
-                }
             }
         }
         .instrument(span)
@@ -667,9 +627,6 @@ async fn handle_begin(
     controls: &watch::Sender<Option<AttemptControl>>,
     commands: &mpsc::WeakSender<AuthCommand>,
 ) -> fdo::Result<String> {
-    if actor.power_busy {
-        return Err(fdo::Error::Failed("power action is in progress".to_owned()));
-    }
     if actor
         .attempt
         .as_ref()
@@ -1547,24 +1504,6 @@ fn require_state(auth: &AuthStateMachine, expected: AuthState) -> fdo::Result<()
     }
 }
 
-fn acquire_power(
-    actor: &mut ActorState,
-    release: mpsc::UnboundedSender<()>,
-) -> fdo::Result<PowerLease> {
-    if actor.power_busy {
-        Err(fdo::Error::Failed(
-            "power action is already in progress".to_owned(),
-        ))
-    } else if actor.auth.state().is_active() {
-        Err(fdo::Error::Failed(
-            "power action rejected while authentication is active".to_owned(),
-        ))
-    } else {
-        actor.power_busy = true;
-        Ok(PowerLease { release })
-    }
-}
-
 fn session_environment(session: &SessionEntry) -> Vec<String> {
     // The backend owns the launch environment and does not inherit a caller's
     // PATH when executing a desktop entry selected through D-Bus.
@@ -1610,7 +1549,7 @@ mod tests {
     use tokio::sync::watch;
 
     use super::{
-        ActorState, AuthActorHandle, AuthSnapshot, acquire_power, cancel_current, display_detail,
+        ActorState, AuthActorHandle, AuthSnapshot, cancel_current, display_detail,
         session_environment, snapshot, validate_attempt, validate_cancel_target,
     };
     use crate::{
@@ -1758,47 +1697,6 @@ mod tests {
         assert_eq!(actor.auth.state(), AuthState::Idle);
     }
 
-    #[test]
-    fn power_rejected_during_auth() {
-        let mut actor = ActorState::default();
-        actor.auth.begin_authentication("alice".to_owned()).unwrap();
-        let (release, _) = tokio::sync::mpsc::unbounded_channel();
-
-        let error = match acquire_power(&mut actor, release) {
-            Ok(_) => panic!("power action should be rejected during authentication"),
-            Err(error) => error,
-        };
-
-        assert!(error.to_string().contains("authentication is active"));
-        assert!(!actor.power_busy);
-    }
-
-    #[test]
-    fn power_rejected_when_busy() {
-        let mut actor = ActorState {
-            power_busy: true,
-            ..ActorState::default()
-        };
-        let (release, _) = tokio::sync::mpsc::unbounded_channel();
-
-        let error = match acquire_power(&mut actor, release) {
-            Ok(_) => panic!("power action should be rejected while busy"),
-            Err(error) => error,
-        };
-
-        assert!(error.to_string().contains("already in progress"));
-    }
-
-    #[test]
-    fn power_allowed_when_idle() {
-        let mut actor = ActorState::default();
-        let (release, _) = tokio::sync::mpsc::unbounded_channel();
-
-        let lease = acquire_power(&mut actor, release).expect("idle power should be allowed");
-        assert!(actor.power_busy);
-        drop(lease);
-    }
-
     #[tokio::test]
     async fn actor_panic_is_observable_and_queries_fail() {
         let (actor, mut runtime) = AuthActorHandle::spawn();
@@ -1809,7 +1707,6 @@ mod tests {
             .unwrap();
         assert!((&mut runtime.task).await.unwrap_err().is_panic());
         assert!(actor.get_state().is_err());
-        assert!(actor.reserve_power().await.is_err());
     }
 
     #[tokio::test]
@@ -1828,19 +1725,5 @@ mod tests {
         runtime.stop();
         (&mut runtime.task).await.unwrap();
         assert!(actor.get_state().is_err());
-        assert!(actor.reserve_power().await.is_err());
-    }
-
-    #[tokio::test]
-    async fn lease_release_unblocks() {
-        let (actor, mut runtime) = AuthActorHandle::spawn();
-        let lease = actor.reserve_power().await.unwrap();
-        assert!(actor.reserve_power().await.is_err());
-
-        drop(lease);
-
-        assert!(actor.reserve_power().await.is_ok());
-        runtime.stop();
-        (&mut runtime.task).await.unwrap();
     }
 }

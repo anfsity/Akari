@@ -36,6 +36,9 @@ async fn auth_roundtrip() {
     .await
     .expect("backend proxy should be available");
 
+    #[cfg(feature = "mock-power")]
+    assert_mock_power(&proxy).await;
+
     let attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
         .await
@@ -45,6 +48,8 @@ async fn auth_roundtrip() {
         .await
         .expect("state query should succeed");
     assert_eq!(state.0, "WaitingForInput");
+    #[cfg(feature = "mock-power")]
+    assert_mock_power(&proxy).await;
 
     proxy
         .call::<_, _, ()>("Respond", &(attempt_id.clone(), "password"))
@@ -55,6 +60,8 @@ async fn auth_roundtrip() {
         .await
         .expect("state query should succeed");
     assert_eq!(state.0, "Authenticated");
+    #[cfg(feature = "mock-power")]
+    assert_mock_power(&proxy).await;
 
     server.finish().await;
     let logs = backend.get_logs();
@@ -247,6 +254,10 @@ async fn cancel_interrupts_io_with_a_full_command_queue() {
         .await
         .unwrap()
         .unwrap();
+    #[cfg(feature = "mock-power")]
+    tokio::time::timeout(Duration::from_secs(2), assert_mock_power(&proxy))
+        .await
+        .expect("power requests must not wait for pending greetd I/O");
     // The actor is blocked in greetd and the burst exceeds its 16-command buffer.
     sleep(Duration::from_millis(100)).await;
     tokio::time::timeout(
@@ -1058,4 +1069,17 @@ async fn write_response(stream: &mut UnixStream, response: Value) {
     stream.write_all(&length).await.unwrap();
     stream.write_all(&payload).await.unwrap();
     stream.flush().await.unwrap();
+}
+
+#[cfg(feature = "mock-power")]
+async fn assert_mock_power(proxy: &Proxy<'_>) {
+    let before: (String, String) = proxy.call("GetState", &()).await.unwrap();
+    for action in ["PowerOff", "Reboot", "Suspend", "Hibernate"] {
+        proxy
+            .call::<_, _, ()>("PowerAction", &(action,))
+            .await
+            .unwrap();
+    }
+    let after: (String, String) = proxy.call("GetState", &()).await.unwrap();
+    assert_eq!(after, before);
 }

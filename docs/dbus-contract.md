@@ -102,7 +102,7 @@ provider secrets must remain outside the D-Bus contract.
 
 ### Concurrency Model
 
-Authentication is owned by one actor. D-Bus state-changing methods enqueue commands and await a per-call reply; the actor exclusively owns `AuthStateMachine`, the active `GreetdTransport`, cancellation handles, caller ownership, and the power-action reservation. `GetState()` reads a `watch` snapshot and does not contend with greetd I/O.
+Authentication is owned by one actor. D-Bus state-changing methods enqueue commands and await a per-call reply; the actor exclusively owns `AuthStateMachine`, the active `GreetdTransport`, cancellation handles, caller ownership. `GetState()` reads a `watch` snapshot and does not contend with greetd I/O.
 
 The actor processes one authentication command at a time, so a greetd request and its state transition cannot overlap with `Respond()`, `Cancel()`, or a replacement `BeginAuthentication()`. Session catalog scans remain outside the actor on blocking worker tasks; their completion is committed only if the attempt ID is still current. This is the stale-result boundary for catalog work and removes the need for backend, operation, transport, and request-gate locks.
 
@@ -200,7 +200,7 @@ This discovery step identifies available session candidates; it does not guarant
 
 ##### `PowerAction(String action) -> Void`
 * **Description**: Requests system power state transitions (`PowerOff`, `Reboot`, `Suspend`, `Hibernate`).
-* **Behavior**: The backend proxies the request to `systemd-logind` via the System D-Bus (`org.freedesktop.login1`).
+* **Behavior**: Production proxies the request to `systemd-logind` via the System D-Bus (`org.freedesktop.login1`), independently of authentication state and pending greetd I/O. Power requests do not cancel or block authentication. Builds with `mock-power` log the action and return success without connecting to the system bus; `mock` includes `mock-power`.
 
 ---
 
@@ -397,7 +397,7 @@ A retryable `auth_error` is not terminal. The backend keeps the same `attempt_id
 3. **Signal Isolation**: Asynchronous signals carry generation tokens; signals matching expired tokens are discarded by the UI.
 4. **Client Disconnect Handling**: Loss of the D-Bus client connection immediately triggers cancellation of the active transaction. A PAM prompt must never remain attached to a dead UI process.
 5. **Failure Classification**: PAM `auth_error` responses represent retryable credential failures. The backend restarts the `greetd` session under the same `attempt_id` and surfaces the rejection as an `error` prompt, so the UI can retry without a new attempt. Non-retryable `error` responses, and protocol, socket, or session execution failures, require complete state cleanup before a new attempt can begin.
-6. **Power Action Isolation**: `PowerAction` maintains an independent state domain. If an authentication transaction is active when a power request is received, the backend must either reject the power action as busy or explicitly cancel the authentication attempt prior to executing the system call.
+6. **Power Action Isolation**: `PowerAction` maintains an independent state domain. Authentication state never gates a power request, and power requests never mutate or reserve authentication state. System authorization and execution failures are returned to the caller.
 
 ---
 
