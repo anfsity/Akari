@@ -4,6 +4,7 @@ No display managers, system timers, or root-owned paths are touched. Fixture
 copies bypass the root guard and redirect installation paths, the lock, and Sway.
 """
 
+import json
 import os
 from pathlib import Path
 import pwd
@@ -89,10 +90,11 @@ elif name == 'sway': print('test compositor output')
             "TEST_ROOT": str(self.root),
             "SUDO_TTY": "/dev/tty3",
             "SUDO_USER": pwd.getpwuid(os.getuid()).pw_name,
-            "MOZAIS_TEST_LOG_DIR": str(self.logs),
         }
 
     def run_script(self, name, *args, **environment):
+        if name == "start.sh":
+            args = ("--log-dir", str(self.logs), *args)
         return subprocess.run(
             ["bash", str(self.root / name), *args],
             env={**self.environment, **environment}, capture_output=True,
@@ -104,7 +106,7 @@ elif name == 'sway': print('test compositor output')
         return path.read_text() if path.exists() else ""
 
     def test_start_uses_sudo_tty_and_arms_recovery_first(self):
-        result = self.run_script("start.sh", MOZAIS_TEST_SCALE="1.5")
+        result = self.run_script("start.sh", "--scale", "1.5")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         calls = self.calls()
         self.assertLess(calls.index('--unit=mozais-restore'), calls.index('stop sddm.service'))
@@ -113,6 +115,8 @@ elif name == 'sway': print('test compositor output')
         current = self.logs / "current"
         self.assertIn('output * scale 1.5', (current / 'sway.conf').read_text())
         self.assertIn('/dev/tty3', (current / 'start.log').read_text())
+        self.assertEqual(json.loads((current / "config.json").read_text()),
+                         {"scale": 1.5, "logRoot": str(self.logs)})
         self.assertEqual((current / "start.log").stat().st_mode & 0o777, 0o644)
         self.assertEqual((self.root / "current-run").resolve(), current.resolve())
         self.assertFalse((self.root / "test-runs").exists())
@@ -132,16 +136,16 @@ elif name == 'sway': print('test compositor output')
         self.assertIn('install -d -o root -g greeter -m 0755', self.calls())
 
     def test_preflight_rejections_do_not_stop_sddm(self):
-        for environment in [
-            {"SUDO_TTY": "/dev/pts/2"},
-            {"SESSION": "Class=user\nType=wayland\nState=active"},
-            {"MOZAIS_TEST_SCALE": "0"},
-            {"MOZAIS_TEST_SCALE": "1; exit 0"},
-            {"MOZAIS_TEST_LOG_DIR": "relative/logs"},
-            {"DENY_GREETER_LOG_ACCESS": "1"},
+        for args, environment in [
+            ([], {"SUDO_TTY": "/dev/pts/2"}),
+            ([], {"SESSION": "Class=user\nType=wayland\nState=active"}),
+            (["--scale", "0"], {}),
+            (["--scale", "1; exit 0"], {}),
+            (["--log-dir", "relative/logs"], {}),
+            ([], {"DENY_GREETER_LOG_ACCESS": "1"}),
         ]:
-            with self.subTest(environment=environment):
-                result = self.run_script("start.sh", **environment)
+            with self.subTest(args=args, environment=environment):
+                result = self.run_script("start.sh", *args, **environment)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertNotIn('stop sddm.service', self.calls())
 
@@ -160,6 +164,8 @@ elif name == 'sway': print('test compositor output')
         self.assertNotEqual(latest_run, armed_run)
         self.assertEqual((runs / "current").resolve(), armed_run)
         self.assertEqual((self.root / "current-run").resolve(), armed_run)
+        uid = os.getuid()
+        self.assertEqual((self.root / f"latest-run-{uid}").resolve(), latest_run)
         self.assertIn(f"Test logs: {latest_run}", result.stdout)
         self.assertIn(f"Startup log: {latest_run}/start.log", result.stdout)
         self.assertIn("Log out of the desktop", (latest_run / "start.log").read_text())
@@ -211,8 +217,6 @@ class InstallerTest(unittest.TestCase):
         self.installation = self.root / "installed"
         script = (SOURCE / "install.sh").read_text()
         script = script.replace('[[ "$EUID" -ne 0 ]]', 'false')
-        script = script.replace('test_root=/opt/mozais-test',
-                                f'test_root="{self.installation}"')
         (self.source / "install.sh").write_text(script)
         for name in ["start.sh", "restore.sh", "launch.sh", "greetd.toml", "sway.conf", "display-layout.py"]:
             shutil.copy2(SOURCE / name, self.source / name)
@@ -272,7 +276,7 @@ if name == 'dart':
 
     def run_installer(self, **environment):
         return subprocess.run(
-            ["bash", str(self.source / "install.sh")], cwd=self.root,
+            ["bash", str(self.source / "install.sh"), str(self.installation)], cwd=self.root,
             env={**self.environment, **environment}, capture_output=True,
             text=True, timeout=10,
         )
@@ -293,6 +297,8 @@ if name == 'dart':
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 for relative in ["frontend/greeter", "frontend/lib/libapp.so", "backend"]:
                     self.assertEqual((self.installation / relative).read_text(), version)
+                self.assertIn(str(self.installation / "launch.sh"),
+                              (self.installation / "greetd.toml").read_text())
         backups = sorted((self.installation / "backups").iterdir())
         self.assertEqual(len(backups), 2)
         self.assertEqual((backups[0] / "frontend/greeter").read_text(), "old")

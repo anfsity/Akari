@@ -2,6 +2,21 @@
 set -euo pipefail
 
 test_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+scale=1
+log_root=''
+while (( $# )); do
+  case "$1" in
+    --scale|--log-dir)
+      if (( $# < 2 )); then
+        printf 'Missing value for %s.\n' "$1" >&2
+        exit 2
+      fi
+      if [[ "$1" == --scale ]]; then scale="$2"; else log_root="$2"; fi
+      shift 2
+      ;;
+    *) printf 'Unknown start option: %s\n' "$1" >&2; exit 2 ;;
+  esac
+done
 if [[ "$EUID" -ne 0 ]]; then
   printf 'Run with sudo: sudo %s/start.sh\n' "$test_root" >&2
   exit 1
@@ -10,9 +25,9 @@ fi
 exec 9>/run/lock/mozais-test.lock
 flock -n 9 || { echo 'Another test setup is running.' >&2; exit 1; }
 IFS=: read -r log_user _ log_uid _ _ _ _ < <(getent passwd "${SUDO_USER:-root}")
-log_root="${MOZAIS_TEST_LOG_DIR:-/var/tmp/mozais-greetd-test-$log_uid}"
+log_root="${log_root:-/var/tmp/mozais-greetd-test-$log_uid}"
 if [[ "$log_root" != /* ]]; then
-  echo 'MOZAIS_TEST_LOG_DIR must be an absolute path.' >&2
+  echo '--log-dir must be an absolute path.' >&2
   exit 1
 fi
 umask 022
@@ -21,6 +36,7 @@ run_dir="$log_root/$(date +%Y%m%d-%H%M%S)-$$"
 # membership in the caller's group, including tests started directly as root.
 install -d -o "$log_user" -g greeter -m 0755 "$log_root" "$run_dir"
 ln -sfn "$run_dir" "$log_root/latest"
+ln -sfn "$run_dir" "$test_root/latest-run-$log_uid"
 exec > >(tee -a "$run_dir/start.log") 2>&1
 trap 'status=$?; printf "Startup failed at line %s (status %s).\n" "$LINENO" "$status"; exit "$status"' ERR
 printf 'Test logs: %s\nStartup log: %s/start.log\n' "$run_dir" "$run_dir"
@@ -58,13 +74,22 @@ done
 test -x "$test_root/frontend/greeter"
 test -x "$test_root/backend"
 
-scale="${MOZAIS_TEST_SCALE:-1}"
 if [[ ! "$scale" =~ ^[0-9]+([.][0-9]+)?$ ]] || ! awk "BEGIN { exit !($scale > 0) }"; then
-  echo 'MOZAIS_TEST_SCALE must be a positive number.'
+  echo '--scale must be a positive number.'
   exit 1
 fi
 install -d -o greeter -g greeter -m 0755 "$run_dir/greeter"
 printf 'output * scale %s\ninclude %s/sway.conf\n' "$scale" "$test_root" > "$run_dir/sway.conf"
+python3 - "$run_dir" "$scale" "$log_root" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+root, scale, log_root = sys.argv[1:]
+(Path(root) / 'config.json').write_text(json.dumps({
+    'scale': float(scale), 'logRoot': log_root,
+}) + '\n')
+PY
 if ! runuser -u greeter -- test -w "$run_dir/greeter"; then
   echo 'The greeter cannot access the log directory. Choose a path outside a private home directory.'
   exit 1

@@ -2,7 +2,7 @@
 set -euo pipefail
 source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$source_dir/../.." && pwd)"
-test_root=/opt/mozais-test
+test_root="${1:?Installation directory is required. Use mozais greetd-test install.}"
 if [[ "$EUID" -ne 0 ]]; then
   echo 'Run this installer with sudo to build and install the test artifacts.' >&2
   exit 1
@@ -45,7 +45,17 @@ done
 cp -aL "$bundle/." "$test_root/frontend/"
 install -m 0755 "$backend" "$test_root/backend"
 install -m 0755 "$source_dir/start.sh" "$source_dir/restore.sh" "$source_dir/launch.sh" "$test_root/"
-install -m 0644 "$source_dir/greetd.toml" "$source_dir/sway.conf" "$test_root/"
+python3 - "$source_dir/greetd.toml" "$test_root" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+source, root = Path(sys.argv[1]), Path(sys.argv[2])
+(root / 'greetd.toml').write_text(source.read_text().replace(
+    '"@TEST_ROOT@/launch.sh"', json.dumps(str(root / 'launch.sh'))))
+PY
+chmod 0644 "$test_root/greetd.toml"
+install -m 0644 "$source_dir/sway.conf" "$test_root/"
 install -m 0644 "$source_dir/display-layout.py" "$test_root/"
 if [[ -n "$layout" ]]; then
   printf '%s\n' "$layout" > "$test_root/display-layout.json"
