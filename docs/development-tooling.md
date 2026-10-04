@@ -63,6 +63,19 @@ Both commands default to debug mode and reload Dart and asset changes on save.
 Scene JSON edits first run incremental code generation; failed generation keeps
 the last working theme. `r` regenerates and reloads, `R` restarts, and `q` quits.
 Profile/release sessions do not hot reload. Both commands accept `--jobs COUNT`.
+
+Preview and Studio open directly in the current desktop; neither starts a nested
+compositor. Preview defaults to a resizable, undecorated window. `run` and built
+greeter bundles default to undecorated fullscreen. Set
+`MOZAIS_WINDOW_MODE=fullscreen` for a fullscreen preview or `windowed` for a
+windowed greeter. Exit live sessions with `q` in the launching terminal.
+
+A preview on Hyprland inherits that output's scale. The standalone Sway test has
+its own output scale, so the same physical resolution can produce a different
+logical viewport and layout. For visual comparison, use fullscreen and match
+both resolution and output scale. `scripts/debug-sway.sh` is an explicit nested
+Sway diagnostic, not the preview entry point; nesting can add another scaling
+stage and does not reproduce a standalone DRM session.
 Production `build` defaults to release and compiles both frontend and Rust backend.
 
 Use `run studio --theme PATH` to edit scene JSON with a shadcn inspector, compiled

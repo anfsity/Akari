@@ -135,6 +135,9 @@ List<RunStep> buildStepsFor(
             dependencies: [if (!demo) 'backend.build', 'theme.host.pub_get'],
             interactive: true,
             environment: {
+              'MOZAIS_WINDOW_MODE':
+                  Platform.environment['MOZAIS_WINDOW_MODE'] ??
+                  (demo ? 'windowed' : 'fullscreen'),
               if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs',
               if (!demo) ...{
                 'MOZAIS_BACKEND_MODE': backendMode,
