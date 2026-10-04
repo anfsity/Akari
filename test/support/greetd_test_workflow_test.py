@@ -214,7 +214,7 @@ class InstallerTest(unittest.TestCase):
         script = script.replace('test_root=/opt/mozais-test',
                                 f'test_root="{self.installation}"')
         (self.source / "install.sh").write_text(script)
-        for name in ["start.sh", "restore.sh", "launch.sh", "greetd.toml", "sway.conf"]:
+        for name in ["start.sh", "restore.sh", "launch.sh", "greetd.toml", "sway.conf", "display-layout.py"]:
             shutil.copy2(SOURCE / name, self.source / name)
         for name in ["lib.sh", "debug-dbus.sh"]:
             shutil.copy2(SOURCE.parent / name, self.repo / "scripts" / name)
@@ -231,6 +231,15 @@ with (root / 'calls').open('a') as log:
     log.write(json.dumps([name, args, os.getcwd()]) + '\\n')
 if name == 'systemctl':
     sys.exit(0 if args[-1] == os.environ.get('ACTIVE_UNIT') else 3)
+if name == 'hyprctl':
+    if args == ['-j', 'instances']:
+        print(json.dumps([] if os.environ.get('NO_DESKTOP') else
+                         [{'instance': 'test-desktop'}]))
+    else:
+        assert args == ['-j', '-i', 'test-desktop', 'monitors'], args
+        print(json.dumps([{'name': 'external', 'x': 1600, 'y': 0, 'disabled': False},
+                          {'name': 'internal', 'x': 0, 'y': 0, 'disabled': False}]))
+    sys.exit(0)
 if name == 'runuser':
     env = {**os.environ, 'HOME': str(root / 'builder-home')}
     sys.exit(subprocess.run(args[args.index('--') + 1:], env=env).returncode)
@@ -251,7 +260,7 @@ if name == 'dart':
     sys.exit(1 if os.environ.get('FAIL_BUILD') else 0)
 ''')
         handler.chmod(0o755)
-        for name in ["systemctl", "runuser", "dart"]:
+        for name in ["systemctl", "runuser", "dart", "hyprctl"]:
             (self.bin / name).symlink_to(handler)
         self.environment = {
             **os.environ,
@@ -309,6 +318,21 @@ if name == 'dart':
         for relative in ["frontend/greeter", "frontend/lib/libapp.so", "backend"]:
             self.assertEqual((self.installation / relative).read_text(), "old")
         self.assertFalse((self.installation / "backups").exists())
+
+    def test_installer_captures_desktop_order_and_preserves_it_without_a_desktop(self):
+        self.create_old_installation()
+        self.environment.pop('SWAYSOCK', None)
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        saved = self.installation / 'display-layout.json'
+        self.assertEqual(saved.read_text().strip(),
+                         '{"axis": "x", "outputs": ["internal", "external"]}')
+        self.assertEqual(saved.stat().st_mode & 0o777, 0o644)
+        result = self.run_installer(NO_DESKTOP='1')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('keeping the installed layout', result.stdout)
+        self.assertEqual(saved.read_text().strip(),
+                         '{"axis": "x", "outputs": ["internal", "external"]}')
 
     def test_active_test_or_timer_rejects_before_build_and_installation(self):
         for unit in ["mozais-test.service", "mozais-restore.timer"]:
