@@ -3,6 +3,7 @@ import 'dart:io';
 import 'src/cli_definition.dart';
 import 'src/cli_install.dart';
 import 'src/command_plans.dart';
+import 'src/greetd_test.dart';
 import 'src/run_report.dart';
 import 'src/shell_completion.dart';
 import 'src/theme_project.dart';
@@ -26,6 +27,20 @@ Future<void> main(List<String> arguments) async {
         .skip(1)
         .any((argument) => argument == '-h' || argument == '--help')) {
       _writeUsage(definition);
+      return;
+    }
+
+    if (command == 'greetd-test') {
+      getCliOptionValues(definition, commandArguments);
+      _writeUsage(definition);
+      return;
+    }
+    if (command.startsWith('greetd-test ')) {
+      exitCode = await runGreetdTestCommand(
+        definition,
+        commandArguments,
+        repoRoot: command == 'greetd-test install' ? _findRepoRoot() : null,
+      );
       return;
     }
 

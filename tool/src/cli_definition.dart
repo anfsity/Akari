@@ -27,6 +27,7 @@ class CliCommand {
     this.aliases = const [],
     this.options = const [],
     this.forwardsArguments = false,
+    this.reportsRun = true,
   });
 
   final String name;
@@ -34,6 +35,7 @@ class CliCommand {
   final List<String> aliases;
   final List<String> options;
   final bool forwardsArguments;
+  final bool reportsRun;
 
   List<String> get spellings => [name, ...aliases];
 }
@@ -103,6 +105,44 @@ const cliOptions = {
     'Shell startup file for command and completion registration.',
     valueName: 'PATH',
   ),
+  '--scale': CliOption(
+    '--scale',
+    'Standalone Sway output scale (default: 1).',
+    valueName: 'NUMBER',
+  ),
+  '--log-dir': CliOption(
+    '--log-dir',
+    'Test log root (default: /var/tmp/mozais-greetd-test-<uid>).',
+    valueName: 'PATH',
+    directory: true,
+  ),
+  '--run': CliOption(
+    '--run',
+    'Test logs to read (default: latest attempt; current: last armed test).',
+    valueName: 'RUN',
+    values: ['latest', 'current'],
+  ),
+  '--file': CliOption(
+    '--file',
+    'Log to read (default: start; session logs use the newest greeter session).',
+    valueName: 'LOG',
+    values: [
+      'start',
+      'backend',
+      'flutter',
+      'sway',
+      'lifecycle',
+      'restore',
+      'journal',
+    ],
+  ),
+  '--lines': CliOption(
+    '--lines',
+    'Number of log lines to display (default: 100).',
+    short: '-n',
+    valueName: 'COUNT',
+  ),
+  '--follow': CliOption('--follow', 'Follow the selected log.', short: '-f'),
 };
 
 const cliCommands = [
@@ -154,11 +194,48 @@ const cliCommands = [
     'install',
     'Install the mozais launcher and shell completion.',
     options: ['--shell', '--prefix', '--rc'],
+    reportsRun: false,
   ),
   CliCommand(
     'completion',
     'Print a shell completion script.',
     options: ['--shell'],
+    reportsRun: false,
+  ),
+  CliCommand(
+    'greetd-test',
+    'Manage standalone greetd testing.',
+    reportsRun: false,
+  ),
+  CliCommand(
+    'greetd-test install',
+    'Build, back up and install the test environment; save desktop display order.',
+    options: ['--dry-run'],
+    reportsRun: false,
+  ),
+  CliCommand(
+    'greetd-test start',
+    'Check the TTY and desktop, arm recovery and start the test service.',
+    options: ['--scale', '--log-dir', '--dry-run'],
+    reportsRun: false,
+  ),
+  CliCommand(
+    'greetd-test restore',
+    'Restore SDDM using the independently installed recovery script.',
+    options: ['--dry-run'],
+    reportsRun: false,
+  ),
+  CliCommand(
+    'greetd-test status',
+    'Show installation, service, recovery timer and saved log paths.',
+    options: ['--format'],
+    reportsRun: false,
+  ),
+  CliCommand(
+    'greetd-test logs',
+    'Read startup, greeter or recovery logs without sudo.',
+    options: ['--run', '--file', '--lines', '--follow'],
+    reportsRun: false,
   ),
 ];
 
@@ -176,7 +253,7 @@ List<CliCommand> getCliSubcommands(String parent) => [
 
 List<CliOption> getCliOptions(CliCommand command) => [
   for (final name in command.options) cliOptions[name]!,
-  if (command.name != 'install' && command.name != 'completion') ...[
+  if (command.reportsRun) ...[
     cliOptions['--format']!,
     cliOptions['--report']!,
     cliOptions['--dry-run']!,

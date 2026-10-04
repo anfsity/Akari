@@ -6,10 +6,16 @@ and power actions call logind, performing actual suspend, reboot and shutdown.
 Boot configuration stays on SDDM. Desktop development with `mozais run` still
 uses mock authentication and mock power by default.
 
+Install the repository-bound `mozais` launcher as described in
+[Development Tooling](development-tooling.md). `mozais greetd-test --help` lists
+all operations; each operation has its own help and bash/zsh completion.
+Install, start and restore request sudo when needed. Status and ordinary log
+reading do not request elevated privileges.
+
 Build and install while no previous test or timer is active:
 
 ```sh
-sudo bash scripts/greetd-test/install.sh /opt/mozais-test
+mozais greetd-test install
 ```
 
 The installer first builds the current repository's default theme and production
@@ -39,7 +45,7 @@ when no layout has been saved. Reinstall from the desktop after rearranging scre
 Save work, log out of the desktop, log in on tty3, then run:
 
 ```sh
-sudo /opt/mozais-test/start.sh
+mozais greetd-test start
 ```
 
 Preflight uses `SUDO_TTY` to identify the original terminal even when sudo creates
@@ -53,7 +59,28 @@ login exits the greeter, while greetd continues to own the user desktop session.
 To restore manually, switch to tty3 and run:
 
 ```sh
+mozais greetd-test restore
+```
+
+Recovery itself is independent of this CLI. systemd's timer and exit callback
+always invoke `/opt/mozais-test/restore.sh` directly. If the repository or
+Flutter/Dart SDK is unavailable, restore from tty3 with:
+
+```sh
 sudo /opt/mozais-test/restore.sh
+```
+
+The CLI, timer and exit callback all use this single recovery implementation.
+`install`, `start` and `restore` accept `--dry-run` to print the command that would
+run without requesting sudo or changing files. Preflight still runs during an
+actual start. The CLI does not change the TTY or live-desktop requirements.
+
+Inspect installed artifacts, SDDM, the test service, the recovery timer and saved
+log paths with:
+
+```sh
+mozais greetd-test status
+mozais greetd-test status --format json
 ```
 
 Logs live outside `/opt`, under `/var/tmp/mozais-greetd-test-<caller-uid>/`.
@@ -68,7 +95,7 @@ Each startup attempt that reaches log setup gets its own
 `<timestamp>-<pid>/start.log`. Startup prints its log directory before preflight.
 The `latest` symlink points to the latest attempt, including preflight failures.
 The `current` symlink points to the latest armed test. The installation keeps
-only a `current-run` pointer to that directory for launching and recovery, so a
+a `current-run` pointer to that directory for launching and recovery, so a
 later rejected attempt cannot redirect recovery logs. Restore prints the test's
 log directory too.
 
@@ -80,23 +107,33 @@ test and SDDM journal plus its own timestamp/result.
 Inspect the latest startup attempt or the test used by recovery:
 
 ```sh
-readlink -f /var/tmp/mozais-greetd-test-$(id -u)/latest
-cat /var/tmp/mozais-greetd-test-$(id -u)/latest/start.log
-tail -n 100 /var/tmp/mozais-greetd-test-$(id -u)/current/greeter/session-*/backend.log
+mozais greetd-test logs
+mozais greetd-test logs --run current --file backend -n 100
+mozais greetd-test logs --run current --file flutter --follow
 ```
 
-Set an absolute custom location when starting a test:
+`logs` defaults to the caller's latest startup attempt and its `start.log`.
+`--run current` selects the last armed test, even after restoration. `--file`
+accepts `start`, `backend`, `flutter`, `sway`, `lifecycle`, `restore` and `journal`.
+Greeter logs select the newest session; older session files remain at the saved
+run path. `--lines` (`-n`) defaults to 100; `--follow` (`-f`) follows the selected
+file, including its later creation. It does not switch sessions automatically.
+
+Set a custom location when starting a test (relative paths use the invocation
+directory):
 
 ```sh
-sudo /opt/mozais-test/start.sh --log-dir /var/tmp/my-mozais-test
+mozais greetd-test start --log-dir /var/tmp/my-mozais-test
 ```
 
 The greeter must be able to traverse the parent directories of a custom location;
-startup checks access before stopping SDDM. A private home directory usually
-prevents this, so use a location beneath `/var/tmp`. The installation also retains a per-caller `latest-run-<uid>` pointer, including
-failed preflight attempts. Recovery resolves the saved `current-run` pointer
-automatically and does not require the custom setting again. Each armed test
-saves its scale and log root in `config.json`.
+startup checks access before stopping SDDM. `logs` discovers the saved location
+without needing `--log-dir` again. A private home directory usually
+prevents this, so use a location beneath `/var/tmp`. The installation also retains
+a per-caller `latest-run-<uid>` pointer, including failed preflight attempts. Recovery resolves the saved `current-run` pointer
+automatically and does not require the custom setting again. Each prepared test
+saves its scale and log root in `config.json`. The former `MOZAIS_TEST_SCALE`
+and `MOZAIS_TEST_LOG_DIR` settings are replaced by these explicit start options.
 
 For live system service output, use `sudo journalctl -u mozais-test.service -f`;
 the directly readable `journal.log` is saved during recovery. Reinstall the
@@ -104,8 +141,8 @@ scripts to make these changes available in `/opt/mozais-test`. Existing logs in
 the old `/opt/mozais-test/test-runs/` directory remain there.
 
 The standalone login environment is the visual reference. Its output scale
-remains 1 by default (`start.sh --scale NUMBER` explicitly overrides it) and Sway records the actual output mode and scale in
-`outputs.json`. Personal Hyprland development settings should make the Mozais
+remains 1 by default. `mozais greetd-test start --scale NUMBER` explicitly
+overrides it; Sway records the actual output mode and scale in `outputs.json`. Personal Hyprland development settings should make the Mozais
 preview match this login environment. Do not change the login output scale to
 follow a developer's desktop settings. Desktop scaling compatibility belongs to
 that developer's local preview setup, outside the production renderer.

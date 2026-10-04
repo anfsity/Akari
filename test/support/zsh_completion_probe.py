@@ -69,6 +69,9 @@ try:
         "mozais run studio --th",
         "mozais run studio -t theme",
         "mozais build -t theme",
+        "mozais greetd-test re",
+        "mozais greetd-test start --log-d",
+        "mozais greetd-test logs --run c",
     ]
     for index, probe in enumerate(probes):
         os.write(master, (probe + "\t").encode())
