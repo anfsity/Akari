@@ -450,21 +450,33 @@ void main() {
     feature.dispose();
   });
 
-  test('sleeping cancels the active authentication attempt', () async {
-    final gateway = _FakeGreeterGateway();
-    final feature = await _createPromptedFeature(gateway);
-    expect(feature.state.authMode, AuthMode.prompting);
+  test(
+    'sleep and wake preserve the unanswered authentication attempt',
+    () async {
+      final gateway = _FakeGreeterGateway();
+      final feature = await _createPromptedFeature(gateway);
+      expect(feature.state.authMode, AuthMode.prompting);
 
-    await feature.dispatch(const SleepGreeterCommand());
-    await _flushEvents();
+      final prompt = feature.state.prompt;
+      for (var cycle = 0; cycle < 5; cycle++) {
+        await feature.dispatch(const SleepGreeterCommand());
+        await _flushEvents();
+        expect(feature.state.dormant, isTrue);
+        expect(feature.state.authMode, AuthMode.prompting);
+        expect(feature.state.prompt, prompt);
 
-    expect(feature.state.dormant, isTrue);
-    expect(feature.state.authMode, AuthMode.userSelection);
-    expect(feature.state.prompt, isNull);
-    expect(gateway.cancelledAttemptId, 'attempt-1');
+        await feature.dispatch(const WakeGreeterCommand());
+        await _flushEvents();
+        expect(feature.state.dormant, isFalse);
+        expect(feature.state.authMode, AuthMode.prompting);
+      }
+      expect(gateway.beginAuthenticationCalls, 1);
+      expect(gateway.cancelledAttemptId, isNull);
+      expect(gateway.respondCalls, 0);
 
-    feature.dispose();
-  });
+      feature.dispose();
+    },
+  );
 }
 
 Future<GreeterFeature> _createPromptedFeature(
@@ -516,6 +528,7 @@ class _FakeGreeterGateway implements GreeterGateway {
   int getStateCalls = 0;
   int listSessionsCalls = 0;
   int respondCalls = 0;
+  int beginAuthenticationCalls = 0;
   String? attemptId;
   String? cancelledAttemptId;
   PowerAction? requestedPowerAction;
@@ -557,6 +570,7 @@ class _FakeGreeterGateway implements GreeterGateway {
 
   @override
   Future<String> beginAuthentication(String username) async {
+    beginAuthenticationCalls++;
     attemptId = 'attempt-1';
     _events.add(
       const BackendStateChanged(

@@ -246,6 +246,13 @@ The Feature projection contains no `BackgroundSlots`. Visual mood is derived by
 the adapter or theme when a theme explicitly needs it. The credential response
 remains local to the adapter's text controller until it is sent as a command.
 
+Returning to the dormant background with Escape preserves the authentication
+attempt and its prompt. Wake resumes that same conversation. The adapter clears
+local credential text on hide and restores focus on wake; it does not submit or
+cancel the prompt. Explicit cancellation and client disconnect still release the
+backend transaction. This prevents UI visibility changes from being counted as
+failed PAM login attempts.
+
 ## 8. Testing Policy
 
 Tests prioritize logic, interaction, and performance over visual layout.
