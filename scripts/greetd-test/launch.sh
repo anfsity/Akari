@@ -14,12 +14,14 @@ export MOZAIS_FLUTTER_LOG="$MOZAIS_LOG_DIR/flutter.log"
 export MOZAIS_WINDOW_MODE=fullscreen
 export MOZAIS_DISPLAY_LAYOUT="$test_root/display-layout.json"
 export MOZAIS_DISPLAY_LAYOUT_RUNNER="$test_root/display-layout.py"
+export MOZAIS_DISPLAY_SOURCE=greetd-login
+export MOZAIS_TEST_RUN="$run_dir"
 export XDG_STATE_HOME="$test_root/state"
 export GDK_BACKEND=wayland
 export XDG_CURRENT_DESKTOP=Sway
 export XDG_SESSION_DESKTOP=sway
 export XDG_SESSION_TYPE=wayland
 # This is a standalone DRM test. Do not inherit nested desktop backend settings.
-unset WAYLAND_DISPLAY WLR_BACKENDS WLR_WAYLAND_DISPLAY
+unset DISPLAY WAYLAND_DISPLAY WAYLAND_SOCKET SWAYSOCK WLR_BACKENDS WLR_WAYLAND_DISPLAY
 exec "$test_root/scripts/debug-dbus.sh" \
   /usr/bin/sway --config "$run_dir/sway.conf" > "$MOZAIS_LOG_DIR/sway.log" 2>&1

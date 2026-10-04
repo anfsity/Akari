@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "source": {"kind": "reference"},
+  "outputs": [
+    {
+      "name": "reference",
+      "make": null,
+      "model": null,
+      "serial": null,
+      "mode": {"width": 1920, "height": 1080, "refresh": 60000},
+      "scale": 1,
+      "transform": "normal",
+      "rect": {"x": 0, "y": 0, "width": 1920, "height": 1080}
+    }
+  ]
+}

@@ -116,7 +116,7 @@ elif name == 'sway': print('test compositor output')
         self.assertIn('output * scale 1.5', (current / 'sway.conf').read_text())
         self.assertIn('/dev/tty3', (current / 'start.log').read_text())
         self.assertEqual(json.loads((current / "config.json").read_text()),
-                         {"scale": 1.5, "logRoot": str(self.logs)})
+                         {"scale": 1.5, "logRoot": str(self.logs), "source": "greetd-login"})
         self.assertEqual((current / "start.log").stat().st_mode & 0o777, 0o644)
         self.assertEqual((self.root / "current-run").resolve(), current.resolve())
         self.assertFalse((self.root / "test-runs").exists())
@@ -218,8 +218,11 @@ class InstallerTest(unittest.TestCase):
         script = (SOURCE / "install.sh").read_text()
         script = script.replace('[[ "$EUID" -ne 0 ]]', 'false')
         (self.source / "install.sh").write_text(script)
-        for name in ["start.sh", "restore.sh", "launch.sh", "greetd.toml", "sway.conf", "display-layout.py"]:
+        for name in ["start.sh", "restore.sh", "launch.sh", "greetd.toml", "sway.conf", "display-layout.py", "display_profile.py"]:
             shutil.copy2(SOURCE / name, self.source / name)
+        layout_script = self.source / 'display-layout.py'
+        layout_script.write_text(layout_script.read_text().replace(
+            '/run/user/{os.getuid()}', str(self.root / 'runtime') + '/{os.getuid()}'))
         for name in ["lib.sh", "debug-dbus.sh"]:
             shutil.copy2(SOURCE.parent / name, self.repo / "scripts" / name)
         (self.repo / "source-version").write_text("new")

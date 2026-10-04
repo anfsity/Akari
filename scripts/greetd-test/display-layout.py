@@ -18,6 +18,9 @@ import subprocess
 import sys
 import threading
 
+sys.dont_write_bytecode = True
+from display_profile import capture_outputs
+
 
 def get_layout(displays):
     if not displays:
@@ -113,15 +116,16 @@ def run_greeter(layout, command):
         response = receive_event()
         if not response['success']:
             raise RuntimeError(f'Could not subscribe to output changes: {response}')
-        update_positions(layout)
-        if log_directory := os.environ.get('MOZAIS_LOG_DIR'):
-            snapshot = subprocess.check_output(['swaymsg', '-r', '-t', 'get_outputs'])
-            (Path(log_directory) / 'outputs.json').write_bytes(snapshot)
+        if layout is not None:
+            update_positions(layout)
+        if os.environ.get('MOZAIS_LOG_DIR'):
+            capture_outputs()
 
         def update_on_output_changes():
             try:
                 while receive_event() is not None:
-                    update_positions(layout)
+                    if layout is not None:
+                        update_positions(layout)
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
                 print(f'Display layout update failed: {error}', file=sys.stderr)
 
@@ -157,8 +161,8 @@ def main():
             return 0
         if not arguments.app:
             raise ValueError('A greeter command is required.')
-        layout = json.loads(arguments.layout.read_text())
-        if (not isinstance(layout, dict) or layout.get('axis') not in ['x', 'y'] or
+        layout = json.loads(arguments.layout.read_text()) if arguments.layout.exists() else None
+        if layout is not None and (not isinstance(layout, dict) or layout.get('axis') not in ['x', 'y'] or
                 not isinstance(layout.get('outputs'), list) or not layout['outputs'] or
                 any(not isinstance(name, str) or not re.fullmatch(r'[\w.:-]+', name)
                     for name in layout['outputs']) or
