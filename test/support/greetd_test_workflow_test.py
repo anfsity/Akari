@@ -1,12 +1,13 @@
 """Exercise recovery and preflight with service/privilege boundaries replaced.
 
 No display managers, system timers, or root-owned paths are touched. Fixture
-copies bypass only the root guard and redirect the lock and Sway executable.
+copies bypass the root guard and redirect installation paths, the lock, and Sway.
 """
 
 import os
 from pathlib import Path
 import pwd
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -184,6 +185,126 @@ elif name == 'sway': print('test compositor output')
             self.assertEqual((session / 'sway.log').read_text(), 'test compositor output\n')
             for log in [session / 'backend.log', session / 'sway.log']:
                 self.assertEqual(log.stat().st_mode & 0o777, 0o640)
+
+
+class InstallerTest(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="mozais-install-test-")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.repo = self.root / "repository with spaces"
+        self.source = self.repo / "scripts/greetd-test"
+        self.source.mkdir(parents=True)
+        self.installation = self.root / "installed"
+        script = (SOURCE / "install.sh").read_text()
+        script = script.replace('[[ "$EUID" -ne 0 ]]', 'false')
+        script = script.replace('test_root=/opt/mozais-test',
+                                f'test_root="{self.installation}"')
+        (self.source / "install.sh").write_text(script)
+        for name in ["start.sh", "restore.sh", "launch.sh", "greetd.toml", "sway.conf"]:
+            shutil.copy2(SOURCE / name, self.source / name)
+        for name in ["lib.sh", "debug-dbus.sh"]:
+            shutil.copy2(SOURCE.parent / name, self.repo / "scripts" / name)
+        (self.repo / "source-version").write_text("new")
+        self.bin = self.root / "bin"
+        self.bin.mkdir()
+        handler = self.bin / "handler"
+        handler.write_text('''#!/usr/bin/env python3
+import json, os, pathlib, subprocess, sys
+root = pathlib.Path(os.environ['TEST_ROOT'])
+name = pathlib.Path(sys.argv[0]).name
+args = sys.argv[1:]
+with (root / 'calls').open('a') as log:
+    log.write(json.dumps([name, args, os.getcwd()]) + '\\n')
+if name == 'systemctl':
+    sys.exit(0 if args[-1] == os.environ.get('ACTIVE_UNIT') else 3)
+if name == 'runuser':
+    env = {**os.environ, 'HOME': str(root / 'builder-home')}
+    sys.exit(subprocess.run(args[args.index('--') + 1:], env=env).returncode)
+if name == 'dart':
+    repo = pathlib.Path(os.getcwd())
+    assert args == [str(repo / 'tool/mozais.dart'), 'build', '--theme',
+                    str(repo / 'themes/default'), '--mode', 'release',
+                    '--platform', 'linux', '--jobs', '4'], args
+    assert os.environ['HOME'] == str(root / 'builder-home')
+    assert os.environ['PATH'].split(':')[0] == str(root / 'builder-home/.cargo/bin')
+    version = (repo / 'source-version').read_text()
+    for relative in ['build/out/default/greeter', 'build/out/default/lib/libapp.so',
+                     'build/out/backend']:
+        path = repo / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(version)
+        path.chmod(0o755)
+    sys.exit(1 if os.environ.get('FAIL_BUILD') else 0)
+''')
+        handler.chmod(0o755)
+        for name in ["systemctl", "runuser", "dart"]:
+            (self.bin / name).symlink_to(handler)
+        self.environment = {
+            **os.environ,
+            "PATH": f"{self.bin}:{os.environ['PATH']}",
+            "TEST_ROOT": str(self.root),
+            "SUDO_USER": pwd.getpwuid(os.getuid()).pw_name,
+            "MOZAIS_DART_BIN": str(self.bin / "dart"),
+        }
+
+    def run_installer(self, **environment):
+        return subprocess.run(
+            ["bash", str(self.source / "install.sh")], cwd=self.root,
+            env={**self.environment, **environment}, capture_output=True,
+            text=True, timeout=10,
+        )
+
+    def create_old_installation(self):
+        (self.installation / "scripts").mkdir(parents=True)
+        for relative in ["frontend/greeter", "frontend/lib/libapp.so", "backend"]:
+            path = self.installation / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("old")
+
+    def test_installer_builds_without_existing_artifacts_and_rebuilds_on_repeat(self):
+        self.create_old_installation()
+        for version in ["new", "newer"]:
+            with self.subTest(version=version):
+                (self.repo / "source-version").write_text(version)
+                result = self.run_installer()
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                for relative in ["frontend/greeter", "frontend/lib/libapp.so", "backend"]:
+                    self.assertEqual((self.installation / relative).read_text(), version)
+        backups = sorted((self.installation / "backups").iterdir())
+        self.assertEqual(len(backups), 2)
+        self.assertEqual((backups[0] / "frontend/greeter").read_text(), "old")
+        self.assertEqual((backups[1] / "frontend/greeter").read_text(), "new")
+        calls = (self.root / "calls").read_text()
+        self.assertIn(f'"-u", "{self.environment["SUDO_USER"]}"', calls)
+
+    def test_direct_root_invocation_builds_as_repository_owner(self):
+        self.create_old_installation()
+        self.environment.pop("SUDO_USER")
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        owner = pwd.getpwuid(self.repo.stat().st_uid).pw_name
+        self.assertIn(f'"-u", "{owner}"', (self.root / "calls").read_text())
+
+    def test_failed_build_preserves_installation_even_with_existing_artifacts(self):
+        self.create_old_installation()
+        bundle = self.repo / "build/out/default"
+        bundle.mkdir(parents=True)
+        (bundle / "greeter").write_text("stale")
+        result = self.run_installer(FAIL_BUILD="1")
+        self.assertNotEqual(result.returncode, 0)
+        for relative in ["frontend/greeter", "frontend/lib/libapp.so", "backend"]:
+            self.assertEqual((self.installation / relative).read_text(), "old")
+        self.assertFalse((self.installation / "backups").exists())
+
+    def test_active_test_or_timer_rejects_before_build_and_installation(self):
+        for unit in ["mozais-test.service", "mozais-restore.timer"]:
+            with self.subTest(unit=unit):
+                result = self.run_installer(ACTIVE_UNIT=unit)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(unit, result.stderr)
+                self.assertNotIn('"runuser"', (self.root / "calls").read_text())
+                self.assertFalse(self.installation.exists())
 
 
 if __name__ == "__main__":
