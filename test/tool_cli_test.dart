@@ -47,6 +47,7 @@ void main() {
       );
       expect(steps.last['id'], 'theme.studio');
       expect(steps.last['command'].last, 'demo');
+      expect(steps.last['environment']['MOZAIS_DISPLAY_MODE'], 'single');
       expect(steps.last['environment']['MOZAIS_BUILD_JOBS'], '2');
       expect(plan['artifacts']['host_project'], endsWith('/studio'));
       expect(plan['artifacts'], isNot(contains('backend_executable')));

@@ -244,7 +244,17 @@ keyboard, and accessibility behavior.
 
 The Feature projection contains no `BackgroundSlots`. Visual mood is derived by
 the adapter or theme when a theme explicitly needs it. The credential response
-remains local to the adapter's text controller until it is sent as a command.
+remains in the application's shared text controller until it is sent as a command.
+
+The Linux runner creates one fullscreen `FlView` per monitor in a single engine.
+`MyApp` renders sibling views through `ViewAnchor` and `ViewCollection`, sharing
+one `GreeterFeature` and credential controller. Each adapter owns its display's
+focus node and animation; only the active display handles global keyboard input.
+GTK reports native view focus through `mozais/displays` so moving between windows
+does not submit a response twice or let a passive display take credential focus.
+The implicit view owns the app root and survives monitor removal by moving to a
+remaining output, or staying hidden until an output reconnects. Studio requests
+`MOZAIS_DISPLAY_MODE=single` because its editor is a single-view application.
 
 Returning to the dormant background with Escape preserves the authentication
 attempt and its prompt. Wake resumes that same conversation. The adapter clears

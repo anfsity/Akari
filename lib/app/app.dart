@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui' show FlutterView;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:greeter_ui/greeter_ui.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
@@ -25,14 +27,27 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  static const _displayChannel = MethodChannel('mozais/displays');
+  final _credentialController = TextEditingController();
   late final GreeterFeature _feature;
   late ThemeDefinition _theme;
+  late List<FlutterView> _views;
+  late int _activeViewId;
   Color? _themeSeed;
 
   @override
   void initState() {
     super.initState();
+    _views = WidgetsBinding.instance.platformDispatcher.views.toList();
+    _activeViewId =
+        WidgetsBinding.instance.platformDispatcher.implicitView!.viewId;
+    WidgetsBinding.instance.addObserver(this);
+    _displayChannel.setMethodCallHandler((call) async {
+      if (call.method == 'focusView') {
+        _activateView(call.arguments as int);
+      }
+    });
     final backendMode = const String.fromEnvironment(
       'MOZAIS_BACKEND',
       defaultValue: 'demo',
@@ -73,19 +88,70 @@ class _MyAppState extends State<MyApp> {
   }
 
   @override
+  void didChangeMetrics() {
+    final views = WidgetsBinding.instance.platformDispatcher.views.toList();
+    if (views.length == _views.length &&
+        views.every((view) => _views.any((old) => old.viewId == view.viewId))) {
+      return;
+    }
+    setState(() {
+      _views = views;
+      if (!views.any((view) => view.viewId == _activeViewId)) {
+        _activeViewId =
+            WidgetsBinding.instance.platformDispatcher.implicitView!.viewId;
+      }
+    });
+  }
+
+  void _activateView(int viewId) {
+    if (_activeViewId != viewId) {
+      setState(() => _activeViewId = viewId);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _displayChannel.setMethodCallHandler(null);
+    _credentialController.dispose();
     _feature.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final primaryViewId = View.of(context).viewId;
+    return ViewAnchor(
+      view: ViewCollection(
+        views: [
+          for (final view in _views)
+            if (view.viewId != primaryViewId)
+              View(
+                key: ValueKey(view.viewId),
+                view: view,
+                child: _createDisplay(view.viewId),
+              ),
+        ],
+      ),
+      child: _createDisplay(primaryViewId),
+    );
+  }
+
+  Widget _createDisplay(int viewId) {
     return MaterialApp(
       title: 'Mozais Greeter',
       debugShowCheckedModeBanner: false,
       theme: _theme.materialTheme,
       home: Scaffold(
-        body: GreeterSceneAdapter(feature: _feature, theme: _theme),
+        body: Listener(
+          onPointerDown: (_) => _activateView(viewId),
+          child: GreeterSceneAdapter(
+            feature: _feature,
+            theme: _theme,
+            credentialController: _credentialController,
+            isActive: viewId == _activeViewId,
+          ),
+        ),
       ),
     );
   }
