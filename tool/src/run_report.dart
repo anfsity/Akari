@@ -13,6 +13,7 @@ void writeRunPlan({
   required String runDirectory,
   required List<RunStep> steps,
   required Map<String, String> artifactPaths,
+  Map<String, Object?>? displayProfile,
 }) {
   final runDirectoryPath = _join(repoRoot.path, runDirectory);
   final reportFile = reportPath == null
@@ -26,6 +27,7 @@ void writeRunPlan({
     const JsonEncoder.withIndent('  ').convert({
       'schema_version': 1,
       'dry_run': true,
+      'display': ?displayProfile,
       'run_id': _lastSegment(runDirectory),
       'command': command,
       'run_directory': _relativePath(repoRoot, runDirectoryPath),
@@ -87,6 +89,7 @@ Future<int> runDevCommand({
   required String runDirectory,
   required List<RunStep> steps,
   required Map<String, String> artifactPaths,
+  Map<String, Object?>? displayProfile,
 }) async {
   final runDirectoryPath = _join(repoRoot.path, runDirectory);
   await Directory(runDirectoryPath).create(recursive: true);
@@ -201,6 +204,28 @@ Future<int> runDevCommand({
       }
     }
   }
+  Map<String, Object?>? displayReport = displayProfile;
+  final displayReportPath = artifactPaths['display_report'];
+  if (displayReportPath != null) {
+    final file = File(_resolvePath(repoRoot, displayReportPath));
+    if (await file.exists()) {
+      try {
+        displayReport = (jsonDecode(await file.readAsString()) as Map)
+            .cast<String, Object?>();
+        if (displayReport['matched'] != true) {
+          reportError = redactor.redact(
+            '${displayReport['error'] ?? 'Sway outputs did not match the requested profile.'}',
+          );
+        }
+      } catch (error) {
+        reportError = redactor.redact(
+          'Could not read Sway display report: $error',
+        );
+      }
+    } else if (stepResults.every((result) => result.status == 'passed')) {
+      reportError = 'Sway session did not publish its display report.';
+    }
+  }
   final status =
       stepResults.every((result) => result.status == 'passed') &&
           reportError == null
@@ -225,6 +250,7 @@ Future<int> runDevCommand({
   final report = <String, Object?>{
     'schema_version': 1,
     'run_id': _lastSegment(runDirectory),
+    'display': ?displayReport,
     'command': command,
     'status': status,
     'started_at': startedAt.toIso8601String(),

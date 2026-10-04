@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'build_links.dart';
@@ -22,16 +23,21 @@ List<RunStep> buildStepsFor(
   int? jobs,
   String backendMode = 'mock',
   List<String> themeArguments = const [],
+  Map<String, Object?>? displayProfile,
+  String swayBackend = 'wayland',
 }) {
   switch (command) {
     case 'build':
     case 'run':
+    case 'run sway':
     case 'preview':
     case 'run studio':
       final studio = command == 'run studio';
+      final sway = command == 'run sway';
+      final greeter = command == 'run' || sway;
       final demo = preview || studio;
       final live = command != 'build';
-      final transport = command == 'run' ? backendMode : 'real';
+      final transport = greeter ? backendMode : 'real';
       final theme = selectedTheme!;
       final hostDirectory = getThemeHostDirectory(
         theme,
@@ -49,10 +55,7 @@ List<RunStep> buildStepsFor(
               '--target-dir',
               'target/mozais-$transport',
               if (buildMode != 'debug') '--release',
-              if (command == 'run' && backendMode == 'mock') ...[
-                '--features',
-                'mock',
-              ],
+              if (greeter && backendMode == 'mock') ...['--features', 'mock'],
               if (jobs != null) ...['--jobs', '$jobs'],
             ],
             workingDirectory: 'backend',
@@ -118,8 +121,21 @@ List<RunStep> buildStepsFor(
           ),
         if (live)
           _step(
-            'theme.${studio ? 'studio' : command}',
+            'theme.${studio
+                ? 'studio'
+                : sway
+                ? 'sway'
+                : command}',
             [
+              if (sway) ...[
+                'python3',
+                _join(repoRoot.path, 'scripts/sway-session.py'),
+                '--log-dir',
+                _join(repoRoot.path, '$runDirectory/sway'),
+                '--backend',
+                swayBackend,
+                '--',
+              ],
               if (!demo) ...[
                 'bash',
                 _join(repoRoot.path, 'scripts/debug-dbus.sh'),
@@ -140,6 +156,8 @@ List<RunStep> buildStepsFor(
                   Platform.environment['MOZAIS_WINDOW_MODE'] ??
                   (demo ? 'windowed' : 'fullscreen'),
               if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs',
+              if (sway)
+                'MOZAIS_DISPLAY_PROFILE_JSON': jsonEncode(displayProfile!),
               if (!demo) ...{
                 'MOZAIS_BACKEND_MODE': backendMode,
                 'MOZAIS_BACKEND_BIN': _join(
@@ -397,7 +415,7 @@ Map<String, String> artifactPathsFor(
           studio: command == 'run studio',
         );
   return switch (command) {
-    'build' || 'run' || 'preview' || 'run studio' => {
+    'build' || 'run' || 'run sway' || 'preview' || 'run studio' => {
       if (!preview && command != 'run studio')
         'backend_executable':
             'backend/target/mozais-$backendMode/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
@@ -407,6 +425,13 @@ Map<String, String> artifactPathsFor(
         'executable': getLinuxExecutablePath(hostDirectory, buildMode),
       if (command == 'build' && buildTarget == 'linux')
         ...getBuildLinkPaths(selectedTheme!),
+      if (command == 'run sway') ...{
+        'display_report': '$runDirectory/sway/display-report.json',
+        'display_snapshot': '$runDirectory/sway/outputs.json',
+        'screenshots': '$runDirectory/sway/screenshots',
+        'sway_log': '$runDirectory/sway/sway.log',
+        'flutter_log': '$runDirectory/sway/flutter.log',
+      },
     },
     'verify-perf' || 'trace-perf' => {
       'performance_output': '$runDirectory/perf',
