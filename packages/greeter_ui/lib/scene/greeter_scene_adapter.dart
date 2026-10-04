@@ -215,14 +215,21 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
 
   void _handleDormantChanged() {
     if (widget.feature.dormantSlots.value) {
-      // The attempt is cancelled when the greeter sleeps, so discard the
-      // response instead of retaining it in the field during the exit.
+      // Authentication stays alive while hidden, but local credential text
+      // must not remain in the field when the greeter returns to its background.
       _credentialController.clear();
       _typeahead.clear();
       _credentialFocusNode.unfocus();
       _wakeController.reverse();
     } else {
       _wakeController.forward();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            !widget.feature.dormantSlots.value &&
+            widget.feature.authPromptSlots.value.mode == AuthMode.prompting) {
+          _flushTypeaheadAndFocus();
+        }
+      });
     }
     _handleSceneSlotsChanged();
   }

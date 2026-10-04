@@ -116,6 +116,43 @@ void main() {
     expect(clock.hitTestable(), findsNothing);
   });
 
+  testWidgets(
+    'escape and wake keep one prompt without submitting credentials',
+    (tester) async {
+      final gateway = _SingleUserGateway();
+      final feature = GreeterFeature(gateway: gateway);
+      addTearDown(feature.dispose);
+      await feature.initialize();
+      final theme = buildDefaultTheme();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme.materialTheme,
+          home: Scaffold(
+            body: GreeterSceneAdapter(feature: feature, theme: theme),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _wake(tester);
+
+      for (var cycle = 0; cycle < 5; cycle++) {
+        await tester.enterText(find.byType(TextField), 'unsubmitted');
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(feature.state.dormant, isTrue);
+        expect(feature.state.authMode, AuthMode.prompting);
+
+        await _wake(tester);
+        final field = tester.widget<TextField>(find.byType(TextField));
+        expect(field.controller!.text, isEmpty);
+        expect(field.focusNode!.hasFocus, isTrue);
+      }
+      expect(gateway.beginCalls, 1);
+      expect(gateway.cancelCalls, 0);
+      expect(gateway.respondCalls, 0);
+    },
+  );
+
   testWidgets('mouse click wakes the greeter', (tester) async {
     await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
     await tester.pumpAndSettle();
@@ -391,6 +428,9 @@ class _SingleUserGateway implements GreeterGateway {
       StreamController<GreeterEvent>.broadcast();
 
   String? _attemptId;
+  int beginCalls = 0;
+  int cancelCalls = 0;
+  int respondCalls = 0;
 
   @override
   Stream<GreeterEvent> get events => _events.stream;
@@ -411,6 +451,7 @@ class _SingleUserGateway implements GreeterGateway {
 
   @override
   Future<String> beginAuthentication(String username) async {
+    beginCalls++;
     final attemptId = 'attempt-$username';
     _attemptId = attemptId;
     scheduleMicrotask(() {
@@ -436,10 +477,14 @@ class _SingleUserGateway implements GreeterGateway {
   }
 
   @override
-  Future<void> respond(String attemptId, String response) async {}
+  Future<void> respond(String attemptId, String response) async {
+    respondCalls++;
+  }
 
   @override
-  Future<void> cancel(String attemptId) async {}
+  Future<void> cancel(String attemptId) async {
+    cancelCalls++;
+  }
 
   @override
   Future<void> startSession(String attemptId, String sessionId) async {}

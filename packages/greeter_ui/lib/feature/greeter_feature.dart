@@ -222,13 +222,7 @@ class GreeterFeature {
     if (!_state.dormant || _state.serviceMode != ServiceMode.ready) {
       return;
     }
-    _replace(
-      _state.copyWith(
-        dormant: false,
-        clearAuthError: true,
-        clearPromptError: true,
-      ),
-    );
+    _replace(_state.copyWith(dormant: false));
     _beginAuthenticationIfReady();
   }
 
@@ -236,32 +230,10 @@ class GreeterFeature {
     if (_state.dormant || _state.authMode == AuthMode.handingOff) {
       return;
     }
-    final attemptId = _attemptId;
-    _attemptId = null;
-    _eventsDuringBegin.clear();
-    _replace(
-      _state.copyWith(
-        dormant: true,
-        authMode: AuthMode.userSelection,
-        clearPrompt: true,
-        clearAuthError: true,
-        clearPromptError: true,
-        clearCatalogError: true,
-        backendAuthState: BackendAuthState.idle,
-      ),
-    );
-    if (attemptId != null) {
-      unawaited(_cancelAttempt(attemptId));
-    }
-  }
-
-  Future<void> _cancelAttempt(String attemptId) async {
-    try {
-      await _gateway.cancel(attemptId);
-    } on Object {
-      // Sleeping is best effort: the greeter returns to the background even
-      // when the backend cannot cancel the abandoned attempt.
-    }
+    // Hiding the form does not abandon its PAM conversation. Cancelling an
+    // unanswered password prompt can count as a failure on the host, so wake
+    // resumes the same attempt instead of creating another login attempt.
+    _replace(_state.copyWith(dormant: true));
   }
 
   bool get _canSelectUser {
