@@ -22,6 +22,34 @@ void main() {
     }
   });
 
+  test('quitting an interactive step restores the terminal and writes its report', () async {
+    final runner = File('${tempRoot.path}/interactive.dart');
+    await runner.writeAsString('''
+import 'dart:io';
+import '${Directory.current.uri}tool/src/run_report.dart';
+Future<void> main() async {
+  exitCode = await runDevCommand(
+    command: 'interactive', format: RunOutputFormat.text, reportPath: null,
+    repoRoot: Directory.current, runDirectory: 'run', artifactPaths: {},
+    steps: [RunStep(id: 'session', workingDirectory: '.', environment: {},
+      interactive: true,
+      command: ['bash', '-c', 'echo INTERACTIVE_READY; dd bs=1 count=1 >/dev/null 2>&1'])],
+  );
+}
+''');
+    final result = await Process.run('python3', [
+      '${Directory.current.path}/test/support/interactive_run_probe.py',
+      '${Directory.current.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
+      '--packages=${Directory.current.path}/.dart_tool/package_config.json',
+      runner.path,
+    ], workingDirectory: tempRoot.path);
+    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    final report = jsonDecode(
+      await File('${tempRoot.path}/run/report.json').readAsString(),
+    );
+    expect(report['status'], 'passed');
+  });
+
   test(
     'run studio plans a separate editor host without backend transport',
     () async {
