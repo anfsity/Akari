@@ -1,0 +1,10 @@
+[terminal]
+vt = 1
+switch = true
+
+[general]
+source_profile = false
+
+[default_session]
+command = "/opt/mozais-test/launch.sh"
+user = "greeter"
