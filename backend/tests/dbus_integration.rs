@@ -414,6 +414,60 @@ async fn blank_username_is_rejected() {
 }
 
 #[tokio::test]
+async fn auth_error_without_user_input_does_not_retry() {
+    let _guard = lock().lock().await;
+    let directory = temp_dir("no-input-retry");
+    let socket = directory.join("greetd.sock");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let server = spawn_server(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        assert_eq!(read_request(&mut stream).await["type"], "create_session");
+        write_response(
+            &mut stream,
+            serde_json::json!({
+                "type": "auth_message",
+                "auth_message_type": "error",
+                "auth_message": "Authentication provider unavailable"
+            }),
+        )
+        .await;
+        let acknowledgment = read_request(&mut stream).await;
+        assert_eq!(acknowledgment["type"], "post_auth_message_response");
+        assert!(acknowledgment.get("response").is_none());
+        write_response(
+            &mut stream,
+            serde_json::json!({
+                "type": "error",
+                "error_type": "auth_error",
+                "description": "authentication failed before user input"
+            }),
+        )
+        .await;
+        assert_eq!(read_request(&mut stream).await["type"], "cancel_session");
+        write_response(&mut stream, serde_json::json!({"type": "success"})).await;
+        assert!(
+            tokio::time::timeout(Duration::from_millis(300), listener.accept())
+                .await
+                .is_err(),
+            "an automatic PAM acknowledgment must not trigger another login attempt"
+        );
+    });
+    let _backend = start_backend(&socket);
+    let connection = connect_backend().await;
+    let proxy = make_proxy(&connection).await;
+    let result = tokio::time::timeout(
+        Duration::from_secs(2),
+        proxy.call::<_, _, String>("BeginAuthentication", &("alice",)),
+    )
+    .await
+    .unwrap();
+    assert!(result.is_err());
+    let state: (String, String) = proxy.call("GetState", &()).await.unwrap();
+    assert_eq!(state.0, "Failed");
+    server.finish().await;
+}
+
+#[tokio::test]
 async fn wrong_password_prompts_again() {
     let _guard = lock().lock().await;
     let directory = temp_dir("dbus");
@@ -748,6 +802,10 @@ async fn fake_bad_password_then_prompt(listener: UnixListener) {
             }),
         )
         .await;
+        // Keep greetd's configured session until the explicit cancel request.
+        // Reconnecting alone must not stand in for server-side cleanup.
+        assert_eq!(read_request(&mut stream).await["type"], "cancel_session");
+        write_response(&mut stream, serde_json::json!({"type": "success"})).await;
     }
 
     let (mut stream, _) = listener
