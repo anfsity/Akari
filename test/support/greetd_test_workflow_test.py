@@ -116,8 +116,20 @@ elif name == 'sway': print('test compositor output')
         self.assertEqual((current / "start.log").stat().st_mode & 0o777, 0o644)
         self.assertEqual((self.root / "current-run").resolve(), current.resolve())
         self.assertFalse((self.root / "test-runs").exists())
-        self.assertEqual(current.stat().st_mode & 0o777, 0o750)
-        self.assertEqual((current / "greeter").stat().st_mode & 0o7777, 0o2750)
+        self.assertEqual(self.logs.stat().st_mode & 0o777, 0o755)
+        self.assertEqual(current.stat().st_mode & 0o777, 0o755)
+        self.assertEqual((current / "greeter").stat().st_mode & 0o7777, 0o755)
+
+    def test_direct_root_start_keeps_diagnostics_readable_by_other_users(self):
+        self.environment.pop("SUDO_USER")
+        result = self.run_script("start.sh", FAIL_START="1")
+        self.assertNotEqual(result.returncode, 0)
+        current = self.logs / "current"
+        for directory in [self.logs, current, current / "greeter"]:
+            self.assertEqual(directory.stat().st_mode & 0o7777, 0o755)
+        for name in ["start.log", "journal.log", "restore.log"]:
+            self.assertEqual((current / name).stat().st_mode & 0o777, 0o644)
+        self.assertIn('install -d -o root -g greeter -m 0755', self.calls())
 
     def test_preflight_rejections_do_not_stop_sddm(self):
         for environment in [
@@ -151,6 +163,8 @@ elif name == 'sway': print('test compositor output')
         self.assertIn(f"Test logs: {latest_run}", result.stdout)
         self.assertIn(f"Startup log: {latest_run}/start.log", result.stdout)
         self.assertIn("Log out of the desktop", (latest_run / "start.log").read_text())
+        self.assertEqual(latest_run.stat().st_mode & 0o777, 0o755)
+        self.assertEqual((latest_run / "start.log").stat().st_mode & 0o777, 0o644)
 
     def test_start_failure_restores_sddm(self):
         result = self.run_script("start.sh", FAIL_START="1")
@@ -179,12 +193,11 @@ elif name == 'sway': print('test compositor output')
         sessions = list((self.logs / 'current/greeter').iterdir())
         self.assertEqual(len(sessions), 2)
         for session in sessions:
-            self.assertEqual(session.stat().st_mode & 0o7777, 0o2750)
-            self.assertEqual(session.stat().st_gid, os.getgid())
+            self.assertEqual(session.stat().st_mode & 0o7777, 0o755)
             self.assertEqual((session / 'backend.log').read_text(), 'backend')
             self.assertEqual((session / 'sway.log').read_text(), 'test compositor output\n')
             for log in [session / 'backend.log', session / 'sway.log']:
-                self.assertEqual(log.stat().st_mode & 0o777, 0o640)
+                self.assertEqual(log.stat().st_mode & 0o777, 0o644)
 
 
 class InstallerTest(unittest.TestCase):
