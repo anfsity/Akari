@@ -60,18 +60,24 @@ Set<ScenePredicate> activeScenePredicates({
 
 /// UI lifetime boundary between feature state and compiled theme components.
 ///
-/// Owns focus, wake animation, and transient credential text because these are
-/// presentation concerns. The cached scene receives predicate notifications
+/// Owns per-display focus and wake animation, borrowing shared credential text
+/// when displays mirror the application. The cached scene receives notifications
 /// and local slot updates, avoiding a full scene rebuild for each backend event.
 class GreeterSceneAdapter extends StatefulWidget {
   const GreeterSceneAdapter({
     required this.feature,
     required this.theme,
+    this.credentialController,
+    this.isActive = true,
     super.key,
   });
 
   final GreeterFeature feature;
   final ThemeDefinition theme;
+
+  /// Multiple displays borrow one controller from the application owner.
+  final TextEditingController? credentialController;
+  final bool isActive;
 
   @override
   State<GreeterSceneAdapter> createState() => _GreeterSceneAdapterState();
@@ -79,7 +85,7 @@ class GreeterSceneAdapter extends StatefulWidget {
 
 class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     with SingleTickerProviderStateMixin {
-  final TextEditingController _credentialController = TextEditingController();
+  late final TextEditingController _credentialController;
   final FocusNode _credentialFocusNode = FocusNode();
   final List<String> _typeahead = <String>[];
   late StreamSubscription<FeatureEffect> _effectSubscription;
@@ -91,6 +97,8 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   @override
   void initState() {
     super.initState();
+    _credentialController =
+        widget.credentialController ?? TextEditingController();
     _activeScenePredicates = ValueNotifier(_activePredicates());
     _listenToFeature(widget.feature);
     _wakeController = AnimationController(
@@ -107,6 +115,10 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   @override
   void didUpdateWidget(GreeterSceneAdapter oldWidget) {
     super.didUpdateWidget(oldWidget);
+    assert(widget.credentialController == oldWidget.credentialController);
+    if (widget.isActive && !oldWidget.isActive) {
+      _scheduleCredentialFocus();
+    }
     final featureChanged = !identical(widget.feature, oldWidget.feature);
     if (featureChanged) {
       _stopListeningToFeature(oldWidget.feature);
@@ -173,7 +185,9 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     _stopListeningToFeature(widget.feature);
     _activeScenePredicates.dispose();
     _wakeController.dispose();
-    _credentialController.dispose();
+    if (widget.credentialController == null) {
+      _credentialController.dispose();
+    }
     _credentialFocusNode.dispose();
     super.dispose();
   }
@@ -181,7 +195,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   @override
   Widget build(BuildContext context) {
     return Focus(
-      autofocus: true,
+      autofocus: widget.isActive,
       child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerDown: (_) {
@@ -223,19 +237,13 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       _wakeController.reverse();
     } else {
       _wakeController.forward();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted &&
-            !widget.feature.dormantSlots.value &&
-            widget.feature.authPromptSlots.value.mode == AuthMode.prompting) {
-          _flushTypeaheadAndFocus();
-        }
-      });
+      _scheduleCredentialFocus();
     }
     _handleSceneSlotsChanged();
   }
 
   KeyEventResult _handleKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) {
+    if (!widget.isActive || event is! KeyDownEvent) {
       return KeyEventResult.ignored;
     }
     // A pushed dialog or menu owns the keyboard until it is dismissed.
@@ -326,15 +334,30 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   }
 
   void _flushTypeaheadAndFocus() {
+    if (!widget.isActive) {
+      return;
+    }
     _flushTypeahead();
     _credentialFocusNode.canRequestFocus = true;
     if (_credentialFocusNode.canRequestFocus) {
       _credentialFocusNode.requestFocus();
       return;
     }
+    // A waking node can still inherit ExcludeFocus until its next build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (mounted && widget.isActive) {
         _credentialFocusNode.requestFocus();
+      }
+    });
+  }
+
+  void _scheduleCredentialFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          widget.isActive &&
+          !widget.feature.dormantSlots.value &&
+          widget.feature.authPromptSlots.value.mode == AuthMode.prompting) {
+        _flushTypeaheadAndFocus();
       }
     });
   }
