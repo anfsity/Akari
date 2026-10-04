@@ -25,6 +25,17 @@ display managers.
 The installer expects the existing test setup's `greeter` account and writable
 `/opt/mozais-test/state` directory.
 
+Installation also captures the active Sway or Hyprland desktop's display order
+in `/opt/mozais-test/display-layout.json`. An aligned horizontal row or vertical
+column is supported. This uses the desktop's configured arrangement; display
+hardware cannot report which side of another screen it physically occupies.
+Login computes contiguous positions from Sway's actual logical output sizes,
+retaining the login environment's own modes and scale. Hotplug recomputes those
+positions; newly discovered outputs follow the saved outputs until installation
+captures a new arrangement. If no supported desktop layout can be captured,
+installation preserves the previous layout, or uses Sway's automatic arrangement
+when no layout has been saved. Reinstall from the desktop after rearranging screens.
+
 Save work, log out of the desktop, log in on tty3, then run:
 
 ```sh
