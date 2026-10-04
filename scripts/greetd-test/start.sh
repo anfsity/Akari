@@ -87,7 +87,7 @@ import sys
 
 root, scale, log_root = sys.argv[1:]
 (Path(root) / 'config.json').write_text(json.dumps({
-    'scale': float(scale), 'logRoot': log_root,
+    'scale': float(scale), 'logRoot': log_root, 'source': 'greetd-login',
 }) + '\n')
 PY
 if ! runuser -u greeter -- test -w "$run_dir/greeter"; then

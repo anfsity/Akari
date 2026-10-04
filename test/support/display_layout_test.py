@@ -7,6 +7,7 @@ import unittest
 
 
 sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/greetd-test'))
 spec = importlib.util.spec_from_file_location(
     'display_layout', Path(__file__).resolve().parents[2] /
     'scripts/greetd-test/display-layout.py')
