@@ -4,7 +4,7 @@ source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$source_dir/../.." && pwd)"
 test_root=/opt/mozais-test
 if [[ "$EUID" -ne 0 ]]; then
-  echo 'Run this installer with sudo after building the test artifacts.' >&2
+  echo 'Run this installer with sudo to build and install the test artifacts.' >&2
   exit 1
 fi
 for unit in mozais-test.service mozais-restore.timer; do
@@ -13,6 +13,18 @@ for unit in mozais-test.service mozais-restore.timer; do
     exit 1
   fi
 done
+build_user="${SUDO_USER:-$(stat -c '%U' "$repo_root")}"
+printf 'Building the current default theme and production backend as %s...\n' "$build_user"
+# Build as the caller so SDK and repository caches retain their user ownership.
+# Direct root invocation uses the repository owner for the same reason.
+runuser -u "$build_user" -- bash -c '
+  set -euo pipefail
+  cd -- "$1"
+  source scripts/lib.sh
+  export PATH="$HOME/.cargo/bin:$PATH"
+  mozais_run_dev_cli "$1" build --theme "$1/themes/default" --mode release --platform linux --jobs 4
+' bash "$repo_root"
+
 backend="$repo_root/build/out/backend"
 bundle="$repo_root/build/out/default"
 test -x "$backend"
