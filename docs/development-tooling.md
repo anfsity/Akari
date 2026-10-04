@@ -70,6 +70,18 @@ greeter bundles default to undecorated fullscreen. Set
 `MOZAIS_WINDOW_MODE=fullscreen` for a fullscreen preview or `windowed` for a
 windowed greeter. Exit live sessions with `q` in the launching terminal.
 
+Fullscreen greeters render the same theme on every connected monitor, using
+each output's logical size and scale. Account, session, authentication, dormant
+state, and credential text are shared; keyboard actions belong to the focused
+window. Connecting or disconnecting an output updates its window without
+restarting authentication. Windowed previews and Studio use one window.
+
+For native multi-monitor regression checks, build a demo preview bundle and run
+`python3 test/support/multi_display_workflow_test.py --app PATH/greeter`.
+This opt-in check requires Sway, wtype, and grim. It starts an isolated headless
+compositor with mixed output scales, tests hotplug and both window modes, and
+retains screenshots and logs in the printed temporary directory.
+
 A preview on Hyprland inherits that output's scale. The standalone Sway test has
 its own output scale, so the same physical resolution can produce a different
 logical viewport and layout. For visual comparison, use the standalone login as
