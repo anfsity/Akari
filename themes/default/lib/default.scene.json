@@ -184,10 +184,17 @@
       "focusOrder": 50,
       "motion": "hoverLift",
       "visibleWhen": {
-        "any": [
-          "isAuthPrompting",
-          "isAuthSubmitting",
-          "isAuthError"
+        "all": [
+          {
+            "not": "isDormant"
+          },
+          {
+            "any": [
+              "isAuthPrompting",
+              "isAuthSubmitting",
+              "isAuthError"
+            ]
+          }
         ]
       },
       "interactive": true,
