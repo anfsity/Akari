@@ -345,13 +345,15 @@ Future<_StepResult> _runStep({
       );
     }
   } finally {
-    await input?.cancel();
-    for (final signal in signals) {
-      await signal.cancel();
-    }
+    // Cancelling Dart's stdin subscription can close the terminal descriptor.
+    // Restore its flags while the descriptor is still owned by this step.
     if (terminal) {
       stdin.lineMode = originalLineMode!;
       stdin.echoMode = originalEchoMode!;
+    }
+    await input?.cancel();
+    for (final signal in signals) {
+      await signal.cancel();
     }
     await Future.wait([stdoutLog.flush(), stderrLog.flush()]);
     await Future.wait([stdoutLog.close(), stderrLog.close()]);
