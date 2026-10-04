@@ -46,6 +46,15 @@ Reinstall after changing that definition to refresh installed completion scripts
 For manual registration, `mozais completion --shell zsh` or `--shell bash` prints
 the corresponding script.
 
+Use `mozais greetd-test install`, `start`, `restore`, `status` and `logs` for
+standalone login testing. This command family calls the installed test lifecycle
+scripts directly and keeps diagnostics outside repository run reports. Only
+installation needs repository build artifacts; status/log queries and service
+control do not acquire theme locks or create development run directories.
+The `mozais` launcher still needs the repository and SDK. Emergency recovery
+remains `sudo /opt/mozais-test/restore.sh`, independent of both.
+See [Standalone greetd testing](greetd-testing.md) for options and prerequisites.
+
 `build` accepts a theme project with `--theme PATH`, defaulting to
 `themes/default`. It resolves that project's dependencies, generates its scene
 source, and builds a reusable host project under `build/tool/hosts/`. The host imports
