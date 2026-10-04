@@ -413,6 +413,7 @@ struct AttemptResources {
     cancellation: CancellationToken,
     caller_watcher: CancellationToken,
     transport: Option<GreetdTransport>,
+    user_response_submitted: bool,
 }
 
 impl Drop for AttemptResources {
@@ -650,6 +651,7 @@ async fn handle_begin(
         cancellation: cancellation.clone(),
         caller_watcher: watcher_token.clone(),
         transport: None,
+        user_response_submitted: false,
     });
     tracing::info!(%attempt_id, %caller, state = actor.auth.state().as_str(), "authentication started");
     publish_state(&actor.auth, &attempt_id, snapshots);
@@ -740,6 +742,12 @@ async fn handle_respond(
 ) -> fdo::Result<()> {
     require_state(&actor.auth, AuthState::WaitingForInput)?;
     let cancellation = actor.get_attempt().cancellation.clone();
+
+    actor
+        .attempt
+        .as_mut()
+        .expect("active authentication owns attempt resources")
+        .user_response_submitted = true;
 
     actor
         .auth
@@ -964,11 +972,47 @@ async fn consume_response(
                 description,
             } => {
                 let detail = display_detail(&format!("{error_type}: {description}"));
-                // A rejected credential is retryable: keep the attempt alive,
-                // surface the failure, and restart the greetd session so the
-                // user can answer the prompt again without a new attempt.
-                if error_type == "auth_error" && actor.auth.state() == AuthState::SubmittingResponse
-                {
+                // A rejected PAM conversation remains configured in greetd.
+                // Dropping its socket does not cancel that server-side session;
+                // reset it before retrying or accepting a later explicit begin.
+                match actor.get_transport().cancel_session(cancellation).await {
+                    Ok(GreetdResponse::Success) => {}
+                    Ok(_) => {
+                        return Err(fail_transaction(
+                            actor,
+                            attempt_id,
+                            GreetdError::UnexpectedResponse(
+                                "unexpected reply while cancelling rejected authentication"
+                                    .to_owned(),
+                            ),
+                            &emitter,
+                            snapshots,
+                            controls,
+                        )
+                        .await);
+                    }
+                    Err(GreetdError::Cancelled) => {
+                        return Err(finish_cancellation(
+                            actor,
+                            attempt_id,
+                            Some(&emitter),
+                            snapshots,
+                            controls,
+                        )
+                        .await);
+                    }
+                    Err(error) => {
+                        return Err(fail_transaction(
+                            actor, attempt_id, error, &emitter, snapshots, controls,
+                        )
+                        .await);
+                    }
+                }
+                // Automatic info/error acknowledgments also use
+                // SubmittingResponse. Only a conversation with user input may
+                // restart on rejection; otherwise PAM failures can loop and
+                // consume login attempts without anyone submitting a response.
+                if error_type == "auth_error" && actor.get_attempt().user_response_submitted {
                     tracing::info!(%attempt_id, %error_type, state = actor.auth.state().as_str(), "credential rejected; retrying authentication");
                     let username = actor
                         .auth
@@ -987,12 +1031,12 @@ async fn consume_response(
                     emit_prompt_best_effort(&emitter, attempt_id, "error", detail, cancellation)
                         .await;
 
-                    actor
+                    let resources = actor
                         .attempt
                         .as_mut()
-                        .expect("active authentication owns attempt resources")
-                        .transport
-                        .take();
+                        .expect("active authentication owns attempt resources");
+                    resources.transport.take();
+                    resources.user_response_submitted = false;
 
                     let transport = match GreetdTransport::connect(cancellation).await {
                         Ok(transport) => transport,
@@ -1667,6 +1711,7 @@ mod tests {
             cancellation: tokio_util::sync::CancellationToken::new(),
             caller_watcher: tokio_util::sync::CancellationToken::new(),
             transport: None,
+            user_response_submitted: false,
         });
         let (snapshots, _) = watch::channel(AuthSnapshot::idle());
         let (controls, _) = watch::channel(None);
