@@ -83,6 +83,18 @@ class _FilePicker extends FilePickerPlatform {
   }) async => selected;
 }
 
+Future<void> _writeImage(File file) async {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  canvas.drawColor(const Color(0xff123456), BlendMode.src);
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(2, 2);
+  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+  file.writeAsBytesSync(bytes!.buffer.asUint8List());
+  image.dispose();
+  picture.dispose();
+}
+
 void main() {
   late Directory directory;
   late File file;
@@ -594,17 +606,7 @@ void main() {
     tester,
   ) async {
     final source = File('${directory.path}/wallpaper.png');
-    await tester.runAsync(() async {
-      final recorder = ui.PictureRecorder();
-      final canvas = Canvas(recorder);
-      canvas.drawColor(const Color(0xff123456), BlendMode.src);
-      final picture = recorder.endRecording();
-      final image = await picture.toImage(2, 2);
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      source.writeAsBytesSync(bytes!.buffer.asUint8List());
-      image.dispose();
-      picture.dispose();
-    });
+    await tester.runAsync(() => _writeImage(source));
     await openStudio(tester);
     picker.selected = _PickedFile(source);
     await tester.tap(find.text('Import asset'));
@@ -634,6 +636,116 @@ void main() {
     expect(File('${directory.path}/assets/wallpaper.png').existsSync(), isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'loaded theme owns imported assets, saved paths and background previews',
+    (tester) async {
+      final source = File('${directory.path}/assets/wallpaper.png');
+      source.parent.createSync();
+      await tester.runAsync(() => _writeImage(source));
+      final originalManifest = File('${directory.path}/pubspec.yaml')
+          .readAsStringSync();
+      final other = Directory('${directory.path}/other-project')..createSync();
+      final manifest = File('${other.path}/pubspec.yaml')
+        ..writeAsStringSync('name: theme_other\n');
+      final localImage = File('${other.path}/assets/local.png');
+      localImage.parent.createSync();
+      source.copySync(localImage.path);
+      const localAsset = 'packages/theme_other/assets/local.png';
+      final scene = File('${other.path}/lib/scenes/other.scene.json');
+      scene.parent.createSync(recursive: true);
+      scene.writeAsStringSync(
+        encodeSceneDocument(
+          _document.copyWith(
+            id: 'other',
+            background: const SceneBackground(
+              kind: SceneBackgroundKind.image,
+              asset: localAsset,
+            ),
+          ),
+        ),
+      );
+      await openStudio(tester);
+      final invalid = File('${scene.parent.path}/invalid.json')
+        ..writeAsStringSync('invalid');
+      picker.selected = _PickedFile(invalid);
+      await tester.tap(find.text('Load JSON'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('FormatException'), findsOneWidget);
+      expect(find.text('wallpaper.png'), findsOneWidget);
+      expect(find.text('local.png'), findsNothing);
+      picker.selected = _PickedFile(scene);
+      await tester.tap(find.text('Load JSON'));
+      await tester.pumpAndSettle();
+      expect(find.text('local.png'), findsOneWidget);
+      expect(find.text('wallpaper.png'), findsNothing);
+      var preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      var renderer =
+          preview.theme.bundle.backgrounds[SceneBackgroundKind.image]
+              as ImageBackgroundRenderer;
+      expect(
+        (renderer.resolveImage(localAsset) as FileImage).file.path,
+        localImage.path,
+      );
+
+      picker.selected = _PickedFile(source);
+      await tester.tap(find.text('Import asset'));
+      await tester.pumpAndSettle();
+      expect(
+        File('${other.path}/assets/wallpaper.png').readAsBytesSync(),
+        source.readAsBytesSync(),
+      );
+      expect(manifest.readAsStringSync(), contains('assets/wallpaper.png'));
+      expect(
+        File('${directory.path}/pubspec.yaml').readAsStringSync(),
+        originalManifest,
+      );
+      expect(
+        File('${directory.path}/assets/wallpaper-2.png').existsSync(),
+        isFalse,
+      );
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Use image').last);
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      const importedAsset = 'packages/theme_other/assets/wallpaper.png';
+      expect(
+        decodeSceneDocument(scene.readAsStringSync()).background.asset,
+        importedAsset,
+      );
+      preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      renderer =
+          preview.theme.bundle.backgrounds[SceneBackgroundKind.image]
+              as ImageBackgroundRenderer;
+      expect(
+        (renderer.resolveImage(importedAsset) as FileImage).file.path,
+        '${other.path}/assets/wallpaper.png',
+      );
+      expect(
+        decodeSceneDocument(file.readAsStringSync()).background.kind,
+        SceneBackgroundKind.solid,
+      );
+
+      await tester.tap(find.text('test.scene.json'));
+      await tester.pumpAndSettle();
+      expect(find.text('local.png'), findsNothing);
+      expect(find.text('wallpaper.png'), findsOneWidget);
+      await tester.tap(find.text('Import asset'));
+      await tester.pumpAndSettle();
+      expect(
+        File('${directory.path}/assets/wallpaper-2.png').existsSync(),
+        isTrue,
+      );
+      expect(
+        File('${other.path}/assets/wallpaper-2.png').existsSync(),
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'load JSON handles cancellation, invalid files and unsaved edits',

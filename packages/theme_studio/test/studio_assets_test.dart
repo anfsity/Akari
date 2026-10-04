@@ -17,6 +17,40 @@ void main() {
   });
   tearDown(() => directory.deleteSync(recursive: true));
 
+  test(
+    'finds a scene theme by its manifest through nested paths and symlinks',
+    () {
+      final theme = Directory('${directory.path}/different-folder')
+        ..createSync();
+      File('${theme.path}/pubspec.yaml')
+          .writeAsStringSync('name: theme_ocean\n');
+      final scene = File('${theme.path}/lib/scenes/ocean.scene.json');
+      scene.parent.createSync(recursive: true);
+      scene.writeAsStringSync('{}');
+      final link = Link('${directory.path}/linked.json')
+        ..createSync(scene.path);
+      for (final file in [scene, File(link.path)]) {
+        final found = StudioAssets.findForScene(file)!;
+        expect(found.directory.path, theme.resolveSymbolicLinksSync());
+        expect(found.packageName, 'theme_ocean');
+      }
+    },
+  );
+
+  test('standalone scenes stop at a non-theme package boundary', () {
+    manifest.writeAsStringSync('name: theme_parent\n');
+    final standalone = File('${directory.path}/nested/lib/scene.json');
+    standalone.parent.createSync(recursive: true);
+    File('${directory.path}/nested/pubspec.yaml')
+        .writeAsStringSync('name: standalone\n');
+    standalone.writeAsStringSync('{}');
+    expect(StudioAssets.findForScene(standalone), isNull);
+    manifest.deleteSync();
+    final external = File('${directory.path}/external.json')
+      ..writeAsStringSync('{}');
+    expect(StudioAssets.findForScene(external), isNull);
+  });
+
   test('imports portable assets, registers manifest and avoids overwrites', () {
     final source = File('${directory.path}/picture.png')
       ..writeAsBytesSync([1, 2]);

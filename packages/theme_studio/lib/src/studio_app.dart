@@ -43,7 +43,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   late String _path;
   late final List<String> _scenePaths;
   bool _loadingFile = false;
-  late final StudioAssets _assets;
+  late final StudioAssets _compiledAssets;
+  late StudioAssets _assets;
   List<String> _assetPaths = [];
   String? _error;
   StudioPreferences _preferences = const StudioPreferences();
@@ -54,10 +55,11 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   @override
   void initState() {
     super.initState();
-    _assets = StudioAssets(
+    _compiledAssets = StudioAssets(
       directory: Directory(widget.themeDirectory),
       packageName: widget.themePackageName,
     );
+    _assets = _compiledAssets;
     _updateTheme(widget.themeBuilder());
     _assetPaths = _assets.getAssets();
     _scenePaths = [...widget.scenePaths];
@@ -115,7 +117,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         backgrounds: {
           ...theme.bundle.backgrounds,
           SceneBackgroundKind.image: ImageBackgroundRenderer(
-            resolveImage: _assets.getImageProvider,
+            resolveImage: (asset) => _assets.getImageProvider(asset),
           ),
         },
       ),
@@ -138,9 +140,13 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   void _openScene(String path) {
     try {
+      final assets = StudioAssets.findForScene(File(path)) ?? _compiledAssets;
+      final assetPaths = assets.getAssets();
       final editor = SceneEditor(File(path));
       _editor?.dispose();
       _editor = editor;
+      _assets = assets;
+      _assetPaths = assetPaths;
       _path = path;
       if (!_scenePaths.contains(path)) _scenePaths.add(path);
       _error = null;

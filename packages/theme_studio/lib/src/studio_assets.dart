@@ -3,13 +3,33 @@ import 'dart:io';
 import 'package:flutter/painting.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 
-/// Imports into the compiled theme package so saved scene references remain
+/// Imports into the scene's theme package so saved scene references remain
 /// portable. The manifest keeps its comments and existing asset declarations.
 class StudioAssets {
   StudioAssets({required this.directory, required this.packageName});
 
   final Directory directory;
   final String packageName;
+
+  /// A standalone JSON keeps the host theme's assets. Stop at the nearest
+  /// package boundary so it cannot inherit an unrelated ancestor's theme.
+  static StudioAssets? findForScene(File scene) {
+    var directory = File(scene.resolveSymbolicLinksSync()).parent;
+    while (true) {
+      final manifest = File('${directory.path}/pubspec.yaml');
+      if (manifest.existsSync()) {
+        final root = YamlEditor(manifest.readAsStringSync()).parseAt([]).value;
+        final packageName = root is Map ? root['name'] : null;
+        if (packageName is! String || !packageName.startsWith('theme_')) {
+          return null;
+        }
+        return StudioAssets(directory: directory, packageName: packageName);
+      }
+      final parent = directory.parent;
+      if (parent.path == directory.path) return null;
+      directory = parent;
+    }
+  }
 
   String importFile(File source) {
     final target = _getAvailableAssetFile(source.uri.pathSegments.last);

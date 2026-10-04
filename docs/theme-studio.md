@@ -42,6 +42,9 @@ scene switches within the current session. Small windows scroll the workspace.
    it to the scene list for this session. It uses the current compiled theme's
    components. Invalid files retain the previous scene; unsaved edits must be
    saved or discarded first. Subsequent saves write to the opened file.
+   When the JSON belongs to another theme package, its assets and import
+   destination follow that package; preview components remain the compiled
+   theme's components. A standalone JSON uses the compiled theme's assets.
 2. Select a node on the canvas or in the layer list. The list also includes
    nodes hidden by the current preview state, ordered from front to back.
 3. Edit normalized position/size, depth, paint/focus order, transforms, motion,
@@ -120,7 +123,7 @@ precedence so the node remains inside the canvas.
 
 ## Importing assets
 
-**Import asset** copies a file into the compiled theme's `assets/` directory,
+**Import asset** copies a file into the current scene's theme `assets/` directory,
 chooses a new name when needed, and registers it in the theme's `pubspec.yaml`
 while preserving existing entries and comments. Imports are written immediately;
 scene undo does not delete files. The package asset reference is copied to the
@@ -128,9 +131,10 @@ clipboard; click an asset name to copy it again for component properties.
 
 **Use image** validates that an asset can be decoded and applies it as the scene
 background. This scene edit supports undo/redo and needs **Save scene** to reach
-disk. Studio resolves the theme's image backgrounds directly from disk so new
-images appear immediately. Other component asset references still follow their
-compiled implementation; restart Studio if a new bundle asset is not available.
+disk. Studio resolves the current scene's image backgrounds directly from disk
+so new images appear immediately. Other component asset references still follow
+their compiled implementation; restart Studio if a new bundle asset is not
+available.
 
 ## Checks
 
