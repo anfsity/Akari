@@ -134,6 +134,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _wake(tester);
+      final arrow = find.byIcon(Icons.arrow_forward).hitTestable();
+      expect(arrow, findsOneWidget);
 
       for (var cycle = 0; cycle < 5; cycle++) {
         await tester.enterText(find.byType(TextField), 'unsubmitted');
@@ -141,8 +143,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(feature.state.dormant, isTrue);
         expect(feature.state.authMode, AuthMode.prompting);
+        expect(arrow, findsNothing);
 
         await _wake(tester);
+        expect(arrow, findsOneWidget);
         final field = tester.widget<TextField>(find.byType(TextField));
         expect(field.controller!.text, isEmpty);
         expect(field.focusNode!.hasFocus, isTrue);
