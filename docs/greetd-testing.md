@@ -46,11 +46,12 @@ sudo /opt/mozais-test/restore.sh
 ```
 
 Logs live outside `/opt`, under `/var/tmp/mozais-greetd-test-<caller-uid>/`.
-For a user with UID 1000 this is `/var/tmp/mozais-greetd-test-1000/`. The sudo
-caller can read startup, frontend, backend, compositor and recovery logs directly,
-including while the test is running, without sudo. Direct root invocation uses
-UID 0. Log directories exclude unrelated users; greeter sessions inherit the
-caller's primary group and create group-readable files.
+For a user with UID 1000 this is `/var/tmp/mozais-greetd-test-1000/`.
+All users can read startup, frontend, backend, compositor and recovery logs
+directly, including while the test is running, without sudo or special group
+membership. Direct root invocation uses UID 0 and keeps the same read access.
+Log directories use mode `0755`; log files use mode `0644`. Only their owners
+and root can write to them.
 
 Each startup attempt that reaches log setup gets its own
 `<timestamp>-<pid>/start.log`. Startup prints its log directory before preflight.

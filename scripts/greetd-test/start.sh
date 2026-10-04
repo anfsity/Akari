@@ -9,7 +9,7 @@ fi
 
 exec 9>/run/lock/mozais-test.lock
 flock -n 9 || { echo 'Another test setup is running.' >&2; exit 1; }
-IFS=: read -r log_user _ log_uid log_gid _ _ _ < <(getent passwd "${SUDO_USER:-root}")
+IFS=: read -r log_user _ log_uid _ _ _ _ < <(getent passwd "${SUDO_USER:-root}")
 log_root="${MOZAIS_TEST_LOG_DIR:-/var/tmp/mozais-greetd-test-$log_uid}"
 if [[ "$log_root" != /* ]]; then
   echo 'MOZAIS_TEST_LOG_DIR must be an absolute path.' >&2
@@ -17,9 +17,9 @@ if [[ "$log_root" != /* ]]; then
 fi
 umask 022
 run_dir="$log_root/$(date +%Y%m%d-%H%M%S)-$$"
-# Keep the caller's logs outside the installation. The greeter group can traverse
-# these directories; other users cannot read this user's test output.
-install -d -o "$log_user" -g greeter -m 0750 "$log_root" "$run_dir"
+# Keep diagnostics outside the installation and readable without root or
+# membership in the caller's group, including tests started directly as root.
+install -d -o "$log_user" -g greeter -m 0755 "$log_root" "$run_dir"
 ln -sfn "$run_dir" "$log_root/latest"
 exec > >(tee -a "$run_dir/start.log") 2>&1
 trap 'status=$?; printf "Startup failed at line %s (status %s).\n" "$LINENO" "$status"; exit "$status"' ERR
@@ -63,9 +63,7 @@ if [[ ! "$scale" =~ ^[0-9]+([.][0-9]+)?$ ]] || ! awk "BEGIN { exit !($scale > 0)
   echo 'MOZAIS_TEST_SCALE must be a positive number.'
   exit 1
 fi
-# Inherit the caller's group in every greeter session so its live logs are
-# readable by the caller without granting other users access.
-install -d -o greeter -g "$log_gid" -m 2750 "$run_dir/greeter"
+install -d -o greeter -g greeter -m 0755 "$run_dir/greeter"
 printf 'output * scale %s\ninclude %s/sway.conf\n' "$scale" "$test_root" > "$run_dir/sway.conf"
 if ! runuser -u greeter -- test -w "$run_dir/greeter"; then
   echo 'The greeter cannot access the log directory. Choose a path outside a private home directory.'
