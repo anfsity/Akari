@@ -6,15 +6,22 @@ and power actions call logind, performing actual suspend, reboot and shutdown.
 Boot configuration stays on SDDM. Desktop development with `mozais run` still
 uses mock authentication and mock power by default.
 
-Prepare production artifacts, then install while no previous test or timer is active:
+Build and install while no previous test or timer is active:
 
 ```sh
-fvm dart run tool/mozais.dart build --jobs 4
 sudo bash scripts/greetd-test/install.sh
 ```
 
-Installation backs up the previous frontend, backend, scripts and configuration
-beneath `/opt/mozais-test/backups/`. It does not switch display managers.
+The installer first builds the current repository's default theme and production
+backend in Linux release mode with four build jobs. It runs the build as the sudo
+caller (or the repository owner when invoked directly as root), keeping SDK and
+repository caches owned by that user. SDK selection uses the same repository
+configuration and `MOZAIS_FLUTTER_BIN` / `MOZAIS_DART_BIN` overrides as the CLI.
+A failed build aborts installation before any installed files or backups change.
+
+After a successful build, installation backs up the previous frontend, backend,
+scripts and configuration beneath `/opt/mozais-test/backups/`. It does not switch
+display managers.
 The installer expects the existing test setup's `greeter` account and writable
 `/opt/mozais-test/state` directory.
 
