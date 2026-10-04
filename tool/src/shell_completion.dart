@@ -41,7 +41,7 @@ _mozais() {
       );
     }
     script.writeln(r'''      )
-      _describe 'run target' targets
+      _describe 'subcommand' targets
       return
     fi
   fi''');

@@ -41,6 +41,20 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(await completeBashWords(['mozais', 'st']), isEmpty);
     expect(await completeBashWords(['mozais', 'run', 'st']), ['studio']);
     expect(await completeBashWords(['mozais', 'run', '']), ['studio']);
+    expect(await completeBashWords(['mozais', 'greetd-test', '']), [
+      'install',
+      'start',
+      'restore',
+      'status',
+      'logs',
+    ]);
+    expect(await completeBashWords(['mozais', 'greetd-test', 'start', '--l']), [
+      '--log-dir',
+    ]);
+    expect(
+      await completeBashWords(['mozais', 'greetd-test', 'logs', '--run', 'c']),
+      ['current'],
+    );
     final studioOptions = await completeBashWords([
       'mozais',
       'run',
@@ -121,7 +135,10 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       buffers[7].trimRight(),
       r'mozais run studio -t theme\ with\ spaces/',
     );
-    expect(buffers.last.trimRight(), r'mozais build -t theme\ with\ spaces/');
+    expect(buffers[8].trimRight(), r'mozais build -t theme\ with\ spaces/');
+    expect(buffers[9].trimRight(), 'mozais greetd-test restore');
+    expect(buffers[10].trimRight(), 'mozais greetd-test start --log-dir=');
+    expect(buffers[11].trimRight(), 'mozais greetd-test logs --run current');
   });
 
   test('installation preserves startup content and works outside the repository', () async {
