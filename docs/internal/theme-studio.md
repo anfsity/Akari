@@ -28,6 +28,10 @@ session; saving scene JSON also regenerates the compiled scene. Hot reload
 keeps the editor's current document and undo history. Use **Reload from disk**
 to explicitly adopt changes made by another editor.
 
+Studio accepts `--theme`, `--jobs`, and the common report/dry-run options. It
+does not accept `--mode` or `--backend`. For command and report details, see the
+[CLI reference](../reference/cli.md#commands-and-targets).
+
 ## Editing a scene
 
 Drag the boundaries beside the left sidebar or right inspector to resize their
@@ -42,9 +46,8 @@ scene switches within the current session. Small windows scroll the workspace.
    it to the scene list for this session. It uses the current compiled theme's
    components. Invalid files retain the previous scene; unsaved edits must be
    saved or discarded first. Subsequent saves write to the opened file.
-   When the JSON belongs to another theme package, its assets and import
-   destination follow that package; preview components remain the compiled
-   theme's components. A standalone JSON uses the compiled theme's assets.
+   See [Importing assets](#importing-assets) for the package used by imports
+   and the compiled preview.
 2. Select a node on the canvas or in the layer list. The list also includes
    nodes hidden by the current preview state, ordered from front to back.
 3. Edit position/size in reference pixels (the default) or percentages,
@@ -63,6 +66,21 @@ scene switches within the current session. Small windows scroll the workspace.
 5. Use **Undo** and **Redo** for document edits. **Save scene** applies pending
    fields and writes the scene JSON. **Reload from disk** requires an explicit
    discard action and clears history.
+
+Pixel layout values use the reference canvas, independently of desktop scale
+or editor zoom. For a 1920×1080 canvas, these three representations describe
+the same rectangle:
+
+| Field | Scene JSON | Pixels | Percentages |
+| --- | --- | --- | --- |
+| X | `0.25` | `480` | `25` |
+| Y | `0.25` | `270` | `25` |
+| Width | `0.5` | `960` | `50` |
+| Height | `0.25` | `270` | `25` |
+
+Changing the reference resolution changes the pixel representation of existing
+normalized rectangles. It does not convert transform translations into
+percentages; their units follow the [scene format](../reference/scene-format.md#transforms).
 
 Use **Duplicate node** in the layer panel to copy the selected node, including
 its layout, transforms, visibility, motion and properties. The copy is selected
@@ -105,19 +123,38 @@ drag a visible node:
   vertical movement. The authored perspective is preserved; edit **Perspective**
   in the inspector to adjust projection.
 
+Resize handles start from the node's rendered layout bounds, including the
+compiled theme's minimum hit target for interactive nodes. Both built-in themes
+use 44 reference pixels per dimension. A smaller authored rectangle still
+renders at that minimum, so dragging its handle starts at the visible edge and
+cannot shrink below it. Non-interactive nodes can shrink to one reference pixel.
+Zero-scale or edge-on 3D projections have no resize handles; restore their scale
+or rotation in **Advanced layout** before resizing.
+
 A completed drag creates one undo entry; invalid inspector drafts block dragging
 until corrected. All tools follow canvas coordinates even when a node is rotated
 or scaled. The inspector's position, scale and rotation fields follow the live
 preview without rebuilding the inspector or recording intermediate scene
 revisions. Cancelling a drag restores both the canvas and its displayed values.
 
-With the canvas focused, **V** selects Move/Resize, **H** selects Hand, **K**
-selects Scale, **R** selects Rotate and **Shift+R** selects 3D rotate.
-**Shift+1** fits and recenters. Arrow keys move the selected node by one
-reference pixel, or ten with Shift. **Ctrl+Z**, **Ctrl+Shift+Z / Ctrl+Y**,
-**Ctrl+D**, **Delete**, and **Ctrl+S** undo, redo, duplicate, delete and save.
-These shortcuts are scoped to the canvas so inspector text fields retain their
-normal editing behavior.
+With the canvas focused, use these shortcuts. Inspector text fields retain
+their normal editing behavior.
+
+| Shortcut | Action |
+| --- | --- |
+| V | Move/Resize |
+| H | Hand |
+| K | Scale |
+| R / Shift+R | Rotate / 3D rotate |
+| Space+drag | Temporarily pan |
+| Ctrl+mouse wheel | Zoom around the pointer |
+| Shift+1 | Fit and recenter |
+| Arrow / Shift+Arrow | Move by one / ten reference pixels |
+| Ctrl+Z | Undo |
+| Ctrl+Shift+Z / Ctrl+Y | Redo |
+| Ctrl+D | Duplicate node |
+| Delete | Delete node, keeping at least one |
+| Ctrl+S | Apply pending fields and save |
 
 Animations are disabled in
 the editing canvas so selection and property inspection remain stable.
@@ -166,6 +203,29 @@ disk. Studio resolves the current scene's image backgrounds directly from disk
 so new images appear immediately. Other component asset references still follow
 their compiled implementation; restart Studio if a new bundle asset is not
 available.
+
+**Load JSON** resolves the opened file to its nearest package boundary. A package
+whose name begins with `theme_` owns that scene's asset list, imports, and image
+backgrounds. A non-theme package boundary or a file with no package uses the
+compiled theme's assets instead. Loading another theme's JSON changes this asset
+ownership, but does not compile its component factory into the running editor.
+For example, a `theme_other` scene imports into that package's `assets/` and
+saves references beginning with `packages/theme_other/assets/`. Restart Studio
+with `--theme /path/to/theme_other` to preview that package's components too.
+
+## Diagnose an edit
+
+| Symptom | Next step |
+| --- | --- |
+| Text looks stretched | Use **Advanced layout → Reset scale**, then resize the layout with handles |
+| A small interactive node stops shrinking | Check the compiled theme's minimum hit target; zoom changes handle presentation, not that limit |
+| A field or canvas drag will not apply | Correct the reported inspector error; document commands apply and validate pending fields first |
+| Another theme's JSON shows the current theme's components | Launch Studio with the other package selected through `--theme` |
+| A newly imported background works but a component image does not | Restart Studio to include the new asset in the compiled bundle |
+| Save reports that the source changed externally | Preserve any needed unsaved edits, then use the explicit discard/reload flow before continuing |
+
+Scene files and imported assets are the authoring source. Generated
+`*.scene.g.dart` is refreshed by the CLI; do not edit it to repair a Studio save.
 
 ## Checks
 
