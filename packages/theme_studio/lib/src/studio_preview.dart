@@ -3,20 +3,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
-import 'node_resize.dart';
+import 'node_geometry.dart';
 import 'studio_preferences.dart';
 import 'studio_preview_host.dart';
+import 'studio_viewport.dart';
 
 enum StudioCanvasTool {
-  move('Move', 'Drag to move'),
-  scale('Scale', 'Drag horizontally / vertically to scale X / Y'),
-  rotate('Rotate', 'Drag horizontally to rotate Z'),
-  rotate3d('3D rotate', 'Drag horizontally / vertically to rotate Y / X');
+  move('Move', 'Drag to move', 'V'),
+  scale('Scale', 'Drag horizontally / vertically to scale X / Y', 'K'),
+  rotate('Rotate', 'Drag horizontally to rotate Z', 'R'),
+  rotate3d(
+    '3D rotate',
+    'Drag horizontally / vertically to rotate Y / X',
+    'Shift+R',
+  );
 
-  const StudioCanvasTool(this.label, this.hint);
+  const StudioCanvasTool(this.label, this.hint, this.shortcut);
 
   final String label;
   final String hint;
+  final String shortcut;
 }
 
 /// Renders the compiled theme at its authored resolution. Selection wraps each
@@ -35,6 +41,10 @@ class StudioPreview extends StatefulWidget {
     required this.preferences,
     required this.tool,
     this.lockAspectRatio = false,
+    this.zoom,
+    this.panEnabled = false,
+    this.resetView = 0,
+    this.onZoom,
     super.key,
   });
 
@@ -45,6 +55,10 @@ class StudioPreview extends StatefulWidget {
   final StudioPreferences preferences;
   final StudioCanvasTool tool;
   final bool lockAspectRatio;
+  final double? zoom;
+  final bool panEnabled;
+  final int resetView;
+  final ValueChanged<double>? onZoom;
   final ValueChanged<String> onSelect;
   final SceneNode? Function(String id) onStartDrag;
   final ValueChanged<SceneNode> onCommitDrag;
@@ -111,7 +125,14 @@ class _StudioPreviewState extends State<StudioPreview> {
           )
         : switch (drag.tool) {
             StudioCanvasTool.move => node.copyWith(
-              rect: _calculateMovedRect(node.rect, canvas.size, delta),
+              rect: calculateMovedRect(
+                rect: node.rect,
+                canvasSize: canvas.size,
+                delta: delta,
+                gridSize: widget.preferences.snapToGrid
+                    ? widget.preferences.gridSize.toDouble()
+                    : null,
+              ),
             ),
             StudioCanvasTool.scale => node.copyWith(
               transform: node.transform.copyWith(
@@ -163,20 +184,6 @@ class _StudioPreviewState extends State<StudioPreview> {
   // edge. Scaling changes the transform, never the component's layout rect.
   double _calculateScale(double source, double delta) =>
       (source < 0 ? -1 : 1) * (source.abs() + delta * 3).clamp(0.01, 100.0);
-
-  SceneRect _calculateMovedRect(SceneRect rect, Size size, Offset delta) {
-    final grid = widget.preferences.gridSize;
-    var x = rect.x * size.width + delta.dx;
-    var y = rect.y * size.height + delta.dy;
-    if (widget.preferences.snapToGrid) {
-      x = (x / grid).round() * grid.toDouble();
-      y = (y / grid).round() * grid.toDouble();
-    }
-    return rect.copyWith(
-      x: (x / size.width).clamp(0.0, 1.0 - rect.width),
-      y: (y / size.height).clamp(0.0, 1.0 - rect.height),
-    );
-  }
 
   void _stopDrag({required bool commit}) {
     final node = _dragPreview;
@@ -244,45 +251,43 @@ class _StudioPreviewState extends State<StudioPreview> {
     final visible =
         selected.visibleWhen == null ||
         evaluateSceneCondition(selected.visibleWhen!, predicates);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final fit = applyBoxFit(
-          BoxFit.contain,
-          referenceSize,
-          constraints.biggest,
-        );
-        final viewportScale = fit.destination.width / referenceSize.width;
-        return _PreviewViewport(
-          canvasKey: _canvas,
-          size: referenceSize,
-          preferences: widget.preferences,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _PreviewScene(
-                theme: widget.theme,
-                document: document,
-                referenceSize: referenceSize,
-                dormant: widget.dormant,
-                nodeBuilder: _buildInteractiveNode,
+    return StudioViewport(
+      canvasKey: _canvas,
+      referenceSize: referenceSize,
+      zoom: widget.zoom,
+      resetView: widget.resetView,
+      panEnabled: widget.panEnabled,
+      onZoom: (zoom) => widget.onZoom?.call(zoom),
+      childBuilder: (viewportScale) => CustomPaint(
+        foregroundPainter: widget.preferences.showGrid
+            ? _GridPainter(widget.preferences.gridSize)
+            : null,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _PreviewScene(
+              theme: widget.theme,
+              document: document,
+              referenceSize: referenceSize,
+              dormant: widget.dormant,
+              nodeBuilder: _buildInteractiveNode,
+            ),
+            if (visible)
+              _NodeSelectionOverlay(
+                node: selected,
+                canvasSize: referenceSize,
+                viewportScale: viewportScale,
+                minHitTarget: widget.theme.bundle.tokens.minHitTarget,
+                showHandles: widget.tool == StudioCanvasTool.move,
+                onStart: (handle, details) =>
+                    _startDrag(selected.id, details, handle: handle),
+                onUpdate: _updateDrag,
+                onStop: (_) => _stopDrag(commit: true),
+                onCancel: () => _stopDrag(commit: false),
               ),
-              if (visible)
-                _NodeSelectionOverlay(
-                  node: selected,
-                  canvasSize: referenceSize,
-                  viewportScale: viewportScale,
-                  minHitTarget: widget.theme.bundle.tokens.minHitTarget,
-                  showHandles: widget.tool == StudioCanvasTool.move,
-                  onStart: (handle, details) =>
-                      _startDrag(selected.id, details, handle: handle),
-                  onUpdate: _updateDrag,
-                  onStop: (_) => _stopDrag(commit: true),
-                  onCancel: () => _stopDrag(commit: false),
-                ),
-            ],
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 
@@ -296,37 +301,6 @@ class _StudioPreviewState extends State<StudioPreview> {
         onCancelDrag: () => _stopDrag(commit: false),
         child: _components.build(context, node),
       );
-}
-
-class _PreviewViewport extends StatelessWidget {
-  const _PreviewViewport({
-    required this.canvasKey,
-    required this.size,
-    required this.preferences,
-    required this.child,
-  });
-
-  final Key canvasKey;
-  final Size size;
-  final StudioPreferences preferences;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => ClipRect(
-    child: FittedBox(
-      fit: BoxFit.contain,
-      child: SizedBox.fromSize(
-        key: canvasKey,
-        size: size,
-        child: CustomPaint(
-          foregroundPainter: preferences.showGrid
-              ? _GridPainter(preferences.gridSize)
-              : null,
-          child: child,
-        ),
-      ),
-    ),
-  );
 }
 
 /// Material and localization belong to the compiled theme preview. Editor

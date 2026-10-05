@@ -76,7 +76,11 @@ undoing a deletion restores the node with its applied draft edits. Changes
 reach disk only when explicitly saved.
 
 Preview renders at the scene's reference resolution and scales to fit the
-workspace. **State: Login / Dormant** switches between two simulated display
+workspace. Use **− / +** to zoom, **100%** for reference pixel size, and the
+percentage/**Fit** button to fit and recenter the canvas. Ctrl+mouse wheel zooms
+around the pointer; ordinary wheel scrolling pans. **Hand** or Space+drag pans
+without selecting or editing nodes. Zoom and pan do not enter document history.
+**State: Login / Dormant** switches between two simulated display
 states. Component interactions are intercepted for selection. Node hit testing
 uses the runtime's transforms and visibility rules. Choose a canvas tool, then
 drag a visible node:
@@ -102,6 +106,14 @@ until corrected. All tools follow canvas coordinates even when a node is rotated
 or scaled. The inspector's position, scale and rotation fields follow the live
 preview without rebuilding the inspector or recording intermediate scene
 revisions. Cancelling a drag restores both the canvas and its displayed values.
+
+With the canvas focused, **V** selects Move/Resize, **H** selects Hand, **K**
+selects Scale, **R** selects Rotate and **Shift+R** selects 3D rotate.
+**Shift+1** fits and recenters. Arrow keys move the selected node by one
+reference pixel, or ten with Shift. **Ctrl+Z**, **Ctrl+Shift+Z / Ctrl+Y**,
+**Ctrl+D**, **Delete**, and **Ctrl+S** undo, redo, duplicate, delete and save.
+These shortcuts are scoped to the canvas so inspector text fields retain their
+normal editing behavior.
 
 Animations are disabled in
 the editing canvas so selection and property inspection remain stable.
