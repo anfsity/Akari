@@ -141,6 +141,16 @@ class _InspectorForm extends StatelessWidget {
     children: [
       _buildPair('Translate X', 'Translate Y'),
       _buildPair('Scale X', 'Scale Y'),
+      OutlineButton(
+        key: const ValueKey('reset-node-scale'),
+        onPressed: () {
+          controller.getField('Scale X').text = '1.0';
+          controller.getField('Scale Y').text = '1.0';
+          onApply();
+        },
+        child: const Text('Reset scale'),
+      ),
+      const Gap(12),
       _buildPair('Rotate X', 'Rotate Y'),
       _buildPair('Pivot X', 'Pivot Y'),
       _buildField('Perspective'),

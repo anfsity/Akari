@@ -1578,6 +1578,67 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'reset scale repairs stretched nodes and preserves other transforms',
+    (tester) async {
+      const transform = SceneTransform(
+        scaleX: 1.4,
+        scaleY: 0.7,
+        rotationZ: 20,
+        pivotX: 0.3,
+      );
+      final original = _document.copyWith(
+        nodes: [
+          _document.nodes.first.copyWith(transform: transform),
+          _document.nodes.last,
+        ],
+      );
+      file.writeAsStringSync(encodeSceneDocument(original));
+      await openStudio(tester);
+      final scroll = find
+          .descendant(
+            of: find.byType(NodeInspector),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.text('Advanced layout'),
+        200,
+        scrollable: scroll,
+      );
+      await tester.tap(find.text('Advanced layout'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('reset-node-scale')),
+        200,
+        scrollable: scroll,
+      );
+      await tester.tap(find.byKey(const ValueKey('reset-node-scale')));
+      await tester.pumpAndSettle();
+      final node = tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .nodes
+          .first;
+      expect(node.transform.scaleX, 1);
+      expect(node.transform.scaleY, 1);
+      expect(node.transform.rotationZ, 20);
+      expect(node.transform.pivotX, 0.3);
+      expect(node.rect.width, 0.3);
+      expect(node.rect.height, 0.4);
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(
+        encodeSceneDocument(
+          tester.widget<StudioPreview>(find.byType(StudioPreview)).document,
+        ),
+        encodeSceneDocument(original),
+      );
+      expect(find.text('Saved'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('select, edit, undo, redo and save through shadcn controls', (
     tester,
   ) async {
