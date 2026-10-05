@@ -1,3 +1,8 @@
+/// Compiled scene layout, presence, background, and motion runtime.
+///
+/// [SceneRuntime] renders a [SceneDocument] using a [ThemeBundle] and a theme's
+/// node builder. The runtime owns animation lifetime and node layout; components
+/// own visual content. The Flutter-free scene schema is re-exported here.
 library;
 
 export 'package:scene_schema/scene_schema.dart';

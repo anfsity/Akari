@@ -1,3 +1,9 @@
+/// Public contract for compiled Mozais themes.
+///
+/// Start with [ThemeDefinition] to assemble a scene, visual bundle, and component
+/// factory. Components receive a [GreeterHost] with typed display slots and
+/// semantic callbacks; authentication and transport remain owned by the greeter.
+/// Scene model and runtime types are re-exported for theme authors.
 library;
 
 export 'package:scene/scene.dart';
