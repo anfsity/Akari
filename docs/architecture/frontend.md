@@ -1,4 +1,6 @@
-# Mozais Frontend Architecture
+---
+title: Frontend architecture
+---
 
 ## 1. Purpose
 
@@ -76,11 +78,10 @@ SceneDocument
   canvas: fit, safe-area policy
   background: renderer kind and trusted asset/config reference
   nodes[]
-  transitions[]
 
 SceneNode
   id
-  kind
+  componentId
   normalized rect
   transform: translation, scale, rotation, pivot
   z
@@ -88,7 +89,8 @@ SceneNode
   focusOrder
   motion preset
   visibleWhen: boolean condition over semantic predicates
-  style
+  interactive
+  properties
 ```
 
 `z` is spatial depth. `renderOrder` is draw order. `focusOrder` is keyboard
@@ -98,7 +100,7 @@ insertion order.
 `visibleWhen` is a small boolean condition (`all`, `any`, `not`) over a
 closed vocabulary of semantic predicates such as `isDormant` or
 `isAuthPrompting`. A null condition means the node is always present. The
-vocabulary and actions are enumerations over semantic greeter state; arbitrary
+predicate vocabulary is an enumeration over semantic greeter state; arbitrary
 expressions, scripts, runtime-loaded Dart, backend types, and untrusted asset
 paths are not part of the scene contract. Repository assets use `assets/...`;
 theme-owned Flutter package assets use `packages/<package>/assets/...`.
@@ -162,7 +164,7 @@ inject builders directly; `tool/dev_main.dart` explicitly selects the default
 theme for debugging. The fallback theme remains an independently selectable
 minimal static theme with no blur or continuous animation.
 
-`--preview` builds and launches that same host with demo login state.
+`preview --theme PATH` builds and launches that same host with demo login state.
 Each theme project owns its scenes, component assembly, tokens, and assets. A
 theme may depend on SDK or explicitly shared component packages, but one theme
 must not import another theme package. Its Dart and Flutter code is compiled
@@ -290,7 +292,7 @@ number of usability invariants may assert reachability, focus order, hit target
 size, and absence of overflow.
 
 Each theme owns its performance tests and thresholds. The CLI executes declared
-commands through the [theme perf protocol](theme-package.md#performance-protocol).
+commands through the [theme perf protocol](../reference/theme-package.md#performance-protocol).
 The default theme verifies performance with a Linux/Wayland profile integration
 run. Reports record p50/p95 and maximum build, raster, vsync overhead, and total
 frame time by interaction phase, count frames beyond the 16.67 ms budget,
@@ -312,11 +314,3 @@ and are not used by the performance gate. Set `MOZAIS_FLUTTER_BIN` to use a
 specific Flutter SDK; the matching Dart binary is taken from the same SDK
 directory.
 
-## 9. Implementation Order
-
-1. Define the scene package, generated document contract, and codegen.
-2. Implement SceneRuntime, transforms, background renderers, and motion.
-3. Move Greeter composition behind `GreeterSceneAdapter`.
-4. Add the default and fallback themes.
-5. Replace layout assertions with interaction coverage.
-6. Add the separate profile performance suite.

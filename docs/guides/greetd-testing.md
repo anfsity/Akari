@@ -1,4 +1,6 @@
-# Standalone greetd testing
+---
+title: Standalone greetd testing
+---
 
 The maintained test harness lives in `scripts/greetd-test/` and installs into
 `/opt/mozais-test`. It uses the production backend: authentication talks to greetd
@@ -7,7 +9,7 @@ Boot configuration stays on SDDM. Desktop development with `mozais run` still
 uses mock authentication and mock power by default.
 
 Install the repository-bound `mozais` launcher as described in
-[Development Tooling](development-tooling.md). `mozais greetd-test --help` lists
+[Development Tooling](../reference/cli.md). `mozais greetd-test --help` lists
 all operations; each operation has its own help and bash/zsh completion.
 Install, start and restore request sudo when needed. Status and ordinary log
 reading do not request elevated privileges.
@@ -118,7 +120,7 @@ damaged or unmarked captures and keeps any existing valid local profile.
 `--display-profile reference` uses the project's 1920×1080, scale 1
 reference (fixed resolution for headless); `--display-profile login` requires
 a valid login capture.
-See [Development Tooling](development-tooling.md) for overrides, multi-output
+See [Development Tooling](../reference/cli.md) for overrides, multi-output
 mapping, actual-output checks and inner screenshots. Reinstall the harness to
 enable these source-marked captures; login processes never write to a
 developer's home directory.
