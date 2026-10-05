@@ -14,6 +14,12 @@ loader reads these categories directly:
 - `reference/`: exact external contracts and lookup pages.
 - `architecture/`: module relationships, ownership, and design reasoning.
 
+Published pages have a Simplified Chinese counterpart under `zh-cn/`, using the
+same category and filename. Astro serves English at the site root and Chinese
+under `/zh-cn/` (`zh-CN`). Keep Markdown links relative so the link plugin
+resolves each page within its own locale. The generated API under
+`docs/site/public/api/` remains a shared, untranslated reference.
+
 `internal/` and `proposals/` remain repository documents. They are excluded from
 the site's loader, page generation, and search index. Studio user documentation
 stays in `internal/` while the editor is in development.
@@ -51,6 +57,11 @@ Add a Markdown file to the appropriate category with `title` and `description`
 frontmatter. Add its slug to the explicit sidebar in `astro.config.mjs`.
 Repository-relative `.md` links remain readable on GitHub and are converted to
 website routes by the Markdown plugin. Mermaid fences render as diagrams.
+
+For every published English page, add a translation at the matching path below
+`docs/zh-cn/`. Translate the sidebar label in the item's `translations` map using
+the `zh-CN` language tag. Keep `internal/` and `proposals/` outside the loader;
+they are repository documents rather than published pages.
 
 When changing an API contract, update its source comment and relevant guide in
 the same change. Explain constraints and reasons rather than narrating the code.
