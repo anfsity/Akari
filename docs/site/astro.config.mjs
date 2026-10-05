@@ -27,6 +27,7 @@ export default defineConfig({
           { slug: 'guides/themes' },
           { slug: 'guides/components' },
           { slug: 'guides/testing' },
+          { slug: 'guides/display-testing' },
         ] },
         { label: 'Technical reference', items: [
           { slug: 'reference/theme-package' },

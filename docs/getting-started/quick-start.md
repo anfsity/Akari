@@ -37,6 +37,10 @@ accepts `password`; it does not authenticate a system account or launch a real
 desktop session. The greeter defaults to fullscreen; use
 `MOZAIS_WINDOW_MODE=windowed` before the command for a windowed session.
 
+Fullscreen renders the same login state on all connected monitors. Follow
+[display and scaling testing](../guides/display-testing.md) to check focus,
+hotplug, a nested Sway session, or fixed-resolution screenshots.
+
 ## Build the production bundle
 
 ```sh

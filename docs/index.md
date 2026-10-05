@@ -20,6 +20,7 @@ hero:
 | Prepare a development machine | [Environment setup](getting-started/installation.md) |
 | Preview the existing themes | [Quick start](getting-started/quick-start.md) |
 | Create your own theme | [Theme development](guides/themes.md) |
+| Check several displays or standalone scale | [Display testing](guides/display-testing.md) |
 | Look up types and methods | [API reference](reference/api.md) |
 | Understand the implementation | [Code map](architecture/code-map.md) |
 

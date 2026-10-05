@@ -1,5 +1,6 @@
 ---
 title: Standalone greetd testing
+description: Build and install the real-login harness, capture displays, inspect logs, and restore SDDM.
 ---
 
 The maintained test harness lives in `scripts/greetd-test/` and installs into
@@ -124,6 +125,9 @@ See [Development Tooling](../reference/cli.md) for overrides, multi-output
 mapping, actual-output checks and inner screenshots. Reinstall the harness to
 enable these source-marked captures; login processes never write to a
 developer's home directory.
+
+Continue with [display testing](display-testing.md#compare-a-nested-session-with-standalone-login)
+to compare that capture in a desktop session or produce fixed-resolution images.
 
 Inspect the latest startup attempt or the test used by recovery:
 
