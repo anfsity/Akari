@@ -5,8 +5,8 @@ description: Command targets, accepted options, display profiles, and execution 
 
 ## Commands and targets
 
-From the repository root, use `fvm dart run tool/mozais.dart COMMAND`. After
-[installing the launcher](#shell-launcher-and-completion), use `mozais COMMAND`.
+From the repository root, use `fvm dart run tool/akari.dart COMMAND`. After
+[installing the launcher](#shell-launcher-and-completion), use `akari COMMAND`.
 
 | Command | Purpose | Command-specific options |
 | --- | --- | --- |
@@ -29,19 +29,19 @@ Every command accepts `--help` (`-h`). `install`, `completion`, and the
 `greetd-test` family use their own output and option contracts.
 
 `run sway` and `run studio` are targets of `run`, so use
-`mozais run TARGET --help` to see their accepted options. Studio always runs in
+`akari run TARGET --help` to see their accepted options. Studio always runs in
 debug mode without a backend; it does not accept `--mode` or `--backend`.
 Its developing user guide remains in the repository's
-[Studio notes](https://github.com/anfsity/Mozais/blob/main/docs/internal/theme-studio.md).
+[Studio notes](https://github.com/anfsity/Akari/blob/main/docs/internal/theme-studio.md).
 
 Run project checks through the Dart tool entry point:
 
 ```sh
-fvm dart run tool/mozais.dart build
-fvm dart run tool/mozais.dart verify
-fvm dart run tool/mozais.dart verify-perf
-fvm dart run tool/mozais.dart generate-scenes
-fvm dart run tool/mozais.dart trace-perf
+fvm dart run tool/akari.dart build
+fvm dart run tool/akari.dart verify
+fvm dart run tool/akari.dart verify-perf
+fvm dart run tool/akari.dart generate-scenes
+fvm dart run tool/akari.dart trace-perf
 ```
 
 Use `-t`, `-m`, and `-j` for `--theme`, `--mode`, and `--jobs`.
@@ -52,26 +52,26 @@ accepted by that command. Only performance commands accept arguments after `--`;
 they pass them literally to the theme's runner.
 
 ```sh
-fvm dart run tool/mozais.dart build -t themes/default -m release -j 4
-fvm dart run tool/mozais.dart perf -t themes/default -- --cycles 5
+fvm dart run tool/akari.dart build -t themes/default -m release -j 4
+fvm dart run tool/akari.dart perf -t themes/default -- --cycles 5
 ```
 
 ## Shell launcher and completion
 
-Install a repository-bound `mozais` command and shell completion at user level:
+Install a repository-bound `akari` command and shell completion at user level:
 
 ```sh
-fvm dart run tool/mozais.dart install --shell zsh
+fvm dart run tool/akari.dart install --shell zsh
 # Or, for bash:
-fvm dart run tool/mozais.dart install --shell bash
+fvm dart run tool/akari.dart install --shell bash
 ```
 
-The launcher is written to `~/.local/bin/mozais` and completion support to
-`~/.local/share/mozais/`. Installation appends one source line to `.zshrc`
+The launcher is written to `~/.local/bin/akari` and completion support to
+`~/.local/share/akari/`. Installation appends one source line to `.zshrc`
 (respecting `ZDOTDIR`) or `.bashrc`; repeating installation does not duplicate it.
 Open a new shell or source the printed environment script to activate it.
 The launcher works from any directory, preserves relative argument paths, and
-uses the repository SDK and its `MOZAIS_*_BIN` overrides. Its repository must
+uses the repository SDK and its `AKARI_*_BIN` overrides. Its repository must
 remain available at the installed path; reinstall after moving the repository.
 `install --prefix PATH --rc PATH` selects installation and startup file locations.
 
@@ -79,16 +79,16 @@ Completion covers commands and aliases, command-specific long and short options,
 enum values, and paths. It stops after `--`, where arguments belong to the theme.
 The parser, help, and generated scripts share `tool/src/cli_definition.dart`.
 Reinstall after changing that definition to refresh installed completion scripts.
-For manual registration, `mozais completion --shell zsh` or `--shell bash` prints
+For manual registration, `akari completion --shell zsh` or `--shell bash` prints
 the corresponding script.
 
-Use `mozais greetd-test install`, `start`, `restore`, `status` and `logs` for
+Use `akari greetd-test install`, `start`, `restore`, `status` and `logs` for
 standalone login testing. This command family calls the installed test lifecycle
 scripts directly and keeps diagnostics outside repository run reports. Only
 installation needs repository build artifacts; status/log queries and service
 control do not acquire theme locks or create development run directories.
-The `mozais` launcher still needs the repository and SDK. Emergency recovery
-remains `sudo /opt/mozais-test/restore.sh`, independent of both.
+The `akari` launcher still needs the repository and SDK. Emergency recovery
+remains `sudo /opt/akari-test/restore.sh`, independent of both.
 See [Standalone greetd testing](../guides/greetd-testing.md) for options and prerequisites.
 
 ## Build, preview, and run
@@ -97,7 +97,7 @@ See [Standalone greetd testing](../guides/greetd-testing.md) for options and pre
 `themes/default`. It resolves that project's dependencies, generates its scene
 source, and builds a reusable host project under `build/tool/hosts/`. The host imports
 only the selected theme. Projects can
-live outside the Mozais repository. See the
+live outside the Akari repository. See the
 [theme project contract](theme-package.md).
 
 Use `run --theme PATH` to start a complete greeter on a private D-Bus session.
@@ -113,7 +113,7 @@ Profile/release sessions do not hot reload. Both commands accept `--jobs COUNT`.
 
 Preview opens directly in the current desktop without a nested compositor. Preview defaults to a resizable, undecorated window. `run` and built
 greeter bundles default to undecorated fullscreen. Set
-`MOZAIS_WINDOW_MODE=fullscreen` for a fullscreen preview or `windowed` for a
+`AKARI_WINDOW_MODE=fullscreen` for a fullscreen preview or `windowed` for a
 windowed greeter. Exit live sessions with `q` in the launching terminal.
 
 Fullscreen greeters render the same theme on every connected monitor, using
@@ -137,11 +137,11 @@ A preview on Hyprland inherits that output's scale. Use `run sway` to apply
 the standalone greeter's scale in a nested compositor:
 
 ```sh
-mozais run sway
-mozais run sway --display-profile reference
-mozais run sway --display-profile login
-mozais run sway --resolution 1920x1080 --scale 1.6
-mozais run sway --display-profile reference --sway-backend headless
+akari run sway
+akari run sway --display-profile reference
+akari run sway --display-profile login
+akari run sway --resolution 1920x1080 --scale 1.6
+akari run sway --display-profile reference --sway-backend headless
 ```
 
 The selected theme, build mode, build jobs, mock/real backend and reload keys
@@ -154,7 +154,7 @@ Quitting or a failure cleans them up and retains logs.
 
 `--display-profile` accepts `auto` (default), `login` and `reference`. Auto imports
 the newest complete, marked DRM login snapshot from
-`/opt/mozais-test/current-run/greeter/session-*/`, or keeps a newer saved login
+`/opt/akari-test/current-run/greeter/session-*/`, or keeps a newer saved login
 profile. Without one, it uses `config/sway/reference.json`: one output,
 1920×1080 pixels, scale 1, logical viewport 1920×1080. `login` reports an error
 when no valid login profile exists. `reference` bypasses login discovery and
@@ -162,7 +162,7 @@ import, allowing consistent team comparisons. Reinstall the greetd harness to
 produce marked snapshots; older unmarked `outputs.json` files remain diagnostics.
 
 Imported profiles live at
-`${XDG_STATE_HOME:-~/.local/state}/mozais/display-profiles/login.json`, with
+`${XDG_STATE_HOME:-~/.local/state}/akari/display-profiles/login.json`, with
 atomic replacement and owner-only access. They retain mode including refresh,
 scale, transform, logical rectangle, display identity, capture time, original
 snapshot path and test/session provenance. Failed attempts, partial or corrupt
@@ -222,7 +222,7 @@ Run the native nested regression matrix against a built greeter and mock backend
 ```sh
 python3 test/support/sway_native_workflow_test.py \
   --app build/out/default/greeter \
-  --backend backend/target/mozais-mock/debug/backend
+  --backend backend/target/akari-mock/debug/backend
 ```
 
 This creates an isolated headless outer Sway at scales 1 and 1.6, then tests
@@ -250,9 +250,9 @@ fvm flutter run -d linux --target tool/dev_main.dart
 ```
 
 Use the CLI for build, run, verification, scene generation, and performance
-workflows. After installing the launcher, use `mozais build`, `mozais run`,
-`mozais verify`, `mozais generate-scenes`, `mozais perf`,
-and `mozais trace`.
+workflows. After installing the launcher, use `akari build`, `akari run`,
+`akari verify`, `akari generate-scenes`, `akari perf`,
+and `akari trace`.
 Shell scripts handle toolchain setup and checks, standalone backend startup,
 and Linux session work such as private D-Bus and Sway. `scripts/debug-dbus.sh`
 accepts a command to run with the backend on a private bus; without a command,
@@ -273,8 +273,8 @@ screenshots because no compositor has started.
 
 Build reports list the generated host project, build directory, and Linux
 executable. SDK commands use the repository's configured Flutter SDK even when
-the selected theme project lives outside the repository. `MOZAIS_FLUTTER_BIN`
-and `MOZAIS_DART_BIN` can override those binaries.
+the selected theme project lives outside the repository. `AKARI_FLUTTER_BIN`
+and `AKARI_DART_BIN` can override those binaries.
 
 Successful Linux builds publish relative symlinks at `build/out/<theme-name>`
 (the entire frontend bundle) and `build/out/backend` (the production backend).
@@ -305,7 +305,7 @@ Arguments following `--` are passed literally to the theme command. For the
 default theme, request five measurement cycles with:
 
 ```sh
-fvm dart run tool/mozais.dart verify-perf --theme themes/default -- --cycles 5
+fvm dart run tool/akari.dart verify-perf --theme themes/default -- --cycles 5
 ```
 
 The default theme owns its Linux profile integration fixture, measurement and
@@ -313,7 +313,7 @@ trace tools, and baseline under `themes/default/perf/`. Its gate defaults to
 three cycles, requires at least three, and accepts `--baseline PATH` after `--`.
 The fallback theme currently declares no performance commands.
 
-Each perf command receives an absolute `MOZAIS_PERF_OUTPUT_DIR` pointing to
+Each perf command receives an absolute `AKARI_PERF_OUTPUT_DIR` pointing to
 `build/tool/runs/<run-id>/perf/`. Successful commands must publish `result.json`;
 the run report records its validated artifact paths in `theme_artifacts` without
 parsing the artifact contents. Failed commands can publish diagnostic artifacts
@@ -340,5 +340,5 @@ jobs through a CMake Ninja pool. Without it, each tool uses its normal multicore
 This does not set the Dart compiler's thread count.
 
 Rust mock and production builds use separate stable target directories beneath
-`backend/target/mozais-mock/` and `backend/target/mozais-real/`. Commands sharing a
+`backend/target/akari-mock/` and `backend/target/akari-real/`. Commands sharing a
 theme serialize on a process lock; different themes can build independently.

@@ -18,14 +18,14 @@ import '../frame_metrics.dart';
 
 const _frameInterval = Duration(microseconds: 16667);
 const _captureTimelineDiagnostics = bool.fromEnvironment(
-  'MOZAIS_PERF_TRACE_TIMELINE',
+  'AKARI_PERF_TRACE_TIMELINE',
 );
 const _timelinePath = String.fromEnvironment(
-  'MOZAIS_PERF_TIMELINE_PATH',
+  'AKARI_PERF_TIMELINE_PATH',
   defaultValue: 'build/perf/scene_interactions_timeline.json',
 );
 const _reportPath = String.fromEnvironment(
-  'MOZAIS_PERF_REPORT_PATH',
+  'AKARI_PERF_REPORT_PATH',
   defaultValue: 'build/perf/scene_report.json',
 );
 
@@ -129,7 +129,7 @@ void main() {
       if (!_captureTimelineDiagnostics) {
         return action();
       }
-      return tracePhase('MOZAIS_PERF.$name', action);
+      return tracePhase('AKARI_PERF.$name', action);
     }
 
     Future<void> captureJourney() async {

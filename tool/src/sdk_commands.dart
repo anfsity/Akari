@@ -3,7 +3,7 @@ import 'dart:io';
 // Session startup needs only SDK resolution; keep it independent of command
 // planning, YAML manifests, and reporting to avoid loading those libraries again.
 List<String> getFlutterCommand(Directory repoRoot) {
-  final customFlutter = Platform.environment['MOZAIS_FLUTTER_BIN'];
+  final customFlutter = Platform.environment['AKARI_FLUTTER_BIN'];
   if (customFlutter != null && customFlutter.isNotEmpty) {
     return [_resolveSdkBinary(customFlutter, repoRoot)];
   }
@@ -14,11 +14,11 @@ List<String> getFlutterCommand(Directory repoRoot) {
 }
 
 List<String> getDartCommand(Directory repoRoot) {
-  final customDart = Platform.environment['MOZAIS_DART_BIN'];
+  final customDart = Platform.environment['AKARI_DART_BIN'];
   if (customDart != null && customDart.isNotEmpty) {
     return [_resolveSdkBinary(customDart, repoRoot)];
   }
-  final customFlutter = Platform.environment['MOZAIS_FLUTTER_BIN'];
+  final customFlutter = Platform.environment['AKARI_FLUTTER_BIN'];
   if (customFlutter != null && customFlutter.isNotEmpty) {
     final flutterPath = _resolveSdkBinary(customFlutter, repoRoot);
     return [_join(File(flutterPath).parent.path, 'dart')];

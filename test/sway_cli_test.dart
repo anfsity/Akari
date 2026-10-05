@@ -8,13 +8,13 @@ import '../tool/src/run_report.dart';
 void main() {
   late Directory temp;
   setUp(() async {
-    temp = await Directory.systemTemp.createTemp('mozais-sway-cli-');
+    temp = await Directory.systemTemp.createTemp('akari-sway-cli-');
   });
   tearDown(() => temp.delete(recursive: true));
 
   Future<ProcessResult> runTool(List<String> arguments) => Process.run(
     '${Directory.current.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
-    ['tool/mozais.dart', ...arguments],
+    ['tool/akari.dart', ...arguments],
     environment: {'XDG_STATE_HOME': temp.path},
   );
 
@@ -50,7 +50,7 @@ void main() {
     expect(command, contains(endsWith('scripts/sway-session.py')));
     expect(command, contains(endsWith('themes/fallback')));
     expect(command, isNot(contains(contains('tool/dev_main.dart'))));
-    expect(steps.last['environment']['MOZAIS_BACKEND_MODE'], 'mock');
+    expect(steps.last['environment']['AKARI_BACKEND_MODE'], 'mock');
     expect(steps.last['dependencies'], ['backend.build', 'theme.host.pub_get']);
     expect(
       plan['artifacts']['display_report'],
@@ -84,7 +84,7 @@ void main() {
       );
       expect(
         plan['artifacts']['backend_executable'],
-        contains('mozais-real/release'),
+        contains('akari-real/release'),
       );
     },
   );

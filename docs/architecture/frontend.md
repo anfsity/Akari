@@ -4,7 +4,7 @@ title: Frontend architecture
 
 ## 1. Purpose
 
-This document defines the frontend boundary for the Mozais greeter. The
+This document defines the frontend boundary for the Akari greeter. The
 authentication protocol remains owned by the Rust backend and the D-Bus
 contract; the Flutter frontend owns presentation, input, and local interaction
 state.
@@ -252,11 +252,11 @@ The Linux runner creates one fullscreen `FlView` per monitor in a single engine.
 `MyApp` renders sibling views through `ViewAnchor` and `ViewCollection`, sharing
 one `GreeterFeature` and credential controller. Each adapter owns its display's
 focus node and animation; only the active display handles global keyboard input.
-GTK reports native view focus through `mozais/displays` so moving between windows
+GTK reports native view focus through `akari/displays` so moving between windows
 does not submit a response twice or let a passive display take credential focus.
 The implicit view owns the app root and survives monitor removal by moving to a
 remaining output, or staying hidden until an output reconnects. Studio requests
-`MOZAIS_DISPLAY_MODE=single` because its editor is a single-view application.
+`AKARI_DISPLAY_MODE=single` because its editor is a single-view application.
 
 Changing focus or attaching a view does not create another feature or backend
 conversation. Account, session, authentication, dormant state, and credential
@@ -315,8 +315,8 @@ Each interaction also records the first response frame separately from its
 later animation frames. Its UI-thread build/layout/paint work must stay below
 5 ms in every measured cycle; raster, vsync scheduling, and normal transitions
 remain covered by the frame metrics above.
-Run `fvm dart run tool/mozais.dart trace-perf` to capture widget build, layout,
+Run `fvm dart run tool/akari.dart trace-perf` to capture widget build, layout,
 and paint events during a separate profile run; its timings are diagnostic
-and are not used by the performance gate. Set `MOZAIS_FLUTTER_BIN` to use a
+and are not used by the performance gate. Set `AKARI_FLUTTER_BIN` to use a
 specific Flutter SDK; the matching Dart binary is taken from the same SDK
 directory.

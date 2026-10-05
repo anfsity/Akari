@@ -2,7 +2,7 @@
 title: Theme package contract
 ---
 
-Mozais themes are independent Dart/Flutter packages. Built-in projects live in
+Akari themes are independent Dart/Flutter packages. Built-in projects live in
 `themes/default/` and `themes/fallback/`; third-party projects can live outside
 this repository. `packages/` contains platform modules.
 
@@ -21,14 +21,14 @@ my_theme/
   test/
 ```
 
-The directory name is independent of the package name. Mozais reads the name
+The directory name is independent of the package name. Akari reads the name
 from `pubspec.yaml`. For example, a package named `theme_ocean` exports
 `buildOceanTheme` from `lib/theme.dart`.
 
 A theme depends on `theme_sdk` and `scene`, and uses `scene_codegen` through
 `build_runner`. It may explicitly reuse `greeter_components`, but must not import
 another concrete theme. The current development SDK uses path dependencies;
-external projects must point those dependencies at their Mozais SDK checkout.
+external projects must point those dependencies at their Akari SDK checkout.
 
 `theme.dart` returns one `ThemeDefinition` containing the generated
 `SceneDocument`, its `ThemeBundle`, and its component factory. Component ids are
@@ -39,16 +39,16 @@ package paths such as `packages/theme_ocean/assets/wallpaper.jpg`.
 
 ```sh
 # Build the default theme for production.
-fvm dart run tool/mozais.dart build
+fvm dart run tool/akari.dart build
 
 # Build an independent project, including a project outside this repository.
-fvm dart run tool/mozais.dart build --theme /path/to/my_theme --mode release
+fvm dart run tool/akari.dart build --theme /path/to/my_theme --mode release
 
 # Build and launch a Linux preview with simulated login state.
-fvm dart run tool/mozais.dart preview --theme themes/default
+fvm dart run tool/akari.dart preview --theme themes/default
 
 # Inspect the complete execution plan without generating files.
-fvm dart run tool/mozais.dart preview --theme /path/to/my_theme --dry-run
+fvm dart run tool/akari.dart preview --theme /path/to/my_theme --dry-run
 ```
 
 The CLI resolves the selected theme's dependencies, generates its scene source,
@@ -93,14 +93,14 @@ source is linked into the host, and Linux runner files are synchronized only whe
 they change. Run directories contain logs and reports rather than another build.
 
 Rust mock and production builds use separate stable target directories beneath
-`backend/target/mozais-mock/` and `backend/target/mozais-real/`. Commands sharing a
+`backend/target/akari-mock/` and `backend/target/akari-real/`. Commands sharing a
 theme serialize on a process lock; different themes can build independently.
 
 ## Performance Protocol
 
 Themes own their perf entrypoints, UI interactions, measurements, baselines,
 thresholds, and trace analysis. No UI selectors or metric fields are required by
-Mozais. A theme opts into either operation explicitly in its `pubspec.yaml`:
+Akari. A theme opts into either operation explicitly in its `pubspec.yaml`:
 
 ```yaml
 perf:
@@ -112,15 +112,15 @@ perf:
 Each entry is a non-empty argument array. Commands execute in the theme project
 with no implicit shell. A leading `dart` or `flutter` uses the repository's
 configured SDK; other executables use normal process resolution. Missing entries
-mean unsupported operations; Mozais never falls back to another theme's tests.
+mean unsupported operations; Akari never falls back to another theme's tests.
 
 ```sh
-fvm dart run tool/mozais.dart verify-perf --theme /path/to/theme -- --custom-option value
-fvm dart run tool/mozais.dart trace-perf --theme /path/to/theme
+fvm dart run tool/akari.dart verify-perf --theme /path/to/theme -- --custom-option value
+fvm dart run tool/akari.dart trace-perf --theme /path/to/theme
 ```
 
 The CLI forwards arguments after `--` verbatim, including `--help`, and provides
-an existing absolute output directory through `MOZAIS_PERF_OUTPUT_DIR`.
+an existing absolute output directory through `AKARI_PERF_OUTPUT_DIR`.
 The command's exit code determines test success: zero means success and nonzero
 means failure. A successful command must also provide a valid `result.json` in
 that directory. Commands can publish results before a failure to retain

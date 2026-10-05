@@ -89,7 +89,7 @@ class GreeterGatewayException implements Exception {
 /// Deterministic gateway used by widget tests and the no-bus preview.
 ///
 /// The production implementation keeps this port unchanged while using
-/// `io.mozais.Greeter1` over D-Bus.
+/// `io.akari.Greeter1` over D-Bus.
 class DemoGreeterGateway implements GreeterGateway {
   final StreamController<GreeterEvent> _events =
       StreamController<GreeterEvent>.broadcast();

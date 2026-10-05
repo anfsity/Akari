@@ -6,8 +6,8 @@ not implement the refactor.
 
 ## 1. Product Shape
 
-Mozais is a Theme Studio and greeter platform. A theme is an independent
-Dart/Flutter package authored with the Mozais Theme SDK. Theme Studio provides
+Akari is a Theme Studio and greeter platform. A theme is an independent
+Dart/Flutter package authored with the Akari Theme SDK. Theme Studio provides
 the development host, live preview, hot reload, diagnostics, state fixtures,
 and performance tooling. The production greeter uses the same Host contract
 and Theme Runtime.
@@ -23,7 +23,7 @@ Production greeter -> Theme Runtime -> Greeter Host
 ```
 
 Theme authors own backgrounds, layout, decoration, animation, typography,
-assets, and custom visual components. Mozais supplies a small semantic host
+assets, and custom visual components. Akari supplies a small semantic host
 surface for login behavior:
 
 ```text
@@ -67,7 +67,7 @@ Theme package
 The Rust launcher is the greetd command and receives `GREETD_SOCK`. It starts
 the private session bus, owns the Rust backend service, and supervises the
 Flutter child. Flutter communicates with Rust through the private
-`io.mozais.Greeter1` interface.
+`io.akari.Greeter1` interface.
 
 Theme Studio uses the same Flutter Host contract with a deterministic
 `MockGreeterHost`. The editor can switch authentication states without starting
@@ -101,7 +101,7 @@ backend/src/session_catalog.rs
   desktop session discovery, validation, command and environment resolution
 
 backend/src/service.rs
-  io.mozais.Greeter1 D-Bus interface and signals
+  io.akari.Greeter1 D-Bus interface and signals
 ```
 
 `AuthActor` is the single owner of the active greetd transaction. It serializes
@@ -158,9 +158,9 @@ prompt.
 Rust exposes a dedicated private session D-Bus service:
 
 ```text
-Bus name:    io.mozais.Greeter
-Object path: /io/mozais/Greeter
-Interface:   io.mozais.Greeter1
+Bus name:    io.akari.Greeter
+Object path: /io/akari/Greeter
+Interface:   io.akari.Greeter1
 ```
 
 The launcher gives Rust and Flutter the same private bus address. System D-Bus
@@ -239,7 +239,7 @@ my_theme/
 Theme SDK packages expose:
 
 ```text
-mozais_theme_sdk
+akari_theme_sdk
   Host components
   typed host state
   layout and animation helpers
@@ -305,12 +305,12 @@ update when the gesture commits.
 Theme Studio uses the existing Dart and Flutter toolchain:
 
 ```text
-mozais theme create <name>
-mozais theme run
-mozais theme test
-mozais theme screenshot
-mozais theme profile
-mozais theme build
+akari theme create <name>
+akari theme run
+akari theme test
+akari theme screenshot
+akari theme profile
+akari theme build
 ```
 
 Development mode uses Flutter JIT and hot reload. The Host snapshot and Studio
@@ -375,22 +375,22 @@ same Theme Studio diagnostics validate every generated change.
 The target package layout is:
 
 ```text
-mozais_greeter_host
+akari_greeter_host
   Rust/Dart Host contract and typed display state
 
-mozais_theme_sdk
+akari_theme_sdk
   Theme author API and semantic components
 
-mozais_theme_runtime
+akari_theme_runtime
   Theme composition, layout, input, motion, and repaint regions
 
-mozais_theme_studio
+akari_theme_studio
   Project editor, preview, Inspector, and diagnostics
 
-mozais_theme_tooling
+akari_theme_tooling
   Theme Generator, build commands, source mapping, and profiles
 
-mozais_theme_test
+akari_theme_test
   State, screenshot, interaction, and performance suites
 ```
 

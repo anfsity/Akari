@@ -29,9 +29,9 @@ async fn auth_roundtrip() {
     let connection = connect_backend().await;
     let proxy = Proxy::new(
         &connection,
-        "io.mozais.Greeter",
-        "/io/mozais/Greeter",
-        "io.mozais.Greeter1",
+        "io.akari.Greeter",
+        "/io/akari/Greeter",
+        "io.akari.Greeter1",
     )
     .await
     .expect("backend proxy should be available");
@@ -930,9 +930,9 @@ async fn wait_for_backend(connection: &zbus::Connection) {
 async fn make_proxy(connection: &zbus::Connection) -> zbus::Proxy<'_> {
     Proxy::new(
         connection,
-        "io.mozais.Greeter",
-        "/io/mozais/Greeter",
-        "io.mozais.Greeter1",
+        "io.akari.Greeter",
+        "/io/akari/Greeter",
+        "io.akari.Greeter1",
     )
     .await
     .expect("backend proxy should be available")
@@ -1038,8 +1038,8 @@ fn start_backend(socket: &Path) -> BackendProcess {
 fn start_backend_for_sessions(socket: &Path, session_root: &Path) -> BackendProcess {
     let mut command = create_backend_command(socket);
     command
-        .env("MOZAIS_WAYLAND_SESSIONS", session_root)
-        .env("MOZAIS_X11_SESSIONS", "/mozais/missing-x11");
+        .env("AKARI_WAYLAND_SESSIONS", session_root)
+        .env("AKARI_X11_SESSIONS", "/akari/missing-x11");
     start_backend_command(socket, command)
 }
 
@@ -1102,7 +1102,7 @@ fn temp_dir(label: &str) -> TestDirectory {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let path = std::env::temp_dir().join(format!("mozais-{label}-{}-{nonce}", std::process::id()));
+    let path = std::env::temp_dir().join(format!("akari-{label}-{}-{nonce}", std::process::id()));
     std::fs::create_dir(&path).unwrap();
     TestDirectory(path)
 }

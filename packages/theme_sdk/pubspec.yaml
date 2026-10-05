@@ -1,5 +1,5 @@
 name: theme_sdk
-description: Compile-time Flutter theme API for Mozais greeters.
+description: Compile-time Flutter theme API for Akari greeters.
 publish_to: none
 
 environment:

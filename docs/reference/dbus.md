@@ -2,7 +2,7 @@
 title: D-Bus contract
 ---
 
-This specification defines the inter-process communication (IPC) boundaries, state machine invariants, security policies, and technical implementations for the **Mozais Greeter** backend-frontend abstraction layer.
+This specification defines the inter-process communication (IPC) boundaries, state machine invariants, security policies, and technical implementations for the **Akari Greeter** backend-frontend abstraction layer.
 
 ---
 
@@ -17,11 +17,11 @@ The architecture decouples the user interface (Flutter client) from underlying s
 └─────────────────────────────┬─────────────────────────────┘
                               │
                               │ Private / Session D-Bus
-                              │ Bus: io.mozais.Greeter
-                              │ Interface: io.mozais.Greeter1
+                              │ Bus: io.akari.Greeter
+                              │ Interface: io.akari.Greeter1
                               ▼
 ┌───────────────────────────────────────────────────────────┐
-│              Mozais Backend Bridge Daemon                 │
+│              Akari Backend Bridge Daemon                 │
 │         (Translates D-Bus Calls to greetd / System)       │
 └──────────────┬─────────────────────────────┬──────────────┘
                │                             │
@@ -43,7 +43,7 @@ The component diagram above shows ownership boundaries. The following sequence d
 sequenceDiagram
     autonumber
     participant UI as Flutter UI
-    participant B as Mozais backend bridge
+    participant B as Akari backend bridge
     participant F as Session desktop files
     participant G as greetd
     participant L as systemd-logind
@@ -85,7 +85,7 @@ For `info` and `error` authentication messages, the backend emits the prompt for
 
 The authentication contract is factor-agnostic. A PAM stack may use a
 password, fingerprint, face provider, smart card, or more than one factor.
-Mozais does not identify a user from a face or fingerprint; the UI starts an
+Akari does not identify a user from a face or fingerprint; the UI starts an
 attempt for the explicitly selected username and the system authentication
 stack decides which factors are required.
 
@@ -114,12 +114,12 @@ A successful `StartSession` response uses zbus response-dispatch notification be
 
 ---
 
-## 2. Interface Specification: `io.mozais.Greeter1`
+## 2. Interface Specification: `io.akari.Greeter1`
 
 ### Service Coordinates
-* **Bus Name**: `io.mozais.Greeter`
-* **Object Path**: `/io/mozais/Greeter`
-* **Interface**: `io.mozais.Greeter1`
+* **Bus Name**: `io.akari.Greeter`
+* **Object Path**: `/io/akari/Greeter`
+* **Interface**: `io.akari.Greeter1`
 
 ---
 
@@ -259,7 +259,7 @@ sequenceDiagram
 ## 4. Security Policies & Boundaries
 
 ### 1. Zero-Trace Secret Handling
-* **No Logging**: Passwords, response tokens, and raw PAM secret prompts must never be written to stdout, stderr, persistent logs, or ephemeral debug logs (`/tmp/mozais-flutter.log`, `/tmp/sway-debug.log`).
+* **No Logging**: Passwords, response tokens, and raw PAM secret prompts must never be written to stdout, stderr, persistent logs, or ephemeral debug logs (`/tmp/akari-flutter.log`, `/tmp/sway-debug.log`).
 * **No Signal Exposure**: Confidential user input must only traverse the unicast D-Bus method call `Respond()`. Secrets must never be emitted over D-Bus Signals.
 * **Memory Wiping**: Secret buffers must be explicitly zeroed out in memory immediately after socket transmission (e.g., using `explicit_bzero` or `sodium_memzero`). Memory pages holding credentials should be marked with `MADV_DONTDUMP` to prevent leaks in crash dumps.
 
@@ -406,9 +406,9 @@ An `auth_error` is retryable only when user input was submitted in the current g
 ## 6. Development Workflow & Client Implementation
 
 ### Mock Backend Strategy
-For local UI development, build and run the backend with `cargo run --manifest-path backend/Cargo.toml --features mock`. The D-Bus integration wrapper `scripts/debug-dbus.sh` establishes a private session bus (`dbus-run-session`) and exports `MOZAIS_BUS_MODE=private`. `MOZAIS_BACKEND` is a Flutter UI setting only; it does not select the backend transport.
+For local UI development, build and run the backend with `cargo run --manifest-path backend/Cargo.toml --features mock`. The D-Bus integration wrapper `scripts/debug-dbus.sh` establishes a private session bus (`dbus-run-session`) and exports `AKARI_BUS_MODE=private`. `AKARI_BACKEND` is a Flutter UI setting only; it does not select the backend transport.
 
-The mock backend implements the complete `io.mozais.Greeter1` interface specification without making system PAM calls or opening a `greetd` socket:
+The mock backend implements the complete `io.akari.Greeter1` interface specification without making system PAM calls or opening a `greetd` socket:
 
 1. `ListUsers()` serves stubbed mock user data.
 2. `ListSessions()` returns deterministic test session entries (Wayland and X11).

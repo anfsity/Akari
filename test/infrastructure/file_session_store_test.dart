@@ -8,7 +8,7 @@ void main() {
   late FileSessionStore store;
 
   setUp(() async {
-    directory = await Directory.systemTemp.createTemp('mozais-session');
+    directory = await Directory.systemTemp.createTemp('akari-session');
     store = FileSessionStore(file: File('${directory.path}/greeter.json'));
   });
 

@@ -12,7 +12,7 @@ void main() {
   late ThemePackage theme;
 
   setUp(() async {
-    repo = await Directory.systemTemp.createTemp('mozais-build-links-');
+    repo = await Directory.systemTemp.createTemp('akari-build-links-');
     theme = ThemePackage(
       packageName: 'theme_ocean',
       builderName: 'buildOceanTheme',

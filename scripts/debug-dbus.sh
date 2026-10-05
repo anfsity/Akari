@@ -4,18 +4,18 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 source "$script_dir/lib.sh"
-repo_root="$(mozais_repo_root)"
+repo_root="$(akari_repo_root)"
 
 usage() {
   printf '%s\n' \
     'Usage: scripts/debug-dbus.sh [command [args...]]' \
     '  Starts the mock backend and command on one private D-Bus session.' \
-    '  With no command, runs the Mozais CLI run command.' \
+    '  With no command, runs the Akari CLI run command.' \
     'Environment:' \
-    '  MOZAIS_BACKEND_MODE=mock|real   Backend transport (default: mock).' \
-    '  MOZAIS_START_BACKEND=0|1        Skip or start the backend (default: 1).' \
-    '  MOZAIS_BACKEND_BIN=PATH         Start an already-built backend.' \
-    '  MOZAIS_LOG_DIR=PATH              Reuse an explicit log directory.'
+    '  AKARI_BACKEND_MODE=mock|real   Backend transport (default: mock).' \
+    '  AKARI_START_BACKEND=0|1        Skip or start the backend (default: 1).' \
+    '  AKARI_BACKEND_BIN=PATH         Start an already-built backend.' \
+    '  AKARI_LOG_DIR=PATH              Reuse an explicit log directory.'
 }
 
 if [[ "${1:-}" == -h || "${1:-}" == --help ]]; then
@@ -24,7 +24,7 @@ if [[ "${1:-}" == -h || "${1:-}" == --help ]]; then
 fi
 
 if [[ "$#" -eq 0 ]]; then
-  mozais_run_dev_cli "$repo_root" run
+  akari_run_dev_cli "$repo_root" run
 fi
 
 inside_private_bus=0
@@ -36,19 +36,19 @@ fi
 if [[ "$inside_private_bus" -eq 0 ]]; then
   # Re-enter after dbus-run-session sets the bus address so backend and client
   # inherit one isolated bus. The internal flag prevents recursive bus creation.
-  if [[ -z "${MOZAIS_LOG_DIR:-}" ]]; then
-    export MOZAIS_LOG_DIR="$repo_root/logs/debug-$(date +%Y%m%d-%H%M%S)-$$"
+  if [[ -z "${AKARI_LOG_DIR:-}" ]]; then
+    export AKARI_LOG_DIR="$repo_root/logs/debug-$(date +%Y%m%d-%H%M%S)-$$"
   fi
-  export MOZAIS_PRIVATE_BUS=1
+  export AKARI_PRIVATE_BUS=1
   exec dbus-run-session -- "$script_dir/debug-dbus.sh" --inside-private-bus "$@"
 fi
 
-if [[ "${MOZAIS_PRIVATE_BUS:-0}" != 1 ]]; then
+if [[ "${AKARI_PRIVATE_BUS:-0}" != 1 ]]; then
   printf '%s\n' 'Internal error: private D-Bus marker is missing.' >&2
   exit 1
 fi
 
-log_dir="$(mozais_log_dir "$repo_root")"
+log_dir="$(akari_log_dir "$repo_root")"
 backend_pid=''
 command_pid=''
 
@@ -70,27 +70,27 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-start_backend="${MOZAIS_START_BACKEND:-1}"
+start_backend="${AKARI_START_BACKEND:-1}"
 if [[ "$start_backend" != 0 && "$start_backend" != 1 ]]; then
-  printf 'MOZAIS_START_BACKEND must be 0 or 1, got: %s\n' "$start_backend" >&2
+  printf 'AKARI_START_BACKEND must be 0 or 1, got: %s\n' "$start_backend" >&2
   exit 2
 fi
 
 if [[ "$start_backend" -eq 1 ]]; then
-  backend_mode="${MOZAIS_BACKEND_MODE:-mock}"
+  backend_mode="${AKARI_BACKEND_MODE:-mock}"
   case "$backend_mode" in
     mock|real)
       ;;
     *)
-      printf 'MOZAIS_BACKEND_MODE must be mock or real, got: %s\n' "$backend_mode" >&2
+      printf 'AKARI_BACKEND_MODE must be mock or real, got: %s\n' "$backend_mode" >&2
       exit 2
       ;;
   esac
 
-  mozais_require_command busctl
-  if [[ -n "${MOZAIS_BACKEND_BIN:-}" ]]; then
-    mozais_require_file "$MOZAIS_BACKEND_BIN" 'built backend executable'
-    "$MOZAIS_BACKEND_BIN" >"$log_dir/backend.log" 2>&1 &
+  akari_require_command busctl
+  if [[ -n "${AKARI_BACKEND_BIN:-}" ]]; then
+    akari_require_file "$AKARI_BACKEND_BIN" 'built backend executable'
+    "$AKARI_BACKEND_BIN" >"$log_dir/backend.log" 2>&1 &
   else
     "$script_dir/run-backend.sh" "--$backend_mode" >"$log_dir/backend.log" 2>&1 &
   fi
@@ -104,9 +104,9 @@ if [[ "$start_backend" -eq 1 ]]; then
       exit 1
     fi
     if busctl --user introspect \
-      io.mozais.Greeter \
-      /io/mozais/Greeter \
-      io.mozais.Greeter1 >/dev/null 2>&1; then
+      io.akari.Greeter \
+      /io/akari/Greeter \
+      io.akari.Greeter1 >/dev/null 2>&1; then
       backend_ready=1
       break
     fi
@@ -120,7 +120,7 @@ if [[ "$start_backend" -eq 1 ]]; then
   fi
 fi
 
-export MOZAIS_BUS_MODE=private
+export AKARI_BUS_MODE=private
 export RUST_LOG="${RUST_LOG:-backend=info,warn}"
 # Non-interactive shells may redirect a background job's stdin to /dev/null.
 # Preserve the caller's descriptor explicitly so reload and quit keys arrive.

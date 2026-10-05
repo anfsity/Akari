@@ -13,7 +13,7 @@ void main() {
   late File runner;
 
   setUp(() async {
-    temporary = await Directory.systemTemp.createTemp('mozais-greetd-cli-');
+    temporary = await Directory.systemTemp.createTemp('akari-greetd-cli-');
     installation = Directory('${temporary.path}/installation with spaces');
     bin = Directory('${temporary.path}/bin');
     await installation.create();
@@ -36,8 +36,8 @@ elif name == 'systemctl':
         print('Failed to connect to systemd', file=sys.stderr)
         sys.exit(1)
     print('Id=sddm.service\\nLoadState=loaded\\nActiveState=active\\nSubState=running\\n')
-    print('Id=mozais-test.service\\nLoadState=not-found\\nActiveState=inactive\\nSubState=dead\\n')
-    print('Id=mozais-restore.timer\\nLoadState=not-found\\nActiveState=inactive\\nSubState=dead')
+    print('Id=akari-test.service\\nLoadState=not-found\\nActiveState=inactive\\nSubState=dead\\n')
+    print('Id=akari-restore.timer\\nLoadState=not-found\\nActiveState=inactive\\nSubState=dead')
     sys.exit(1)
 ''');
     expect((await Process.run('chmod', ['+x', boundary.path])).exitCode, 0);
@@ -106,13 +106,13 @@ Future<void> main(List<String> arguments) async {
     ]) {
       final result = await Process.run(dart.first, [
         ...dart.skip(1),
-        'tool/mozais.dart',
+        'tool/akari.dart',
         'greetd-test',
         if (target.isNotEmpty) target,
         '--help',
       ]);
       expect(result.exitCode, 0, reason: '${result.stderr}');
-      expect(result.stdout, contains('Usage: mozais greetd-test'));
+      expect(result.stdout, contains('Usage: akari greetd-test'));
       expect(result.stdout, isNot(contains('--theme')));
       expect(result.stdout, isNot(contains('--report')));
       if (target == 'start') {
@@ -166,7 +166,7 @@ Future<void> main(List<String> arguments) async {
           dart.first,
           [
             ...dart.skip(1),
-            '${Directory.current.path}/tool/mozais.dart',
+            '${Directory.current.path}/tool/akari.dart',
             'greetd-test',
             target,
             if (target == 'start') ...[
@@ -199,7 +199,7 @@ Future<void> main(List<String> arguments) async {
     for (final target in ['install', 'start', 'restore']) {
       final result = await runFixture(
         [target, '--dry-run'],
-        environment: {'MOZAIS_DART_BIN': 'SDK with spaces/bin/dart'},
+        environment: {'AKARI_DART_BIN': 'SDK with spaces/bin/dart'},
       );
       expect(result.exitCode, 0, reason: '${result.stderr}');
       final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
@@ -208,7 +208,7 @@ Future<void> main(List<String> arguments) async {
         expect(
           plan['invocation'],
           contains(
-            'MOZAIS_DART_BIN=${Directory.current.path}/SDK with spaces/bin/dart',
+            'AKARI_DART_BIN=${Directory.current.path}/SDK with spaces/bin/dart',
           ),
         );
         expect((plan['invocation'] as List).last, installation.path);

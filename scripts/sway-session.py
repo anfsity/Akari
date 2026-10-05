@@ -99,7 +99,7 @@ def get_greeter_outputs(tree):
     def collect(node, output=None):
         if node['type'] == 'output':
             output = node['name']
-        if node.get('app_id') == 'dev.mozais.greeter':
+        if node.get('app_id') == 'dev.akari.greeter':
             found.add(output)
         for child in node.get('nodes', []) + node.get('floating_nodes', []):
             collect(child, output)
@@ -109,7 +109,7 @@ def get_greeter_outputs(tree):
 
 
 def start_session(directory, backend, command):
-    profile = json.loads(os.environ['MOZAIS_DISPLAY_PROFILE_JSON'])
+    profile = json.loads(os.environ['AKARI_DISPLAY_PROFILE_JSON'])
     target = get_virtual_outputs(profile, backend)
     parent_environment = dict(os.environ)
     hyprland = (backend == 'wayland' and not parent_environment.get('SWAYSOCK')
@@ -132,12 +132,12 @@ def start_session(directory, backend, command):
     outer_display = environment.get('WAYLAND_DISPLAY')
     outer_runtime = environment.get('XDG_RUNTIME_DIR')
     for key in ['DISPLAY', 'SWAYSOCK', 'WAYLAND_DISPLAY', 'WAYLAND_SOCKET',
-                'WLR_WAYLAND_DISPLAY', 'MOZAIS_DISPLAY_SOURCE', 'MOZAIS_TEST_RUN']:
+                'WLR_WAYLAND_DISPLAY', 'AKARI_DISPLAY_SOURCE', 'AKARI_TEST_RUN']:
         environment.pop(key, None)
     environment.update(XDG_RUNTIME_DIR=str(runtime), WLR_BACKENDS=backend,
                        GDK_BACKEND='wayland', XDG_CURRENT_DESKTOP='Sway',
                        XDG_SESSION_DESKTOP='sway', XDG_SESSION_TYPE='wayland',
-                       MOZAIS_WINDOW_MODE='fullscreen', MOZAIS_DISPLAY_MODE='mirror')
+                       AKARI_WINDOW_MODE='fullscreen', AKARI_DISPLAY_MODE='mirror')
     if backend == 'wayland':
         if not outer_display or (not Path(outer_display).is_absolute() and not outer_runtime):
             raise ValueError('Run nested Sway from a Wayland desktop, or select --sway-backend headless.')

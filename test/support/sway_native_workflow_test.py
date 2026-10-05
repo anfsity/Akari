@@ -24,7 +24,7 @@ def run_frontend(executable):
     app = subprocess.Popen([executable])
     try:
         deadline = time.monotonic() + 45
-        screenshot = Path(os.environ['MOZAIS_NATIVE_SCREENSHOT'])
+        screenshot = Path(os.environ['AKARI_NATIVE_SCREENSHOT'])
         while not screenshot.exists() and time.monotonic() < deadline and app.poll() is None:
             time.sleep(.1)
         if not screenshot.exists():
@@ -46,7 +46,7 @@ def main():
     for path in [arguments.app, arguments.backend]:
         if not path.is_file() or not os.access(path, os.X_OK):
             parser.error(f'Expected an executable: {path}')
-    root = Path(tempfile.mkdtemp(prefix='mozais-sway-native-'))
+    root = Path(tempfile.mkdtemp(prefix='akari-sway-native-'))
     print(f'Artifacts: {root}', flush=True)
     results = []
     for outer_scale in [1, 1.6]:
@@ -91,9 +91,9 @@ def main():
                         '--scale', str(inner_scale), '--dry-run']))
                     screenshot = session / 'screenshots/WL-1.png'
                     inner_environment = dict(environment,
-                        MOZAIS_DISPLAY_PROFILE_JSON=json.dumps(profile),
-                        MOZAIS_BACKEND_MODE='mock', MOZAIS_BACKEND_BIN=str(arguments.backend.resolve()),
-                        MOZAIS_LOG_DIR=str(session / 'dbus'), MOZAIS_NATIVE_SCREENSHOT=str(screenshot))
+                        AKARI_DISPLAY_PROFILE_JSON=json.dumps(profile),
+                        AKARI_BACKEND_MODE='mock', AKARI_BACKEND_BIN=str(arguments.backend.resolve()),
+                        AKARI_LOG_DIR=str(session / 'dbus'), AKARI_NATIVE_SCREENSHOT=str(screenshot))
                     command = [sys.executable, str(ROOT / 'scripts/sway-session.py'),
                         '--log-dir', str(session), '--backend', 'wayland', '--',
                         'bash', str(ROOT / 'scripts/debug-dbus.sh'),

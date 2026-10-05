@@ -67,7 +67,7 @@ void main() {
       );
 
       await binding.defaultBinaryMessenger.handlePlatformMessage(
-        'mozais/displays',
+        'akari/displays',
         const StandardMethodCodec().encodeMethodCall(
           MethodCall('focusView', secondary.viewId),
         ),

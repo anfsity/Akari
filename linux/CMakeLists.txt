@@ -4,10 +4,10 @@ project(runner LANGUAGES CXX)
 
 # Flutter invokes Ninja directly, so CMAKE_BUILD_PARALLEL_LEVEL does not
 # configure these builds. A shared pool caps native compile and link jobs.
-if(DEFINED ENV{MOZAIS_BUILD_JOBS})
-  set_property(GLOBAL PROPERTY JOB_POOLS mozais_native=$ENV{MOZAIS_BUILD_JOBS})
-  set(CMAKE_JOB_POOL_COMPILE mozais_native)
-  set(CMAKE_JOB_POOL_LINK mozais_native)
+if(DEFINED ENV{AKARI_BUILD_JOBS})
+  set_property(GLOBAL PROPERTY JOB_POOLS akari_native=$ENV{AKARI_BUILD_JOBS})
+  set(CMAKE_JOB_POOL_COMPILE akari_native)
+  set(CMAKE_JOB_POOL_LINK akari_native)
 endif()
 
 # The name of the executable created for the application. Change this to change
@@ -15,7 +15,7 @@ endif()
 set(BINARY_NAME "greeter")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
-set(APPLICATION_ID "dev.mozais.greeter")
+set(APPLICATION_ID "dev.akari.greeter")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.

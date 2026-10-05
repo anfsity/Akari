@@ -5,15 +5,15 @@ import { remarkDocs } from './src/remark-docs.mjs';
 
 export default defineConfig({
   site: 'https://anfsity.github.io',
-  base: '/Mozais',
+  base: '/Akari',
   trailingSlash: 'always',
   markdown: { processor: unified({ remarkPlugins: [remarkDocs] }) },
   integrations: [
     starlight({
-      title: 'Mozais',
+      title: 'Akari',
       description: 'Build compile-time Flutter themes for a Linux greeter.',
       favicon: '/favicon.svg',
-      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/anfsity/Mozais' }],
+      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/anfsity/Akari' }],
       routeMiddleware: './src/route-data.ts',
       expressiveCode: false,
       customCss: ['./src/styles/custom.css'],

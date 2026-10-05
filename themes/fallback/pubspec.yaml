@@ -1,5 +1,5 @@
 name: theme_fallback
-description: Minimal built-in fallback theme for the Mozais greeter.
+description: Minimal built-in fallback theme for the Akari greeter.
 publish_to: none
 
 environment:

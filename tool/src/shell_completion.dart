@@ -4,8 +4,8 @@ String getShellCompletion(String shell) =>
     shell == 'zsh' ? _getZshCompletion() : _getBashCompletion();
 
 String _getZshCompletion() {
-  final script = StringBuffer(r'''#compdef mozais
-_mozais() {
+  final script = StringBuffer(r'''#compdef akari
+_akari() {
   local separator=${words[(i)--]}
   (( separator < CURRENT )) && return 0
   if (( CURRENT == 2 )); then
@@ -94,12 +94,12 @@ _mozais() {
   (( CURRENT -= command_words ))
   _arguments -s "${options[@]}"
 }
-compdef _mozais mozais''');
+compdef _akari akari''');
   return script.toString();
 }
 
 String _getBashCompletion() {
-  final script = StringBuffer(r'''_mozais() {
+  final script = StringBuffer(r'''_akari() {
   COMPREPLY=()
   local i cur="${COMP_WORDS[COMP_CWORD]}" prev="${COMP_WORDS[COMP_CWORD-1]}"
   for (( i=1; i<COMP_CWORD; i++ )); do
@@ -183,7 +183,7 @@ String _getBashCompletion() {
   fi
   return 0
 }
-complete -o filenames -F _mozais mozais''');
+complete -o filenames -F _akari akari''');
   return script.toString();
 }
 

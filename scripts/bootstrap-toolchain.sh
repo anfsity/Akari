@@ -4,11 +4,11 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 source "$script_dir/lib.sh"
-repo_root="$(mozais_repo_root)"
+repo_root="$(akari_repo_root)"
 
-mozais_require_command fvm
-mozais_require_command cargo
-mozais_require_file "$repo_root/backend/Cargo.toml" 'backend Cargo manifest'
+akari_require_command fvm
+akari_require_command cargo
+akari_require_file "$repo_root/backend/Cargo.toml" 'backend Cargo manifest'
 
 cd -- "$repo_root"
 
@@ -20,7 +20,7 @@ if [[ ! -f pubspec.yaml ]]; then
   fvm flutter create \
     --platforms=linux \
     --project-name=greeter \
-    --org=dev.mozais \
+    --org=dev.akari \
     --no-pub \
     .
 fi

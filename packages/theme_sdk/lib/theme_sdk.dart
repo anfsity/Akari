@@ -1,4 +1,4 @@
-/// Public contract for compiled Mozais themes.
+/// Public contract for compiled Akari themes.
 ///
 /// Start with [ThemeDefinition] to assemble a scene, visual bundle, and component
 /// factory. Components receive a [GreeterHost] with typed display slots and

@@ -19,7 +19,7 @@ SOURCE = Path(__file__).resolve().parents[2] / "scripts/greetd-test"
 
 class WorkflowTest(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="mozais-greetd-test-")
+        self.temporary = tempfile.TemporaryDirectory(prefix="akari-greetd-test-")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.logs = self.root / "logs"
@@ -39,12 +39,12 @@ if name == 'systemctl':
     elif args[0] == 'is-active':
         unit = args[-1]
         sys.exit(0 if unit == 'sddm.service' or
-                 (unit == 'mozais-restore.timer' and (root / 'timer').exists()) else 3)
-    elif args == ['stop', 'mozais-restore.timer']:
+                 (unit == 'akari-restore.timer' and (root / 'timer').exists()) else 3)
+    elif args == ['stop', 'akari-restore.timer']:
         (root / 'timer').unlink(missing_ok=True)
 elif name == 'systemd-run':
-    if '--unit=mozais-restore' in args: (root / 'timer').touch()
-    if '--unit=mozais-test' in args and os.environ.get('FAIL_START'): sys.exit(1)
+    if '--unit=akari-restore' in args: (root / 'timer').touch()
+    if '--unit=akari-test' in args and os.environ.get('FAIL_START'): sys.exit(1)
 elif name == 'loginctl':
     if args[0] == 'list-sessions': print('11 1000 alice seat0 tty3')
     else: print(os.environ.get('SESSION', 'Class=user\\nType=tty\\nState=active'))
@@ -75,7 +75,7 @@ elif name == 'sway': print('test compositor output')
         for name in ["start.sh", "restore.sh", "launch.sh"]:
             script = (SOURCE / name).read_text()
             script = script.replace('[[ "$EUID" -ne 0 ]]', 'false')
-            script = script.replace('/run/lock/mozais-test.lock', str(self.root / 'lock'))
+            script = script.replace('/run/lock/akari-test.lock', str(self.root / 'lock'))
             script = script.replace('/usr/bin/sway', str(self.bin / 'sway'))
             target = self.root / name
             target.write_text(script)
@@ -109,8 +109,8 @@ elif name == 'sway': print('test compositor output')
         result = self.run_script("start.sh", "--scale", "1.5")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         calls = self.calls()
-        self.assertLess(calls.index('--unit=mozais-restore'), calls.index('stop sddm.service'))
-        self.assertLess(calls.index('stop sddm.service'), calls.index('--unit=mozais-test'))
+        self.assertLess(calls.index('--unit=akari-restore'), calls.index('stop sddm.service'))
+        self.assertLess(calls.index('stop sddm.service'), calls.index('--unit=akari-test'))
         self.assertIn('restore.sh --service-stopped', calls)
         current = self.logs / "current"
         self.assertIn('output * scale 1.5', (current / 'sway.conf').read_text())
@@ -176,22 +176,22 @@ elif name == 'sway': print('test compositor output')
         result = self.run_script("start.sh", FAIL_START="1")
         self.assertNotEqual(result.returncode, 0)
         calls = self.calls()
-        self.assertIn('stop mozais-test.service', calls)
-        self.assertLess(calls.index('start sddm.service'), calls.index('stop mozais-restore.timer'))
+        self.assertIn('stop akari-test.service', calls)
+        self.assertLess(calls.index('start sddm.service'), calls.index('stop akari-restore.timer'))
         self.assertEqual((self.logs / 'current/journal.log').read_text(), 'test journal\n')
         self.assertEqual((self.logs / 'current/journal.log').stat().st_mode & 0o777, 0o644)
 
     def test_service_exit_restores_without_stopping_itself(self):
         result = self.run_script("restore.sh", "--service-stopped")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn('stop mozais-test.service', self.calls())
+        self.assertNotIn('stop akari-test.service', self.calls())
         self.assertIn('start sddm.service', self.calls())
 
     def test_each_greeter_keeps_its_own_logs(self):
         self.assertEqual(self.run_script("start.sh").returncode, 0)
         (self.root / 'scripts').mkdir()
         launcher = self.root / 'scripts/debug-dbus.sh'
-        launcher.write_text('#!/bin/sh\nprintf backend > "$MOZAIS_LOG_DIR/backend.log"\nexec "$@"\n')
+        launcher.write_text('#!/bin/sh\nprintf backend > "$AKARI_LOG_DIR/backend.log"\nexec "$@"\n')
         launcher.chmod(0o755)
         for _ in range(2):
             result = self.run_script('launch.sh')
@@ -208,7 +208,7 @@ elif name == 'sway': print('test compositor output')
 
 class InstallerTest(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="mozais-install-test-")
+        self.temporary = tempfile.TemporaryDirectory(prefix="akari-install-test-")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.repo = self.root / "repository with spaces"
@@ -252,7 +252,7 @@ if name == 'runuser':
     sys.exit(subprocess.run(args[args.index('--') + 1:], env=env).returncode)
 if name == 'dart':
     repo = pathlib.Path(os.getcwd())
-    assert args == [str(repo / 'tool/mozais.dart'), 'build', '--theme',
+    assert args == [str(repo / 'tool/akari.dart'), 'build', '--theme',
                     str(repo / 'themes/default'), '--mode', 'release',
                     '--platform', 'linux', '--jobs', '4'], args
     assert os.environ['HOME'] == str(root / 'builder-home')
@@ -274,7 +274,7 @@ if name == 'dart':
             "PATH": f"{self.bin}:{os.environ['PATH']}",
             "TEST_ROOT": str(self.root),
             "SUDO_USER": pwd.getpwuid(os.getuid()).pw_name,
-            "MOZAIS_DART_BIN": str(self.bin / "dart"),
+            "AKARI_DART_BIN": str(self.bin / "dart"),
         }
 
     def run_installer(self, **environment):
@@ -344,7 +344,7 @@ if name == 'dart':
                          '{"axis": "x", "outputs": ["internal", "external"]}')
 
     def test_active_test_or_timer_rejects_before_build_and_installation(self):
-        for unit in ["mozais-test.service", "mozais-restore.timer"]:
+        for unit in ["akari-test.service", "akari-restore.timer"]:
             with self.subTest(unit=unit):
                 result = self.run_installer(ACTIVE_UNIT=unit)
                 self.assertNotEqual(result.returncode, 0)

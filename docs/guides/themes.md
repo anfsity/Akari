@@ -29,7 +29,7 @@ the folder name. See the [theme package contract](../reference/theme-package.md)
 ## Preview and iterate
 
 ```sh
-fvm dart run tool/mozais.dart preview --theme themes/ocean
+fvm dart run tool/akari.dart preview --theme themes/ocean
 ```
 
 Edit the scene JSON to change layout and visibility. Edit `theme.dart` to change
@@ -67,12 +67,12 @@ bundle must register an image renderer, as the fallback example does.
 ## Keep an external project
 
 A theme can live outside the repository. Point each SDK path dependency at its
-corresponding package in your Mozais checkout, including the `scene_codegen`
+corresponding package in your Akari checkout, including the `scene_codegen`
 development dependency. Asset paths must use the external theme's package name.
 
 ```sh
-fvm dart run tool/mozais.dart preview --theme /path/to/ocean
-fvm dart run tool/mozais.dart build --theme /path/to/ocean
+fvm dart run tool/akari.dart preview --theme /path/to/ocean
+fvm dart run tool/akari.dart build --theme /path/to/ocean
 ```
 
 The CLI builds a host for this selected project. Installing new Dart or Flutter

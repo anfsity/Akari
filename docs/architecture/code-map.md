@@ -1,6 +1,6 @@
 ---
 title: Code map
-description: Where to read and change each part of Mozais.
+description: Where to read and change each part of Akari.
 ---
 
 ## Repository map
@@ -25,7 +25,7 @@ description: Where to read and change each part of Mozais.
 
 ## Follow a theme build
 
-Start at `tool/mozais.dart`. `tool/src/cli_definition.dart` owns the shared
+Start at `tool/akari.dart`. `tool/src/cli_definition.dart` owns the shared
 command grammar. `theme_project.dart` resolves the package and builder;
 `command_plans.dart` describes execution; `theme_host.dart` creates the selected
 host. The scene builder delegates validation to `scene_schema` and emits Dart

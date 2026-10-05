@@ -1,5 +1,5 @@
 name: theme_default
-description: Built-in default theme for the Mozais greeter.
+description: Built-in default theme for the Akari greeter.
 publish_to: none
 
 environment:

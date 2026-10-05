@@ -30,15 +30,15 @@ def validate_site(root):
     handbook = [file for file in pages if not file.relative_to(root).as_posix().startswith("api/")]
     for file in handbook:
         relative = file.relative_to(root).as_posix()
-        page_url = "/Mozais/" + (relative[:-10] if relative.endswith("index.html") else relative)
+        page_url = "/Akari/" + (relative[:-10] if relative.endswith("index.html") else relative)
         for link in pages[file].links:
             url = urlsplit(urljoin(page_url, link))
             if url.scheme or url.netloc:
                 continue
-            if not url.path.startswith("/Mozais/"):
-                errors.append(f"{relative}: link escapes /Mozais/: {link}")
+            if not url.path.startswith("/Akari/"):
+                errors.append(f"{relative}: link escapes /Akari/: {link}")
                 continue
-            target = root / unquote(url.path.removeprefix("/Mozais/"))
+            target = root / unquote(url.path.removeprefix("/Akari/"))
             if target.is_dir():
                 target /= "index.html"
             if not target.is_file():
@@ -50,7 +50,7 @@ def validate_site(root):
         entrypoint = root / "api" / "dart" / package / "index.html"
         if not entrypoint.is_file():
             errors.append(f"missing API entrypoint: {package}")
-        elif "/Mozais/reference/api/" not in pages[entrypoint].links:
+        elif "/Akari/reference/api/" not in pages[entrypoint].links:
             errors.append(f"missing handbook navigation in API reference: {package}")
     for directory in ("internal", "proposals"):
         if (root / directory).exists():

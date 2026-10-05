@@ -11,7 +11,7 @@ void main() {
     'D-Bus launcher reuses prepared backend, forwards input, and cleans it up',
     () async {
       final temporary = await Directory.systemTemp.createTemp(
-        'mozais-dbus-session-',
+        'akari-dbus-session-',
       );
       addTearDown(() => temporary.delete(recursive: true));
       final backend = File('${temporary.path}/backend');
@@ -41,9 +41,9 @@ exit 17
         ['scripts/debug-dbus.sh', '--inside-private-bus', client.path],
         environment: {
           'PATH': '${temporary.path}:${Platform.environment['PATH']}',
-          'MOZAIS_PRIVATE_BUS': '1',
-          'MOZAIS_BACKEND_BIN': backend.path,
-          'MOZAIS_LOG_DIR': '${temporary.path}/logs',
+          'AKARI_PRIVATE_BUS': '1',
+          'AKARI_BACKEND_BIN': backend.path,
+          'AKARI_LOG_DIR': '${temporary.path}/logs',
         },
       );
       launcher.stdin.writeln('input');
@@ -63,7 +63,7 @@ exit 17
     'scene generation precedes reload and failures preserve the running app',
     () async {
       final temporary = await Directory.systemTemp.createTemp(
-        'mozais-session-',
+        'akari-session-',
       );
       addTearDown(() => temporary.delete(recursive: true));
       final theme = Directory('${temporary.path}/theme');
@@ -110,8 +110,8 @@ pathlib.Path(${jsonEncode(generated.path)}).write_text(content)
           'demo',
         ],
         environment: {
-          'MOZAIS_FLUTTER_BIN': flutter.path,
-          'MOZAIS_DART_BIN': dart.path,
+          'AKARI_FLUTTER_BIN': flutter.path,
+          'AKARI_DART_BIN': dart.path,
         },
       );
       addTearDown(() {
@@ -142,7 +142,7 @@ pathlib.Path(${jsonEncode(generated.path)}).write_text(content)
       await scene.writeAsString('invalid');
       await failed.future.timeout(const Duration(seconds: 15));
       expect(output, isNot(contains('reloaded')));
-      final saved = await scene.parent.createTemp('.mozais-studio-');
+      final saved = await scene.parent.createTemp('.akari-studio-');
       await File('${saved.path}/scene.json').writeAsString('updated');
       await File('${saved.path}/scene.json').rename(scene.path);
       await saved.delete();

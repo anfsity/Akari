@@ -1,5 +1,5 @@
 name: greeter_components
-description: Reusable visual components for compiled Mozais greeter themes.
+description: Reusable visual components for compiled Akari greeter themes.
 publish_to: none
 
 environment:

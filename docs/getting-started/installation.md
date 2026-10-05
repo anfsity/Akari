@@ -1,11 +1,11 @@
 ---
 title: Environment setup
-description: Prepare the Linux toolchain for Mozais development.
+description: Prepare the Linux toolchain for Akari development.
 ---
 
 ## Prerequisites
 
-Mozais currently builds and runs on Linux. Install:
+Akari currently builds and runs on Linux. Install:
 
 - Git and [FVM](https://fvm.app/) to use the repository's Flutter SDK.
 - Rust and Cargo for the backend.
@@ -19,8 +19,8 @@ and the existing test environment described in its guide.
 ## Check out the project
 
 ```sh
-git clone https://github.com/anfsity/Mozais.git
-cd Mozais
+git clone https://github.com/anfsity/Akari.git
+cd Akari
 bash scripts/bootstrap-toolchain.sh
 ```
 
@@ -39,11 +39,11 @@ headless compositor tests do not require a live Wayland desktop.
 ## Optional shell launcher
 
 ```sh
-fvm dart run tool/mozais.dart install --shell zsh
+fvm dart run tool/akari.dart install --shell zsh
 ```
 
 For bash, use `--shell bash`. Open a new shell or source the environment file
-printed by the installer. The installed `mozais` command refers to this checkout;
+printed by the installer. The installed `akari` command refers to this checkout;
 reinstall it after moving the repository.
 
 Proceed to the [quick start](quick-start.md). For alternate SDK locations, see

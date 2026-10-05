@@ -18,7 +18,7 @@ Future<void> updateBuildLinks(
   final host = getThemeHostDirectory(theme, preview: false);
   final frontend = getLinuxExecutablePath(host, buildMode);
   final backend =
-      'backend/target/mozais-real/${buildMode == 'debug' ? 'debug' : 'release'}/backend';
+      'backend/target/akari-real/${buildMode == 'debug' ? 'debug' : 'release'}/backend';
   final targets = {
     'bundle_link': File(frontend).parent.path,
     'backend_link': backend,

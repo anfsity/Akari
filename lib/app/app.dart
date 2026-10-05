@@ -28,7 +28,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  static const _displayChannel = MethodChannel('mozais/displays');
+  static const _displayChannel = MethodChannel('akari/displays');
   final _credentialController = TextEditingController();
   late final GreeterFeature _feature;
   late ThemeDefinition _theme;
@@ -49,7 +49,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       }
     });
     final backendMode = const String.fromEnvironment(
-      'MOZAIS_BACKEND',
+      'AKARI_BACKEND',
       defaultValue: 'demo',
     );
     final gateway = backendMode == 'demo'
@@ -139,7 +139,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   Widget _createDisplay(int viewId) {
     return MaterialApp(
-      title: 'Mozais Greeter',
+      title: 'Akari Greeter',
       debugShowCheckedModeBanner: false,
       theme: _theme.materialTheme,
       home: Scaffold(

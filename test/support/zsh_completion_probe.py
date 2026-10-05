@@ -43,38 +43,38 @@ def drain_output(duration):
 try:
     drain_output(0.1)
     setup = (
-        "PROMPT='MOZAIS> '; KEYTIMEOUT=1; autoload -Uz compinit; "
+        "PROMPT='AKARI> '; KEYTIMEOUT=1; autoload -Uz compinit; "
         f"compinit -d {shlex.quote(str(output / 'zcompdump'))}; "
         f"source {shlex.quote(completion)}; "
         "dump-buffer() { "
         f"print -r -- \"$BUFFER\" >> {shlex.quote(str(buffers))}; "
         "BUFFER=''; zle reset-prompt; }; "
         "zle -N dump-buffer; bindkey '^X' dump-buffer; "
-        "print -r -- 'MOZAIS''_READY'\n"
+        "print -r -- 'AKARI''_READY'\n"
     )
     os.write(master, setup.encode())
     transcript = b""
     deadline = time.monotonic() + 10
-    while b"\r\nMOZAIS_READY\r\n" not in transcript:
+    while b"\r\nAKARI_READY\r\n" not in transcript:
         transcript += drain_output(0.1)
         if time.monotonic() > deadline:
             raise RuntimeError(transcript.decode(errors="replace"))
     probes = [
-        "mozais tr",
-        "mozais build -m pr",
-        "mozais run --backend re",
-        "mozais perf -- --mode pr",
-        "mozais build --mode=pr",
-        "mozais run st",
-        "mozais run studio --th",
-        "mozais run studio -t theme",
-        "mozais build -t theme",
-        "mozais greetd-test re",
-        "mozais greetd-test start --log-d",
-        "mozais greetd-test logs --run c",
-        "mozais run sw",
-        "mozais run sway --display-profile re",
-        "mozais run sway --sway-backend=h",
+        "akari tr",
+        "akari build -m pr",
+        "akari run --backend re",
+        "akari perf -- --mode pr",
+        "akari build --mode=pr",
+        "akari run st",
+        "akari run studio --th",
+        "akari run studio -t theme",
+        "akari build -t theme",
+        "akari greetd-test re",
+        "akari greetd-test start --log-d",
+        "akari greetd-test logs --run c",
+        "akari run sw",
+        "akari run sway --display-profile re",
+        "akari run sway --sway-backend=h",
     ]
     for index, probe in enumerate(probes):
         os.write(master, (probe + "\t").encode())
