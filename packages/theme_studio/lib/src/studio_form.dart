@@ -7,6 +7,8 @@ class StudioFormField extends StatelessWidget {
     required this.inputKey,
     this.maxLines = 1,
     this.onSubmitted,
+    this.onFocusLost,
+    this.onChanged,
     super.key,
   });
 
@@ -15,6 +17,8 @@ class StudioFormField extends StatelessWidget {
   final Key inputKey;
   final int maxLines;
   final VoidCallback? onSubmitted;
+  final VoidCallback? onFocusLost;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -26,13 +30,19 @@ class StudioFormField extends StatelessWidget {
         const Gap(6),
         Semantics(
           label: label,
-          child: TextField(
-            key: inputKey,
-            controller: controller,
-            maxLines: maxLines,
-            onSubmitted: onSubmitted == null
-                ? null
-                : (_) => onSubmitted?.call(),
+          child: Focus(
+            onFocusChange: (focused) {
+              if (!focused) onFocusLost?.call();
+            },
+            child: TextField(
+              key: inputKey,
+              controller: controller,
+              maxLines: maxLines,
+              onChanged: onChanged,
+              onSubmitted: onSubmitted == null
+                  ? null
+                  : (_) => onSubmitted?.call(),
+            ),
           ),
         ),
       ],

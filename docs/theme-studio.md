@@ -49,8 +49,11 @@ scene switches within the current session. Small windows scroll the workspace.
    nodes hidden by the current preview state, ordered from front to back.
 3. Edit position/size in reference pixels (the default) or percentages,
    depth, paint/focus order, transforms, motion,
-   or the component's string-valued JSON properties in the inspector.
-4. Click **Apply to preview**, or press Enter in a numeric field. Invalid edits
+   or the component's named property fields in the inspector. **Advanced layout**
+   contains layering, scale, translations, pivots and 3D transforms;
+   **Advanced properties** edits the complete string-valued property JSON.
+4. Press Enter or leave a field to apply it to the preview. Motion choices
+   apply immediately; **Apply to preview** can also apply all pending fields. Invalid edits
    show an error and retain the last valid document. Selecting another node
    applies valid pending fields first.
    Switching layout units only changes the displayed values; it preserves
