@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="scene_schema library API docs, for the Dart programming language.">
+  <title>scene_schema library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../static-assets/styles.css?v1">
+  <link rel="icon" href="../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../index.html">scene_schema</a></li>
+    <li class="self-crumb">scene_schema.dart</li>
+  </ol>
+  <div class="self-name">scene_schema</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar=""
+    data-below-sidebar="scene_schema&#47;scene_schema-library-sidebar.html">
+  
+    <div>
+      
+
+      <h1>
+        <span class="kind-library">scene_schema</span>
+        library 
+ 
+
+      </h1>
+    </div>
+
+    
+<section class="desc markdown">
+  <p>Flutter-free scene model and authoring codec shared by tooling and codegen.</p>
+<p><a href="../scene_schema/decodeSceneDocument.html">decodeSceneDocument</a> validates JSON and normalizes supported versions into
+the current model. <a href="../scene_schema/encodeSceneDocument.html">encodeSceneDocument</a> writes its authoring representation.
+Production themes import generated Dart instead of decoding JSON at login.</p>
+</section>
+
+
+    <section class="summary offset-anchor" id="classes">
+      <h2>Classes</h2>
+      <dl>
+          <dt id="SceneAll">
+  <span class="name "><a href="../scene_schema/SceneAll-class.html">SceneAll</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="SceneAny">
+  <span class="name "><a href="../scene_schema/SceneAny-class.html">SceneAny</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="SceneBackground">
+  <span class="name "><a href="../scene_schema/SceneBackground-class.html">SceneBackground</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="SceneCanvas">
+  <span class="name "><a href="../scene_schema/SceneCanvas-class.html">SceneCanvas</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="SceneCondition">
+  <span class="name "><a href="../scene_schema/SceneCondition-class.html">SceneCondition</a></span> 
+
+</dt>
+<dd>
+  Declarative presence condition over <a href="../scene_schema/ScenePredicate.html">ScenePredicate</a> values.
+</dd>
+
+          <dt id="SceneDocument">
+  <span class="name "><a href="../scene_schema/SceneDocument-class.html">SceneDocument</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="SceneNode">
+  <span class="name "><a href="../scene_schema/SceneNode-class.html">SceneNode</a></span> 
+
+</dt>
+<dd>
+  Authored layout and component identity, without executable business logic.
+<a href="../scene_schema/SceneNode/componentId.html">componentId</a> is resolved by the selected theme's component factory; string
+properties configure that component rather than invoking backend commands.
+</dd>
+
+          <dt id="SceneNot">
+  <span class="name "><a href="../scene_schema/SceneNot-class.html">SceneNot</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="ScenePredicateCondition">
+  <span class="name "><a href="../scene_schema/ScenePredicateCondition-class.html">ScenePredicateCondition</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="SceneRect">
+  <span class="name "><a href="../scene_schema/SceneRect-class.html">SceneRect</a></span> 
+
+</dt>
+<dd>
+  Fractions of the available canvas, independent of screen pixel dimensions.
+Layout uses the safe-area-adjusted canvas when that policy is enabled.
+</dd>
+
+          <dt id="SceneTransform">
+  <span class="name "><a href="../scene_schema/SceneTransform-class.html">SceneTransform</a></span> 
+
+</dt>
+<dd>
+  Transform in node-local coordinates: translations use logical pixels,
+rotations use degrees, and pivots use fractions of the node's laid-out size.
+These units differ deliberately from <a href="../scene_schema/SceneRect-class.html">SceneRect</a>'s normalized canvas units.
+</dd>
+
+      </dl>
+    </section>
+
+    <section class="summary offset-anchor" id="enums">
+      <h2>Enums</h2>
+      <dl>
+          <dt id="SceneBackgroundKind">
+  <span class="name "><a href="../scene_schema/SceneBackgroundKind.html">SceneBackgroundKind</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="SceneCanvasFit">
+  <span class="name "><a href="../scene_schema/SceneCanvasFit.html">SceneCanvasFit</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="SceneMotionPreset">
+  <span class="name "><a href="../scene_schema/SceneMotionPreset.html">SceneMotionPreset</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="ScenePredicate">
+  <span class="name "><a href="../scene_schema/ScenePredicate.html">ScenePredicate</a></span> 
+
+</dt>
+<dd>
+  Boolean questions about semantic greeter state used by <a href="../scene_schema/SceneCondition-class.html">SceneCondition</a>.
+</dd>
+
+      </dl>
+    </section>
+
+
+
+
+    <section class="summary offset-anchor" id="constants">
+      <h2>Constants</h2>
+      <dl class="properties">
+          <dt id="currentSceneVersion" class="constant">
+    <span class="name "><a href="../scene_schema/currentSceneVersion-constant.html">currentSceneVersion</a></span>
+  <span class="signature">&#8594; const <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd>
+  
+  
+
+</dd>
+
+      </dl>
+    </section>
+
+
+    <section class="summary offset-anchor" id="functions">
+      <h2>Functions</h2>
+      <dl class="callables">
+          <dt id="decodeSceneColor" class="callable">
+  <span class="name"><a href="../scene_schema/decodeSceneColor.html">decodeSceneColor</a></span><span class="signature">(<wbr><span class="parameter" id="decodeSceneColor-param-value"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">value</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Parses a <code>#RRGGBB</code> or <code>#AARRGGBB</code> scene color into a 32-bit ARGB value.
+  
+
+</dd>
+
+          <dt id="decodeSceneDocument" class="callable">
+  <span class="name"><a href="../scene_schema/decodeSceneDocument.html">decodeSceneDocument</a></span><span class="signature">(<wbr><span class="parameter" id="decodeSceneDocument-param-source"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">source</span></span>)
+    <span class="returntype parameter">&#8594; <a href="../scene_schema/SceneDocument-class.html">SceneDocument</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Decodes a scene document from its JSON authoring form.
+  
+
+</dd>
+
+          <dt id="decodeSceneDocumentMap" class="callable">
+  <span class="name"><a href="../scene_schema/decodeSceneDocumentMap.html">decodeSceneDocumentMap</a></span><span class="signature">(<wbr><span class="parameter" id="decodeSceneDocumentMap-param-json"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span> <span class="parameter-name">json</span></span>)
+    <span class="returntype parameter">&#8594; <a href="../scene_schema/SceneDocument-class.html">SceneDocument</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Decodes a scene document from an already-parsed JSON map.
+  
+
+</dd>
+
+          <dt id="encodeSceneColor" class="callable">
+  <span class="name"><a href="../scene_schema/encodeSceneColor.html">encodeSceneColor</a></span><span class="signature">(<wbr><span class="parameter" id="encodeSceneColor-param-value"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">value</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Formats a 32-bit ARGB value as a <code>#RRGGBB</code> or <code>#AARRGGBB</code> scene color.
+  
+
+</dd>
+
+          <dt id="encodeSceneDocument" class="callable">
+  <span class="name"><a href="../scene_schema/encodeSceneDocument.html">encodeSceneDocument</a></span><span class="signature">(<wbr><span class="parameter" id="encodeSceneDocument-param-document"><span class="type-annotation"><a href="../scene_schema/SceneDocument-class.html">SceneDocument</a></span> <span class="parameter-name">document</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Encodes a scene document into its JSON authoring form.
+  
+
+</dd>
+
+          <dt id="evaluateSceneCondition" class="callable">
+  <span class="name"><a href="../scene_schema/evaluateSceneCondition.html">evaluateSceneCondition</a></span><span class="signature">(<wbr><span class="parameter" id="evaluateSceneCondition-param-condition"><span class="type-annotation"><a href="../scene_schema/SceneCondition-class.html">SceneCondition</a></span> <span class="parameter-name">condition</span>, </span><span class="parameter" id="evaluateSceneCondition-param-activePredicates"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Set-class.html">Set</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../scene_schema/ScenePredicate.html">ScenePredicate</a></span>&gt;</span></span> <span class="parameter-name">activePredicates</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Evaluates <code>condition</code> against the predicates currently true for the scene.
+  
+
+</dd>
+
+          <dt id="sceneDocumentToMap" class="callable">
+  <span class="name"><a href="../scene_schema/sceneDocumentToMap.html">sceneDocumentToMap</a></span><span class="signature">(<wbr><span class="parameter" id="sceneDocumentToMap-param-document"><span class="type-annotation"><a href="../scene_schema/SceneDocument-class.html">SceneDocument</a></span> <span class="parameter-name">document</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Encodes a scene document into a JSON-ready map.
+  
+
+</dd>
+
+      </dl>
+    </section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../index.html">scene_schema</a></li>
+    <li class="self-crumb">scene_schema.dart</li>
+</ol>
+
+    <h5><span class="package-name">scene_schema</span> <span class="package-kind">package</span></h5>
+    <ol>
+      <li class="section-title">Libraries</li>
+      <li><a href="../scene_schema/">scene_schema</a></li>
+</ol>
+
+  </div>
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+    <h5>scene_schema library</h5>
+  </div><!--/sidebar-offcanvas-right-->
+</main>
+<footer>
+  <span class="no-break">
+    scene_schema
+      0.0.0-unknown
+  </span>
+  
+</footer>
+
+
+<script src="../static-assets/highlight.pack.js?v1"></script>
+<script src="../static-assets/docs.dart.js"></script>
+<p><a href="/Mozais/reference/api/">Mozais API overview</a> · <a href="/Mozais/">Documentation handbook</a></p>
+
+</body>
+</html>
+

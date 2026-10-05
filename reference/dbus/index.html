@@ -1,0 +1,553 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-g5ptsecz"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>D-Bus contract | Mozais</title><link rel="canonical" href="https://anfsity.github.io/Mozais/reference/dbus/"/><link rel="sitemap" href="/Mozais/sitemap-index.xml"/><link rel="shortcut icon" href="/Mozais/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.3.5"/><meta name="generator" content="Starlight v0.42.5"/><meta property="og:title" content="D-Bus contract"/><meta property="og:type" content="article"/><meta property="og:url" content="https://anfsity.github.io/Mozais/reference/dbus/"/><meta property="og:locale" content="en"/><meta property="og:description" content="Build compile-time Flutter themes for a Linux greeter."/><meta property="og:site_name" content="Mozais"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="Build compile-time Flutter themes for a Linux greeter."/><script type="module" src="/Mozais/_astro/Head.astro_astro_type_script_index_0_lang.D45tbunx.js"></script><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/Mozais/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/Mozais/_astro/common.BsSsZre1.css"><script type="module" src="/Mozais/_astro/page.Dwipeu-R.js"></script></head><body class="astro-g5ptsecz"><a class="sl-skip-link astro-qb7clj6f" href="#_top">Skip to content</a><div class="page sl-flex astro-yntsjkba"><header class="header astro-yntsjkba"><div class="header astro-by6fddyj"><div class="title-wrapper sl-flex astro-by6fddyj"><a href="/Mozais/" class="site-title sl-flex astro-6rvad3va"><span class="astro-6rvad3va" translate="no">Mozais</span></a></div><div class="sl-flex print:hidden astro-by6fddyj"><site-search class="astro-by6fddyj astro-b5kgnn7o" data-translations="{&quot;placeholder&quot;:&quot;Search documentation&quot;}"><button data-open-modal disabled aria-label="Search documentation" aria-keyshortcuts="Control+K" class="astro-b5kgnn7o"><svg aria-hidden="true" class="astro-b5kgnn7o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-b5kgnn7o" aria-hidden="true">Search documentation</span><kbd class="sl-hidden md:sl-flex astro-b5kgnn7o" style="display: none;"><kbd class="astro-b5kgnn7o">Ctrl</kbd><kbd class="astro-b5kgnn7o">K</kbd></kbd></button><dialog style="padding:0" aria-label="Search documentation" class="astro-b5kgnn7o"><div class="dialog-frame sl-flex astro-b5kgnn7o"><button data-close-modal class="sl-flex md:sl-hidden astro-b5kgnn7o">Cancel</button><div class="search-container astro-b5kgnn7o"><div id="starlight__search" class="astro-b5kgnn7o"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/Mozais/_astro/Search.astro_astro_type_script_index_0_lang.0CyZjpD1.js"></script></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-by6fddyj"><div class="sl-flex social-icons astro-by6fddyj"><a href="https://github.com/anfsity/Mozais" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div></header><nav class="sidebar print:hidden astro-yntsjkba" aria-label="Main"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-r2osgdlg"><svg aria-hidden="true" class="open-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-r2osgdlg">Menu</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-yntsjkba"><div class="sidebar-content sl-flex astro-yntsjkba"><sl-sidebar-state-persist data-hash="0afwo3u" class="astro-ipdry5cl"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-rmhv4bp6"><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Start here</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/Mozais/getting-started/installation/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Environment setup</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/getting-started/quick-start/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Quick start</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Theme development</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/Mozais/guides/themes/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Develop a theme</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/guides/components/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Develop theme components</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/guides/testing/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Develop and test</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Technical reference</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/Mozais/reference/theme-package/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Theme package contract</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/reference/scene-format/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Scene format</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/reference/cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">CLI and development tooling</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/reference/dbus/" aria-current="page" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">D-Bus contract</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/reference/api/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">API reference</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Contributing</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/Mozais/architecture/overview/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">System overview</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/architecture/code-map/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Code map</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/architecture/frontend/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Frontend architecture</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/architecture/backend/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Backend code guide</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/guides/greetd-testing/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Standalone greetd testing</span></a></li><li class="astro-rmhv4bp6"><a href="/Mozais/guides/documentation/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Maintain the documentation</span></a></li></ul></details></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-p4azlveh"><div class="social-icons astro-p4azlveh"><a href="https://github.com/anfsity/Mozais" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-yntsjkba"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lrzkfocr"><aside class="right-sidebar-container print:hidden astro-lrzkfocr"><div class="right-sidebar astro-lrzkfocr"><div class="lg:sl-hidden astro-qok35upx"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-66cqc7ze"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-66cqc7ze"><details id="starlight__mobile-toc" class="astro-66cqc7ze"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-66cqc7ze"><span class="toggle sl-flex astro-66cqc7ze">On this page<svg aria-hidden="true" class="caret astro-66cqc7ze astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-66cqc7ze"></span></summary><div class="dropdown astro-66cqc7ze"><ul class="isMobile astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#1-system-architecture--component-separation" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">1. System Architecture &amp; Component Separation</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#communication-flow" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Communication Flow</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#key-architectural-benefits" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Key Architectural Benefits</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#concurrency-model" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Concurrency Model</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#2-interface-specification-iomozaisgreeter1" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">2. Interface Specification: io.mozais.Greeter1</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#service-coordinates" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Service Coordinates</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#methods-specification" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Methods Specification</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#session-discovery-and-desktopnames-data-model" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Session Discovery and DesktopNames Data Model</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#signals-specification" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Signals Specification</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#3-the-attempt_id-transaction-design" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">3. The attempt_id Transaction Design</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#protocol-invariants" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Protocol Invariants</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#4-security-policies--boundaries" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">4. Security Policies &amp; Boundaries</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#1-zero-trace-secret-handling" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">1. Zero-Trace Secret Handling</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#2-d-bus-bus-segregation--privilege-model" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">2. D-Bus Bus Segregation &amp; Privilege Model</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#3-biometric-integration-boundary" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">3. Biometric Integration Boundary</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#5-state-machine-and-transitions" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">5. State Machine and Transitions</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#51-primary-authstate-lifecycle-diagram" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">5.1 Primary AuthState Lifecycle Diagram</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#52-authentication-transition-rules" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">5.2 Authentication Transition Rules</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#53-transaction-and-client-invariants" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">5.3 Transaction and Client Invariants</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#6-development-workflow--client-implementation" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">6. Development Workflow &amp; Client Implementation</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#mock-backend-strategy" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Mock Backend Strategy</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#backend-diagnostics" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Backend diagnostics</span></a></li></ul></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/Mozais/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-qok35upx"><div class="sl-container astro-qok35upx"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#1-system-architecture--component-separation" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">1. System Architecture &amp; Component Separation</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#communication-flow" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Communication Flow</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#key-architectural-benefits" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Key Architectural Benefits</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#concurrency-model" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Concurrency Model</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#2-interface-specification-iomozaisgreeter1" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">2. Interface Specification: io.mozais.Greeter1</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#service-coordinates" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Service Coordinates</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#methods-specification" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Methods Specification</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#session-discovery-and-desktopnames-data-model" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Session Discovery and DesktopNames Data Model</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#signals-specification" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Signals Specification</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#3-the-attempt_id-transaction-design" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">3. The attempt_id Transaction Design</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#protocol-invariants" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Protocol Invariants</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#4-security-policies--boundaries" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">4. Security Policies &amp; Boundaries</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#1-zero-trace-secret-handling" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">1. Zero-Trace Secret Handling</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#2-d-bus-bus-segregation--privilege-model" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">2. D-Bus Bus Segregation &amp; Privilege Model</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#3-biometric-integration-boundary" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">3. Biometric Integration Boundary</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#5-state-machine-and-transitions" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">5. State Machine and Transitions</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#51-primary-authstate-lifecycle-diagram" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">5.1 Primary AuthState Lifecycle Diagram</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#52-authentication-transition-rules" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">5.2 Authentication Transition Rules</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#53-transaction-and-client-invariants" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">5.3 Transaction and Client Invariants</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#6-development-workflow--client-implementation" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">6. Development Workflow &amp; Client Implementation</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#mock-backend-strategy" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Mock Backend Strategy</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#backend-diagnostics" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Backend diagnostics</span></a></li></ul></li></ul></nav></starlight-toc><script type="module" src="/Mozais/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lrzkfocr"><main data-pagefind-body class="astro-g5ptsecz" lang="en" dir="ltr"><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><h1 id="_top" class="astro-bebwqqxs">D-Bus contract</h1></div></div><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><div class="sl-markdown-content"><p>This specification defines the inter-process communication (IPC) boundaries, state machine invariants, security policies, and technical implementations for the <strong>Mozais Greeter</strong> backend-frontend abstraction layer.</p>
+<hr>
+<h2 id="1-system-architecture--component-separation">1. System Architecture &#x26; Component Separation</h2>
+<p>The architecture decouples the user interface (Flutter client) from underlying system daemons (<code>greetd</code> and <code>systemd-logind</code>) using a dedicated, unprivileged backend bridge.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>┌───────────────────────────────────────────────────────────┐</span></span>
+<span class="line"><span>│                    Flutter UI Client                      │</span></span>
+<span class="line"><span>│            (Unprivileged / Non-root User)                 │</span></span>
+<span class="line"><span>└─────────────────────────────┬─────────────────────────────┘</span></span>
+<span class="line"><span>                              │</span></span>
+<span class="line"><span>                              │ Private / Session D-Bus</span></span>
+<span class="line"><span>                              │ Bus: io.mozais.Greeter</span></span>
+<span class="line"><span>                              │ Interface: io.mozais.Greeter1</span></span>
+<span class="line"><span>                              ▼</span></span>
+<span class="line"><span>┌───────────────────────────────────────────────────────────┐</span></span>
+<span class="line"><span>│              Mozais Backend Bridge Daemon                 │</span></span>
+<span class="line"><span>│         (Translates D-Bus Calls to greetd / System)       │</span></span>
+<span class="line"><span>└──────────────┬─────────────────────────────┬──────────────┘</span></span>
+<span class="line"><span>               │                             │</span></span>
+<span class="line"><span>               │ Unix Domain Socket          │ System D-Bus</span></span>
+<span class="line"><span>               │ 32-bit native-endian      │ (org.freedesktop.login1)</span></span>
+<span class="line"><span>               │ length + UTF-8 JSON       │</span></span>
+<span class="line"><span>               ▼                             ▼</span></span>
+<span class="line"><span>┌─────────────────────────────┐   ┌─────────────────────────┐</span></span>
+<span class="line"><span>│           greetd            │   │     systemd-logind      │</span></span>
+<span class="line"><span>│   (PAM Authentication)      │   │   (Power Management)    │</span></span>
+<span class="line"><span>└─────────────────────────────┘   └─────────────────────────┘</span></span></code></pre>
+<h3 id="communication-flow">Communication Flow</h3>
+<p>The component diagram above shows ownership boundaries. The following sequence diagram details the runtime communication path. Session desktop files are read locally by the backend daemon; they do not constitute a separate IPC endpoint.</p>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    participant UI as Flutter UI
+    participant B as Mozais backend bridge
+    participant F as Session desktop files
+    participant G as greetd
+    participant L as systemd-logind
+
+    UI->>B: ListSessions()
+    B->>F: Read wayland-sessions and xsessions
+    F-->>B: Name / Exec / DesktopNames
+    B-->>UI: a(ssas) session records
+
+    UI->>B: BeginAuthentication(username)
+    B->>G: create_session JSON frame
+    G-->>B: auth_message / success / error
+    B-->>UI: StateChanged and/or Prompt
+
+    loop Each authentication message
+        UI->>B: Respond(attempt_id, response)
+        B->>G: post_auth_message_response JSON frame
+        G-->>B: auth_message / success / error
+        B-->>UI: StateChanged and/or Prompt
+    end
+
+    UI->>B: StartSession(attempt_id, session_id)
+    B->>F: Resolve and validate session_id
+    B->>G: start_session(cmd, env)
+    G-->>B: success / error
+    B-->>UI: StateChanged(HandingOff)
+    UI->>UI: Exit after handoff
+    G->>G: Start selected desktop after greeter exits
+
+    opt PowerAction
+        UI->>B: PowerAction(action)
+        B->>L: login1 power method
+        L-->>B: success / error
+        B-->>UI: Method result
+    end</pre>
+<p>For <code>info</code> and <code>error</code> authentication messages, the backend emits the prompt for display and may submit an empty response automatically. For <code>visible</code> and <code>secret</code> messages, it must wait for the UI response. The loop must not assume that there is only one password prompt.</p>
+<p>The authentication contract is factor-agnostic. A PAM stack may use a
+password, fingerprint, face provider, smart card, or more than one factor.
+Mozais does not identify a user from a face or fingerprint; the UI starts an
+attempt for the explicitly selected username and the system authentication
+stack decides which factors are required.</p>
+<p>The current <code>Prompt</code> signal describes greetd/PAM conversation messages only:
+<code>visible</code>, <code>secret</code>, <code>info</code>, and <code>error</code>. The UI must not infer a biometric
+provider from arbitrary prompt text. If a future backend can obtain
+authoritative provider progress, it should expose a separate typed
+display-safe interaction event rather than changing the meaning of these
+prompt kinds. Raw camera frames, fingerprint data, biometric templates, and
+provider secrets must remain outside the D-Bus contract.</p>
+<h3 id="key-architectural-benefits">Key Architectural Benefits</h3>
+<ul>
+<li><strong>Framework Isolation</strong>: The Flutter frontend remains strictly agnostic of Unix domain sockets, PAM message formats, binary frame packing, and <code>systemd</code> DBus interfaces.</li>
+<li><strong>Testability</strong>: A separate mock backend build (<code>cargo run --features mock</code>) can be used on a private D-Bus session (<code>dbus-run-session</code>), allowing complete UI development and automated integration testing without running a real <code>greetd</code> daemon or requiring elevated privileges. The production build does not contain the mock transport and never selects it from a runtime environment variable.</li>
+<li><strong>Least Privilege Enforcement</strong>: The UI runs as an unprivileged client with zero direct access to root or system-level control interfaces.</li>
+</ul>
+<h3 id="concurrency-model">Concurrency Model</h3>
+<p>Authentication is owned by one actor. D-Bus state-changing methods enqueue commands and await a per-call reply; the actor exclusively owns <code>AuthStateMachine</code>, the active <code>GreetdTransport</code>, cancellation handles, caller ownership. <code>GetState()</code> reads a <code>watch</code> snapshot and does not contend with greetd I/O.</p>
+<p>The actor processes one authentication command at a time, so a greetd request and its state transition cannot overlap with <code>Respond()</code>, <code>Cancel()</code>, or a replacement <code>BeginAuthentication()</code>. Session catalog scans remain outside the actor on blocking worker tasks; their completion is committed only if the attempt ID is still current. This is the stale-result boundary for catalog work and removes the need for backend, operation, transport, and request-gate locks.</p>
+<p>The process owns and observes the actor task. SIGINT, SIGTERM, or loss of the greeter D-Bus connection closes the service, interrupts pending greetd I/O, and waits for bounded authentication cleanup. Actor failure closes the service and exits with an error; state queries reject a stopped actor instead of returning a retained snapshot. Actor and disconnect watchers hold weak command senders, so releasing all external handles also triggers cleanup.</p>
+<p>A successful <code>StartSession</code> response uses zbus response-dispatch notification before requesting process shutdown. <code>HandingOff</code> signals may precede the method reply. The backend does not use connection activity or a fixed delay as evidence of reply completion.</p>
+<hr>
+<h2 id="2-interface-specification-iomozaisgreeter1">2. Interface Specification: <code>io.mozais.Greeter1</code></h2>
+<h3 id="service-coordinates">Service Coordinates</h3>
+<ul>
+<li><strong>Bus Name</strong>: <code>io.mozais.Greeter</code></li>
+<li><strong>Object Path</strong>: <code>/io/mozais/Greeter</code></li>
+<li><strong>Interface</strong>: <code>io.mozais.Greeter1</code></li>
+</ul>
+<hr>
+<h3 id="methods-specification">Methods Specification</h3>
+<h4 id="query-operations">Query Operations</h4>
+<h5 id="getstate---string-state-string-detail"><code>GetState() -> (String state, String detail)</code></h5>
+<ul>
+<li><strong>Description</strong>: Returns the current state of the backend authentication engine.</li>
+<li><strong>Returns</strong>:
+<ul>
+<li><code>state</code>: The current authentication phase (e.g., <code>Idle</code>, <code>CreatingSession</code>, <code>WaitingForInput</code>, <code>Authenticated</code>).</li>
+<li><code>detail</code>: Additional status metadata or display-safe error text.</li>
+</ul>
+</li>
+<li><strong>Wire Signature</strong>: <code>ss</code></li>
+</ul>
+<h5 id="listusers---arraystructstring-string-string"><code>ListUsers() -> Array&#x3C;Struct&#x3C;String, String, String>></code></h5>
+<ul>
+<li><strong>Description</strong>: Enumerates system users available for interactive login.</li>
+<li><strong>Returns</strong>: Array of user records containing <code>username</code>, <code>display_name</code>, and <code>icon_path</code>.</li>
+<li><strong>Wire Signature</strong>: <code>a(sss)</code></li>
+</ul>
+<h5 id="listsessions---arraystructstring-string-arraystring"><code>ListSessions() -> Array&#x3C;Struct&#x3C;String, String, Array&#x3C;String>>></code></h5>
+<ul>
+<li><strong>Description</strong>: Parses and returns available Wayland and X11 sessions from <code>/usr/share/wayland-sessions</code> and <code>/usr/share/xsessions</code>.</li>
+<li><strong>Returns</strong>: Array of session records containing <code>session_id</code>, <code>name</code>, and <code>desktop_names</code> (e.g., <code>["sway", "wlroots"]</code>, <code>["Hyprland"]</code>).</li>
+<li><strong>Wire Signature</strong>: <code>a(ssas)</code></li>
+</ul>
+<hr>
+<h3 id="session-discovery-and-desktopnames-data-model">Session Discovery and <code>DesktopNames</code> Data Model</h3>
+<p>Each session record represents one desktop entry file, not a running compositor. The backend retains and validates the following internal fields:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>session_id     Stable identifier, e.g., "wayland:sway"</span></span>
+<span class="line"><span>session_type   "wayland" or "x11"</span></span>
+<span class="line"><span>name           User-facing Name= value from .desktop entry</span></span>
+<span class="line"><span>exec           Parsed Exec= argv array, backend-owned and sanitized</span></span>
+<span class="line"><span>desktop_names  DesktopNames= split on ';', preserving specified order</span></span>
+<span class="line"><span>available      Boolean indicating whether TryExec and binary checks pass</span></span>
+<span class="line"><span>source         Absolute desktop entry file path</span></span></code></pre>
+<p><code>DesktopNames</code> is a semicolon-separated list of desktop environment identifiers from the desktop entry (e.g., <code>DesktopNames=sway;wlroots</code>). This describes a single Sway session with two fallback environment identifiers. It does not request multiple compositors.</p>
+<p><code>session_id</code> must remain distinct from <code>desktop_names</code>: two separate desktop entries may refer to the same compositor while supplying different wrapper scripts or environment variables. The UI receives <code>session_id</code>, <code>name</code>, and <code>desktop_names</code>, while the backend maintains sole ownership over the parsed <code>Exec</code> vector and constructs the final <code>cmd</code> and <code>env</code> parameters for <code>greetd</code>.</p>
+<p>The backend may normalize or override desktop metadata to handle compatibility issues. Display-only overrides remain in the UI layer. Changes affecting the launched environment must be represented as a validated backend profile, rather than an arbitrary command or environment map supplied by the UI.</p>
+<p>This discovery step identifies available session candidates; it does not guarantee that the selected compositor will execute successfully. <code>greetd</code> accepts the <code>start_session</code> request and spawns the command after the greeter process exits.</p>
+<hr>
+<h4 id="authentication-lifecycle-operations">Authentication Lifecycle Operations</h4>
+<h5 id="beginauthenticationstring-username---string-attempt_id"><code>BeginAuthentication(String username) -> String attempt_id</code></h5>
+<ul>
+<li><strong>Description</strong>: Initiates a PAM authentication transaction for the specified <code>username</code>.</li>
+<li><strong>Behavior</strong>:
+<ul>
+<li>Replaces an active attempt only when the same D-Bus unique sender owns it. Other callers receive <code>AccessDenied</code>.</li>
+<li>Connects to the underlying <code>greetd</code> socket and transmits <code>create_session</code>.</li>
+<li>Generates and returns a unique <code>attempt_id</code> (UUID v4 or monotonic token).</li>
+</ul>
+</li>
+</ul>
+<h5 id="respondstring-attempt_id-string-response---void"><code>Respond(String attempt_id, String response) -> Void</code></h5>
+<ul>
+<li><strong>Description</strong>: Submits credential input (e.g., password or OTP token) for an ongoing PAM challenge.</li>
+<li><strong>Parameters</strong>:
+<ul>
+<li><code>attempt_id</code>: The transaction token returned by <code>BeginAuthentication</code>.</li>
+<li><code>response</code>: The plaintext response string (must be zeroed out in memory immediately after processing).</li>
+</ul>
+</li>
+</ul>
+<h5 id="cancelstring-attempt_id---void"><code>Cancel(String attempt_id) -> Void</code></h5>
+<ul>
+<li><strong>Description</strong>: Explicitly aborts an active authentication transaction.</li>
+<li><strong>Behavior</strong>: Transmits <code>cancel_session</code> to <code>greetd</code> and resets the backend state machine to <code>Idle</code>.</li>
+</ul>
+<h5 id="startsessionstring-attempt_id-string-session_id---void"><code>StartSession(String attempt_id, String session_id) -> Void</code></h5>
+<ul>
+<li><strong>Description</strong>: Requests execution of the selected desktop environment upon successful PAM authentication.</li>
+<li><strong>Parameters</strong>:
+<ul>
+<li><code>attempt_id</code>: Valid token for a currently <code>Authenticated</code> session.</li>
+<li><code>session_id</code>: The identifier corresponding to a session entry returned by <code>ListSessions()</code>.</li>
+</ul>
+</li>
+<li><strong>Selection Rule</strong>: The backend resolves <code>session_id</code> against its internally verified session catalog. The UI is strictly prohibited from supplying arbitrary <code>Exec</code> strings.</li>
+</ul>
+<hr>
+<h4 id="power-management-operations">Power Management Operations</h4>
+<h5 id="poweractionstring-action---void"><code>PowerAction(String action) -> Void</code></h5>
+<ul>
+<li><strong>Description</strong>: Requests system power state transitions (<code>PowerOff</code>, <code>Reboot</code>, <code>Suspend</code>, <code>Hibernate</code>).</li>
+<li><strong>Behavior</strong>: Production proxies the request to <code>systemd-logind</code> via the System D-Bus (<code>org.freedesktop.login1</code>), independently of authentication state and pending greetd I/O. Power requests do not cancel or block authentication. Builds with <code>mock-power</code> log the action and return success without connecting to the system bus; <code>mock</code> includes <code>mock-power</code>.</li>
+</ul>
+<hr>
+<h3 id="signals-specification">Signals Specification</h3>
+<h5 id="promptstring-attempt_id-string-prompt_kind-string-text"><code>Prompt(String attempt_id, String prompt_kind, String text)</code></h5>
+<ul>
+<li><strong>Description</strong>: Emitted asynchronously when PAM requests user input.</li>
+<li><strong>Parameters</strong>:
+<ul>
+<li><code>attempt_id</code>: The associated authentication transaction token.</li>
+<li><code>prompt_kind</code>: Enum string indicating input type (<code>visible</code> for plain text, <code>secret</code> for passwords, <code>info</code> for informational notices, <code>error</code> for PAM errors).</li>
+<li><code>text</code>: The prompt string provided by PAM (e.g., <code>"Password: "</code>).</li>
+</ul>
+</li>
+</ul>
+<p>After a retryable <code>auth_error</code> in a greetd conversation with submitted user input, the backend emits a display-only <code>error</code> prompt and then a new <code>visible</code> or <code>secret</code> prompt for the same <code>attempt_id</code>; the UI answers the new prompt instead of starting a new attempt.</p>
+<h5 id="statechangedstring-attempt_id-string-state-string-detail"><code>StateChanged(String attempt_id, String state, String detail)</code></h5>
+<ul>
+<li><strong>Description</strong>: Emitted when the authentication engine transitions between internal states.</li>
+<li><strong>Parameters</strong>:
+<ul>
+<li><code>attempt_id</code>: The associated authentication transaction token.</li>
+<li><code>state</code>: New authentication state string.</li>
+<li><code>detail</code>: Display-safe explanatory text or failure reason. Must never contain passwords or confidential payload data.</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="3-the-attempt_id-transaction-design">3. The <code>attempt_id</code> Transaction Design</h2>
+<p>To eliminate race conditions, stale UI responses, and replay attempts, all state-modifying authentication operations require a unique <code>attempt_id</code>.</p>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    participant UI as UI Client
+    participant B as Backend Daemon
+
+    UI->>B: BeginAuthentication("alice")
+    Note over B: Generates active token "att_01"
+    B-->>UI: Prompt("att_01", "secret", "Password: ")
+
+    UI->>B: Respond("att_01", "*****")
+    Note over B: VALID: Matches active att_01
+    B-->>UI: Accepted / StateChanged(...)
+
+    UI->>B: Respond("att_00", "*****")
+    Note over B: REJECTED: Stale / expired attempt ID
+    B-->>UI: D-Bus Error (StaleAttemptId)</pre>
+<h3 id="protocol-invariants">Protocol Invariants</h3>
+<ol>
+<li><strong>Single Active Transaction</strong>: The backend permits <strong>exactly one</strong> active <code>attempt_id</code> at a time. Executing <code>BeginAuthentication</code> while another attempt is active cancels it only for its original D-Bus unique sender; other callers receive <code>AccessDenied</code>.</li>
+<li><strong>Caller Ownership</strong>: <code>Respond()</code>, <code>Cancel()</code>, and <code>StartSession()</code> require the original D-Bus unique sender. Attempt IDs identify transactions and are not authorization credentials. Disconnecting the owner cancels and releases its attempt.</li>
+<li><strong>Stale Token Rejection</strong>: Any <code>Respond()</code>, <code>Cancel()</code>, or <code>StartSession()</code> invocation carrying a mismatched or expired <code>attempt_id</code> is rejected immediately without forwarding commands to <code>greetd</code>.</li>
+</ol>
+<hr>
+<h2 id="4-security-policies--boundaries">4. Security Policies &#x26; Boundaries</h2>
+<h3 id="1-zero-trace-secret-handling">1. Zero-Trace Secret Handling</h3>
+<ul>
+<li><strong>No Logging</strong>: Passwords, response tokens, and raw PAM secret prompts must never be written to stdout, stderr, persistent logs, or ephemeral debug logs (<code>/tmp/mozais-flutter.log</code>, <code>/tmp/sway-debug.log</code>).</li>
+<li><strong>No Signal Exposure</strong>: Confidential user input must only traverse the unicast D-Bus method call <code>Respond()</code>. Secrets must never be emitted over D-Bus Signals.</li>
+<li><strong>Memory Wiping</strong>: Secret buffers must be explicitly zeroed out in memory immediately after socket transmission (e.g., using <code>explicit_bzero</code> or <code>sodium_memzero</code>). Memory pages holding credentials should be marked with <code>MADV_DONTDUMP</code> to prevent leaks in crash dumps.</li>
+</ul>
+<h3 id="2-d-bus-bus-segregation--privilege-model">2. D-Bus Bus Segregation &#x26; Privilege Model</h3>
+<ul>
+<li><strong>Session/Private Bus</strong>: Used exclusively for UI-to-Backend IPC.</li>
+<li><strong>System Bus Isolation</strong>: System actions (<code>PowerAction</code>) are routed across the System D-Bus to <code>systemd-logind</code>.</li>
+<li><strong>Polkit Authorization</strong>: Power actions rely on Polkit policies residing in <code>/usr/share/polkit-1/actions/</code> to grant or restrict shutdown/reboot capabilities to the <code>greeter</code> user without requiring <code>sudo</code> or <code>setuid</code> binaries.</li>
+<li><strong>Unprivileged Backend Execution</strong>: The backend daemon executes strictly under the unprivileged <code>greeter</code> system user account (belonging to groups <code>greeter</code>, <code>video</code>, <code>render</code>).</li>
+</ul>
+<h3 id="3-biometric-integration-boundary">3. Biometric Integration Boundary</h3>
+<p>Biometric authentication is integrated through the system authentication stack,
+normally PAM modules used by <code>greetd</code>. The Flutter client does not open the
+camera, access the fingerprint device, store biometric templates, or decide
+which account a biometric belongs to.</p>
+<p>The UI may render only display-safe states supplied by the backend, such as:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>WaitingForFactor</span></span>
+<span class="line"><span>ProcessingFactor</span></span>
+<span class="line"><span>FactorAccepted</span></span>
+<span class="line"><span>FactorRejected</span></span>
+<span class="line"><span>FactorUnavailable</span></span>
+<span class="line"><span>FallbackRequired</span></span></code></pre>
+<p>These states are presentation information, not replacements for the primary
+<code>AuthState</code>. Password fallback, cancellation, timeout, stale-attempt rejection,
+and client disconnect continue to use the same <code>attempt_id</code> and backend state
+machine. A provider that cannot report progress remains valid; the UI shows a
+generic authentication-waiting state.</p>
+<hr>
+<h2 id="5-state-machine-and-transitions">5. State Machine and Transitions</h2>
+<p>The backend daemon manages multiple orthogonal state domains. The primary public phase exposed via <code>GetState()</code> and <code>StateChanged()</code> represents the <strong><code>AuthState</code></strong>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>ServiceState:  Starting ──► Ready ──► Unavailable ──► Reconnecting ──► Ready</span></span>
+<span class="line"><span>                              │</span></span>
+<span class="line"><span>                              └──► Stopping</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>CatalogState:  Empty ──► Loading ──► Ready</span></span>
+<span class="line"><span>                           │</span></span>
+<span class="line"><span>                           ├──► Refreshing ──► Ready</span></span>
+<span class="line"><span>                           └──► Failure ──► Degraded / Empty</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>PowerState:    Idle ──► Authorizing ──► Executing ──► Succeeded / Failed</span></span></code></pre>
+<h3 id="51-primary-authstate-lifecycle-diagram">5.1 Primary <code>AuthState</code> Lifecycle Diagram</h3>
+<p>The state machine for a single <code>attempt_id</code> is defined below:</p>
+<pre class="mermaid">stateDiagram-v2
+    [*] --> Idle
+
+    state "Active Authentication Transaction" as ActiveTx {
+        Idle --> CreatingSession : BeginAuthentication(username)
+
+        CreatingSession --> PromptPending : auth_message
+        CreatingSession --> Authenticated : success
+        CreatingSession --> Failed : auth_error / error
+
+        state PromptPending {
+            [*] --> EvaluatingPrompt
+            EvaluatingPrompt --> WaitingForInput : visible / secret
+            EvaluatingPrompt --> SubmittingResponse : info / error (Auto Empty Reply)
+        }
+
+        WaitingForInput --> SubmittingResponse : Respond(attempt_id, response)
+
+        SubmittingResponse --> PromptPending : auth_message (Multi-step PAM)
+        SubmittingResponse --> Authenticated : success
+        SubmittingResponse --> CreatingSession : auth_error after user response (Retryable)
+        SubmittingResponse --> Failed : error
+
+        Authenticated --> ResolvingSession : StartSession(attempt_id, session_id)
+
+        ResolvingSession --> Authenticated : Invalid session_id / TryExec failed
+        ResolvingSession --> StartingSession : Valid session_id
+
+        StartingSession --> HandingOff : success
+        StartingSession --> Failed : session_start_failed
+
+        HandingOff --> [*] : Greeter Exits &#x26; Session Launches
+    }
+
+    ActiveTx --> Cancelling : Cancel() / Timeout / Client Disconnect
+    Cancelling --> Idle : Socket Closed &#x26; Tokens Invalidated
+
+    Failed --> Idle : Reset State (Retain Display-Safe Error)</pre>
+<p><code>PromptPending</code> messages of type <code>info</code> or <code>error</code> trigger a <code>Prompt</code> signal and automatically submit an empty response back to <code>greetd</code>. Messages of type <code>visible</code> and <code>secret</code> transition to <code>WaitingForInput</code>. The protocol loop may cycle through <code>PromptPending</code> multiple times during multi-factor or multi-step PAM challenges before reaching a terminal state.</p>
+<p>An <code>auth_error</code> is retryable only when user input was submitted in the current greetd conversation. Automatic acknowledgments of <code>info</code> or <code>error</code> messages do not count as user input. An <code>auth_error</code> without user input is terminal, preventing automatic retries from consuming login attempts. The backend sends <code>cancel_session</code> and waits for success after a greetd authentication error, before dropping the socket; closing the socket alone does not release greetd’s configured session. A retryable <code>auth_error</code> is not terminal. The backend keeps the same <code>attempt_id</code>, emits a display-only <code>error</code> prompt with the failure, cancels the rejected greetd session, reconnects to <code>greetd</code>, and sends a fresh <code>create_session</code> so the user can answer the prompt again. The attempt only reaches <code>Failed</code> on a non-retryable <code>error</code> or on a transport, protocol, or session failure.</p>
+<hr>
+<h3 id="52-authentication-transition-rules">5.2 Authentication Transition Rules</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th align="left">Current State</th><th align="left">Event or Guard Condition</th><th align="left">Next State</th><th align="left">Required Backend Action</th></tr></thead><tbody><tr><td align="left"><code>Idle</code></td><td align="left">Valid <code>BeginAuthentication(user)</code></td><td align="left"><code>CreatingSession</code></td><td align="left">Invalidate previous token, generate new <code>attempt_id</code>, open socket to <code>GREETD_SOCK</code>, send <code>create_session</code>.</td></tr><tr><td align="left"><code>CreatingSession</code></td><td align="left">Receives <code>auth_message</code></td><td align="left"><code>PromptPending</code></td><td align="left">Parse prompt type and text; emit <code>Prompt</code> signal.</td></tr><tr><td align="left"><code>CreatingSession</code></td><td align="left">Receives <code>success</code></td><td align="left"><code>Authenticated</code></td><td align="left">Maintain active <code>greetd</code> socket connection; await desktop selection.</td></tr><tr><td align="left"><code>CreatingSession</code></td><td align="left">Receives <code>auth_error</code> or <code>error</code></td><td align="left"><code>Failed</code></td><td align="left">Record display-safe error description; close socket; invalidate transaction token.</td></tr><tr><td align="left"><code>PromptPending</code></td><td align="left"><code>prompt_kind</code> is <code>visible</code> or <code>secret</code></td><td align="left"><code>WaitingForInput</code></td><td align="left">Await exactly one valid <code>Respond()</code> invocation for the matching <code>attempt_id</code>.</td></tr><tr><td align="left"><code>PromptPending</code></td><td align="left"><code>prompt_kind</code> is <code>info</code> or <code>error</code></td><td align="left"><code>SubmittingResponse</code></td><td align="left">Emit prompt text to UI; automatically send empty <code>post_auth_message_response</code> to <code>greetd</code>.</td></tr><tr><td align="left"><code>WaitingForInput</code></td><td align="left">Valid <code>Respond(attempt_id, resp)</code></td><td align="left"><code>SubmittingResponse</code></td><td align="left">Transmit <code>post_auth_message_response</code> over socket; zero out plaintext buffer immediately.</td></tr><tr><td align="left"><code>WaitingForInput</code></td><td align="left">Stale token or invalid phase</td><td align="left"><em>Unchanged</em></td><td align="left">Return a D-Bus error to caller; do not send data over <code>greetd</code> socket.</td></tr><tr><td align="left"><code>SubmittingResponse</code></td><td align="left">Receives <code>auth_message</code></td><td align="left"><code>PromptPending</code></td><td align="left">Continue authentication loop for subsequent PAM challenges.</td></tr><tr><td align="left"><code>SubmittingResponse</code></td><td align="left">Receives <code>success</code></td><td align="left"><code>Authenticated</code></td><td align="left">Transition to authenticated state; await <code>StartSession()</code>.</td></tr><tr><td align="left"><code>SubmittingResponse</code></td><td align="left">Receives <code>auth_error</code> after user input</td><td align="left"><code>CreatingSession</code></td><td align="left">Emit a display-only <code>error</code> prompt; cancel the rejected greetd session, then reconnect to <code>GREETD_SOCK</code> and send <code>create_session</code> for the same <code>attempt_id</code>; keep the attempt alive so the user can retry.</td></tr><tr><td align="left"><code>SubmittingResponse</code></td><td align="left">Receives <code>error</code></td><td align="left"><code>Failed</code></td><td align="left">Record display-safe error description; close socket; invalidate transaction token.</td></tr><tr><td align="left"><code>Authenticated</code></td><td align="left">Valid <code>StartSession(attempt_id, id)</code></td><td align="left"><code>ResolvingSession</code></td><td align="left">Resolve <code>session_id</code> against backend-owned session catalog.</td></tr><tr><td align="left"><code>ResolvingSession</code></td><td align="left">Invalid or unavailable <code>session_id</code></td><td align="left"><code>Authenticated</code></td><td align="left">Reject call with D-Bus error; preserve <code>Authenticated</code> state to allow re-selection.</td></tr><tr><td align="left"><code>ResolvingSession</code></td><td align="left">Valid <code>session_id</code></td><td align="left"><code>StartingSession</code></td><td align="left">Build sanitized <code>cmd</code> and <code>env</code> arrays from verified <code>.desktop</code> file.</td></tr><tr><td align="left"><code>StartingSession</code></td><td align="left">Receives <code>success</code></td><td align="left"><code>HandingOff</code></td><td align="left">Emit <code>StateChanged("HandingOff")</code>; close D-Bus connection; terminate greeter process.</td></tr><tr><td align="left"><code>StartingSession</code></td><td align="left">Receives <code>error</code></td><td align="left"><code>Failed</code></td><td align="left">Report <code>session_start_failed</code>; clean up socket state.</td></tr><tr><td align="left"><em>Any Active State</em></td><td align="left"><code>Cancel()</code>, timeout, or UI disconnect</td><td align="left"><code>Cancelling</code></td><td align="left">Transmit <code>cancel_session</code> to <code>greetd</code> if socket is open; invalidate token immediately.</td></tr><tr><td align="left"><code>Cancelling</code></td><td align="left">Response received or socket closed</td><td align="left"><code>Idle</code></td><td align="left">Clear prompt buffers, socket references, credentials, and transaction tokens.</td></tr><tr><td align="left"><em>Any Active State</em></td><td align="left">Socket EOF, malformed JSON, or timeout</td><td align="left"><code>Failed</code></td><td align="left">Close socket; discard transaction token; preserve structured, non-secret error.</td></tr></tbody></table>
+<p><code>Failed</code> is a terminal state for the active authentication transaction, not for the backend process. Upon completing cleanup, the backend returns to <code>Idle</code> holding a structured, display-safe <code>last_error</code> readable by the UI.</p>
+<hr>
+<h3 id="53-transaction-and-client-invariants">5.3 Transaction and Client Invariants</h3>
+<ol>
+<li><strong>Strict Atomicity</strong>: At most one active authentication attempt exists at any time.</li>
+<li><strong>Preemptive Cancellation</strong>: Invoking <code>BeginAuthentication</code> automatically revokes and cancels any in-flight <code>attempt_id</code> before processing the new request.</li>
+<li><strong>Signal Isolation</strong>: Asynchronous signals carry generation tokens; signals matching expired tokens are discarded by the UI.</li>
+<li><strong>Client Disconnect Handling</strong>: Loss of the D-Bus client connection immediately triggers cancellation of the active transaction. A PAM prompt must never remain attached to a dead UI process.</li>
+<li><strong>Failure Classification</strong>: PAM <code>auth_error</code> responses following submitted user input represent retryable credential failures. An <code>auth_error</code> before user input terminates the attempt without automatic retry. The backend restarts the <code>greetd</code> session under the same <code>attempt_id</code> and surfaces the rejection as an <code>error</code> prompt, so the UI can retry without a new attempt. Non-retryable <code>error</code> responses, and protocol, socket, or session execution failures, require complete state cleanup before a new attempt can begin.</li>
+<li><strong>Power Action Isolation</strong>: <code>PowerAction</code> maintains an independent state domain. Authentication state never gates a power request, and power requests never mutate or reserve authentication state. System authorization and execution failures are returned to the caller.</li>
+</ol>
+<hr>
+<h2 id="6-development-workflow--client-implementation">6. Development Workflow &#x26; Client Implementation</h2>
+<h3 id="mock-backend-strategy">Mock Backend Strategy</h3>
+<p>For local UI development, build and run the backend with <code>cargo run --manifest-path backend/Cargo.toml --features mock</code>. The D-Bus integration wrapper <code>scripts/debug-dbus.sh</code> establishes a private session bus (<code>dbus-run-session</code>) and exports <code>MOZAIS_BUS_MODE=private</code>. <code>MOZAIS_BACKEND</code> is a Flutter UI setting only; it does not select the backend transport.</p>
+<p>The mock backend implements the complete <code>io.mozais.Greeter1</code> interface specification without making system PAM calls or opening a <code>greetd</code> socket:</p>
+<ol>
+<li><code>ListUsers()</code> serves stubbed mock user data.</li>
+<li><code>ListSessions()</code> returns deterministic test session entries (Wayland and X11).</li>
+<li><code>BeginAuthentication()</code> instantiates a mock transaction and emits realistic <code>Prompt</code> signals.</li>
+<li><code>Respond()</code> validates against test credentials (e.g., matching <code>"password"</code>) and reproduces accurate success/failure transitions.</li>
+</ol>
+<p>The helper scripts establish the execution environment and spawn the Flutter client. Full integration testing executes both the mock backend daemon and the Flutter UI client within the same isolated <code>dbus-run-session</code> instance.</p>
+<h3 id="backend-diagnostics">Backend diagnostics</h3>
+<p>The default backend log level is <code>info</code>. Authentication events carry <code>attempt_id</code>, operation, caller, and state so begin, prompt progression, credential rejection and retry, cancellation, authentication success, and session launch can be followed together. Transport failures retain their underlying error in backend diagnostics; catalog failures include their source path. D-Bus display text remains bounded and sanitized. Response values and PAM prompt bodies are never logged. Failed prompt delivery is a warning while the attempt and bus remain live, and debug during cancellation or disconnect. Startup failures have an explicit <code>startup_failed</code> event.</p></div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"><a href="/Mozais/reference/cli/" rel="prev" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-b5raizh3">Previous<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">CLI and development tooling</span></span></a><a href="/Mozais/reference/api/" rel="next" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-b5raizh3">Next<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">API reference</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>
