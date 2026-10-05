@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -1071,6 +1072,164 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'zoom and pan preserve geometry, pointer anchor and handle size',
+    (tester) async {
+      await openStudio(tester);
+      final scene = find.byType(SceneRuntime);
+      final originalRect = tester.getRect(scene);
+      final handle = find.byKey(const ValueKey('resize-right'));
+      final originalHandleSize = tester.getRect(handle).size;
+      final viewport = find.byKey(const ValueKey('studio-viewport'));
+      final pointer = tester.getCenter(viewport) + const Offset(70, 20);
+      final canvas = tester.renderObject<RenderBox>(scene);
+      final local = canvas.globalToLocal(pointer);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      tester.binding.handlePointerEvent(
+        PointerScrollEvent(
+          position: pointer,
+          scrollDelta: const Offset(0, -100),
+        ),
+      );
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect((canvas.globalToLocal(pointer) - local).distance, lessThan(1e-6));
+      expect(tester.getRect(scene).width, greaterThan(originalRect.width));
+      expect(
+        tester.getRect(handle).size.width,
+        closeTo(originalHandleSize.width, 1e-6),
+      );
+      await tester.tap(find.byKey(const ValueKey('zoom-fit')));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(scene), originalRect);
+      await tester.tap(find.byKey(const ValueKey('canvas-hand')));
+      await tester.pumpAndSettle();
+      await tester.drag(viewport, const Offset(60, 30));
+      await tester.pumpAndSettle();
+      expect(
+        (tester.getRect(scene).topLeft -
+                originalRect.topLeft -
+                const Offset(60, 30))
+            .distance,
+        lessThan(1e-6),
+      );
+      expect(find.text('Saved'), findsOneWidget);
+      expect(
+        encodeSceneDocument(
+          tester.widget<StudioPreview>(find.byType(StudioPreview)).document,
+        ),
+        encodeSceneDocument(_document),
+      );
+      await tester.tap(find.byKey(const ValueKey('zoom-fit')));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(scene), originalRect);
+      await tester.tap(find.byKey(const ValueKey('canvas-hand')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('zoom-actual-size')));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(scene).width, closeTo(1280, 1e-6));
+      await tester.drag(handle, const Offset(40, 0));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<StudioPreview>(find.byType(StudioPreview))
+            .document
+            .nodes
+            .first
+            .rect
+            .width,
+        closeTo(0.3 + 40 / 1280, 1e-8),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'canvas shortcuts nudge, undo, duplicate, delete, save and leave text editing alone',
+    (tester) async {
+      await openStudio(tester);
+      await tester.tap(find.byKey(const ValueKey('preview-panel')));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      var preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(
+        preview.document.nodes.first.rect.x,
+        closeTo(0.1 + 1 / 1280, 1e-8),
+      );
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<StudioPreview>(find.byType(StudioPreview))
+            .document
+            .nodes
+            .first
+            .rect
+            .y,
+        closeTo(0.1 + 10 / 720, 1e-8),
+      );
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(find.text('Saved'), findsOneWidget);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).panEnabled,
+        isTrue,
+      );
+      await tester.drag(
+        find.byKey(const ValueKey('studio-viewport')),
+        const Offset(20, 10),
+      );
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).panEnabled,
+        isFalse,
+      );
+      expect(find.text('Saved'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyH);
+      await tester.pumpAndSettle();
+      final canvas = find.byKey(const ValueKey('studio-viewport'));
+      await tester.drag(canvas, const Offset(40, 20));
+      await tester.pumpAndSettle();
+      expect(find.text('Saved'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+      await tester.pumpAndSettle();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(preview.selectedId, 'panel-copy');
+      expect(decodeSceneDocument(file.readAsStringSync()).nodes, hasLength(3));
+      await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).document.nodes,
+        hasLength(2),
+      );
+      final before = tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document;
+      await tester.tap(find.byKey(const ValueKey('field-X')));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+      await tester.pump();
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).document,
+        same(before),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('resize relayouts text, cancels and commits one undo step', (
     tester,
   ) async {
@@ -1238,7 +1397,7 @@ void main() {
       tester,
     ) async {
       await openStudio(tester);
-      await tester.tap(find.text(tool.label));
+      await tester.tap(find.byKey(ValueKey('tool-${tool.name}')));
       await tester.pumpAndSettle();
       final inspector = tester
           .widget<NodeInspector>(find.byType(NodeInspector))
@@ -1386,7 +1545,7 @@ void main() {
     );
     file.writeAsStringSync(encodeSceneDocument(document));
     await openStudio(tester);
-    await tester.tap(find.text('Scale'));
+    await tester.tap(find.byKey(const ValueKey('tool-scale')));
     await tester.pumpAndSettle();
     await tester.drag(
       find.byKey(const ValueKey('preview-panel')),
