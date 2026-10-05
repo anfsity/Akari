@@ -1,7 +1,8 @@
 :root {
   --sl-color-accent-low: #11352f;
-  --sl-color-accent: #53bca5;
+  --sl-color-accent: #71d5bb;
   --sl-color-accent-high: #b4e5d8;
+  --sl-font: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
 }
 :root[data-theme='light'] {
   --sl-color-accent-low: #d9f1e9;
@@ -17,4 +18,217 @@
 }
 .mermaid svg {
   height: auto;
+}
+
+html:has(.akari-hero) {
+  --sl-content-width: 78rem;
+  --akari-surface: #131c1b;
+  --akari-border: #2a3935;
+  background: radial-gradient(ellipse at 90% 12%, #17372b55, transparent 45%), #101615;
+}
+html[data-theme='light']:has(.akari-hero) {
+  --akari-surface: #ffffff;
+  --akari-border: #d7e2dc;
+  background: radial-gradient(ellipse at 90% 12%, #dcece0, transparent 45%), #f7f9f5;
+}
+.akari-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(2rem, 5vw, 4.5rem);
+  padding-block: 4rem 5.5rem;
+}
+.akari-hero-copy { min-width: 0; }
+.akari-eyebrow {
+  margin: 0;
+  color: var(--sl-color-accent-high);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+}
+.akari-hero-copy > .akari-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.akari-brand-mark { font-size: 1.9rem; line-height: 1; }
+.akari-hero h1 {
+  margin-block: 1.7rem 1.5rem;
+  font-size: clamp(2.3rem, 3.8vw, 3.4rem);
+  line-height: 1.12;
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  color: var(--sl-color-white);
+  text-wrap: balance;
+}
+.akari-hero h1 span { color: var(--sl-color-accent-high); }
+.akari-tagline {
+  max-width: 34rem;
+  margin: 0;
+  color: var(--sl-color-gray-2);
+  font-size: 1.08rem;
+  line-height: 1.85;
+}
+.akari-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-block: 2rem 1.1rem;
+}
+.akari-hero-actions a { border-radius: 0.6rem; font-weight: 600; }
+.akari-hero-note { margin: 0; color: var(--sl-color-gray-3); font-size: 0.78rem; }
+.akari-theme-concept { margin: 0; min-width: 0; }
+.akari-display {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 30rem;
+  overflow: hidden;
+  border: 1px solid #66867580;
+  border-radius: 1.2rem;
+  background: #153b33;
+  color: #f3f9f1;
+  box-shadow: 0 1.5rem 4rem #071e2526, inset 0 0 0 5px #ffffff05;
+  transform: rotate(-2deg);
+}
+.akari-landscape {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 90% 0%, #d9dd9a80, transparent 50%),
+    radial-gradient(ellipse at 5% 55%, #80a88790, transparent 65%),
+    linear-gradient(150deg, #244e46, #365e4c 45%, #152f30);
+}
+.akari-landscape::before, .akari-landscape::after {
+  content: '';
+  position: absolute;
+  width: 150%;
+  height: 70%;
+  border-radius: 50%;
+  transform: rotate(-30deg);
+}
+.akari-landscape::before {
+  left: -60%;
+  top: 54%;
+  background: linear-gradient(180deg, #9ba88090, #2c534c);
+  box-shadow: 0 -1px 0 #d0dcb640;
+}
+.akari-landscape::after {
+  left: 15%;
+  top: 65%;
+  background: linear-gradient(180deg, #507969, #193834);
+  box-shadow: 0 -1px 0 #c2d7b840;
+}
+.akari-display-bar, .akari-display-footer {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.3rem 1.5rem;
+  color: #e0eee1;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+}
+.akari-display-bar > :first-child { font-size: 1rem; font-weight: 600; letter-spacing: -0.03em; }
+.akari-display-footer { font-size: 0.55rem; }
+.akari-login-preview { position: relative; padding: 0.5rem 1rem 1rem; text-align: center; }
+.akari-clock { font-size: 3.6rem; font-weight: 350; line-height: 1.1; letter-spacing: -0.06em; }
+.akari-date { margin-top: 0.4rem; font-size: 0.7rem; color: #d6e3d4; }
+.akari-login-card {
+  width: min(15rem, 100%);
+  margin: 1.4rem auto 0;
+  padding: 1.2rem;
+  border: 1px solid #dbe8cf35;
+  border-radius: 0.9rem;
+  background: #172d2999;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0.5rem 2rem #0a242333;
+}
+.akari-avatar {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  margin: 0 auto 0.75rem;
+  border-radius: 50%;
+  background: #c5d6ab;
+  color: #243e31;
+  font-size: 1.3rem;
+}
+.akari-welcome { font-size: 0.65rem; color: #c6d4c1; }
+.akari-account { margin-top: 0.2rem; font-size: 1.05rem; font-weight: 500; }
+.akari-password {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding: 0.35rem 0.4rem 0.35rem 0.75rem;
+  border: 1px solid #ffffff25;
+  border-radius: 0.4rem;
+  background: #0d282633;
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+}
+.akari-submit {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 0.25rem;
+  background: #c5d6ab;
+  color: #243e31;
+  letter-spacing: 0;
+}
+.akari-session { margin-top: 0.9rem; font-size: 0.6rem; color: #ceddc8; }
+.akari-session span { padding-left: 0.4rem; }
+.akari-theme-concept figcaption {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.2rem;
+  color: var(--sl-color-gray-3);
+  font-size: 0.72rem;
+}
+.akari-caption-dot { width: 0.35rem; height: 0.35rem; background: var(--sl-color-accent); border-radius: 50%; }
+.sl-markdown-content .akari-section-intro {
+  max-width: 42rem;
+  margin-block: 1rem 2.5rem;
+}
+.sl-markdown-content .akari-section-intro h2 { margin-block: 0.8rem; font-size: 2rem; letter-spacing: -0.03em; }
+.sl-markdown-content .akari-section-intro > p:last-child { color: var(--sl-color-gray-2); font-size: 1.05rem; line-height: 1.8; }
+.sl-markdown-content .akari-features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-block: 0 4rem;
+}
+.akari-features section {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 2rem;
+  border: 1px solid var(--akari-border);
+  border-radius: 0.85rem;
+  background: var(--akari-surface);
+}
+.akari-feature-number { color: var(--sl-color-accent-high); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; }
+.sl-markdown-content .akari-features h3 { margin-block: 1rem 0; font-size: 1.35rem; line-height: 1.4; letter-spacing: -0.02em; }
+.sl-markdown-content .akari-features p { margin-block: 0.8rem 1.4rem; color: var(--sl-color-gray-2); line-height: 1.8; }
+.sl-markdown-content .akari-features a { margin-top: auto; color: var(--sl-color-accent-high); font-size: 0.85rem; text-decoration: none; }
+.akari-features a:hover { text-decoration: underline; }
+.akari-features a span { margin-left: 0.3rem; }
+@media (max-width: 55rem) {
+  .akari-hero { grid-template-columns: 1fr; gap: 2.5rem; padding-block: 2.5rem 3rem; }
+  .akari-hero h1 { font-size: clamp(2.1rem, 5.5vw, 3.4rem); }
+  .akari-theme-concept { width: min(100%, 34rem); margin-inline: auto; }
+  .akari-display { min-height: 28rem; transform: none; }
+}
+@media (max-width: 35rem) {
+  .sl-markdown-content .akari-features { grid-template-columns: 1fr; }
+  .akari-features section { padding: 1.5rem; }
+  .akari-hero h1 { letter-spacing: -0.035em; }
+  .akari-tagline { font-size: 1rem; }
+  .sl-markdown-content .akari-section-intro h2 { font-size: 1.6rem; }
 }
