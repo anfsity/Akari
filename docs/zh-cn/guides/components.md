@@ -1,17 +1,17 @@
 ---
 title: 开发主题组件
-description: 读取类型化宿主状态，同时保持身份验证归属清晰。
+description: 用 Flutter 编写主题组件，读取登录状态并响应用户操作。
 ---
 
 ## 组件工厂
 
-`ThemeDefinition.components` 接收一个 `GreeterThemeContext`，其中包含主题 token 和 `GreeterHost`。工厂返回 `GreeterThemeComponents`，通过 `build(context, node)` 将场景组件标识符映射到 Flutter widget。这些标识符仅对该工厂有意义；Scene 运行时不规定统一的 widget 目录。
+`ThemeDefinition.components` 是主题的组件工厂。它接收 `GreeterThemeContext`，从中取得样式参数和 `GreeterHost`，再返回 `GreeterThemeComponents`。运行时调用 `build(context, node)`，由工厂根据场景中的组件标识符创建 Flutter widget。标识符由主题自己定义，不需要遵循统一的组件列表。
 
-使用 `StandardGreeterComponents` 时，请沿用 fallback 场景支持的标识符。自行编写工厂时，确保场景和工厂对每个标识符的定义一致。节点的 `properties` 是由对应组件负责解释的字符串配置；应由组件在理解其含义的位置进行解析。
+使用 `StandardGreeterComponents` 时，可以沿用 fallback 场景中的标识符。自己写工厂时，确保场景里使用的每个标识符都有对应组件。节点的 `properties` 是字符串配置，具体含义和解析方式由组件决定。
 
-## 订阅一个区域
+## 读取需要显示的状态
 
-使用类型化 slot 订阅 widget 要显示的内容。例如，服务状态小组件只需订阅 `serviceSlots`：
+通过 slot 订阅组件需要的状态。例如，显示服务状态的标签只需订阅 `serviceSlots`：
 
 ```dart
 import 'package:flutter/material.dart';
@@ -32,16 +32,16 @@ class ServiceLabel extends StatelessWidget {
 }
 ```
 
-这样，账户、会话或电源状态的无关更新不会触发该标签重建。`SceneRuntime` 已为每个场景节点设置重绘边界。只有性能分析证明确有需要时，才添加额外边界。
+这样，账户、会话或电源状态变化时，这个标签无需重新构建。`SceneRuntime` 已经为每个节点设置了重绘边界；只有性能分析发现问题时，才需要添加额外的边界。
 
-## 分发语义操作
+## 响应用户操作
 
-组件调用宿主回调，例如 `onSelectUser`、`onSelectSession`、`onRespondToPrompt` 和 `onRequestPowerAction`。请使用对应 slot 启用控件，并保留原生键盘、焦点和无障碍行为。身份验证状态、传输对象和 D-Bus 调用属于登录功能层及后端。
+用户选择账户、切换桌面、提交密码或操作电源时，组件调用对应的宿主回调：`onSelectUser`、`onSelectSession`、`onRespondToPrompt` 和 `onRequestPowerAction`。根据对应 slot 的状态决定控件是否可用，并保留键盘操作、焦点和无障碍支持。登录功能层和后端会处理身份验证及 D-Bus 通信。
 
-凭据 widget 借用 `credentialController` 和 `credentialFocusNode`；它们由所有者释放，主题 widget 不得释放它们。不要将凭据文本复制到场景属性、视觉配置或日志。
+输入凭据的 widget 可以使用宿主提供的 `credentialController` 和 `credentialFocusNode`。它们由宿主管理和释放，主题组件不要调用它们的 `dispose`。密码等输入也不要复制到场景属性、样式配置或日志中。
 
-## 遵循挂载生命周期
+## 管理组件生命周期
 
-组件出现动画和预热机制可能会让隐藏节点继续保持挂载。隐藏期间的订阅和计时器应尽量轻量；widget 卸载时，释放组件自己创建的资源。动效 builder 借用由运行时驱动的动画，不拥有动画控制器。
+在进入、退出动画或预热期间，隐藏节点可能仍然挂载着。避免让隐藏组件的订阅和计时器做太多工作；组件卸载时，释放自己创建的资源。动效 builder 使用运行时提供的动画，动画控制器由运行时管理。
 
-精确类型请查阅 [API 参考](../reference/api.md)，所有权细节请查阅[前端架构](../architecture/frontend.md)。
+具体类型见 [API 参考](../reference/api.md)。各部分由谁管理、何时释放，见[前端架构](../architecture/frontend.md)。

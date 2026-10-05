@@ -2,7 +2,7 @@
 title: 主题包约定
 ---
 
-Akari 主题是独立的 Dart/Flutter package。内置项目位于 `themes/default/` 和 `themes/fallback/`；第三方项目可以放在仓库外。`packages/` 则包含平台模块。
+Akari 主题是独立的 Dart/Flutter 包。内置项目位于 `themes/default/` 和 `themes/fallback/`；第三方项目可以放在仓库外。`packages/` 则包含平台模块。
 
 ## 项目结构
 
@@ -19,11 +19,11 @@ my_theme/
   test/
 ```
 
-目录名与 package 名称互不相关。Akari 从 `pubspec.yaml` 中读取名称。例如，名为 `theme_ocean` 的 package 会从 `lib/theme.dart` 导出 `buildOceanTheme`。
+目录名可以与包名不同。Akari 从 `pubspec.yaml` 中读取名称。例如，名为 `theme_ocean` 的包会从 `lib/theme.dart` 导出 `buildOceanTheme`。
 
-主题依赖 `theme_sdk` 和 `scene`，并通过 `build_runner` 使用 `scene_codegen`。它可以明确复用 `greeter_components`，但不得导入其他具体主题。当前开发 SDK 使用 path dependency；外部项目须将依赖指向其 Akari SDK checkout。
+主题依赖 `theme_sdk` 和 `scene`，并通过 `build_runner` 使用 `scene_codegen`。需要通用组件时，可以依赖 `greeter_components`，但不要直接依赖其他主题。开发 SDK 目前使用路径依赖。仓库外的主题需要把这些依赖指向本地 Akari 仓库。
 
-`theme.dart` 会返回一个 `ThemeDefinition`，其中包含生成的 `SceneDocument`、`ThemeBundle` 和组件工厂。组件 ID 只对该工厂有效。资源属于主题 package，并使用 Flutter package 路径，例如 `packages/theme_ocean/assets/wallpaper.jpg`。
+`theme.dart` 会返回一个 `ThemeDefinition`，其中包含生成的 `SceneDocument`、`ThemeBundle` 和组件工厂。组件 ID 只对该工厂有效。资源属于主题包，并使用 Flutter 包路径，例如 `packages/theme_ocean/assets/wallpaper.jpg`。
 
 ## 构建与预览
 
@@ -41,9 +41,9 @@ fvm dart run tool/akari.dart preview --theme themes/default
 fvm dart run tool/akari.dart preview --theme /path/to/my_theme --dry-run
 ```
 
-CLI 会解析所选主题的依赖、生成场景源文件，并在 `build/tool/hosts/<encoded-canonical-theme-path>/<demo-or-real>/` 下创建宿主项目。该项目包含共享登录应用源代码、Linux runner、manifest 和入口文件；入口直接导入所选主题的 builder。主题构建不会修改平台 manifest。
+CLI 会解析所选主题的依赖、生成场景源文件，并在 `build/tool/hosts/<encoded-canonical-theme-path>/<demo-or-real>/` 下创建宿主项目。该项目包含共享登录应用源代码、Linux 原生运行器、manifest 和入口文件；入口直接导入所选主题的 builder。主题构建不会修改平台 manifest。
 
-`build` 默认使用 release 模式，同时构建前端和生产版 Rust 后端。`run --theme PATH` 会在私有 D-Bus 会话中启动完整登录界面，默认使用 Rust 模拟后端；`--backend real` 可选择生产传输。前端始终使用 D-Bus。`run` 直接管理所选主题的 Flutter 会话。
+`build` 默认使用 release 模式，同时构建前端和正式版 Rust 后端。`run --theme PATH` 会在私有 D-Bus 会话中启动完整登录界面，默认使用 Rust 模拟后端；`--backend real` 可选择真实后端通信。前端始终使用 D-Bus。`run` 直接管理所选主题的 Flutter 会话。
 
 `preview --theme PATH` 使用前端演示状态预览主题。两个命令默认运行在 debug 模式，并会在保存后重新加载 Dart 和资源变更。场景 JSON 修改会先执行增量代码生成；如果生成失败，会继续使用上一次可用主题。按 `r` 重新生成并加载，按 `R` 热重启，按 `q` 退出。profile/release 会话不支持热重载。两个命令都接受 `--jobs COUNT`。
 
@@ -55,11 +55,11 @@ Preview 直接在当前桌面中打开，不会启动嵌套合成器；默认使
 
 ## 仓库开发
 
-`generate-scenes` 和 `verify` 会扫描 `themes/` 下的项目，不要求主题名称固定。性能命令一次选择一个项目。每个项目由自身的 manifest 和 builder 入口标识；仓库内 package 名称必须唯一。
+`generate-scenes` 和 `verify` 会扫描 `themes/` 下的项目，不要求主题名称固定。性能命令一次选择一个项目。每个项目由自身的 manifest 和 builder 入口标识；仓库内包名称必须唯一。
 
-根项目提供共享应用代码。仓库测试直接注入主题 builder，调试入口 `tool/dev_main.dart` 则明确选择默认主题。性能测试数据属于各自的主题项目。构建外部主题只需要所选项目。
+根项目提供共享应用代码。仓库测试直接注入主题 builder，调试入口 `tool/dev_main.dart` 则选择默认主题。性能测试数据属于各自的主题项目。构建外部主题只需要所选项目。
 
-宿主项目会在多次运行间保留 Flutter 和原生构建缓存。共享应用源代码会链接到宿主；只有发生更改时才同步 Linux runner 文件。运行目录保存日志和报告，不会额外创建另一套构建。
+宿主项目会在多次运行间保留 Flutter 和原生构建缓存。共享应用源代码会链接到宿主；只有发生更改时才同步 Linux 原生运行器文件。运行目录保存日志和报告，不会额外创建另一套构建。
 
 Rust 模拟版和生产版构建使用独立且稳定的目标目录：`backend/target/akari-mock/` 和 `backend/target/akari-real/`。相同主题的命令使用进程锁串行运行；不同主题可以并行构建。
 
@@ -67,7 +67,7 @@ Rust 模拟版和生产版构建使用独立且稳定的目标目录：`backend/
 
 ## 性能约定
 
-主题负责性能入口、UI 交互、测量、基线、阈值和跟踪分析。Akari 不要求指定 UI selector 或指标字段。主题可在自己的 `pubspec.yaml` 中显式声明支持的操作：
+每个主题自行定义性能测试命令、交互步骤、测量指标、基线和通过标准。Akari 不强制使用某种控件选择器或指标字段。在主题的 `pubspec.yaml` 中声明支持的命令：
 
 ```yaml
 perf:
@@ -76,14 +76,14 @@ perf:
   trace: [dart, run, perf/trace.dart]
 ```
 
-每个入口都是非空参数数组。命令会在主题项目中运行，不会通过隐式 shell 执行。以 `dart` 或 `flutter` 开头的命令使用仓库配置的 SDK；其他可执行文件按系统正常路径解析。未设置入口表示不支持相应操作；Akari 不会回退到其他主题的测试。
+每个命令用一个非空参数数组表示。CLI 直接在主题目录中执行它，不经过 shell。以 `dart` 或 `flutter` 开头的命令使用仓库配置的 SDK；其他可执行文件按系统正常路径解析。未设置入口表示不支持相应操作；Akari 不会回退到其他主题的测试。
 
 ```sh
 fvm dart run tool/akari.dart verify-perf --theme /path/to/theme -- --custom-option value
 fvm dart run tool/akari.dart trace-perf --theme /path/to/theme
 ```
 
-CLI 会将 `--` 后的参数原样转发，包括 `--help`，并通过 `AKARI_PERF_OUTPUT_DIR` 提供已存在的绝对输出目录。命令退出码决定测试是否成功：0 表示成功，非零表示失败。成功命令还必须在该目录中生成有效的 `result.json`。即使命令随后失败，也可以先发布结果，以保留已登记的诊断信息。
+CLI 会将 `--` 后的参数原样转发，包括 `--help`，并通过 `AKARI_PERF_OUTPUT_DIR` 提供已存在的绝对输出目录。命令退出码决定测试是否成功：0 表示成功，非零表示失败。成功命令还必须在该目录中生成有效的 `result.json`。即使命令最终失败，也可以先写入结果文件，保留诊断信息。
 
 ```json
 {
