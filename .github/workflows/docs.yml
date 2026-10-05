@@ -1,33 +1,16 @@
 name: Documentation
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'docs/**'
-      - 'packages/theme_sdk/**'
-      - 'packages/scene/**'
-      - 'packages/scene_schema/**'
-      - 'packages/greeter_components/**'
-      - 'scripts/build-api-docs.sh'
-      - 'scripts/verify-docs.py'
-      - 'dartdoc_options.yaml'
-      - '.github/workflows/docs.yml'
-  pull_request:
-    paths:
-      - 'docs/**'
-      - 'packages/theme_sdk/**'
-      - 'packages/scene/**'
-      - 'packages/scene_schema/**'
-      - 'packages/greeter_components/**'
-      - 'scripts/build-api-docs.sh'
-      - 'scripts/verify-docs.py'
-      - 'dartdoc_options.yaml'
-      - '.github/workflows/docs.yml'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_ref:
+        description: Source revision to build for a publication branch.
+        required: true
+        type: string
 
 concurrency:
-  group: documentation-${{ github.ref }}
+  group: documentation-pages
   cancel-in-progress: true
 
 permissions:
@@ -38,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
       - uses: actions/setup-node@v7.0.0
         with:
           node-version: '24'
@@ -62,7 +47,7 @@ jobs:
           include-hidden-files: true
 
   publish:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/gh-pages'
     needs: build
     runs-on: ubuntu-latest
     permissions:

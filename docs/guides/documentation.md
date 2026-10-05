@@ -59,13 +59,25 @@ from examples.
 
 ## GitHub Pages
 
-The website is hosted at `https://anfsity.github.io/Mozais/`. Main-branch pushes
-that change documentation or API source trigger the documentation workflow.
+The website is hosted at `https://anfsity.github.io/Mozais/`. Pushes to `gh-pages`
+or manual workflow runs trigger the documentation workflow.
 The workflow builds the handbook and Dart reference, verifies the output, and
 deploys a Pages artifact directly using GitHub's official deployment actions.
 
-GitHub Pages uses **GitHub Actions** as its publishing source. The initial
-publication uses an independent `gh-pages` branch containing the locally
-verified static build and a deployment workflow, so unfinished main-branch
-history does not need to be pushed. Once the source workflow is pushed to main,
-main-branch builds update the same website directly.
+GitHub Pages uses **GitHub Actions** as its publishing source. The build and
+deployment implementation lives in `.github/workflows/docs.yml` on `main`.
+It also accepts reusable workflow calls with an explicit `source_ref`.
+Manual **Documentation** runs on `main` build their selected revision.
+Main-branch pushes and pull requests do not automatically start this workflow.
+
+The `gh-pages` branch contains a small publication workflow and a README,
+without generated HTML, API pages, or search assets. Pushing that branch or
+running its **Publish documentation** workflow manually calls the main workflow
+with `source_ref: main`, rebuilding and deploying the latest main source. It
+does not publish files directly from the branch. Main and publication-branch
+runs share one publication concurrency group.
+
+The initial static snapshot remains in the branch's history for recovery.
+Subsequent publications upload the verified `docs/site/dist/` directory as a
+Pages artifact. Keep `dist/`, `public/api/`, and `node_modules/` out of commits;
+the source checkout's ignore rules already exclude them.
