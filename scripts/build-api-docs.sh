@@ -2,17 +2,17 @@
 set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-flutter_bin="${MOZAIS_FLUTTER_BIN:-$repo_root/.fvm/flutter_sdk/bin/flutter}"
+flutter_bin="${AKARI_FLUTTER_BIN:-$repo_root/.fvm/flutter_sdk/bin/flutter}"
 if [[ "$flutter_bin" != /* ]]; then
   flutter_bin="$repo_root/$flutter_bin"
 fi
-dart_bin="${MOZAIS_DART_BIN:-$(dirname -- "$flutter_bin")/dart}"
+dart_bin="${AKARI_DART_BIN:-$(dirname -- "$flutter_bin")/dart}"
 if [[ "$dart_bin" != /* ]]; then
   dart_bin="$repo_root/$dart_bin"
 fi
 
 if [[ ! -x "$flutter_bin" || ! -x "$dart_bin" ]]; then
-  printf '%s\n' 'Run fvm install, or set MOZAIS_FLUTTER_BIN and MOZAIS_DART_BIN to SDK executables.' >&2
+  printf '%s\n' 'Run fvm install, or set AKARI_FLUTTER_BIN and AKARI_DART_BIN to SDK executables.' >&2
   exit 1
 fi
 

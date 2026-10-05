@@ -54,7 +54,7 @@ static GtkWindow* create_window(MyApplication* self, GdkMonitor* monitor) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(self)));
 
-  gtk_window_set_title(window, "Mozais Greeter");
+  gtk_window_set_title(window, "Akari Greeter");
   // The greeter owns the whole display; compositor border rules cannot remove
   // a GTK client-side header. Windowed previews use the desktop's own scale.
   gtk_window_set_decorated(window, FALSE);
@@ -76,7 +76,7 @@ static GtkWindow* create_window(MyApplication* self, GdkMonitor* monitor) {
     g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
     self->display_channel =
         fl_method_channel_new(fl_engine_get_binary_messenger(self->engine),
-                              "mozais/displays", FL_METHOD_CODEC(codec));
+                              "akari/displays", FL_METHOD_CODEC(codec));
   } else {
     view = fl_view_new_for_engine(self->engine);
   }
@@ -170,11 +170,11 @@ static void my_application_activate(GApplication* application) {
     gtk_window_present(self->primary_window);
     return;
   }
-  if (g_strcmp0(g_getenv("MOZAIS_WINDOW_MODE"), "windowed") == 0) {
+  if (g_strcmp0(g_getenv("AKARI_WINDOW_MODE"), "windowed") == 0) {
     create_window(self, nullptr);
     return;
   }
-  if (g_strcmp0(g_getenv("MOZAIS_DISPLAY_MODE"), "single") == 0) {
+  if (g_strcmp0(g_getenv("AKARI_DISPLAY_MODE"), "single") == 0) {
     gtk_window_fullscreen(create_window(self, nullptr));
     return;
   }

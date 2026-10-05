@@ -1,4 +1,4 @@
-/// Optional reusable visual components for compiled Mozais themes.
+/// Optional reusable visual components for compiled Akari themes.
 ///
 /// [StandardGreeterComponents] implements the component identifiers used by the
 /// fallback theme. A theme opts into this factory explicitly; scene and SDK

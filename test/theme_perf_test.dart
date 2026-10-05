@@ -10,7 +10,7 @@ void main() {
   late Directory temporary;
 
   setUp(() async {
-    temporary = await Directory.systemTemp.createTemp('mozais-theme-perf-');
+    temporary = await Directory.systemTemp.createTemp('akari-theme-perf-');
   });
   tearDown(() => temporary.delete(recursive: true));
 

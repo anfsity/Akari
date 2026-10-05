@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 source "$script_dir/lib.sh"
-repo_root="$(mozais_repo_root)"
+repo_root="$(akari_repo_root)"
 missing=0
 
 check_command() {
@@ -17,7 +17,7 @@ check_command() {
   fi
 }
 
-printf '%s\n' "Mozais toolchain: $repo_root"
+printf '%s\n' "Akari toolchain: $repo_root"
 if [[ ! -f "$repo_root/pubspec.yaml" ]]; then
   printf 'miss %-20s pubspec.yaml is missing\n' project
   missing=1
@@ -57,8 +57,8 @@ fi
 
 flutter_command=(fvm flutter)
 dart_command=(fvm dart)
-custom_flutter="${MOZAIS_FLUTTER_BIN:-}"
-custom_dart="${MOZAIS_DART_BIN:-}"
+custom_flutter="${AKARI_FLUTTER_BIN:-}"
+custom_dart="${AKARI_DART_BIN:-}"
 
 if [[ -n "$custom_flutter" ]]; then
   if [[ "$custom_flutter" != /* ]]; then

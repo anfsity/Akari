@@ -1,4 +1,4 @@
-/// The reusable Mozais greeter UI: feature and scene composition.
+/// The reusable Akari greeter UI: feature and scene composition.
 ///
 /// This library has no backend dependency. The executable or a development
 /// host supplies a `GreeterGateway` and a `SessionStore`.

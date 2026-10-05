@@ -1,5 +1,5 @@
 name: scene_codegen
-description: Build-time code generator for Mozais scene documents.
+description: Build-time code generator for Akari scene documents.
 publish_to: none
 
 environment:

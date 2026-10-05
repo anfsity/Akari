@@ -69,10 +69,10 @@ pub struct SessionCatalog {
 
 impl Default for SessionCatalog {
     fn default() -> Self {
-        let wayland_root = env::var_os("MOZAIS_WAYLAND_SESSIONS")
+        let wayland_root = env::var_os("AKARI_WAYLAND_SESSIONS")
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("/usr/share/wayland-sessions"));
-        let x11_root = env::var_os("MOZAIS_X11_SESSIONS")
+        let x11_root = env::var_os("AKARI_X11_SESSIONS")
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("/usr/share/xsessions"));
 
@@ -400,7 +400,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("clock before epoch")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("mozais-sessions-{suffix}"));
+        let root = std::env::temp_dir().join(format!("akari-sessions-{suffix}"));
         fs::create_dir_all(&root).unwrap();
         root
     }
@@ -497,8 +497,8 @@ mod tests {
     #[test]
     fn missing_roots_are_empty() {
         let catalog = SessionCatalog::from_roots(
-            PathBuf::from("/mozais/path-that-does-not-exist"),
-            PathBuf::from("/mozais/another-missing-path"),
+            PathBuf::from("/akari/path-that-does-not-exist"),
+            PathBuf::from("/akari/another-missing-path"),
         );
 
         assert!(catalog.list().unwrap().is_empty());

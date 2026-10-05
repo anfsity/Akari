@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class SwaySessionTest(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory(prefix='mozais-sway-session-')
+        temporary = tempfile.TemporaryDirectory(prefix='akari-sway-session-')
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.bin = self.root / 'bin'
@@ -26,7 +26,7 @@ import json, os, pathlib, re, signal, socket, subprocess, sys, time
 name = pathlib.Path(sys.argv[0]).name
 root = pathlib.Path(os.environ['SESSION_TEST_ROOT'])
 runtime = pathlib.Path(os.environ['XDG_RUNTIME_DIR'])
-profile = json.loads(os.environ['MOZAIS_DISPLAY_PROFILE_JSON'])
+profile = json.loads(os.environ['AKARI_DISPLAY_PROFILE_JSON'])
 prefix = 'HEADLESS' if os.environ.get('WLR_BACKENDS') == 'headless' else 'WL'
 outputs = []
 for index, source in enumerate(profile['outputs'], 1):
@@ -75,7 +75,7 @@ elif name == 'swaymsg':
     else:
         print(json.dumps({'type': 'root', 'nodes': [
             {'type': 'output', 'name': output['name'], 'nodes': [
-                {'type': 'con', 'app_id': 'dev.mozais.greeter'}]}
+                {'type': 'con', 'app_id': 'dev.akari.greeter'}]}
             for output in outputs]}))
 elif name == 'hyprctl':
     (root / 'hypr-env.json').write_text(json.dumps(dict(os.environ)))
@@ -122,11 +122,11 @@ elif name == 'app':
                         'selection': 'reference', 'custom': False}
         self.environment = {**os.environ, 'PATH': f'{self.bin}:{os.environ["PATH"]}',
                             'SESSION_TEST_ROOT': str(self.root),
-                            'MOZAIS_DISPLAY_PROFILE_JSON': json.dumps(self.profile),
+                            'AKARI_DISPLAY_PROFILE_JSON': json.dumps(self.profile),
                             'WAYLAND_DISPLAY': 'outer-wayland',
                             'XDG_RUNTIME_DIR': str(self.root / 'outer'),
                             'SWAYSOCK': 'outer-sway-socket',
-                            'MOZAIS_DISPLAY_SOURCE': 'greetd-login'}
+                            'AKARI_DISPLAY_SOURCE': 'greetd-login'}
         self.command = [sys.executable, str(ROOT / 'scripts/sway-session.py'),
                         '--log-dir', str(self.root / 'session'), '--backend', 'headless',
                         '--', str(self.bin / 'app')]
@@ -158,8 +158,8 @@ elif name == 'app':
         self.assertEqual(Path(report['screenshots'][0]).read_bytes(), b'inner screenshot')
         app_environment = json.loads((self.root / 'app-env.json').read_text())
         self.assertNotEqual(app_environment['SWAYSOCK'], 'outer-sway-socket')
-        self.assertNotIn('MOZAIS_DISPLAY_SOURCE', app_environment)
-        self.assertEqual(app_environment['MOZAIS_WINDOW_MODE'], 'fullscreen')
+        self.assertNotIn('AKARI_DISPLAY_SOURCE', app_environment)
+        self.assertEqual(app_environment['AKARI_WINDOW_MODE'], 'fullscreen')
         self.assertIn('theme started', (self.root / 'session/flutter.log').read_text())
         self.assert_processes_stopped()
 
@@ -176,7 +176,7 @@ elif name == 'app':
     def test_fractional_scale_screenshots_request_the_output_pixel_scale(self):
         self.profile['outputs'][0]['scale'] = 1.6
         self.profile['outputs'][0]['rect'].update(width=1200, height=675)
-        result = self.run_session(MOZAIS_DISPLAY_PROFILE_JSON=json.dumps(self.profile))
+        result = self.run_session(AKARI_DISPLAY_PROFILE_JSON=json.dumps(self.profile))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(json.loads((self.root / 'grim-arguments.json').read_text())[:2],
                          ['-s', '1.6'])
@@ -232,7 +232,7 @@ elif name == 'app':
         second.update(name='second', scale=1)
         second['rect'].update(x=1200, width=1920, height=1080)
         self.profile['outputs'].append(second)
-        result = self.run_hyprland_session(MOZAIS_DISPLAY_PROFILE_JSON=json.dumps(self.profile))
+        result = self.run_hyprland_session(AKARI_DISPLAY_PROFILE_JSON=json.dumps(self.profile))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         report = self.get_report()
         self.assertTrue(report['matched'])

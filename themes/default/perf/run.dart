@@ -7,7 +7,7 @@ import '../../../tool/src/theme_project.dart';
 
 Future<void> main(List<String> arguments) async {
   try {
-    final output = Directory(Platform.environment['MOZAIS_PERF_OUTPUT_DIR']!);
+    final output = Directory(Platform.environment['AKARI_PERF_OUTPUT_DIR']!);
     if (arguments
         .skip(1)
         .any((argument) => argument == '--help' || argument == '-h')) {
@@ -53,11 +53,11 @@ Future<void> main(List<String> arguments) async {
         'linux',
         '--profile',
         '--no-dds',
-        '--dart-define=MOZAIS_BACKEND=demo',
-        '--dart-define=MOZAIS_PERF_REPORT_PATH=$reportPath',
+        '--dart-define=AKARI_BACKEND=demo',
+        '--dart-define=AKARI_PERF_REPORT_PATH=$reportPath',
         if (options.trace) ...[
-          '--dart-define=MOZAIS_PERF_TRACE_TIMELINE=true',
-          '--dart-define=MOZAIS_PERF_TIMELINE_PATH=$timelinePath',
+          '--dart-define=AKARI_PERF_TRACE_TIMELINE=true',
+          '--dart-define=AKARI_PERF_TIMELINE_PATH=$timelinePath',
         ],
         '--driver=${themeDirectory.path}/perf/test_driver/integration_test.dart',
         '--target=${themeDirectory.path}/perf/integration_test/scene_performance_test.dart',

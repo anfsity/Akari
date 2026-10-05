@@ -8,13 +8,13 @@ Run these commands from the repository root after [environment setup](installati
 ## Preview a theme
 
 ```sh
-fvm dart run tool/mozais.dart preview --theme themes/fallback
+fvm dart run tool/akari.dart preview --theme themes/fallback
 ```
 
 The fallback theme is a small, static example. To preview the default theme:
 
 ```sh
-fvm dart run tool/mozais.dart preview --theme themes/default
+fvm dart run tool/akari.dart preview --theme themes/default
 ```
 
 Preview uses simulated frontend state and does not require a backend. It opens
@@ -28,14 +28,14 @@ and reloads, `R` restarts, and `q` quits.
 ## Run the mock backend
 
 ```sh
-fvm dart run tool/mozais.dart run --theme themes/fallback
+fvm dart run tool/akari.dart run --theme themes/fallback
 ```
 
 This starts the Flutter greeter and Rust mock backend on a private D-Bus session.
 It exercises the same frontend transport as production. The mock conversation
 accepts `password`; it does not authenticate a system account or launch a real
 desktop session. The greeter defaults to fullscreen; use
-`MOZAIS_WINDOW_MODE=windowed` before the command for a windowed session.
+`AKARI_WINDOW_MODE=windowed` before the command for a windowed session.
 
 Fullscreen renders the same login state on all connected monitors. Follow
 [display and scaling testing](../guides/display-testing.md) to check focus,
@@ -44,7 +44,7 @@ hotplug, a nested Sway session, or fixed-resolution screenshots.
 ## Build the production bundle
 
 ```sh
-fvm dart run tool/mozais.dart build --theme themes/fallback --jobs 4
+fvm dart run tool/akari.dart build --theme themes/fallback --jobs 4
 ```
 
 Build defaults to release mode and builds both the frontend and production Rust

@@ -155,7 +155,7 @@ class SceneEditor extends ChangeNotifier {
     final source = '$encoded\n';
     // A failed write must leave the authored file intact. A sibling temporary
     // file keeps the final rename on the same filesystem.
-    final temporaryDirectory = file.parent.createTempSync('.mozais-studio-');
+    final temporaryDirectory = file.parent.createTempSync('.akari-studio-');
     try {
       final temporary = File('${temporaryDirectory.path}/scene.json');
       temporary.writeAsStringSync(source, flush: true);

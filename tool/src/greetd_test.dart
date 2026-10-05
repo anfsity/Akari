@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'cli_definition.dart';
 
-const greetdTestInstallationPath = '/opt/mozais-test';
+const greetdTestInstallationPath = '/opt/akari-test';
 
 Future<int> runGreetdTestCommand(
   CliCommand command,
@@ -79,7 +79,7 @@ Future<int> runGreetdTestCommand(
   // settings, resolving relative paths before it changes working directory.
   final sdkEnvironment = <String>[];
   if (command.name == 'greetd-test install') {
-    for (final name in ['MOZAIS_FLUTTER_BIN', 'MOZAIS_DART_BIN']) {
+    for (final name in ['AKARI_FLUTTER_BIN', 'AKARI_DART_BIN']) {
       final value = Platform.environment[name];
       if (value != null && value.isNotEmpty) {
         final binary = File(value);
@@ -108,7 +108,7 @@ Future<int> runGreetdTestCommand(
   }
   if (!script.existsSync()) {
     throw FileSystemException(
-      'Test script is missing; run mozais greetd-test install first',
+      'Test script is missing; run akari greetd-test install first',
       script.path,
     );
   }
@@ -179,8 +179,8 @@ Future<Map<String, Object?>> getGreetdTestStatus(
     '--no-pager',
     '--property=Id,LoadState,ActiveState,SubState,Result',
     'sddm.service',
-    'mozais-test.service',
-    'mozais-restore.timer',
+    'akari-test.service',
+    'akari-restore.timer',
   ];
   final result = await Process.run('systemctl', arguments);
   final output = (result.stdout as String).trim();

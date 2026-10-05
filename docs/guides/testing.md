@@ -6,8 +6,8 @@ description: Choose unit, mock integration, compositor, and performance checks.
 ## Repository verification
 
 ```sh
-fvm dart run tool/mozais.dart verify
-fvm dart run tool/mozais.dart verify --theme themes/fallback
+fvm dart run tool/akari.dart verify
+fvm dart run tool/akari.dart verify --theme themes/fallback
 ```
 
 Verification checks shared code and the Rust backend, and runs tests for
@@ -22,7 +22,7 @@ performance. Avoid tests that encode exact visual placement.
 ## Mock integration
 
 ```sh
-fvm dart run tool/mozais.dart run --theme themes/fallback
+fvm dart run tool/akari.dart run --theme themes/fallback
 ```
 
 Use this for the complete frontend/D-Bus path without system PAM calls. Use
@@ -31,8 +31,8 @@ Use this for the complete frontend/D-Bus path without system PAM calls. Use
 ## Compositor and real login
 
 ```sh
-fvm dart run tool/mozais.dart run sway --display-profile reference
-fvm dart run tool/mozais.dart run sway --display-profile reference --sway-backend headless
+fvm dart run tool/akari.dart run sway --display-profile reference
+fvm dart run tool/akari.dart run sway --display-profile reference --sway-backend headless
 ```
 
 The nested/headless session owns a private backend, bus, compositor, and frontend.
@@ -46,14 +46,14 @@ its own installation, TTY preflight, and recovery lifecycle.
 ## Native display regressions
 
 These opt-in scripts start real Flutter windows in isolated compositors. They
-are separate from `mozais verify` and retain logs and screenshots in the printed
+are separate from `akari verify` and retain logs and screenshots in the printed
 temporary directory. Install Sway, `swaymsg`, and grim; the multi-display script
 also needs wtype.
 
 For monitor lifetime and focus checks, first run a release demo preview:
 
 ```sh
-fvm dart run tool/mozais.dart preview --theme themes/default --mode release \
+fvm dart run tool/akari.dart preview --theme themes/default --mode release \
   --report build/tool/native-preview.json
 ```
 
@@ -75,7 +75,7 @@ are covered by `test/multi_display_test.dart` in the normal Flutter test suite.
 For the nested output matrix, prepare a greeter with its mock D-Bus backend:
 
 ```sh
-fvm dart run tool/mozais.dart run sway --theme themes/default \
+fvm dart run tool/akari.dart run sway --theme themes/default \
   --display-profile reference --sway-backend headless \
   --report build/tool/native-sway.json
 ```
@@ -99,8 +99,8 @@ for those behaviors.
 ## Performance
 
 ```sh
-fvm dart run tool/mozais.dart verify-perf --theme themes/default
-fvm dart run tool/mozais.dart trace-perf --theme themes/default
+fvm dart run tool/akari.dart verify-perf --theme themes/default
+fvm dart run tool/akari.dart trace-perf --theme themes/default
 ```
 
 Themes opt into these commands through their own manifest. Their runner owns

@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:dbus/dbus.dart';
 import 'package:greeter_ui/greeter_ui.dart';
 
-const _busName = 'io.mozais.Greeter';
-const _objectPath = '/io/mozais/Greeter';
-const _interfaceName = 'io.mozais.Greeter1';
+const _busName = 'io.akari.Greeter';
+const _objectPath = '/io/akari/Greeter';
+const _interfaceName = 'io.akari.Greeter1';
 
 /// D-Bus implementation of the Feature gateway.
 ///

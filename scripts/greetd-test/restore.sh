@@ -6,17 +6,17 @@ if [[ "$EUID" -ne 0 ]]; then
   exit 1
 fi
 if [[ "${1:-}" != --service-stopped ]]; then
-  systemctl stop mozais-test.service || true
+  systemctl stop akari-test.service || true
 fi
 # ExecStopPost must not stop its own service: systemctl would wait for this
 # very process. Start SDDM before disarming the independent recovery timer.
 systemctl start sddm.service
 systemctl is-active --quiet sddm.service
-systemctl stop mozais-restore.timer || true
+systemctl stop akari-restore.timer || true
 umask 022
 run_dir="$(readlink -f "$test_root/current-run")"
 if [[ -f "$run_dir/started-at" ]]; then
-  journalctl -u mozais-test.service -u sddm.service \
+  journalctl -u akari-test.service -u sddm.service \
     --since="@$(cat "$run_dir/started-at")" --no-pager -o short-iso-precise \
     > "$run_dir/journal.log"
   printf 'Restored SDDM at %s; service result: %s\n' \

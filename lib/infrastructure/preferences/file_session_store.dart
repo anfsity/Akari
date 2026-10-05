@@ -74,9 +74,9 @@ class FileSessionStore implements SessionStore {
   ///
   /// Complies with the Linux XDG Base Directory specification, falling back
   /// in the following priority order:
-  /// 1. `$XDG_STATE_HOME/mozais/greeter.json`
-  /// 2. `$HOME/.local/state/mozais/greeter.json`
-  /// 3. `/tmp/mozais/greeter.json` (fallback for restricted system accounts
+  /// 1. `$XDG_STATE_HOME/akari/greeter.json`
+  /// 2. `$HOME/.local/state/akari/greeter.json`
+  /// 3. `/tmp/akari/greeter.json` (fallback for restricted system accounts
   ///    without a defined home directory).
   static File _defaultFile() {
     final environment = Platform.environment;
@@ -87,6 +87,6 @@ class FileSessionStore implements SessionStore {
         : home != null && home.isNotEmpty
         ? '$home/.local/state'
         : Directory.systemTemp.path;
-    return File('$base/mozais/greeter.json');
+    return File('$base/akari/greeter.json');
   }
 }

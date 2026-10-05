@@ -8,8 +8,8 @@ Future<void> installCli({
   required File rcFile,
   required String shell,
 }) async {
-  final launcher = File('${prefix.path}/bin/mozais');
-  const marker = '# Mozais CLI launcher';
+  final launcher = File('${prefix.path}/bin/akari');
+  const marker = '# Akari CLI launcher';
   if (await launcher.exists() &&
       !(await launcher.readAsString()).contains(marker)) {
     throw FileSystemException(
@@ -17,7 +17,7 @@ Future<void> installCli({
       launcher.path,
     );
   }
-  final support = Directory('${prefix.path}/share/mozais');
+  final support = Directory('${prefix.path}/share/akari');
   await support.create(recursive: true);
   await launcher.parent.create(recursive: true);
   await launcher.writeAsString('''#!/usr/bin/env bash
@@ -25,7 +25,7 @@ set -euo pipefail
 $marker
 repo_root=${encodeShellArgument(repoRoot.path)}
 source "\$repo_root/scripts/lib.sh"
-mozais_run_dev_cli "\$repo_root" "\$@"
+akari_run_dev_cli "\$repo_root" "\$@"
 ''');
   final chmod = await Process.run('chmod', ['+x', launcher.path]);
   if (chmod.exitCode != 0) {
@@ -37,7 +37,7 @@ mozais_run_dev_cli "\$repo_root" "\$@"
   final completion = File('${support.path}/completion.$shell');
   await completion.writeAsString(getShellCompletion(shell));
   final environment = File('${support.path}/env.$shell');
-  await environment.writeAsString('''# Mozais CLI environment
+  await environment.writeAsString('''# Akari CLI environment
 case ":\$PATH:" in
   *:${encodeShellArgument(launcher.parent.path)}:*) ;;
   *) export PATH=${encodeShellArgument(launcher.parent.path)}:"\$PATH" ;;
@@ -50,7 +50,7 @@ ${shell == 'zsh' ? 'if (( ! \$+functions[compdef] )); then\n  autoload -Uz compi
       'if [ -f ${encodeShellArgument(environment.path)} ]; then . ${encodeShellArgument(environment.path)}; fi';
   if (!startup.split('\n').contains(registration)) {
     await rcFile.writeAsString(
-      '\n# Mozais CLI\n$registration\n',
+      '\n# Akari CLI\n$registration\n',
       mode: FileMode.append,
     );
   }

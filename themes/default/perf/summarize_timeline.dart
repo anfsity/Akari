@@ -14,10 +14,10 @@ Future<void> main(List<String> arguments) async {
     throw const FormatException('Timeline contains no Flutter BUILD events.');
   }
   final phaseScopes = events
-      .where((event) => event.name.startsWith('MOZAIS_PERF.'))
+      .where((event) => event.name.startsWith('AKARI_PERF.'))
       .toList();
   if (phaseScopes.isEmpty) {
-    throw const FormatException('Timeline contains no Mozais phase markers.');
+    throw const FormatException('Timeline contains no Akari phase markers.');
   }
 
   final threadCounts = <int, int>{};

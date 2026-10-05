@@ -22,10 +22,10 @@ if [[ "$EUID" -ne 0 ]]; then
   exit 1
 fi
 
-exec 9>/run/lock/mozais-test.lock
+exec 9>/run/lock/akari-test.lock
 flock -n 9 || { echo 'Another test setup is running.' >&2; exit 1; }
 IFS=: read -r log_user _ log_uid _ _ _ _ < <(getent passwd "${SUDO_USER:-root}")
-log_root="${log_root:-/var/tmp/mozais-greetd-test-$log_uid}"
+log_root="${log_root:-/var/tmp/akari-greetd-test-$log_uid}"
 if [[ "$log_root" != /* ]]; then
   echo '--log-dir must be an absolute path.' >&2
   exit 1
@@ -65,7 +65,7 @@ if [[ "$(systemctl get-default)" != graphical.target ]] ||
   echo 'Expected graphical.target with SDDM enabled; boot configuration differs.'
   exit 1
 fi
-for unit in greetd.service mozais-test.service mozais-restore.timer; do
+for unit in greetd.service akari-test.service akari-restore.timer; do
   if systemctl is-active --quiet "$unit"; then
     echo "$unit is already active. Restore the previous test first."
     exit 1
@@ -100,14 +100,14 @@ ln -sfn "$run_dir" "$test_root/current-run"
 
 # Recovery belongs to systemd, so it survives this shell and runs after service
 # exit as well as on the deadline. Arm it before touching the display manager.
-systemd-run --unit=mozais-restore --collect \
+systemd-run --unit=akari-restore --collect \
   --on-active=10m --timer-property=AccuracySec=1s "$test_root/restore.sh"
 trap 'status=$?; trap - EXIT; if (( status != 0 )); then "$test_root/restore.sh"; fi' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-systemctl is-active --quiet mozais-restore.timer
+systemctl is-active --quiet akari-restore.timer
 systemctl stop sddm.service
-systemd-run --unit=mozais-test --collect \
+systemd-run --unit=akari-test --collect \
   --property=Type=exec \
   --property=Conflicts=getty@tty1.service \
   --property=After=systemd-user-sessions.service \
@@ -117,6 +117,6 @@ systemd-run --unit=mozais-test --collect \
   --property=TimeoutStopSec=30s \
   --property="ExecStopPost=$test_root/restore.sh --service-stopped" \
   /usr/bin/greetd --config "$test_root/greetd.toml"
-echo "Mozais is on tty1; power actions call logind; output scale is $scale."
+echo "Akari is on tty1; power actions call logind; output scale is $scale."
 echo "Recovery runs after service exit or in 10 minutes. Logs: $run_dir"
 echo "To restore sooner: Ctrl+Alt+F3, then sudo $test_root/restore.sh"

@@ -2,12 +2,12 @@
 set -euo pipefail
 source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$source_dir/../.." && pwd)"
-test_root="${1:?Installation directory is required. Use mozais greetd-test install.}"
+test_root="${1:?Installation directory is required. Use akari greetd-test install.}"
 if [[ "$EUID" -ne 0 ]]; then
   echo 'Run this installer with sudo to build and install the test artifacts.' >&2
   exit 1
 fi
-for unit in mozais-test.service mozais-restore.timer; do
+for unit in akari-test.service akari-restore.timer; do
   if systemctl is-active --quiet "$unit"; then
     echo "$unit is active. Restore before installing." >&2
     exit 1
@@ -22,7 +22,7 @@ runuser -u "$build_user" -- bash -c '
   cd -- "$1"
   source scripts/lib.sh
   export PATH="$HOME/.cargo/bin:$PATH"
-  mozais_run_dev_cli "$1" build --theme "$1/themes/default" --mode release --platform linux --jobs 4
+  akari_run_dev_cli "$1" build --theme "$1/themes/default" --mode release --platform linux --jobs 4
 ' bash "$repo_root"
 
 backend="$repo_root/build/out/backend"

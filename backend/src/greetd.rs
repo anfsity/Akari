@@ -587,7 +587,7 @@ mod tests {
         cancellation.cancel();
 
         let result =
-            GreetdClient::connect_at("/mozais/path-that-does-not-exist.sock", &cancellation).await;
+            GreetdClient::connect_at("/akari/path-that-does-not-exist.sock", &cancellation).await;
 
         assert!(result.is_err());
     }
@@ -892,7 +892,7 @@ mod tests {
             .expect("system clock should be valid")
             .as_nanos();
         let path = std::env::temp_dir().join(format!(
-            "mozais-greetd-test-{}-{nonce}.sock",
+            "akari-greetd-test-{}-{nonce}.sock",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&path);

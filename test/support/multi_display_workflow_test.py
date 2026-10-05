@@ -24,7 +24,7 @@ def main():
     if not executable.is_file() or not os.access(executable, os.X_OK):
         parser.error('--app must be an executable demo greeter bundle')
 
-    root = Path(tempfile.mkdtemp(prefix='mozais-displays-'))
+    root = Path(tempfile.mkdtemp(prefix='akari-displays-'))
     runtime = root / 'runtime'
     runtime.mkdir(mode=0o700)
     config = root / 'sway.conf'
@@ -39,11 +39,11 @@ def main():
     env.pop('WAYLAND_DISPLAY', None)
     env.pop('DISPLAY', None)
     env.pop('SWAYSOCK', None)
-    env.update(XDG_RUNTIME_DIR=str(runtime), MOZAIS_LOG_DIR=str(root), WLR_BACKENDS='headless',
+    env.update(XDG_RUNTIME_DIR=str(runtime), AKARI_LOG_DIR=str(root), WLR_BACKENDS='headless',
                WLR_HEADLESS_OUTPUTS='2', WLR_RENDERER='gles2',
                WLR_RENDERER_ALLOW_SOFTWARE='1', LIBGL_ALWAYS_SOFTWARE='1',
-               GDK_BACKEND='wayland', MOZAIS_WINDOW_MODE='fullscreen',
-               MOZAIS_DISPLAY_MODE='mirror', NO_AT_BRIDGE='1',
+               GDK_BACKEND='wayland', AKARI_WINDOW_MODE='fullscreen',
+               AKARI_DISPLAY_MODE='mirror', NO_AT_BRIDGE='1',
                G_MESSAGES_DEBUG='all')
     print(f'Artifacts: {root}', flush=True)
     layout = root / 'display-layout.json'
@@ -80,7 +80,7 @@ def main():
                 def collect(node, output=None):
                     if node['type'] == 'output':
                         output = node['name']
-                    if node.get('app_id') == 'dev.mozais.greeter':
+                    if node.get('app_id') == 'dev.akari.greeter':
                         found.append((output, node))
                     for child in node.get('nodes', []) + node.get('floating_nodes', []):
                         collect(child, output)
@@ -167,14 +167,14 @@ def main():
             app.terminate()
             app.wait(timeout=5)
             send_sway_command('output HEADLESS-2 enable')
-            env['MOZAIS_WINDOW_MODE'] = 'windowed'
+            env['AKARI_WINDOW_MODE'] = 'windowed'
             app = subprocess.Popen([str(executable)], env=env, stdout=app_log,
                                    stderr=subprocess.STDOUT, start_new_session=True)
             wait_for_windows(1, 'windowed preview on two displays', fullscreen=False)
             app.terminate()
             app.wait(timeout=5)
-            env['MOZAIS_WINDOW_MODE'] = 'fullscreen'
-            env['MOZAIS_DISPLAY_MODE'] = 'single'
+            env['AKARI_WINDOW_MODE'] = 'fullscreen'
+            env['AKARI_DISPLAY_MODE'] = 'single'
             app = subprocess.Popen([str(executable)], env=env, stdout=app_log,
                                    stderr=subprocess.STDOUT, start_new_session=True)
             wait_for_windows(1, 'single-view fullscreen host on two displays')
