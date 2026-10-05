@@ -62,8 +62,10 @@ from examples.
 The website is hosted at `https://anfsity.github.io/Mozais/`. Main-branch pushes
 that change documentation or API source trigger the documentation workflow.
 The workflow builds the handbook and Dart reference, verifies the output, and
-publishes generated files to the dedicated `gh-pages` branch.
+deploys a Pages artifact directly using GitHub's official deployment actions.
 
-GitHub Pages uses `gh-pages` at `/` as its publishing source. This also allows
-a first publication of a locally verified build without pushing unfinished
-development history. Later main-branch builds update the same branch.
+GitHub Pages uses **GitHub Actions** as its publishing source. The initial
+publication uses an independent `gh-pages` branch containing the locally
+verified static build and a deployment workflow, so unfinished main-branch
+history does not need to be pushed. Once the source workflow is pushed to main,
+main-branch builds update the same website directly.

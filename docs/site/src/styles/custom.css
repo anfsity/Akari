@@ -1,0 +1,20 @@
+:root {
+  --sl-color-accent-low: #11352f;
+  --sl-color-accent: #53bca5;
+  --sl-color-accent-high: #b4e5d8;
+}
+:root[data-theme='light'] {
+  --sl-color-accent-low: #d9f1e9;
+  --sl-color-accent: #216d5b;
+  --sl-color-accent-high: #164638;
+}
+.mermaid {
+  overflow-x: auto;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #222;
+}
+.mermaid svg {
+  height: auto;
+}
