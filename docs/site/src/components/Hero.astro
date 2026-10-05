@@ -1,0 +1,44 @@
+---
+import DefaultHero from '@astrojs/starlight/components/Hero.astro';
+import { LinkButton } from '@astrojs/starlight/components';
+
+const { entry, lang } = Astro.locals.starlightRoute;
+const isHome = entry.id === '' || entry.id === 'zh-cn';
+const isChinese = lang === 'zh-CN';
+const { title, tagline, actions = [] } = entry.data.hero || {};
+---
+
+{isHome ? (
+  <section class="akari-hero">
+    <div class="akari-hero-copy">
+      <p class="akari-eyebrow"><span class="akari-brand-mark" aria-hidden="true">✳</span> AKARI / LINUX GREETER</p>
+      <h1 id="_top" data-page-title set:html={title} />
+      <p class="akari-tagline">{tagline}</p>
+      <div class="akari-hero-actions">
+        {actions.map(({ link, text, variant, icon }) => (
+          <LinkButton href={link} variant={variant} icon={icon?.name}>{text}</LinkButton>
+        ))}
+      </div>
+      <p class="akari-hero-note">{isChinese ? '开源 · Flutter + Rust · 为 Linux 打造' : 'Open source · Flutter + Rust · Built for Linux'}</p>
+    </div>
+    <figure class="akari-theme-concept">
+      <div class="akari-display" aria-hidden="true">
+        <div class="akari-display-bar"><span>akari</span><span>EN · ◌</span></div>
+        <div class="akari-landscape"></div>
+        <div class="akari-login-preview">
+          <div class="akari-clock">09:41</div>
+          <div class="akari-date">{isChinese ? '新的一天，从这里开始' : 'A fresh start, every day'}</div>
+          <div class="akari-login-card">
+            <div class="akari-avatar">a</div>
+            <div class="akari-welcome">{isChinese ? '欢迎回来' : 'Welcome back'}</div>
+            <div class="akari-account">Akari</div>
+            <div class="akari-password"><span>••••••••</span><span class="akari-submit">→</span></div>
+            <div class="akari-session">{isChinese ? '桌面会话' : 'Desktop session'} <span>⌄</span></div>
+          </div>
+        </div>
+        <div class="akari-display-footer"><span>LINUX, WITH A PERSONAL TOUCH.</span><span>◯</span></div>
+      </div>
+      <figcaption><span class="akari-caption-dot" aria-hidden="true"></span>{isChinese ? '主题示意 · 外观由你来设计' : 'Theme concept · Your design goes here'}</figcaption>
+    </figure>
+  </section>
+) : <DefaultHero />}
