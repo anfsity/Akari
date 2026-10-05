@@ -15,8 +15,17 @@ export const collections = {
         'guides/**/*.md',
         'reference/**/*.md',
         'architecture/**/*.md',
+        'zh-cn/index.md',
+        'zh-cn/404.md',
+        'zh-cn/getting-started/**/*.md',
+        'zh-cn/guides/**/*.md',
+        'zh-cn/reference/**/*.md',
+        'zh-cn/architecture/**/*.md',
       ],
-      generateId: ({ entry }) => entry.replace(/\.md$/, ''),
+      generateId: ({ entry }) => {
+        const id = entry.replace(/\.md$/, '');
+        return id === 'index' ? id : id.replace(/\/index$/, '');
+      },
     }),
     schema: docsSchema(),
   }),
