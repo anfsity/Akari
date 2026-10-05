@@ -65,11 +65,11 @@ SceneNode calculateResizedNode({
   required double minHitTarget,
   double? gridSize,
 }) {
-  final rect = Rect.fromLTWH(
-    source.rect.x * canvasSize.width,
-    source.rect.y * canvasSize.height,
-    source.rect.width * canvasSize.width,
-    source.rect.height * canvasSize.height,
+  final rect = sceneNodeRect(
+    node: source,
+    sceneSize: canvasSize,
+    safeArea: EdgeInsets.zero,
+    minHitTarget: minHitTarget,
   );
   final matrix = sceneNodeTransformMatrix(source.transform, rect.size);
   final alignment = handle.alignment;
