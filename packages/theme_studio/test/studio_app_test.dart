@@ -365,7 +365,7 @@ void main() {
     );
   });
 
-  testWidgets('lazy inspector sections preserve fields while scrolling', (
+  testWidgets('inspector sections preserve fields while scrolling', (
     tester,
   ) async {
     await openStudio(tester);
@@ -375,6 +375,13 @@ void main() {
           matching: find.byType(Scrollable),
         )
         .first;
+    await tester.scrollUntilVisible(
+      find.text('Advanced properties'),
+      200,
+      scrollable: inspectorScroll,
+    );
+    await tester.tap(find.text('Advanced properties'));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('field-Properties')),
       200,
@@ -398,6 +405,132 @@ void main() {
     expect(find.text('Saved'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'component fields apply on blur and stay synchronized with JSON and undo',
+    (tester) async {
+      file.writeAsStringSync(
+        encodeSceneDocument(
+          _document.copyWith(
+            nodes: [
+              _document.nodes.first.copyWith(
+                properties: {'variant': 'compact'},
+              ),
+              _document.nodes.last,
+            ],
+          ),
+        ),
+      );
+      await openStudio(tester);
+      expect(find.byKey(const ValueKey('field-Scale X')), findsNothing);
+      final property = find.byKey(const ValueKey('property-variant'));
+      await tester.enterText(property, 'wide');
+      await tester.pump();
+      expect(tester.widget<TextField>(property).controller!.text, 'wide');
+      expect(
+        tester
+            .widget<StudioPreview>(find.byType(StudioPreview))
+            .document
+            .nodes
+            .first
+            .properties['variant'],
+        'compact',
+      );
+      await tester.tap(find.byKey(const ValueKey('field-X')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<StudioPreview>(find.byType(StudioPreview))
+            .document
+            .nodes
+            .first
+            .properties['variant'],
+        'wide',
+      );
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(property).controller!.text, 'compact');
+      await tester.tap(find.text('Redo'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(property).controller!.text, 'wide');
+      final scroll = find
+          .descendant(
+            of: find.byType(NodeInspector),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.text('Advanced properties'),
+        200,
+        scrollable: scroll,
+      );
+      await tester.tap(find.text('Advanced properties'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('field-Properties')),
+        200,
+        scrollable: scroll,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('field-Properties')),
+        '{"variant":"narrow"}',
+      );
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      expect(
+        decodeSceneDocument(file.readAsStringSync())
+            .nodes
+            .first
+            .properties['variant'],
+        'narrow',
+      );
+      await tester.scrollUntilVisible(property, -200, scrollable: scroll);
+      expect(tester.widget<TextField>(property).controller!.text, 'narrow');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'numeric fields apply on blur and unit selection creates no scene edit',
+    (tester) async {
+      await openStudio(tester);
+      await tester.tap(find.text('Pixels'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Percent').last);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('field-Width')))
+            .controller!
+            .text,
+        '30',
+      );
+      expect(find.text('Saved'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '40');
+      await tester.tap(find.byKey(const ValueKey('field-Height')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<StudioPreview>(find.byType(StudioPreview))
+            .document
+            .nodes
+            .first
+            .rect
+            .width,
+        0.4,
+      );
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Saved'), findsOneWidget);
+      expect(
+        tester
+            .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Undo'))
+            .onPressed,
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'failed initial load disables editor actions and reload recovers',
