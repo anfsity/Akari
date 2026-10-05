@@ -92,9 +92,23 @@ class _InspectorForm extends StatelessWidget {
   );
 
   Widget _buildLayoutSection() => StudioFormSection(
-    title: 'Layout · normalized 0–1',
+    title: 'Layout',
     compact: true,
-    children: [_buildPair('X', 'Y'), _buildPair('Width', 'Height')],
+    children: [
+      Align(
+        alignment: Alignment.centerRight,
+        child: StudioEnumSelect(
+          value: controller.layoutUnit,
+          values: StudioLayoutUnit.values,
+          formatValue: (unit) =>
+              unit == StudioLayoutUnit.pixels ? 'Pixels' : 'Percent',
+          onChanged: controller.updateLayoutUnit,
+        ),
+      ),
+      const Gap(12),
+      _buildPair('X', 'Y'),
+      _buildPair('Width', 'Height'),
+    ],
   );
 
   Widget _buildLayeringSection() => StudioFormSection(
