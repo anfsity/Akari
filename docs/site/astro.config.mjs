@@ -11,7 +11,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Akari',
-      description: 'Build compile-time Flutter themes for a Linux greeter.',
+      description: 'A modern Linux greeter. Powered by Flutter. Made yours.',
       locales: {
         root: { label: 'English', lang: 'en' },
         'zh-cn': { label: '简体中文', lang: 'zh-CN' },
@@ -21,7 +21,10 @@ export default defineConfig({
       routeMiddleware: './src/route-data.ts',
       expressiveCode: false,
       customCss: ['./src/styles/custom.css'],
-      components: { Head: './src/components/Head.astro' },
+      components: {
+        Head: './src/components/Head.astro',
+        Hero: './src/components/Hero.astro',
+      },
       sidebar: [
         { label: 'Start here', translations: { 'zh-CN': '开始使用' }, items: [
           { slug: 'getting-started/installation', translations: { 'zh-CN': '环境配置' } },
