@@ -13,6 +13,7 @@
 !/analysis_options.yaml
 !/.metadata
 !/LICENSE
+!/dartdoc_options.yaml
 
 # Flutter/Dart application code and tests.
 !/lib/
@@ -42,6 +43,8 @@
 !/scripts/**
 !/tool/
 !/tool/**
+!/.github/
+!/.github/**
 
 # Generated, local, and editor-specific artifacts remain ignored.
 **/.dart_tool/
@@ -61,3 +64,11 @@
 
 # FVM Version Cache
 .fvm/
+
+# Documentation dependencies and generated output.
+**/node_modules/
+/docs/site/.astro/
+/docs/site/dist/
+/docs/site/public/api/
+**/doc/api/
+**/__pycache__/

@@ -1,0 +1,3 @@
+dartdoc:
+  footer:
+    - docs/site/api-footer.html

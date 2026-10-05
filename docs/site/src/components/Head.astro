@@ -1,0 +1,11 @@
+---
+import DefaultHead from '@astrojs/starlight/components/Head.astro';
+---
+<DefaultHead />
+<script>
+  if (document.querySelector('.mermaid')) {
+    const { default: mermaid } = await import('mermaid');
+    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'neutral' });
+    await mermaid.run({ querySelector: '.mermaid' });
+  }
+</script>
