@@ -9,6 +9,6 @@ permissions:
   id-token: write
 jobs:
   publish:
-    uses: anfsity/Mozais/.github/workflows/docs.yml@main
+    uses: anfsity/Akari/.github/workflows/docs.yml@main
     with:
       source_ref: main
