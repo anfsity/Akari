@@ -10,7 +10,7 @@ void main() {
   late Directory temp;
 
   setUp(() async {
-    temp = await Directory.systemTemp.createTemp('mozais-shell-test-');
+    temp = await Directory.systemTemp.createTemp('akari-shell-test-');
   });
   tearDown(() => temp.delete(recursive: true));
 
@@ -25,7 +25,7 @@ void main() {
 source ${_quote(completion.path)}
 COMP_WORDS=(${words.map(_quote).join(' ')})
 COMP_CWORD=${words.length - 1}
-_mozais
+_akari
 printf '%s\\0' "\${COMPREPLY[@]}"
 ''',
     ], workingDirectory: temp.path);
@@ -37,14 +37,14 @@ printf '%s\\0' "\${COMPREPLY[@]}"
   }
 
   test('bash completes commands, scoped options and enum values', () async {
-    expect(await completeBashWords(['mozais', 'tr']), ['trace-perf', 'trace']);
-    expect(await completeBashWords(['mozais', 'st']), isEmpty);
-    expect(await completeBashWords(['mozais', 'run', 'st']), ['studio']);
-    expect(await completeBashWords(['mozais', 'run', '']), ['sway', 'studio']);
-    expect(await completeBashWords(['mozais', 'run', 'sw']), ['sway']);
+    expect(await completeBashWords(['akari', 'tr']), ['trace-perf', 'trace']);
+    expect(await completeBashWords(['akari', 'st']), isEmpty);
+    expect(await completeBashWords(['akari', 'run', 'st']), ['studio']);
+    expect(await completeBashWords(['akari', 'run', '']), ['sway', 'studio']);
+    expect(await completeBashWords(['akari', 'run', 'sw']), ['sway']);
     expect(
       await completeBashWords([
-        'mozais',
+        'akari',
         'run',
         'sway',
         '--display-profile',
@@ -53,25 +53,25 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       ['reference'],
     );
     expect(
-      await completeBashWords(['mozais', 'run', 'sway', '--sway-backend=h']),
+      await completeBashWords(['akari', 'run', 'sway', '--sway-backend=h']),
       ['--sway-backend=headless'],
     );
-    expect(await completeBashWords(['mozais', 'greetd-test', '']), [
+    expect(await completeBashWords(['akari', 'greetd-test', '']), [
       'install',
       'start',
       'restore',
       'status',
       'logs',
     ]);
-    expect(await completeBashWords(['mozais', 'greetd-test', 'start', '--l']), [
+    expect(await completeBashWords(['akari', 'greetd-test', 'start', '--l']), [
       '--log-dir',
     ]);
     expect(
-      await completeBashWords(['mozais', 'greetd-test', 'logs', '--run', 'c']),
+      await completeBashWords(['akari', 'greetd-test', 'logs', '--run', 'c']),
       ['current'],
     );
     final studioOptions = await completeBashWords([
-      'mozais',
+      'akari',
       'run',
       'studio',
       '',
@@ -79,48 +79,48 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(studioOptions, containsAll(['-t', '--theme', '-j', '--jobs']));
     expect(studioOptions, isNot(contains('--backend')));
     expect(studioOptions, isNot(contains('--mode')));
-    final options = await completeBashWords(['mozais', 'verify', '']);
+    final options = await completeBashWords(['akari', 'verify', '']);
     expect(options, containsAll(['-t', '--theme', '--format']));
     expect(options, isNot(contains('--mode')));
     expect(options, isNot(contains('--jobs')));
-    expect(await completeBashWords(['mozais', 'build', '-m', 'pr']), [
+    expect(await completeBashWords(['akari', 'build', '-m', 'pr']), [
       'profile',
     ]);
-    expect(await completeBashWords(['mozais', 'run', '--backend', 're']), [
+    expect(await completeBashWords(['akari', 'run', '--backend', 're']), [
       'real',
     ]);
-    expect(await completeBashWords(['mozais', 'build', '--mode=pr']), [
+    expect(await completeBashWords(['akari', 'build', '--mode=pr']), [
       '--mode=profile',
     ]);
-    expect(await completeBashWords(['mozais', 'build', '--mode', '=', 'pr']), [
+    expect(await completeBashWords(['akari', 'build', '--mode', '=', 'pr']), [
       'profile',
     ]);
     expect(
-      await completeBashWords(['mozais', 'perf', '--', '-m', 'pr']),
+      await completeBashWords(['akari', 'perf', '--', '-m', 'pr']),
       isEmpty,
     );
-    expect(await completeBashWords(['mozais', 'trace', '--', '']), isEmpty);
+    expect(await completeBashWords(['akari', 'trace', '--', '']), isEmpty);
   });
 
   test('bash preserves spaces in directory and file matches', () async {
     await Directory('${temp.path}/theme with spaces').create();
     await File('${temp.path}/report with spaces.json').writeAsString('{}');
-    expect(await completeBashWords(['mozais', 'build', '-t', 'theme']), [
+    expect(await completeBashWords(['akari', 'build', '-t', 'theme']), [
       'theme with spaces',
     ]);
-    expect(await completeBashWords(['mozais', 'build', '--theme=theme']), [
+    expect(await completeBashWords(['akari', 'build', '--theme=theme']), [
       '--theme=theme with spaces',
     ]);
     expect(
-      await completeBashWords(['mozais', 'run', 'studio', '--theme=theme']),
+      await completeBashWords(['akari', 'run', 'studio', '--theme=theme']),
       ['--theme=theme with spaces'],
     );
     expect(
-      await completeBashWords(['mozais', 'verify', '--report', 'report']),
+      await completeBashWords(['akari', 'verify', '--report', 'report']),
       ['report with spaces.json'],
     );
     expect(
-      await completeBashWords(['mozais', 'verify', '-t', 'report']),
+      await completeBashWords(['akari', 'verify', '-t', 'report']),
       isEmpty,
     );
   });
@@ -138,28 +138,28 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     final buffers = (jsonDecode(result.stdout as String) as List)
         .cast<String>();
     expect(buffers.map((value) => value.trimRight()).take(5), [
-      'mozais trace',
-      'mozais build -m profile',
-      'mozais run --backend real',
-      'mozais perf -- --mode pr',
-      'mozais build --mode=profile',
+      'akari trace',
+      'akari build -m profile',
+      'akari run --backend real',
+      'akari perf -- --mode pr',
+      'akari build --mode=profile',
     ]);
-    expect(buffers[5].trimRight(), 'mozais run studio');
-    expect(buffers[6].trimRight(), 'mozais run studio --theme=');
+    expect(buffers[5].trimRight(), 'akari run studio');
+    expect(buffers[6].trimRight(), 'akari run studio --theme=');
     expect(
       buffers[7].trimRight(),
-      r'mozais run studio -t theme\ with\ spaces/',
+      r'akari run studio -t theme\ with\ spaces/',
     );
-    expect(buffers[8].trimRight(), r'mozais build -t theme\ with\ spaces/');
-    expect(buffers[9].trimRight(), 'mozais greetd-test restore');
-    expect(buffers[10].trimRight(), 'mozais greetd-test start --log-dir=');
-    expect(buffers[11].trimRight(), 'mozais greetd-test logs --run current');
-    expect(buffers[12].trimRight(), 'mozais run sway');
+    expect(buffers[8].trimRight(), r'akari build -t theme\ with\ spaces/');
+    expect(buffers[9].trimRight(), 'akari greetd-test restore');
+    expect(buffers[10].trimRight(), 'akari greetd-test start --log-dir=');
+    expect(buffers[11].trimRight(), 'akari greetd-test logs --run current');
+    expect(buffers[12].trimRight(), 'akari run sway');
     expect(
       buffers[13].trimRight(),
-      'mozais run sway --display-profile reference',
+      'akari run sway --display-profile reference',
     );
-    expect(buffers[14].trimRight(), 'mozais run sway --sway-backend=headless');
+    expect(buffers[14].trimRight(), 'akari run sway --sway-backend=headless');
   });
 
   test('installation preserves startup content and works outside the repository', () async {
@@ -185,11 +185,11 @@ printf '%s\\0' "\${COMPREPLY[@]}"
         .writeAsString('buildOceanTheme() {}');
     await File('${project.path}/lib/ocean.scene.json').writeAsString('{}');
     final result = await Process.run(
-      '${prefix.path}/bin/mozais',
+      '${prefix.path}/bin/akari',
       ['build', '-t', 'relative theme', '-m', 'debug', '--dry-run'],
       workingDirectory: temp.path,
       environment: {
-        'MOZAIS_DART_BIN':
+        'AKARI_DART_BIN':
             '${Directory.current.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
       },
     );
@@ -198,11 +198,11 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(plan['command'], 'build');
     expect((plan['steps'] as List)[1]['working_directory'], project.path);
     final studio = await Process.run(
-      '${prefix.path}/bin/mozais',
+      '${prefix.path}/bin/akari',
       ['run', 'studio', '-t', 'relative theme', '--dry-run'],
       workingDirectory: temp.path,
       environment: {
-        'MOZAIS_DART_BIN':
+        'AKARI_DART_BIN':
             '${Directory.current.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
       },
     );
@@ -216,11 +216,11 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       '--noprofile',
       '--norc',
       '-c',
-      '. ${_quote(rc.path)}; command -v mozais; complete -p mozais',
+      '. ${_quote(rc.path)}; command -v akari; complete -p akari',
     ]);
     expect(activation.exitCode, 0, reason: activation.stderr);
-    expect(activation.stdout, contains('${prefix.path}/bin/mozais'));
-    expect(activation.stdout, contains('-F _mozais mozais'));
+    expect(activation.stdout, contains('${prefix.path}/bin/akari'));
+    expect(activation.stdout, contains('-F _akari akari'));
   });
 
   test('zsh environment registers completion and syntax checks pass', () async {
@@ -237,13 +237,13 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       [
         '-f',
         '-c',
-        '. ${_quote(rc.path)}; print -r -- \$_comps[mozais]; command -v mozais',
+        '. ${_quote(rc.path)}; print -r -- \$_comps[akari]; command -v akari',
       ],
       environment: {'HOME': temp.path, 'ZDOTDIR': temp.path},
     );
     expect(result.exitCode, 0, reason: result.stderr);
-    expect(result.stdout, contains('_mozais'));
-    expect(result.stdout, contains('${prefix.path}/bin/mozais'));
+    expect(result.stdout, contains('_akari'));
+    expect(result.stdout, contains('${prefix.path}/bin/akari'));
     for (final shell in ['bash', 'zsh']) {
       final file = File('${temp.path}/syntax.$shell');
       await file.writeAsString(getShellCompletion(shell));
@@ -254,7 +254,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
 
   test('installation refuses to overwrite an unrelated command', () async {
     final prefix = Directory('${temp.path}/prefix');
-    final launcher = File('${prefix.path}/bin/mozais');
+    final launcher = File('${prefix.path}/bin/akari');
     await launcher.parent.create(recursive: true);
     await launcher.writeAsString('unrelated command');
     final rc = File('${temp.path}/.bashrc');

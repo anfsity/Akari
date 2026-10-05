@@ -1,5 +1,5 @@
 name: scene_schema
-description: Flutter-free scene model and JSON codec for Mozais scene documents.
+description: Flutter-free scene model and JSON codec for Akari scene documents.
 publish_to: none
 
 environment:

@@ -2,7 +2,7 @@
 <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-Bus Object Introspection 1.0//EN"
   "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
 <node>
-  <interface name="io.mozais.Greeter1">
+  <interface name="io.akari.Greeter1">
     <method name="GetState">
       <arg name="state" type="s" direction="out" />
       <arg name="detail" type="s" direction="out" />

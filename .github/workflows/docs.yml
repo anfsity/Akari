@@ -37,7 +37,7 @@ jobs:
         run: npm ci
         working-directory: docs/site
       - name: Generate public Dart reference
-        run: MOZAIS_FLUTTER_BIN="$(command -v flutter)" MOZAIS_DART_BIN="$(command -v dart)" bash scripts/build-api-docs.sh
+        run: AKARI_FLUTTER_BIN="$(command -v flutter)" AKARI_DART_BIN="$(command -v dart)" bash scripts/build-api-docs.sh
       - name: Check and build the handbook
         run: npm run check && npm run build && npm run verify
         working-directory: docs/site

@@ -1,22 +1,22 @@
 # Theme Studio
 
-Theme Studio is the Linux scene editor for a compiled Mozais theme. Its editor
+Theme Studio is the Linux scene editor for a compiled Akari theme. Its editor
 controls use `shadcn_flutter`; the preview renders the selected theme's own
 components, tokens and assets through `SceneRuntime`.
 
 ```sh
-mozais run studio --theme themes/default
+akari run studio --theme themes/default
 # Without the installed launcher:
-fvm dart run tool/mozais.dart run studio --theme themes/default
+fvm dart run tool/akari.dart run studio --theme themes/default
 # External theme packages work the same way.
-fvm dart run tool/mozais.dart run studio --theme /path/to/theme --jobs 2
+fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 ```
 
-`studio` is a `run` target. `mozais run --help` lists it, and
-`mozais run studio --help` shows its options. If an existing shell does not
-complete it, refresh the installed scripts with `mozais install --shell zsh`, then run
-`. ~/.local/share/mozais/env.zsh` in that shell. For bash, use `--shell bash`
-and source `~/.local/share/mozais/env.bash` instead.
+`studio` is a `run` target. `akari run --help` lists it, and
+`akari run studio --help` shows its options. If an existing shell does not
+complete it, refresh the installed scripts with `akari install --shell zsh`, then run
+`. ~/.local/share/akari/env.zsh` in that shell. For bash, use `--shell bash`
+and source `~/.local/share/akari/env.bash` instead.
 
 The CLI resolves the theme, generates its scene Dart, and creates a reusable
 host in `build/tool/hosts/<encoded-canonical-theme-path>/studio/`. The editor
@@ -229,7 +229,7 @@ Scene files and imported assets are the authoring source. Generated
 
 ## Checks
 
-`mozais verify` includes Studio dependency resolution, analysis and tests.
+`akari verify` includes Studio dependency resolution, analysis and tests.
 Focused checks can be run from `packages/theme_studio`:
 
 ```sh

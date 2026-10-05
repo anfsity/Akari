@@ -1,5 +1,5 @@
 name: scene
-description: Compile-time scene model and runtime for the Mozais greeter.
+description: Compile-time scene model and runtime for the Akari greeter.
 publish_to: none
 
 environment:

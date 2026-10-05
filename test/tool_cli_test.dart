@@ -13,7 +13,7 @@ void main() {
   late Directory tempRoot;
 
   setUp(() async {
-    tempRoot = await Directory.systemTemp.createTemp('mozais-tool-cli-test-');
+    tempRoot = await Directory.systemTemp.createTemp('akari-tool-cli-test-');
   });
 
   tearDown(() async {
@@ -75,8 +75,8 @@ Future<void> main() async {
       );
       expect(steps.last['id'], 'theme.studio');
       expect(steps.last['command'].last, 'demo');
-      expect(steps.last['environment']['MOZAIS_DISPLAY_MODE'], 'single');
-      expect(steps.last['environment']['MOZAIS_BUILD_JOBS'], '2');
+      expect(steps.last['environment']['AKARI_DISPLAY_MODE'], 'single');
+      expect(steps.last['environment']['AKARI_BUILD_JOBS'], '2');
       expect(plan['artifacts']['host_project'], endsWith('/studio'));
       expect(plan['artifacts'], isNot(contains('backend_executable')));
     },
@@ -88,13 +88,13 @@ Future<void> main() async {
     expect(help.stdout, contains('run studio'));
     final runHelp = await _runTool(['run', '--help']);
     expect(runHelp.exitCode, 0);
-    expect(runHelp.stdout, contains('Usage: mozais run [target] [options]'));
+    expect(runHelp.stdout, contains('Usage: akari run [target] [options]'));
     expect(runHelp.stdout, contains('Targets:'));
     expect(runHelp.stdout, contains('studio'));
-    expect(runHelp.stdout, contains('mozais run <target> --help'));
+    expect(runHelp.stdout, contains('akari run <target> --help'));
     final studioHelp = await _runTool(['run', 'studio', '--help']);
     expect(studioHelp.exitCode, 0);
-    expect(studioHelp.stdout, contains('Usage: mozais run studio [options]'));
+    expect(studioHelp.stdout, contains('Usage: akari run studio [options]'));
     expect(studioHelp.stdout, contains('debug, no backend'));
     expect(studioHelp.stdout, contains('-t, --theme'));
     expect(studioHelp.stdout, contains('-j, --jobs'));
@@ -293,7 +293,7 @@ Future<void> main() async {
       final flutter = plan.singleWhere(
         (step) => step.id == 'flutter.build_linux',
       );
-      expect(flutter.environment['MOZAIS_BUILD_JOBS'], '4');
+      expect(flutter.environment['AKARI_BUILD_JOBS'], '4');
       expect(flutter.command, contains('--no-pub'));
       expect(
         plan.singleWhere((step) => step.id == 'theme.host.pub_get').command,
@@ -439,8 +439,8 @@ sys.exit(1)
       containsAll(['backend.build', 'theme.host.pub_get']),
     );
     expect(
-      session['environment']['MOZAIS_BACKEND_BIN'],
-      endsWith('/mozais-mock/debug/backend'),
+      session['environment']['AKARI_BACKEND_BIN'],
+      endsWith('/akari-mock/debug/backend'),
     );
   });
 
@@ -598,8 +598,8 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
     final result = await _runTool(
       ['preview', '--theme', project.path, '--format', 'json'],
       environment: {
-        'MOZAIS_FLUTTER_BIN': flutter.path,
-        'MOZAIS_DART_BIN': dart.path,
+        'AKARI_FLUTTER_BIN': flutter.path,
+        'AKARI_DART_BIN': dart.path,
       },
     );
     expect(result.exitCode, 0, reason: result.stderr);
@@ -652,7 +652,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
 
       final result = await _runTool(
         ['generate-scenes', '--format', 'json'],
-        environment: {'MOZAIS_DART_BIN': fakeDart.path},
+        environment: {'AKARI_DART_BIN': fakeDart.path},
       );
       expect(result.exitCode, 0, reason: result.stderr);
       final report = jsonDecode(result.stdout) as Map<String, dynamic>;
@@ -685,13 +685,13 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
   test(
     'dry-run prints strict JSON with resolved SDK commands and log paths',
     () async {
-      const flutterBin = '/tmp/mozais-test-sdk/bin/flutter';
-      const dartBin = '/tmp/mozais-test-sdk/bin/dart';
+      const flutterBin = '/tmp/akari-test-sdk/bin/flutter';
+      const dartBin = '/tmp/akari-test-sdk/bin/dart';
       final result = await _runTool(
         ['verify', '--format', 'json', '--dry-run'],
         environment: {
-          'MOZAIS_FLUTTER_BIN': flutterBin,
-          'MOZAIS_DART_BIN': dartBin,
+          'AKARI_FLUTTER_BIN': flutterBin,
+          'AKARI_DART_BIN': dartBin,
         },
       );
 
@@ -757,8 +757,8 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
 
       final derivedDartResult = await _runTool(
         ['generate-scenes', '--dry-run'],
-        environment: {'MOZAIS_FLUTTER_BIN': flutterBin},
-        unsetEnvironmentVariables: {'MOZAIS_DART_BIN'},
+        environment: {'AKARI_FLUTTER_BIN': flutterBin},
+        unsetEnvironmentVariables: {'AKARI_DART_BIN'},
       );
       expect(derivedDartResult.exitCode, 0, reason: derivedDartResult.stderr);
       final derivedDartPlan =
@@ -767,7 +767,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
           ((derivedDartPlan['steps'] as List).first as Map<String, dynamic>);
       expect(
         (firstStep['command'] as List).first,
-        '/tmp/mozais-test-sdk/bin/dart',
+        '/tmp/akari-test-sdk/bin/dart',
       );
     },
   );
@@ -819,7 +819,7 @@ perf:
         final output = plan['artifacts']['performance_output'];
         expect(output, '${plan['run_directory']}/perf');
         expect(
-          perf['environment']['MOZAIS_PERF_OUTPUT_DIR'],
+          perf['environment']['AKARI_PERF_OUTPUT_DIR'],
           '${Directory.current.path}/$output',
         );
         expect(
@@ -843,7 +843,7 @@ perf:
 ''', mode: FileMode.append);
       await File('${project.path}/perf.py').writeAsString('''
 import json, os, pathlib, sys
-output = pathlib.Path(os.environ['MOZAIS_PERF_OUTPUT_DIR'])
+output = pathlib.Path(os.environ['AKARI_PERF_OUTPUT_DIR'])
 (output / 'custom.txt').write_text(json.dumps(sys.argv[1:]))
 (output / 'result.json').write_text(json.dumps({
     'version': 1, 'artifacts': [{'name': 'custom', 'path': 'custom.txt'}]
@@ -871,8 +871,8 @@ sys.exit(int(sys.argv[1]))
               r'$(touch unexpected)',
             ],
             environment: {
-              'MOZAIS_DART_BIN': sdk.path,
-              'MOZAIS_FLUTTER_BIN': sdk.path,
+              'AKARI_DART_BIN': sdk.path,
+              'AKARI_FLUTTER_BIN': sdk.path,
             },
           );
           expect(result.exitCode, code, reason: result.stderr);
@@ -940,8 +940,8 @@ perf:
           '$code',
         ],
         environment: {
-          'MOZAIS_DART_BIN': sdk.path,
-          'MOZAIS_FLUTTER_BIN': sdk.path,
+          'AKARI_DART_BIN': sdk.path,
+          'AKARI_FLUTTER_BIN': sdk.path,
         },
       );
       expect(result.exitCode, code == 0 ? 1 : code, reason: result.stderr);
@@ -1045,17 +1045,17 @@ perf:
             command: [
               'bash',
               '-c',
-              'printf "PAM secret: %s token=%s password=%s api_key=%s\\n" "\$MOZAIS_PAM_SECRET" "\$MOZAIS_TOKEN" "\$PASSWORD" "\$API_KEY"; printf "Bearer %s\\n" "\$MOZAIS_AUTHORIZATION"',
+              'printf "PAM secret: %s token=%s password=%s api_key=%s\\n" "\$AKARI_PAM_SECRET" "\$AKARI_TOKEN" "\$PASSWORD" "\$API_KEY"; printf "Bearer %s\\n" "\$AKARI_AUTHORIZATION"',
               '--token',
               commandToken,
             ],
             workingDirectory: '.',
             environment: const {
-              'MOZAIS_PAM_SECRET': pamSecret,
-              'MOZAIS_TOKEN': token,
+              'AKARI_PAM_SECRET': pamSecret,
+              'AKARI_TOKEN': token,
               'PASSWORD': password,
               'API_KEY': apiKey,
-              'MOZAIS_AUTHORIZATION': 'Bearer authorization-value-551',
+              'AKARI_AUTHORIZATION': 'Bearer authorization-value-551',
             },
           ),
         ],
@@ -1124,7 +1124,7 @@ Future<ProcessResult> _runTool(
   childEnvironment.addAll(environment);
   return Process.run(
     dartCommand.first,
-    [...dartCommand.skip(1), 'tool/mozais.dart', ...arguments],
+    [...dartCommand.skip(1), 'tool/akari.dart', ...arguments],
     workingDirectory: Directory.current.path,
     environment: childEnvironment,
     includeParentEnvironment: false,

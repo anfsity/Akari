@@ -53,7 +53,7 @@ List<RunStep> buildStepsFor(
               'build',
               '--locked',
               '--target-dir',
-              'target/mozais-$transport',
+              'target/akari-$transport',
               if (buildMode != 'debug') '--release',
               if (greeter && backendMode == 'mock') ...['--features', 'mock'],
               if (jobs != null) ...['--jobs', '$jobs'],
@@ -99,10 +99,10 @@ List<RunStep> buildStepsFor(
               buildTarget,
               '--$buildMode',
               '--no-pub',
-              '--dart-define=MOZAIS_BACKEND=${demo ? 'demo' : 'real'}',
+              '--dart-define=AKARI_BACKEND=${demo ? 'demo' : 'real'}',
             ],
             workingDirectory: hostDirectory,
-            environment: {if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs'},
+            environment: {if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs'},
           ),
         if (!live && buildTarget == 'linux')
           // Publishing requires both artifacts. The backend branch can run in
@@ -151,20 +151,20 @@ List<RunStep> buildStepsFor(
             dependencies: [if (!demo) 'backend.build', 'theme.host.pub_get'],
             interactive: true,
             environment: {
-              'MOZAIS_DISPLAY_MODE': studio ? 'single' : 'mirror',
-              'MOZAIS_WINDOW_MODE':
-                  Platform.environment['MOZAIS_WINDOW_MODE'] ??
+              'AKARI_DISPLAY_MODE': studio ? 'single' : 'mirror',
+              'AKARI_WINDOW_MODE':
+                  Platform.environment['AKARI_WINDOW_MODE'] ??
                   (demo ? 'windowed' : 'fullscreen'),
-              if (jobs != null) 'MOZAIS_BUILD_JOBS': '$jobs',
+              if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs',
               if (sway)
-                'MOZAIS_DISPLAY_PROFILE_JSON': jsonEncode(displayProfile!),
+                'AKARI_DISPLAY_PROFILE_JSON': jsonEncode(displayProfile!),
               if (!demo) ...{
-                'MOZAIS_BACKEND_MODE': backendMode,
-                'MOZAIS_BACKEND_BIN': _join(
+                'AKARI_BACKEND_MODE': backendMode,
+                'AKARI_BACKEND_BIN': _join(
                   repoRoot.path,
-                  'backend/target/mozais-$transport/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
+                  'backend/target/akari-$transport/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
                 ),
-                'MOZAIS_LOG_DIR': _join(repoRoot.path, '$runDirectory/dbus'),
+                'AKARI_LOG_DIR': _join(repoRoot.path, '$runDirectory/dbus'),
               },
             },
           ),
@@ -216,7 +216,7 @@ List<RunStep> buildStepsFor(
           'lib',
           'test',
           'tool/src',
-          'tool/mozais.dart',
+          'tool/akari.dart',
           'tool/theme_host.dart',
           'tool/theme_session.dart',
           'tool/dbus_gateway_smoke.dart',
@@ -266,7 +266,7 @@ List<RunStep> buildStepsFor(
             'tool/dbus_gateway_smoke.dart',
           ],
           environment: {
-            'MOZAIS_LOG_DIR': _join(repoRoot.path, '$runDirectory/dbus'),
+            'AKARI_LOG_DIR': _join(repoRoot.path, '$runDirectory/dbus'),
           },
         ),
       ];
@@ -292,7 +292,7 @@ List<RunStep> buildStepsFor(
           [...executable, ...entrypoint.skip(1), ...themeArguments],
           workingDirectory: theme.directory.path,
           environment: {
-            'MOZAIS_PERF_OUTPUT_DIR': _join(
+            'AKARI_PERF_OUTPUT_DIR': _join(
               repoRoot.path,
               '$runDirectory/perf',
             ),
@@ -418,7 +418,7 @@ Map<String, String> artifactPathsFor(
     'build' || 'run' || 'run sway' || 'preview' || 'run studio' => {
       if (!preview && command != 'run studio')
         'backend_executable':
-            'backend/target/mozais-$backendMode/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
+            'backend/target/akari-$backendMode/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
       'host_project': hostDirectory!,
       'build_directory': '$hostDirectory/build/$buildTarget',
       if (buildTarget == 'linux')

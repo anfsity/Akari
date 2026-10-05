@@ -25,7 +25,7 @@ def output(name='eDP-1', scale=1.5, x=0):
 
 class DisplayProfileTest(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory(prefix='mozais-display-profile-')
+        temporary = tempfile.TemporaryDirectory(prefix='akari-display-profile-')
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.installation = self.root / 'installed'
@@ -40,8 +40,8 @@ class DisplayProfileTest(unittest.TestCase):
     def capture(self, raw=None, name='session-one', timestamp=None, source='greetd-login'):
         session = self.run / 'greeter' / name
         session.mkdir(parents=True, exist_ok=True)
-        with patch.dict(os.environ, MOZAIS_LOG_DIR=str(session),
-                        MOZAIS_DISPLAY_SOURCE=source, MOZAIS_TEST_RUN=str(self.run)), patch.object(
+        with patch.dict(os.environ, AKARI_LOG_DIR=str(session),
+                        AKARI_DISPLAY_SOURCE=source, AKARI_TEST_RUN=str(self.run)), patch.object(
                             displays.subprocess, 'check_output', return_value=json.dumps(
                                 [output()] if raw is None else raw).encode()):
             displays.capture_outputs()

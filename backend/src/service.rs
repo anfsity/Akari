@@ -18,8 +18,8 @@ use crate::{
     users::UserCatalog,
 };
 
-pub const BUS_NAME: &str = "io.mozais.Greeter";
-pub const OBJECT_PATH: &str = "/io/mozais/Greeter";
+pub const BUS_NAME: &str = "io.akari.Greeter";
+pub const OBJECT_PATH: &str = "/io/akari/Greeter";
 
 #[derive(Clone, Debug)]
 /// D-Bus service exposing user/session catalogs and serialized authentication.
@@ -50,7 +50,7 @@ impl GreeterService {
     }
 }
 
-#[interface(name = "io.mozais.Greeter1")]
+#[interface(name = "io.akari.Greeter1")]
 impl GreeterService {
     async fn get_state(&self) -> fdo::Result<(String, String)> {
         self.auth.get_state()

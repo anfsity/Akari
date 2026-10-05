@@ -30,7 +30,7 @@ class StudioPreferences {
 
   static Future<StudioPreferences> load() async {
     final storage = await SharedPreferences.getInstance();
-    final source = storage.getString('mozais.studio.preferences');
+    final source = storage.getString('akari.studio.preferences');
     if (source == null) return const StudioPreferences();
     final json = jsonDecode(source);
     if (json is! Map<String, dynamic> ||
@@ -74,7 +74,7 @@ class StudioPreferences {
   Future<void> save() async {
     final storage = await SharedPreferences.getInstance();
     final saved = await storage.setString(
-      'mozais.studio.preferences',
+      'akari.studio.preferences',
       jsonEncode({
         'themeMode': themeMode.name,
         'palette': palette.name,

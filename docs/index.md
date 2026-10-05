@@ -1,15 +1,15 @@
 ---
-title: Mozais
+title: Akari
 description: Compile-time Flutter themes for a Linux greeter.
 template: splash
 hero:
   tagline: A Linux greeter with a theme you own. Compose Flutter components, author scenes, and build one native executable.
   actions:
     - text: Start here
-      link: /Mozais/getting-started/quick-start/
+      link: /Akari/getting-started/quick-start/
       icon: right-arrow
     - text: Develop a theme
-      link: /Mozais/guides/themes/
+      link: /Akari/guides/themes/
       variant: minimal
 ---
 
@@ -24,7 +24,7 @@ hero:
 | Look up types and methods | [API reference](reference/api.md) |
 | Understand the implementation | [Code map](architecture/code-map.md) |
 
-## How Mozais fits together
+## How Akari fits together
 
 The Flutter frontend owns presentation and interaction. A Rust bridge owns the
 greetd/PAM conversation and system operations. A theme receives typed display

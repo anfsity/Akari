@@ -1,5 +1,5 @@
 name: greeter_ui
-description: Reusable greeter UI for Mozais, free of any backend dependency.
+description: Reusable greeter UI for Akari, free of any backend dependency.
 publish_to: none
 
 environment:

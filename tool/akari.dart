@@ -100,7 +100,7 @@ Future<void> main(List<String> arguments) async {
         '--reference',
         _join(repoRoot.path, 'config/sway/reference.json'),
         '--state',
-        '$state/mozais/display-profiles',
+        '$state/akari/display-profiles',
         '--display-profile',
         options.displayProfile,
         if (options.resolution != null) ...[
@@ -199,7 +199,7 @@ Future<void> main(List<String> arguments) async {
     _writeUsage();
     exitCode = 2;
   } catch (error) {
-    stderr.writeln('Mozais tool failed: $error');
+    stderr.writeln('Akari tool failed: $error');
     exitCode = 1;
   }
 }
@@ -209,7 +209,7 @@ void _writeUsage([CliCommand? command]) {
       ? const <CliCommand>[]
       : getCliSubcommands(command.name);
   stdout.writeln(
-    'Usage: mozais ${command?.name ?? '<command>'}${subcommands.isEmpty ? '' : ' [target]'} [options]',
+    'Usage: akari ${command?.name ?? '<command>'}${subcommands.isEmpty ? '' : ' [target]'} [options]',
   );
   if (command != null) stdout.writeln('\n${command.description}');
   if (command == null) {
@@ -226,7 +226,7 @@ void _writeUsage([CliCommand? command]) {
       stdout.writeln('  ${target.padRight(24)} ${subcommand.description}');
     }
     stdout.writeln(
-      '\nUse mozais ${command!.name} <target> --help for target options.',
+      '\nUse akari ${command!.name} <target> --help for target options.',
     );
   }
   stdout.writeln('\nOptions:');
@@ -336,7 +336,7 @@ Directory _findRepoRoot() {
     }
     final parent = directory.parent;
     if (parent.path == directory.path) {
-      throw StateError('Could not locate the Mozais repository root.');
+      throw StateError('Could not locate the Akari repository root.');
     }
     directory = parent;
   }

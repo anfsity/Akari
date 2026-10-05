@@ -12,7 +12,7 @@ export function remarkDocs() {
         if (target.endsWith('.md')) {
           const relative = path.relative(docsRoot, path.resolve(path.dirname(file.path), target));
           const route = relative.replace(/\.md$/, '').replace(/^index$/, '');
-          node.url = `/Mozais/${route}${route ? '/' : ''}${fragment ? `#${fragment}` : ''}`;
+          node.url = `/Akari/${route}${route ? '/' : ''}${fragment ? `#${fragment}` : ''}`;
         }
       }
       if (node.type === 'code' && node.lang === 'mermaid') {

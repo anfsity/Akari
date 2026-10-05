@@ -41,7 +41,7 @@ Future<int> startThemeSession({
     '--$mode',
     '--no-pub',
     '--machine',
-    '--dart-define=MOZAIS_BACKEND=$backend',
+    '--dart-define=AKARI_BACKEND=$backend',
   ], workingDirectory: host.path);
   final subscriptions = <StreamSubscription<dynamic>>[];
   final watched = <String>{};
@@ -123,7 +123,7 @@ Future<int> startThemeSession({
           'appId': appId,
           'fullRestart': restart,
           'pause': false,
-          'reason': 'Mozais theme changed',
+          'reason': 'Akari theme changed',
         });
         if (response.containsKey('error')) {
           stderr.writeln('Flutter reload failed: ${response['error']}');

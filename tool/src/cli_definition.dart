@@ -129,7 +129,7 @@ const cliOptions = {
   ),
   '--log-dir': CliOption(
     '--log-dir',
-    'Test log root (default: /var/tmp/mozais-greetd-test-<uid>).',
+    'Test log root (default: /var/tmp/akari-greetd-test-<uid>).',
     valueName: 'PATH',
     directory: true,
   ),
@@ -223,7 +223,7 @@ const cliCommands = [
   ),
   CliCommand(
     'install',
-    'Install the mozais launcher and shell completion.',
+    'Install the akari launcher and shell completion.',
     options: ['--shell', '--prefix', '--rc'],
     reportsRun: false,
   ),

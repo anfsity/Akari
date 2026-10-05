@@ -4,13 +4,13 @@ description: Build and install the real-login harness, capture displays, inspect
 ---
 
 The maintained test harness lives in `scripts/greetd-test/` and installs into
-`/opt/mozais-test`. It uses the production backend: authentication talks to greetd
+`/opt/akari-test`. It uses the production backend: authentication talks to greetd
 and power actions call logind, performing actual suspend, reboot and shutdown.
-Boot configuration stays on SDDM. Desktop development with `mozais run` still
+Boot configuration stays on SDDM. Desktop development with `akari run` still
 uses mock authentication and mock power by default.
 
-Install the repository-bound `mozais` launcher as described in
-[Development Tooling](../reference/cli.md). `mozais greetd-test --help` lists
+Install the repository-bound `akari` launcher as described in
+[Development Tooling](../reference/cli.md). `akari greetd-test --help` lists
 all operations; each operation has its own help and bash/zsh completion.
 Install, start and restore request sudo when needed. Status and ordinary log
 reading do not request elevated privileges.
@@ -18,24 +18,24 @@ reading do not request elevated privileges.
 Build and install while no previous test or timer is active:
 
 ```sh
-mozais greetd-test install
+akari greetd-test install
 ```
 
 The installer first builds the current repository's default theme and production
 backend in Linux release mode with four build jobs. It runs the build as the sudo
 caller (or the repository owner when invoked directly as root), keeping SDK and
 repository caches owned by that user. SDK selection uses the same repository
-configuration and `MOZAIS_FLUTTER_BIN` / `MOZAIS_DART_BIN` overrides as the CLI.
+configuration and `AKARI_FLUTTER_BIN` / `AKARI_DART_BIN` overrides as the CLI.
 A failed build aborts installation before any installed files or backups change.
 
 After a successful build, installation backs up the previous frontend, backend,
-scripts and configuration beneath `/opt/mozais-test/backups/`. It does not switch
+scripts and configuration beneath `/opt/akari-test/backups/`. It does not switch
 display managers.
 The installer expects the existing test setup's `greeter` account and writable
-`/opt/mozais-test/state` directory.
+`/opt/akari-test/state` directory.
 
 Installation also captures the active Sway or Hyprland desktop's display order
-in `/opt/mozais-test/display-layout.json`. An aligned horizontal row or vertical
+in `/opt/akari-test/display-layout.json`. An aligned horizontal row or vertical
 column is supported. This uses the desktop's configured arrangement; display
 hardware cannot report which side of another screen it physically occupies.
 Login computes contiguous positions from Sway's actual logical output sizes,
@@ -48,7 +48,7 @@ when no layout has been saved. Reinstall from the desktop after rearranging scre
 Save work, log out of the desktop, log in on tty3, then run:
 
 ```sh
-mozais greetd-test start
+akari greetd-test start
 ```
 
 Preflight uses `SUDO_TTY` to identify the original terminal even when sudo creates
@@ -62,15 +62,15 @@ login exits the greeter, while greetd continues to own the user desktop session.
 To restore manually, switch to tty3 and run:
 
 ```sh
-mozais greetd-test restore
+akari greetd-test restore
 ```
 
 Recovery itself is independent of this CLI. systemd's timer and exit callback
-always invoke `/opt/mozais-test/restore.sh` directly. If the repository or
+always invoke `/opt/akari-test/restore.sh` directly. If the repository or
 Flutter/Dart SDK is unavailable, restore from tty3 with:
 
 ```sh
-sudo /opt/mozais-test/restore.sh
+sudo /opt/akari-test/restore.sh
 ```
 
 The CLI, timer and exit callback all use this single recovery implementation.
@@ -82,12 +82,12 @@ Inspect installed artifacts, SDDM, the test service, the recovery timer and save
 log paths with:
 
 ```sh
-mozais greetd-test status
-mozais greetd-test status --format json
+akari greetd-test status
+akari greetd-test status --format json
 ```
 
-Logs live outside `/opt`, under `/var/tmp/mozais-greetd-test-<caller-uid>/`.
-For a user with UID 1000 this is `/var/tmp/mozais-greetd-test-1000/`.
+Logs live outside `/opt`, under `/var/tmp/akari-greetd-test-<caller-uid>/`.
+For a user with UID 1000 this is `/var/tmp/akari-greetd-test-1000/`.
 All users can read startup, frontend, backend, compositor and recovery logs
 directly, including while the test is running, without sudo or special group
 membership. Direct root invocation uses UID 0 and keeps the same read access.
@@ -115,7 +115,7 @@ outputs but does not update this snapshot. Re-run the test to capture a changed
 display combination. Sessions without a saved arrangement use Sway's initial
 positions and the same snapshot capture path.
 
-Back on the desktop, `mozais run sway` automatically imports the newest valid
+Back on the desktop, `akari run sway` automatically imports the newest valid
 marked snapshot into the developer's local state. It ignores incomplete,
 damaged or unmarked captures and keeps any existing valid local profile.
 `--display-profile reference` uses the project's 1920×1080, scale 1
@@ -132,9 +132,9 @@ to compare that capture in a desktop session or produce fixed-resolution images.
 Inspect the latest startup attempt or the test used by recovery:
 
 ```sh
-mozais greetd-test logs
-mozais greetd-test logs --run current --file backend -n 100
-mozais greetd-test logs --run current --file flutter --follow
+akari greetd-test logs
+akari greetd-test logs --run current --file backend -n 100
+akari greetd-test logs --run current --file flutter --follow
 ```
 
 `logs` defaults to the caller's latest startup attempt and its `start.log`.
@@ -148,7 +148,7 @@ Set a custom location when starting a test (relative paths use the invocation
 directory):
 
 ```sh
-mozais greetd-test start --log-dir /var/tmp/my-mozais-test
+akari greetd-test start --log-dir /var/tmp/my-akari-test
 ```
 
 The greeter must be able to traverse the parent directories of a custom location;
@@ -157,18 +157,18 @@ without needing `--log-dir` again. A private home directory usually
 prevents this, so use a location beneath `/var/tmp`. The installation also retains
 a per-caller `latest-run-<uid>` pointer, including failed preflight attempts. Recovery resolves the saved `current-run` pointer
 automatically and does not require the custom setting again. Each prepared test
-saves its scale and log root in `config.json`. The former `MOZAIS_TEST_SCALE`
-and `MOZAIS_TEST_LOG_DIR` settings are replaced by these explicit start options.
+saves its scale and log root in `config.json`. The former `AKARI_TEST_SCALE`
+and `AKARI_TEST_LOG_DIR` settings are replaced by these explicit start options.
 
-For live system service output, use `sudo journalctl -u mozais-test.service -f`;
+For live system service output, use `sudo journalctl -u akari-test.service -f`;
 the directly readable `journal.log` is saved during recovery. Reinstall the
-scripts to make these changes available in `/opt/mozais-test`. Existing logs in
-the old `/opt/mozais-test/test-runs/` directory remain there.
+scripts to make these changes available in `/opt/akari-test`. Existing logs in
+the old `/opt/akari-test/test-runs/` directory remain there.
 
 The standalone login environment supplies the local visual reference. Its output scale
-remains 1 by default. `mozais greetd-test start --scale NUMBER` explicitly
+remains 1 by default. `akari greetd-test start --scale NUMBER` explicitly
 overrides it; Sway records the actual output mode and scale in `outputs.json`.
-`mozais run sway` compensates for the outer Hyprland monitor scale, so a
+`akari run sway` compensates for the outer Hyprland monitor scale, so a
 fullscreen nested window on the same monitor and mode has the same logical
 viewport and content size as TTY. The inner scale is the selected login scale
 divided by the Hyprland monitor scale; monitor settings remain untouched.

@@ -269,7 +269,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   @override
   Widget build(BuildContext context) {
     return ShadcnApp(
-      title: 'Mozais Theme Studio',
+      title: 'Akari Theme Studio',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: _preferences.palette.getColorScheme(Brightness.light),

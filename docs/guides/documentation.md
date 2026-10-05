@@ -29,7 +29,7 @@ npm ci
 npm run dev
 ```
 
-The local handbook is served under `/Mozais/`, matching GitHub Pages. The API
+The local handbook is served under `/Akari/`, matching GitHub Pages. The API
 links become available after generation. For a complete build:
 
 ```sh
@@ -59,7 +59,7 @@ from examples.
 
 ## GitHub Pages
 
-The website is hosted at `https://anfsity.github.io/Mozais/`. Pushes to `gh-pages`
+The website is hosted at `https://anfsity.github.io/Akari/`. Pushes to `gh-pages`
 or manual workflow runs trigger the documentation workflow.
 The workflow builds the handbook and Dart reference, verifies the output, and
 deploys a Pages artifact directly using GitHub's official deployment actions.

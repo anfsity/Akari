@@ -112,17 +112,17 @@ def write_json_atomic(path, value, mode=0o600):
 
 
 def capture_outputs():
-    directory = Path(os.environ['MOZAIS_LOG_DIR'])
+    directory = Path(os.environ['AKARI_LOG_DIR'])
     raw = subprocess.check_output(['swaymsg', '-r', '-t', 'get_outputs'])
     snapshot = directory / 'outputs.json'
     # Publish raw diagnostics first; the profile is the completion marker.
     snapshot.write_bytes(raw)
-    if os.environ.get('MOZAIS_DISPLAY_SOURCE') == 'greetd-login':
+    if os.environ.get('AKARI_DISPLAY_SOURCE') == 'greetd-login':
         profile = {
             'schema_version': 1,
             'source': {
                 'kind': 'login', 'backend': 'drm',
-                'run': str(Path(os.environ['MOZAIS_TEST_RUN']).resolve()),
+                'run': str(Path(os.environ['AKARI_TEST_RUN']).resolve()),
                 'session': str(directory.resolve()),
                 'captured_at': datetime.now(timezone.utc).isoformat(),
                 'snapshot': str(snapshot.resolve()),
@@ -264,7 +264,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--reference', type=Path, required=True)
     parser.add_argument('--state', type=Path, required=True)
-    parser.add_argument('--installation', type=Path, default=Path('/opt/mozais-test'))
+    parser.add_argument('--installation', type=Path, default=Path('/opt/akari-test'))
     parser.add_argument('--display-profile', choices=['auto', 'login', 'reference'], default='auto')
     parser.add_argument('--resolution')
     parser.add_argument('--scale')

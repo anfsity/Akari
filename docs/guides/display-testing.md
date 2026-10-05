@@ -24,7 +24,7 @@ Python 3, Sway, `swaymsg`, and grim. Native input checks also need wtype.
 ## Check shared state on several monitors
 
 ```sh
-fvm dart run tool/mozais.dart run --theme themes/default
+fvm dart run tool/akari.dart run --theme themes/default
 ```
 
 The fullscreen greeter opens a view on each monitor. Click a view to make it
@@ -39,14 +39,14 @@ retain the conversation, and the reconnected view should show its current state.
 Each view lays out against its own logical dimensions and scale.
 
 For a single resizable window instead, use `preview` or set
-`MOZAIS_WINDOW_MODE=windowed` before `run`. Quit with `q` in the launching terminal.
+`AKARI_WINDOW_MODE=windowed` before `run`. Quit with `q` in the launching terminal.
 
 ## Compare a nested session with standalone login
 
 Start with the project reference when no login capture is available:
 
 ```sh
-fvm dart run tool/mozais.dart run sway --theme themes/default \
+fvm dart run tool/akari.dart run sway --theme themes/default \
   --display-profile reference
 ```
 
@@ -54,7 +54,7 @@ After completing the [standalone capture workflow](greetd-testing.md), return to
 the desktop and require that capture explicitly:
 
 ```sh
-fvm dart run tool/mozais.dart run sway --theme themes/default \
+fvm dart run tool/akari.dart run sway --theme themes/default \
   --display-profile login
 ```
 
@@ -73,7 +73,7 @@ viewport and compensated scale update while the theme keeps running.
 ## Capture a fixed resolution
 
 ```sh
-fvm dart run tool/mozais.dart run sway --theme themes/default \
+fvm dart run tool/akari.dart run sway --theme themes/default \
   --display-profile reference --sway-backend headless \
   --resolution 1920x1080 --scale 1.6
 ```

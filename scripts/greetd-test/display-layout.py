@@ -118,7 +118,7 @@ def run_greeter(layout, command):
             raise RuntimeError(f'Could not subscribe to output changes: {response}')
         if layout is not None:
             update_positions(layout)
-        if os.environ.get('MOZAIS_LOG_DIR'):
+        if os.environ.get('AKARI_LOG_DIR'):
             capture_outputs()
 
         def update_on_output_changes():
