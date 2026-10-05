@@ -138,6 +138,37 @@ void main() {
     expect(resized.rect.height, _source.rect.height);
   });
 
+  test('small interactive nodes resize from their rendered minimum bounds', () {
+    final source = _source.copyWith(
+      interactive: true,
+      rect: _source.rect.copyWith(width: 0.02, height: 0.01),
+    );
+    final resized = calculateResizedNode(
+      source: source,
+      canvasSize: _canvas,
+      handle: NodeResizeHandle.right,
+      delta: const Offset(20, 0),
+      lockAspectRatio: false,
+      minHitTarget: 44,
+    );
+    expect(resized.rect.width, closeTo(64 / 1000, 1e-8));
+    expect(
+      (_getAnchor(resized, Alignment.centerLeft) -
+              _getAnchor(source, Alignment.centerLeft))
+          .distance,
+      lessThan(1e-8),
+    );
+    final shrunk = calculateResizedNode(
+      source: resized,
+      canvasSize: _canvas,
+      handle: NodeResizeHandle.right,
+      delta: const Offset(-100, 0),
+      lockAspectRatio: false,
+      minHitTarget: 44,
+    );
+    expect(shrunk.rect.width * _canvas.width, closeTo(44, 1e-8));
+  });
+
   test('singular projections do not expose resize handles', () {
     expect(
       hasResizableProjection(
