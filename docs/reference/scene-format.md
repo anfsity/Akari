@@ -125,6 +125,12 @@ vocabulary. Conditions do not run arbitrary expressions or scripts. The greeter
 adapter projects semantic state into predicates; themes do not derive them from
 backend transport objects.
 
+Dormancy does not end an authentication prompt. An authentication predicate
+can therefore remain active while `isDormant` is also active. Combine login
+control conditions with `{ "not": "isDormant" }` when they should hide on
+Escape. The default theme's confirm arrow uses this gate for prompting,
+submitting, and authentication errors.
+
 ## Versions
 
 The current version is 2. The decoder also accepts version 1, normalizing the old

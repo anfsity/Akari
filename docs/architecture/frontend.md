@@ -258,6 +258,13 @@ The implicit view owns the app root and survives monitor removal by moving to a
 remaining output, or staying hidden until an output reconnects. Studio requests
 `MOZAIS_DISPLAY_MODE=single` because its editor is a single-view application.
 
+Changing focus or attaching a view does not create another feature or backend
+conversation. Account, session, authentication, dormant state, and credential
+text follow the application lifetime; focus and wake animation follow each
+adapter's lifetime. The multi-display Flutter test checks shared state and
+single-response dispatch, while the [native display checks](../guides/testing.md#native-display-regressions)
+exercise GTK view and monitor lifetime.
+
 Returning to the dormant background with Escape preserves the authentication
 attempt and its prompt. Wake resumes that same conversation. The adapter clears
 local credential text on hide and restores focus on wake; it does not submit or
@@ -313,4 +320,3 @@ and paint events during a separate profile run; its timings are diagnostic
 and are not used by the performance gate. Set `MOZAIS_FLUTTER_BIN` to use a
 specific Flutter SDK; the matching Dart binary is taken from the same SDK
 directory.
-

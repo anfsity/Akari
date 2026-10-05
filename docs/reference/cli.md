@@ -130,6 +130,9 @@ retains screenshots and logs in the printed temporary directory.
 
 ## Sway sessions and display profiles
 
+For a step-by-step comparison and troubleshooting, see
+[display testing](../guides/display-testing.md).
+
 A preview on Hyprland inherits that output's scale. Use `run sway` to apply
 the standalone greeter's scale in a nested compositor:
 
