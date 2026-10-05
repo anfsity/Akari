@@ -18,7 +18,7 @@ description: 查找负责进程生命周期、身份验证和传输的 Rust 模�
 
 进程会同时监控服务生命周期和身份验证 actor 的生命周期。关闭时会先停止接受新调用，再取消正在进行的协议工作。交接桌面会话时，必须释放登录界面，让 greetd 启动所选桌面。
 
-每次身份验证尝试都有一个 generation token。UI 信号和响应必须关联到对应尝试；取消操作会使 token 失效。电源请求使用独立的状态域。
+每次登录验证都有一个用于区分尝试的 generation token。界面信号和响应必须关联到对应尝试；取消后，这个 token 会失效。电源请求单独管理状态。
 
 ## 本地代码参考
 
@@ -28,6 +28,6 @@ description: 查找负责进程生命周期、身份验证和传输的 Rust 模�
 cargo doc --manifest-path backend/Cargo.toml --no-deps --document-private-items
 ```
 
-生成的页面位于 `backend/target/doc/`。Rustdoc 会读取 `///` 项目注释和 `//!` 模块文档。请在这些注释中说明协议不变量和资源所有权；跨模块流程则放在本指南中。
+生成的页面位于 `backend/target/doc/`。Rustdoc 会读取 `///` 项目注释和 `//!` 模块文档。这些注释应说明协议必须遵守的规则，以及资源由谁创建、管理和释放。涉及多个模块的流程写在本指南中。
 
-当前公开网站只发布 Theme SDK API。当出现 Rust API 的使用者，或需要托管的贡献者参考资料时，再添加后端代码参考。
+网站目前只发布 Theme SDK API。以后如果需要让其他项目使用 Rust API，或让贡献者在线查阅后端代码，再加入 Rustdoc 页面。
