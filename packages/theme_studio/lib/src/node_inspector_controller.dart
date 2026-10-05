@@ -182,15 +182,33 @@ class NodeInspectorController extends ChangeNotifier {
     perspective: _getNumber('Perspective'),
   );
 
-  Map<String, String> _getProperties() {
+  void updateProperty(String name, String value) {
+    final properties = getPropertiesDraft();
+    if (properties[name] == value) return;
+    properties[name] = value;
+    getField('Properties').text = const JsonEncoder.withIndent('  ')
+        .convert(properties);
+  }
+
+  Map<String, String> getPropertiesDraft() {
     final properties = jsonDecode(getField('Properties').text);
     if (properties is! Map<String, dynamic> ||
-        properties.values.any((value) => value is! String || value.isEmpty)) {
+        properties.values.any((value) => value is! String)) {
       throw const FormatException(
         'Properties must be an object of non-empty strings.',
       );
     }
     return properties.cast<String, String>();
+  }
+
+  Map<String, String> _getProperties() {
+    final properties = getPropertiesDraft();
+    if (properties.values.any((value) => value.isEmpty)) {
+      throw const FormatException(
+        'Properties must be an object of non-empty strings.',
+      );
+    }
+    return properties;
   }
 
   @override
