@@ -47,11 +47,16 @@ scene switches within the current session. Small windows scroll the workspace.
    theme's components. A standalone JSON uses the compiled theme's assets.
 2. Select a node on the canvas or in the layer list. The list also includes
    nodes hidden by the current preview state, ordered from front to back.
-3. Edit normalized position/size, depth, paint/focus order, transforms, motion,
+3. Edit position/size in reference pixels (the default) or percentages,
+   depth, paint/focus order, transforms, motion,
    or the component's string-valued JSON properties in the inspector.
 4. Click **Apply to preview**, or press Enter in a numeric field. Invalid edits
    show an error and retain the last valid document. Selecting another node
    applies valid pending fields first.
+   Switching layout units only changes the displayed values; it preserves
+   pending edits and does not create an undo entry. Scene JSON continues to
+   store normalized coordinates. Pixel values follow the reference resolution
+   in **Settings**.
 5. Use **Undo** and **Redo** for document edits. **Save scene** applies pending
    fields and writes the scene JSON. **Reload from disk** requires an explicit
    discard action and clears history.

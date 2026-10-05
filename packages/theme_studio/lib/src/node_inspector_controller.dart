@@ -5,16 +5,22 @@ import 'package:scene/scene.dart';
 
 import 'studio_form_values.dart';
 
+enum StudioLayoutUnit { pixels, percent }
+
+const _layoutFields = {'X', 'Y', 'Width', 'Height'};
+
 /// Owns drafts independently of the inspector widget's mount lifecycle. The
 /// editor commits them at document-command boundaries; the view only edits
 /// fields and observes validation results.
 class NodeInspectorController extends ChangeNotifier {
-  NodeInspectorController(SceneNode node) {
+  NodeInspectorController(SceneNode node, this._canvas) {
     resetNode(node);
   }
 
   final _fields = <String, TextEditingController>{};
   late SceneNode _node;
+  SceneCanvas _canvas;
+  StudioLayoutUnit _layoutUnit = StudioLayoutUnit.pixels;
   late SceneMotionPreset _motion;
   String? _error;
   bool _hasDraft = false;
@@ -24,6 +30,7 @@ class NodeInspectorController extends ChangeNotifier {
   SceneMotionPreset get motion => _motion;
   String? get error => _error;
   bool get hasDraft => _hasDraft;
+  StudioLayoutUnit get layoutUnit => _layoutUnit;
   TextEditingController getField(String label) => _fields[label]!;
 
   void _markDraftChanged() {
@@ -50,17 +57,17 @@ class NodeInspectorController extends ChangeNotifier {
     _updatingFields = true;
     for (final entry in _getPreviewValues(node).entries) {
       final field = getField(entry.key);
-      final text = '${entry.value}';
+      final text = _getFieldText(entry.key, entry.value);
       if (field.text != text) field.text = text;
     }
     _updatingFields = false;
   }
 
   Map<String, double> _getPreviewValues(SceneNode node) => {
-    'X': node.rect.x,
-    'Y': node.rect.y,
-    'Width': node.rect.width,
-    'Height': node.rect.height,
+    'X': node.rect.x * _getLayoutFactor('X'),
+    'Y': node.rect.y * _getLayoutFactor('Y'),
+    'Width': node.rect.width * _getLayoutFactor('Width'),
+    'Height': node.rect.height * _getLayoutFactor('Height'),
     'Scale X': node.transform.scaleX,
     'Scale Y': node.transform.scaleY,
     'Rotate X': node.transform.rotationX,
@@ -68,9 +75,42 @@ class NodeInspectorController extends ChangeNotifier {
     'Rotate Z': node.transform.rotationZ,
   };
 
-  void resetNode(SceneNode node) {
+  double _getLayoutFactor(String label) =>
+      _layoutUnit == StudioLayoutUnit.percent
+      ? 100
+      : (label == 'X' || label == 'Width')
+      ? _canvas.referenceWidth.toDouble()
+      : _canvas.referenceHeight.toDouble();
+
+  String _getFieldText(String label, Object value) =>
+      _layoutFields.contains(label)
+      ? (value as double).toStringAsFixed(4).replaceFirst(RegExp(r'\.?0+$'), '')
+      : '$value';
+
+  void updateLayoutUnit(StudioLayoutUnit unit) {
+    if (unit == _layoutUnit) return;
+    try {
+      final rect = _getRect();
+      _layoutUnit = unit;
+      _updatingFields = true;
+      for (final entry in _getPreviewValues(
+        _node.copyWith(rect: rect),
+      ).entries) {
+        if (_layoutFields.contains(entry.key)) {
+          getField(entry.key).text = _getFieldText(entry.key, entry.value);
+        }
+      }
+      _updatingFields = false;
+      notifyListeners();
+    } on FormatException catch (error) {
+      showError(error.message);
+    }
+  }
+
+  void resetNode(SceneNode node, {SceneCanvas? canvas}) {
     _updatingFields = true;
     _node = node;
+    if (canvas != null) _canvas = canvas;
     final transform = node.transform;
     final values = <String, Object>{
       ..._getPreviewValues(node),
@@ -88,7 +128,7 @@ class NodeInspectorController extends ChangeNotifier {
       final controller = _fields.putIfAbsent(entry.key, () {
         return TextEditingController()..addListener(_markDraftChanged);
       });
-      controller.text = '${entry.value}';
+      controller.text = _getFieldText(entry.key, entry.value);
     }
     _motion = node.motion;
     _error = null;
@@ -112,11 +152,21 @@ class NodeInspectorController extends ChangeNotifier {
     properties: _getProperties(),
   );
 
+  double _getLayoutNumber(String label, double source) {
+    final factor = _getLayoutFactor(label);
+    // Formatting is presentation only: untouched geometry retains its full
+    // precision when an unrelated property is edited or the units change.
+    if (getField(label).text == _getFieldText(label, source * factor)) {
+      return source;
+    }
+    return _getNumber(label) / factor;
+  }
+
   SceneRect _getRect() => SceneRect(
-    x: _getNumber('X'),
-    y: _getNumber('Y'),
-    width: _getNumber('Width'),
-    height: _getNumber('Height'),
+    x: _getLayoutNumber('X', _node.rect.x),
+    y: _getLayoutNumber('Y', _node.rect.y),
+    width: _getLayoutNumber('Width', _node.rect.width),
+    height: _getLayoutNumber('Height', _node.rect.height),
   );
 
   SceneTransform _getTransform() => SceneTransform(

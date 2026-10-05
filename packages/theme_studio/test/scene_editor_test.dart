@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scene/scene.dart';
 import 'package:theme_studio/src/scene_editor.dart';
+import 'package:theme_studio/src/node_inspector_controller.dart';
 
 void main() {
   late Directory directory;
@@ -60,22 +61,22 @@ void main() {
   });
 
   test('draft commands work without a mounted inspector', () {
-    editor.inspector.getField('X').text = '0.2';
+    editor.inspector.getField('X').text = '384';
     editor.undo();
     expect(editor.selectedNode.rect.x, 0.1);
     expect(editor.inspector.hasDraft, isFalse);
     editor.redo();
     expect(editor.selectedNode.rect.x, 0.2);
 
-    editor.inspector.getField('X').text = '0.3';
+    editor.inspector.getField('X').text = '576';
     editor.duplicateSelectedNode();
     expect(editor.document.nodes.map((node) => node.rect.x), [0.3, 0.3]);
-    editor.inspector.getField('X').text = '0.4';
+    editor.inspector.getField('X').text = '768';
     editor.selectNode('panel');
     expect(editor.document.nodes.last.rect.x, 0.4);
-    expect(editor.inspector.getField('X').text, '0.3');
+    expect(editor.inspector.getField('X').text, '576');
 
-    editor.inspector.getField('X').text = '0.2';
+    editor.inspector.getField('X').text = '384';
     expect(editor.save(), isTrue);
     expect(
       decodeSceneDocument(file.readAsStringSync()).nodes.first.rect.x,
@@ -87,7 +88,7 @@ void main() {
     editor.duplicateSelectedNode();
     final document = editor.document;
     final source = file.readAsStringSync();
-    editor.inspector.getField('Width').text = '2';
+    editor.inspector.getField('Width').text = '3840';
     editor.undo();
     editor.redo();
     editor.duplicateSelectedNode();
@@ -103,16 +104,65 @@ void main() {
     editor.reload();
     expect(editor.inspector.hasDraft, isFalse);
     expect(editor.inspector.error, isNull);
-    expect(editor.inspector.getField('Width').text, '0.5');
+    expect(editor.inspector.getField('Width').text, '960');
   });
 
   test('equivalent drafts clear without creating history', () {
-    editor.inspector.getField('X').text = '0.10';
+    editor.inspector.getField('X').text = '192.00';
     expect(editor.applyDraft(), isTrue);
     expect(editor.inspector.hasDraft, isFalse);
     expect(editor.canUndo, isFalse);
     expect(editor.isDirty, isFalse);
   });
+
+  test('layout units preserve drafts, transforms and normalized storage', () {
+    expect(editor.inspector.getField('Width').text, '960');
+    editor.inspector.getField('X').text = '384';
+    editor.inspector.getField('Rotate Z').text = '20';
+    editor.inspector.updateLayoutUnit(StudioLayoutUnit.percent);
+    expect(editor.inspector.getField('X').text, '20');
+    expect(editor.inspector.getField('Width').text, '50');
+    expect(editor.inspector.getField('Rotate Z').text, '20');
+    expect(editor.canUndo, isFalse);
+    expect(editor.inspector.hasDraft, isTrue);
+    expect(editor.applyDraft(), isTrue);
+    expect(editor.selectedNode.rect.x, 0.2);
+    expect(editor.selectedNode.transform.rotationZ, 20);
+    editor.undo();
+    expect(editor.inspector.getField('X').text, '10');
+    editor.inspector.updateLayoutUnit(StudioLayoutUnit.pixels);
+    expect(editor.inspector.getField('X').text, '192');
+    expect(editor.inspector.hasDraft, isFalse);
+  });
+
+  test(
+    'pixel dimensions follow canvas settings and retain geometry precision',
+    () {
+      editor.updateNode(
+        editor.selectedNode.copyWith(
+          rect: editor.selectedNode.rect.copyWith(x: 0.123456789),
+        ),
+      );
+      final original = encodeSceneDocument(editor.document);
+      editor.inspector.updateLayoutUnit(StudioLayoutUnit.percent);
+      editor.inspector.updateLayoutUnit(StudioLayoutUnit.pixels);
+      expect(editor.inspector.hasDraft, isFalse);
+      expect(editor.applyDraft(), isTrue);
+      expect(encodeSceneDocument(editor.document), original);
+      editor.inspector.getField('Depth').text = '1';
+      editor.applyDraft();
+      expect(editor.selectedNode.rect.x, 0.123456789);
+      editor.updateScene(canvas: const SceneCanvas(referenceWidth: 1000));
+      expect(editor.inspector.getField('Width').text, '500');
+      editor.undo();
+      expect(editor.inspector.getField('Width').text, '960');
+      editor.inspector.getField('X').text = 'invalid';
+      editor.inspector.updateLayoutUnit(StudioLayoutUnit.percent);
+      expect(editor.inspector.layoutUnit, StudioLayoutUnit.pixels);
+      expect(editor.inspector.getField('X').text, 'invalid');
+      expect(editor.inspector.error, 'X must be a finite number.');
+    },
+  );
 
   test(
     'draft parsing rejects non-finite numbers, invalid integers and properties',
@@ -122,7 +172,7 @@ void main() {
         expect(editor.applyDraft(), isFalse);
         expect(editor.inspector.error, 'X must be a finite number.');
       }
-      editor.inspector.getField('X').text = '0.1';
+      editor.inspector.getField('X').text = '192';
       editor.inspector.getField('Depth').text = '1.5';
       expect(editor.applyDraft(), isFalse);
       expect(editor.inspector.error, 'Depth must be an integer.');
