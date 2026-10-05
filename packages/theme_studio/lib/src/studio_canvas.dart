@@ -27,6 +27,7 @@ class StudioCanvas extends StatefulWidget {
 
 class _StudioCanvasState extends State<StudioCanvas> {
   StudioCanvasTool _tool = StudioCanvasTool.move;
+  bool _lockAspectRatio = false;
 
   @override
   Widget build(BuildContext context) => ColoredBox(
@@ -56,6 +57,24 @@ class _StudioCanvasState extends State<StudioCanvas> {
                       onPressed: () => setState(() => _tool = tool),
                       child: Text(tool.label),
                     ),
+                  Button(
+                    key: const ValueKey('lock-aspect-ratio'),
+                    style: _lockAspectRatio
+                        ? const ButtonStyle.primary()
+                        : const ButtonStyle.outline(),
+                    onPressed: () =>
+                        setState(() => _lockAspectRatio = !_lockAspectRatio),
+                    child: Semantics(
+                      label: 'Lock aspect ratio',
+                      toggled: _lockAspectRatio,
+                      child: Icon(
+                        _lockAspectRatio
+                            ? LucideIcons.lock
+                            : LucideIcons.lockOpen,
+                        size: 16,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -75,6 +94,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                         dormant: widget.dormant,
                         preferences: widget.preferences,
                         tool: _tool,
+                        lockAspectRatio: _lockAspectRatio,
                         onSelect: session.selectNode,
                         onStartDrag: (id) => session.selectNode(id)
                             ? session.selectedNode
@@ -89,7 +109,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
               child: Text(
                 session == null
                     ? 'Choose a valid scene document.'
-                    : '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}  ·  ${_tool.hint}  ·  Simulated data',
+                    : '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}  ·  ${_tool == StudioCanvasTool.move ? 'Drag to move · Drag handles to resize · Shift locks ratio' : _tool.hint}',
                 textAlign: TextAlign.center,
               ).small().muted(),
             ),

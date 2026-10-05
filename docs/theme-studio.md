@@ -74,6 +74,13 @@ uses the runtime's transforms and visibility rules. Choose a canvas tool, then
 drag a visible node:
 
 - **Move** changes the layout X/Y within the canvas.
+- In **Move**, the selected node has eight resize handles. Drag a side to
+  change one layout dimension or a corner to change both. The opposite edge
+  stays anchored, including on transformed nodes. Hold Shift or toggle the
+  lock button to preserve the aspect ratio. Resizing changes layout constraints,
+  allowing content to reflow without stretching glyphs; components with their
+  own fit-to-content scaling may still reduce their font size. Handles retain
+  their screen size, respect grid snapping and stop at the canvas boundary.
 - **Scale** changes Scale X with horizontal movement and Scale Y with vertical
   movement, retaining the layout size and pivot. Mirrored axes retain their sign;
   dragged scale magnitudes stay between 0.01 and 100.
@@ -97,7 +104,7 @@ after a complete write. It refuses to save when the source changed externally,
 leaving both the external file and the editor's unsaved document available.
 
 New nodes can currently be created by duplication. Adding an arbitrary
-component, resizing layout bounds on the canvas, editing visibility rules,
+component, editing visibility rules,
 additional preview states, and unsaved-work recovery after closing
 the application are not implemented. Save explicitly before closing the window.
 Custom property names and values remain the responsibility of the compiled

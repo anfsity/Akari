@@ -59,6 +59,8 @@ class NodeInspectorController extends ChangeNotifier {
   Map<String, double> _getPreviewValues(SceneNode node) => {
     'X': node.rect.x,
     'Y': node.rect.y,
+    'Width': node.rect.width,
+    'Height': node.rect.height,
     'Scale X': node.transform.scaleX,
     'Scale Y': node.transform.scaleY,
     'Rotate X': node.transform.rotationX,
@@ -72,8 +74,6 @@ class NodeInspectorController extends ChangeNotifier {
     final transform = node.transform;
     final values = <String, Object>{
       ..._getPreviewValues(node),
-      'Width': node.rect.width,
-      'Height': node.rect.height,
       'Depth': node.z,
       'Paint order': node.renderOrder,
       'Focus order': node.focusOrder,
