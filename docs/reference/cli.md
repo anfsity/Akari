@@ -1,6 +1,38 @@
 ---
 title: CLI and development tooling
+description: Command targets, accepted options, display profiles, and execution reports.
 ---
+
+## Commands and targets
+
+From the repository root, use `fvm dart run tool/mozais.dart COMMAND`. After
+[installing the launcher](#shell-launcher-and-completion), use `mozais COMMAND`.
+
+| Command | Purpose | Command-specific options |
+| --- | --- | --- |
+| `build` | Build a selected theme and production backend | `--theme`, `--jobs`, `--mode`, `--platform` |
+| `preview` | Preview a theme with demo login state | `--theme`, `--jobs`, `--mode` |
+| `run` | Run the greeter with a private D-Bus and backend | `--theme`, `--jobs`, `--mode`, `--backend` |
+| `run sway` | Run that greeter inside nested or headless Sway | Run options plus `--display-profile`, `--resolution`, `--scale`, `--sway-backend` |
+| `run studio` | Edit scenes with the selected compiled theme | `--theme`, `--jobs` |
+| `verify` | Check shared code, backend, and theme projects | `--theme` |
+| `generate-scenes` | Generate typed Dart from scene JSON | `--theme` |
+| `verify-perf` / `perf` | Run the theme's declared performance gate | `--theme`, arguments after `--` |
+| `trace-perf` / `trace` | Run the theme's declared performance trace | `--theme`, arguments after `--` |
+| `install` | Install the repository-bound launcher and completion | `--shell`, `--prefix`, `--rc` |
+| `completion` | Print a completion script | `--shell` |
+| `greetd-test` | Manage standalone login testing | [Operation-specific options](../guides/greetd-testing.md) |
+
+Build, preview, run targets, verification, scene generation, and performance
+commands also accept `--format text|json`, `--report PATH`, and `--dry-run`.
+Every command accepts `--help` (`-h`). `install`, `completion`, and the
+`greetd-test` family use their own output and option contracts.
+
+`run sway` and `run studio` are targets of `run`, so use
+`mozais run TARGET --help` to see their accepted options. Studio always runs in
+debug mode without a backend; it does not accept `--mode` or `--backend`.
+Its developing user guide remains in the repository's
+[Studio notes](https://github.com/anfsity/Mozais/blob/main/docs/internal/theme-studio.md).
 
 Run project checks through the Dart tool entry point:
 
@@ -16,12 +48,15 @@ Use `-t`, `-m`, and `-j` for `--theme`, `--mode`, and `--jobs`.
 `perf` aliases `verify-perf`, and `trace` aliases `trace-perf`.
 Long options also accept `--name=value`. Mixing short and long spellings of
 the same option is still a duplicate error. `COMMAND --help` lists only options
-accepted by that command. Arguments after `--` remain literal theme arguments.
+accepted by that command. Only performance commands accept arguments after `--`;
+they pass them literally to the theme's runner.
 
 ```sh
 fvm dart run tool/mozais.dart build -t themes/default -m release -j 4
 fvm dart run tool/mozais.dart perf -t themes/default -- --cycles 5
 ```
+
+## Shell launcher and completion
 
 Install a repository-bound `mozais` command and shell completion at user level:
 
@@ -55,6 +90,8 @@ control do not acquire theme locks or create development run directories.
 The `mozais` launcher still needs the repository and SDK. Emergency recovery
 remains `sudo /opt/mozais-test/restore.sh`, independent of both.
 See [Standalone greetd testing](../guides/greetd-testing.md) for options and prerequisites.
+
+## Build, preview, and run
 
 `build` accepts a theme project with `--theme PATH`, defaulting to
 `themes/default`. It resolves that project's dependencies, generates its scene
@@ -90,6 +127,8 @@ For native multi-monitor regression checks, build a demo preview bundle and run
 This opt-in check requires Sway, wtype, and grim. It starts an isolated headless
 compositor with mixed output scales, tests hotplug and both window modes, and
 retains screenshots and logs in the printed temporary directory.
+
+## Sway sessions and display profiles
 
 A preview on Hyprland inherits that output's scale. Use `run sway` to apply
 the standalone greeter's scale in a nested compositor:
@@ -188,6 +227,8 @@ inner scales 1 and 1.6. It retains target/actual reports and checks 1920×1080
 inner screenshot dimensions for all four combinations. It does not alter the
 developer's desktop configuration or certify Hyprland-specific placement.
 
+## Verification and generated hosts
+
 Production `build` defaults to release and compiles both frontend and Rust backend.
 
 `verify` analyzes shared code, the backend, and every project discovered under
@@ -214,10 +255,18 @@ and Linux session work such as private D-Bus and Sway. `scripts/debug-dbus.sh`
 accepts a command to run with the backend on a private bus; without a command,
 it invokes the CLI's `run` command directly.
 
+## Reports and build outputs
+
 Use `--format json` for a machine-readable report on stdout. Every run also
 writes a report and event log beneath `build/tool/runs/<run-id>/`. Each command
 step has separate stdout and stderr log files. A report can be written to a
 chosen path with `--report PATH`.
+
+For commands using this report protocol, `--dry-run` prints a JSON execution
+plan, including artifact paths, without running build or session steps. It does
+not write the report or reserve its run directory. A Sway plan resolves the
+selected display profile without importing it, but has no actual outputs or
+screenshots because no compositor has started.
 
 Build reports list the generated host project, build directory, and Linux
 executable. SDK commands use the repository's configured Flutter SDK even when
@@ -240,6 +289,8 @@ timing, generated artifact paths, and an ordered list of command steps with
 their arguments, working directories, exit codes, timing, and log paths. The
 `events.jsonl` file records run and step start and finish events. Child command
 output stays in the per-step logs so JSON stdout remains parseable.
+
+## Theme performance commands
 
 `verify-perf` and `trace-perf` select one theme with `--theme PATH`, defaulting
 to `themes/default`. They execute that theme's explicitly declared perf command
@@ -266,6 +317,8 @@ parsing the artifact contents. Failed commands can publish diagnostic artifacts
 too. Their nonzero exit codes are preserved, and missing failure manifests do
 not hide the command failure. Protocol errors fail the run while retaining its
 logs and report. JSON console output remains a single CLI report.
+
+## Caches and parallel work
 
 Host projects retain Flutter and native build caches between runs. Shared application
 source is linked into the host, and Linux runner files are synchronized only when
