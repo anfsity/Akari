@@ -310,6 +310,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         preferences: _preferences,
         dormant: _dormant,
         onToggleDormant: () => setState(() => _dormant = !_dormant),
+        onSave: _save,
       ),
       inspector: editor == null
           ? const SizedBox()

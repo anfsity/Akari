@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scene/scene.dart';
-import 'package:theme_studio/src/node_resize.dart';
+import 'package:theme_studio/src/node_geometry.dart';
 
 const _canvas = Size(1000, 800);
 const _source = SceneNode(

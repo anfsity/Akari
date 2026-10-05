@@ -3,6 +3,24 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:scene/scene.dart';
 
+SceneRect calculateMovedRect({
+  required SceneRect rect,
+  required Size canvasSize,
+  required Offset delta,
+  double? gridSize,
+}) {
+  var x = rect.x * canvasSize.width + delta.dx;
+  var y = rect.y * canvasSize.height + delta.dy;
+  if (gridSize != null) {
+    x = (x / gridSize).round() * gridSize;
+    y = (y / gridSize).round() * gridSize;
+  }
+  return rect.copyWith(
+    x: (x / canvasSize.width).clamp(0.0, 1.0 - rect.width),
+    y: (y / canvasSize.height).clamp(0.0, 1.0 - rect.height),
+  );
+}
+
 enum NodeResizeHandle {
   topLeft(Alignment.topLeft, SystemMouseCursors.resizeUpLeftDownRight),
   top(Alignment.topCenter, SystemMouseCursors.resizeUpDown),
