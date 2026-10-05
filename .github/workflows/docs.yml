@@ -1,0 +1,77 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'packages/theme_sdk/**'
+      - 'packages/scene/**'
+      - 'packages/scene_schema/**'
+      - 'packages/greeter_components/**'
+      - 'scripts/build-api-docs.sh'
+      - 'scripts/verify-docs.py'
+      - 'dartdoc_options.yaml'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'packages/theme_sdk/**'
+      - 'packages/scene/**'
+      - 'packages/scene_schema/**'
+      - 'packages/greeter_components/**'
+      - 'scripts/build-api-docs.sh'
+      - 'scripts/verify-docs.py'
+      - 'dartdoc_options.yaml'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: documentation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: docs/site/package-lock.json
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - name: Install website dependencies
+        run: npm ci
+        working-directory: docs/site
+      - name: Generate public Dart reference
+        run: MOZAIS_FLUTTER_BIN="$(command -v flutter)" MOZAIS_DART_BIN="$(command -v dart)" bash scripts/build-api-docs.sh
+      - name: Check and build the handbook
+        run: npm run check && npm run build && npm run verify
+        working-directory: docs/site
+      - uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: docs/site/dist
+          include-hidden-files: true
+
+  publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy verified site
+        id: deployment
+        uses: actions/deploy-pages@v5.0.1
