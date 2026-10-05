@@ -96,6 +96,10 @@ drag a visible node:
 - **Scale** changes Scale X with horizontal movement and Scale Y with vertical
   movement, retaining the layout size and pivot. Mirrored axes retain their sign;
   dragged scale magnitudes stay between 0.01 and 100.
+  For a node already stretched by Scale, use **Advanced layout → Reset scale**
+  to restore both scale axes to 1, then resize its layout with the handles.
+  Resetting scale preserves its layout, translation, pivot and rotations and
+  supports undo/redo.
 - **Rotate** changes Rotate Z with horizontal movement, around the authored pivot.
 - **3D rotate** changes Rotate Y with horizontal movement and Rotate X with
   vertical movement. The authored perspective is preserved; edit **Perspective**
