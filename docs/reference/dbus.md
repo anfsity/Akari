@@ -1,4 +1,6 @@
-# System Architecture & D-Bus Contract Specification
+---
+title: D-Bus contract
+---
 
 This specification defines the inter-process communication (IPC) boundaries, state machine invariants, security policies, and technical implementations for the **Mozais Greeter** backend-frontend abstraction layer.
 

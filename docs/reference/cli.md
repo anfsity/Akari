@@ -1,10 +1,11 @@
-# Development Tooling
+---
+title: CLI and development tooling
+---
 
 Run project checks through the Dart tool entry point:
 
 ```sh
 fvm dart run tool/mozais.dart build
-fvm dart run tool/mozais.dart run studio
 fvm dart run tool/mozais.dart verify
 fvm dart run tool/mozais.dart verify-perf
 fvm dart run tool/mozais.dart generate-scenes
@@ -53,7 +54,7 @@ installation needs repository build artifacts; status/log queries and service
 control do not acquire theme locks or create development run directories.
 The `mozais` launcher still needs the repository and SDK. Emergency recovery
 remains `sudo /opt/mozais-test/restore.sh`, independent of both.
-See [Standalone greetd testing](greetd-testing.md) for options and prerequisites.
+See [Standalone greetd testing](../guides/greetd-testing.md) for options and prerequisites.
 
 `build` accepts a theme project with `--theme PATH`, defaulting to
 `themes/default`. It resolves that project's dependencies, generates its scene
@@ -73,8 +74,7 @@ Scene JSON edits first run incremental code generation; failed generation keeps
 the last working theme. `r` regenerates and reloads, `R` restarts, and `q` quits.
 Profile/release sessions do not hot reload. Both commands accept `--jobs COUNT`.
 
-Preview and Studio open directly in the current desktop; neither starts a nested
-compositor. Preview defaults to a resizable, undecorated window. `run` and built
+Preview opens directly in the current desktop without a nested compositor. Preview defaults to a resizable, undecorated window. `run` and built
 greeter bundles default to undecorated fullscreen. Set
 `MOZAIS_WINDOW_MODE=fullscreen` for a fullscreen preview or `windowed` for a
 windowed greeter. Exit live sessions with `q` in the launching terminal.
@@ -83,7 +83,7 @@ Fullscreen greeters render the same theme on every connected monitor, using
 each output's logical size and scale. Account, session, authentication, dormant
 state, and credential text are shared; keyboard actions belong to the focused
 window. Connecting or disconnecting an output updates its window without
-restarting authentication. Windowed previews and Studio use one window.
+restarting authentication. Windowed previews use one window.
 
 For native multi-monitor regression checks, build a demo preview bundle and run
 `python3 test/support/multi_display_workflow_test.py --app PATH/greeter`.
@@ -190,12 +190,6 @@ developer's desktop configuration or certify Hyprland-specific placement.
 
 Production `build` defaults to release and compiles both frontend and Rust backend.
 
-Use `run studio --theme PATH` to edit scene JSON with a shadcn inspector, compiled
-theme preview, node selection, undo/redo, and explicit saving. Studio runs in a
-separate debug host with simulated data. See [Theme Studio](theme-studio.md).
-`run --help` lists the Studio target; `run studio --help` lists its options.
-Studio always uses debug mode and accepts no `--mode` or `--backend` option.
-
 `verify` analyzes shared code, the backend, and every project discovered under
 `themes/`. With `--theme PATH`, it checks only the selected theme alongside shared
 code and the backend. Theme-specific UI tests live in their theme package. It
@@ -213,7 +207,7 @@ fvm flutter run -d linux --target tool/dev_main.dart
 
 Use the CLI for build, run, verification, scene generation, and performance
 workflows. After installing the launcher, use `mozais build`, `mozais run`,
-`mozais run studio`, `mozais verify`, `mozais generate-scenes`, `mozais perf`,
+`mozais verify`, `mozais generate-scenes`, `mozais perf`,
 and `mozais trace`.
 Shell scripts handle toolchain setup and checks, standalone backend startup,
 and Linux session work such as private D-Bus and Sway. `scripts/debug-dbus.sh`
