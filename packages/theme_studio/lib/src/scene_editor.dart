@@ -25,7 +25,7 @@ class SceneEditor extends ChangeNotifier {
       selectedId: document.nodes.first.id,
     );
     _savedDocument = _revision.encoded;
-    inspector = NodeInspectorController(selectedNode);
+    inspector = NodeInspectorController(selectedNode, document.canvas);
   }
 
   final File file;
@@ -66,7 +66,7 @@ class SceneEditor extends ChangeNotifier {
       encoded: _revision.encoded,
       selectedId: id,
     );
-    inspector.resetNode(selectedNode);
+    inspector.resetNode(selectedNode, canvas: document.canvas);
     notifyListeners();
     return true;
   }
@@ -124,7 +124,7 @@ class SceneEditor extends ChangeNotifier {
     _undo.add(_revision);
     _redo.clear();
     _revision = (document: updated, encoded: encoded, selectedId: selectedId);
-    inspector.resetNode(selectedNode);
+    inspector.resetNode(selectedNode, canvas: document.canvas);
     notifyListeners();
   }
 
@@ -132,7 +132,7 @@ class SceneEditor extends ChangeNotifier {
     if (!applyDraft() || !canUndo) return;
     _redo.add(_revision);
     _revision = _undo.removeLast();
-    inspector.resetNode(selectedNode);
+    inspector.resetNode(selectedNode, canvas: document.canvas);
     notifyListeners();
   }
 
@@ -140,7 +140,7 @@ class SceneEditor extends ChangeNotifier {
     if (!applyDraft() || !canRedo) return;
     _undo.add(_revision);
     _revision = _redo.removeLast();
-    inspector.resetNode(selectedNode);
+    inspector.resetNode(selectedNode, canvas: document.canvas);
     notifyListeners();
   }
 
@@ -183,7 +183,7 @@ class SceneEditor extends ChangeNotifier {
     _savedDocument = _revision.encoded;
     _undo.clear();
     _redo.clear();
-    inspector.resetNode(selectedNode);
+    inspector.resetNode(selectedNode, canvas: document.canvas);
     notifyListeners();
   }
 

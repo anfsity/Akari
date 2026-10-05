@@ -311,7 +311,7 @@ void main() {
     final theme = tester
         .widget<StudioPreview>(find.byType(StudioPreview))
         .theme;
-    await tester.enterText(find.byKey(const ValueKey('field-X')), '0.2');
+    await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
     await tester.tap(find.text('Apply to preview'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Undo'));
@@ -344,7 +344,7 @@ void main() {
   ) async {
     await openStudio(tester);
     final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
-    await tester.enterText(find.byKey(const ValueKey('field-X')), '0.2');
+    await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
     await tester.pump();
     expect(find.text('Unsaved changes'), findsOneWidget);
     expect(
@@ -389,7 +389,7 @@ void main() {
       -200,
       scrollable: inspectorScroll,
     );
-    await tester.enterText(find.byKey(const ValueKey('field-X')), '0.2');
+    await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
     await tester.tap(find.text('Save scene'));
     await tester.pumpAndSettle();
     final node = decodeSceneDocument(file.readAsStringSync()).nodes.first;
@@ -768,7 +768,7 @@ void main() {
       imported.writeAsStringSync(
         encodeSceneDocument(_document.copyWith(id: 'imported')),
       );
-      await tester.enterText(find.byKey(const ValueKey('field-X')), '0.2');
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
       await tester.tap(find.text('Load JSON'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Save or reload'), findsOneWidget);
@@ -781,7 +781,7 @@ void main() {
         'imported',
       );
       expect(find.text('imported.json'), findsOneWidget);
-      await tester.enterText(find.byKey(const ValueKey('field-X')), '0.3');
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '384');
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
       expect(
@@ -891,11 +891,11 @@ void main() {
             .first
             .rect
             .x,
-        liveX,
+        closeTo(liveX / 1280, 1e-7),
       );
       await tester.tap(find.text('Undo'));
       await tester.pumpAndSettle();
-      expect(inspector.getField('X').text, '0.1');
+      expect(inspector.getField('X').text, '128');
       expect(find.text('Saved'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
@@ -965,13 +965,16 @@ void main() {
     expect(live.rect.width, closeTo(0.3 + 60 / canvas.width, 1e-8));
     expect(live.rect.height, 0.4);
     expect(live.transform.isIdentity, isTrue);
-    expect(double.parse(inspector.getField('Width').text), live.rect.width);
+    expect(
+      double.parse(inspector.getField('Width').text) / 1280,
+      closeTo(live.rect.width, 1e-7),
+    );
     expect(inspector.hasDraft, isFalse);
     expect(tester.widget<Text>(text).style, style);
     expect(find.text('Saved'), findsOneWidget);
     await gesture.cancel();
     await tester.pumpAndSettle();
-    expect(inspector.getField('Width').text, '0.3');
+    expect(inspector.getField('Width').text, '384');
     await tester.drag(handle, const Offset(60, 0));
     await tester.pumpAndSettle();
     final changed = tester
@@ -1059,8 +1062,8 @@ void main() {
       encodeSceneDocument(preview.document),
       encodeSceneDocument(_document),
     );
-    expect(inspector.getField('X').text, '0.1');
-    expect(inspector.getField('Y').text, '0.1');
+    expect(inspector.getField('X').text, '128');
+    expect(inspector.getField('Y').text, '72');
     expect(inspector.hasDraft, isFalse);
     expect(find.text('Saved'), findsOneWidget);
     expect(
@@ -1074,7 +1077,7 @@ void main() {
 
   testWidgets('invalid inspector drafts block dragging', (tester) async {
     await openStudio(tester);
-    await tester.enterText(find.byKey(const ValueKey('field-Width')), '2');
+    await tester.enterText(find.byKey(const ValueKey('field-Width')), '2560');
     await tester.drag(
       find.byKey(const ValueKey('preview-panel')),
       const Offset(80, 40),
@@ -1294,7 +1297,7 @@ void main() {
       tester.widget<StudioPreview>(find.byType(StudioPreview)).selectedId,
       'label',
     );
-    await tester.enterText(find.byKey(const ValueKey('field-X')), '0.6');
+    await tester.enterText(find.byKey(const ValueKey('field-X')), '768');
     await tester.pump();
     expect(find.text('Unsaved changes'), findsOneWidget);
     await tester.tap(find.text('Apply to preview'));
@@ -1335,7 +1338,7 @@ void main() {
     (tester) async {
       await openStudio(tester);
       final source = file.readAsStringSync();
-      await tester.enterText(find.byKey(const ValueKey('field-Width')), '2');
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '2560');
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
       expect(find.textContaining('non-normalized rect'), findsOneWidget);
@@ -1350,7 +1353,7 @@ void main() {
             .width,
         0.3,
       );
-      await tester.enterText(find.byKey(const ValueKey('field-Width')), '0.4');
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '512');
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
       expect(
@@ -1365,7 +1368,7 @@ void main() {
     'duplicate applies drafts and updates layers, selection and saved nodes',
     (tester) async {
       await openStudio(tester);
-      await tester.enterText(find.byKey(const ValueKey('field-X')), '0.2');
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
       await tester.tap(find.text('Duplicate node'));
       await tester.pumpAndSettle();
       final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
@@ -1408,7 +1411,7 @@ void main() {
     (tester) async {
       await openStudio(tester);
       final source = file.readAsStringSync();
-      await tester.enterText(find.byKey(const ValueKey('field-Width')), '2');
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '2560');
       for (final action in ['Duplicate node', 'Delete node']) {
         await tester.tap(find.text(action));
         await tester.pumpAndSettle();
@@ -1432,7 +1435,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('layer-label')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const ValueKey('field-X')), '0.6');
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '768');
       await tester.tap(find.text('Delete node'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('layer-label')), findsNothing);
@@ -1490,7 +1493,7 @@ void main() {
     await openStudio(tester);
     await tester.tap(find.byKey(const ValueKey('layer-label')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('field-X')), '0.2');
+    await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
     await tester.tap(find.text('Reload from disk'));
     await tester.pumpAndSettle();
     expect(find.text('Discard edits and reload?'), findsOneWidget);
