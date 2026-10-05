@@ -1,7 +1,9 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
+import 'node_resize.dart';
 import 'studio_preferences.dart';
 import 'studio_preview_host.dart';
 
@@ -32,6 +34,7 @@ class StudioPreview extends StatefulWidget {
     required this.onDragNodeChanged,
     required this.preferences,
     required this.tool,
+    this.lockAspectRatio = false,
     super.key,
   });
 
@@ -41,6 +44,7 @@ class StudioPreview extends StatefulWidget {
   final bool dormant;
   final StudioPreferences preferences;
   final StudioCanvasTool tool;
+  final bool lockAspectRatio;
   final ValueChanged<String> onSelect;
   final SceneNode? Function(String id) onStartDrag;
   final ValueChanged<SceneNode> onCommitDrag;
@@ -52,11 +56,21 @@ class StudioPreview extends StatefulWidget {
 
 class _StudioPreviewState extends State<StudioPreview> {
   final _canvas = GlobalKey();
-  ({SceneNode source, RenderBox canvas, Offset start, StudioCanvasTool tool})?
+  ({
+    SceneNode source,
+    RenderBox canvas,
+    Offset start,
+    StudioCanvasTool tool,
+    NodeResizeHandle? handle,
+  })?
   _drag;
   SceneNode? _dragPreview;
 
-  void _startDrag(String id, DragStartDetails details) {
+  void _startDrag(
+    String id,
+    DragStartDetails details, {
+    NodeResizeHandle? handle,
+  }) {
     final node = widget.onStartDrag(id);
     if (node == null) return;
     final canvas = _canvas.currentContext?.findRenderObject();
@@ -67,6 +81,7 @@ class _StudioPreviewState extends State<StudioPreview> {
         canvas: canvas,
         start: canvas.globalToLocal(details.globalPosition),
         tool: widget.tool,
+        handle: handle,
       );
       _dragPreview = node;
     });
@@ -80,40 +95,59 @@ class _StudioPreviewState extends State<StudioPreview> {
     // and fit-to-workspace must not change the direction or speed of a drag.
     final canvas = drag.canvas;
     final delta = canvas.globalToLocal(details.globalPosition) - drag.start;
-    final updated = switch (drag.tool) {
-      StudioCanvasTool.move => node.copyWith(
-        rect: _calculateMovedRect(node.rect, canvas.size, delta),
-      ),
-      StudioCanvasTool.scale => node.copyWith(
-        transform: node.transform.copyWith(
-          scaleX: _calculateScale(
-            node.transform.scaleX,
-            delta.dx / canvas.size.width,
-          ),
-          scaleY: _calculateScale(
-            node.transform.scaleY,
-            delta.dy / canvas.size.height,
-          ),
-        ),
-      ),
-      StudioCanvasTool.rotate => node.copyWith(
-        transform: node.transform.copyWith(
-          rotationZ:
-              node.transform.rotationZ + 360 * delta.dx / canvas.size.width,
-        ),
-      ),
-      StudioCanvasTool.rotate3d => node.copyWith(
-        transform: node.transform.copyWith(
-          rotationX:
-              node.transform.rotationX - 180 * delta.dy / canvas.size.height,
-          rotationY:
-              node.transform.rotationY + 180 * delta.dx / canvas.size.width,
-        ),
-      ),
-    };
+    final updated = drag.handle != null
+        ? calculateResizedNode(
+            source: node,
+            canvasSize: canvas.size,
+            handle: drag.handle!,
+            delta: delta,
+            lockAspectRatio:
+                widget.lockAspectRatio ||
+                HardwareKeyboard.instance.isShiftPressed,
+            minHitTarget: widget.theme.bundle.tokens.minHitTarget,
+            gridSize: widget.preferences.snapToGrid
+                ? widget.preferences.gridSize.toDouble()
+                : null,
+          )
+        : switch (drag.tool) {
+            StudioCanvasTool.move => node.copyWith(
+              rect: _calculateMovedRect(node.rect, canvas.size, delta),
+            ),
+            StudioCanvasTool.scale => node.copyWith(
+              transform: node.transform.copyWith(
+                scaleX: _calculateScale(
+                  node.transform.scaleX,
+                  delta.dx / canvas.size.width,
+                ),
+                scaleY: _calculateScale(
+                  node.transform.scaleY,
+                  delta.dy / canvas.size.height,
+                ),
+              ),
+            ),
+            StudioCanvasTool.rotate => node.copyWith(
+              transform: node.transform.copyWith(
+                rotationZ:
+                    node.transform.rotationZ +
+                    360 * delta.dx / canvas.size.width,
+              ),
+            ),
+            StudioCanvasTool.rotate3d => node.copyWith(
+              transform: node.transform.copyWith(
+                rotationX:
+                    node.transform.rotationX -
+                    180 * delta.dy / canvas.size.height,
+                rotationY:
+                    node.transform.rotationY +
+                    180 * delta.dx / canvas.size.width,
+              ),
+            ),
+          };
     final previous = _dragPreview!;
     if (updated.rect.x == previous.rect.x &&
         updated.rect.y == previous.rect.y &&
+        updated.rect.width == previous.rect.width &&
+        updated.rect.height == previous.rect.height &&
         updated.transform.scaleX == previous.transform.scaleX &&
         updated.transform.scaleY == previous.transform.scaleY &&
         updated.transform.rotationX == previous.transform.rotationX &&
@@ -203,24 +237,58 @@ class _StudioPreviewState extends State<StudioPreview> {
       document.canvas.referenceWidth.toDouble(),
       document.canvas.referenceHeight.toDouble(),
     );
-    return _PreviewViewport(
-      canvasKey: _canvas,
-      size: referenceSize,
-      preferences: widget.preferences,
-      child: _PreviewScene(
-        theme: widget.theme,
-        document: document,
-        referenceSize: referenceSize,
-        dormant: widget.dormant,
-        nodeBuilder: _buildInteractiveNode,
-      ),
+    final selected = document.nodes.firstWhere(
+      (node) => node.id == widget.selectedId,
+    );
+    final predicates = _getPreviewPredicates(widget.dormant);
+    final visible =
+        selected.visibleWhen == null ||
+        evaluateSceneCondition(selected.visibleWhen!, predicates);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fit = applyBoxFit(
+          BoxFit.contain,
+          referenceSize,
+          constraints.biggest,
+        );
+        final viewportScale = fit.destination.width / referenceSize.width;
+        return _PreviewViewport(
+          canvasKey: _canvas,
+          size: referenceSize,
+          preferences: widget.preferences,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _PreviewScene(
+                theme: widget.theme,
+                document: document,
+                referenceSize: referenceSize,
+                dormant: widget.dormant,
+                nodeBuilder: _buildInteractiveNode,
+              ),
+              if (visible)
+                _NodeSelectionOverlay(
+                  node: selected,
+                  canvasSize: referenceSize,
+                  viewportScale: viewportScale,
+                  minHitTarget: widget.theme.bundle.tokens.minHitTarget,
+                  showHandles: widget.tool == StudioCanvasTool.move,
+                  onStart: (handle, details) =>
+                      _startDrag(selected.id, details, handle: handle),
+                  onUpdate: _updateDrag,
+                  onStop: (_) => _stopDrag(commit: true),
+                  onCancel: () => _stopDrag(commit: false),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildInteractiveNode(BuildContext context, SceneNode node) =>
       _PreviewNode(
         nodeId: node.id,
-        selected: node.id == widget.selectedId,
         onSelect: () => widget.onSelect(node.id),
         onStartDrag: (details) => _startDrag(node.id, details),
         onUpdateDrag: _updateDrag,
@@ -291,13 +359,7 @@ class _PreviewScene extends StatelessWidget {
           backgroundBlurSigma: AlwaysStoppedAnimation(
             dormant ? 0 : document.background.blurSigma,
           ),
-          activePredicates: {
-            ScenePredicate.isServiceReady,
-            ScenePredicate.isAuthPrompting,
-            ScenePredicate.hasSelectedUser,
-            ScenePredicate.isSessionReady,
-            if (dormant) ScenePredicate.isDormant,
-          },
+          activePredicates: _getPreviewPredicates(dormant),
           nodeBuilder: nodeBuilder,
         ),
       ),
@@ -308,7 +370,6 @@ class _PreviewScene extends StatelessWidget {
 class _PreviewNode extends StatelessWidget {
   const _PreviewNode({
     required this.nodeId,
-    required this.selected,
     required this.onSelect,
     required this.onStartDrag,
     required this.onUpdateDrag,
@@ -318,7 +379,6 @@ class _PreviewNode extends StatelessWidget {
   });
 
   final String nodeId;
-  final bool selected;
   final VoidCallback onSelect;
   final GestureDragStartCallback onStartDrag;
   final GestureDragUpdateCallback onUpdateDrag;
@@ -340,17 +400,144 @@ class _PreviewNode extends StatelessWidget {
       onPanUpdate: onUpdateDrag,
       onPanEnd: onStopDrag,
       onPanCancel: onCancelDrag,
-      child: DecoratedBox(
-        position: DecorationPosition.foreground,
-        decoration: BoxDecoration(
-          border: selected
-              ? Border.all(color: const Color(0xffa78bfa), width: 3)
-              : null,
-        ),
-        child: ExcludeFocus(child: IgnorePointer(child: child)),
-      ),
+      child: ExcludeFocus(child: IgnorePointer(child: child)),
     ),
   );
+}
+
+Set<ScenePredicate> _getPreviewPredicates(bool dormant) => {
+  ScenePredicate.isServiceReady,
+  ScenePredicate.isAuthPrompting,
+  ScenePredicate.hasSelectedUser,
+  ScenePredicate.isSessionReady,
+  if (dormant) ScenePredicate.isDormant,
+};
+
+/// Selection belongs to the canvas, outside the component's paint transform.
+/// Handles keep their screen size and remain usable on small or scaled nodes.
+class _NodeSelectionOverlay extends StatelessWidget {
+  const _NodeSelectionOverlay({
+    required this.node,
+    required this.canvasSize,
+    required this.viewportScale,
+    required this.minHitTarget,
+    required this.showHandles,
+    required this.onStart,
+    required this.onUpdate,
+    required this.onStop,
+    required this.onCancel,
+  });
+
+  final SceneNode node;
+  final Size canvasSize;
+  final double viewportScale;
+  final double minHitTarget;
+  final bool showHandles;
+  final void Function(NodeResizeHandle, DragStartDetails) onStart;
+  final GestureDragUpdateCallback onUpdate;
+  final GestureDragEndCallback onStop;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final rect = sceneNodeRect(
+      node: node,
+      sceneSize: canvasSize,
+      safeArea: EdgeInsets.zero,
+      minHitTarget: minHitTarget,
+    );
+    final matrix = sceneNodeTransformMatrix(node.transform, rect.size);
+    final points = {
+      for (final handle in NodeResizeHandle.values)
+        handle:
+            rect.topLeft +
+            MatrixUtils.transformPoint(
+              matrix,
+              handle.alignment.alongSize(rect.size),
+            ),
+    };
+    final hitSize = 20 / viewportScale;
+    final handleSize = 8 / viewportScale;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            child: CustomPaint(
+              painter: _SelectionPainter(points, 1.5 / viewportScale),
+            ),
+          ),
+        ),
+        if (showHandles && hasResizableProjection(node, rect.size))
+          for (final entry in points.entries)
+            Positioned(
+              left: entry.value.dx - hitSize / 2,
+              top: entry.value.dy - hitSize / 2,
+              width: hitSize,
+              height: hitSize,
+              child: MouseRegion(
+                cursor: entry.key.cursor,
+                child: Listener(
+                  onPointerCancel: (_) => onCancel(),
+                  child: GestureDetector(
+                    key: ValueKey('resize-${entry.key.name}'),
+                    behavior: HitTestBehavior.opaque,
+                    dragStartBehavior: DragStartBehavior.down,
+                    onPanStart: (details) => onStart(entry.key, details),
+                    onPanUpdate: onUpdate,
+                    onPanEnd: onStop,
+                    onPanCancel: onCancel,
+                    child: Center(
+                      child: Container(
+                        width: handleSize,
+                        height: handleSize,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(
+                            color: const Color(0xff8b5cf6),
+                            width: 1 / viewportScale,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+class _SelectionPainter extends CustomPainter {
+  const _SelectionPainter(this.points, this.strokeWidth);
+
+  final Map<NodeResizeHandle, Offset> points;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..addPolygon([
+        points[NodeResizeHandle.topLeft]!,
+        points[NodeResizeHandle.topRight]!,
+        points[NodeResizeHandle.bottomRight]!,
+        points[NodeResizeHandle.bottomLeft]!,
+      ], true);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xff8b5cf6)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_SelectionPainter oldDelegate) =>
+      strokeWidth != oldDelegate.strokeWidth ||
+      points.entries.any(
+        (entry) => oldDelegate.points[entry.key] != entry.value,
+      );
 }
 
 class _GridPainter extends CustomPainter {

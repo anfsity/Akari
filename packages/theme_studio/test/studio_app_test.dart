@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -936,6 +937,109 @@ void main() {
     expect(node.transform.rotationZ, 0.6);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('resize relayouts text, cancels and commits one undo step', (
+    tester,
+  ) async {
+    await openStudio(tester);
+    final inspector = tester
+        .widget<NodeInspector>(find.byType(NodeInspector))
+        .controller;
+    final handle = find.byKey(const ValueKey('resize-right'));
+    final canvas = tester.getRect(find.byType(SceneRuntime));
+    final text = find.descendant(
+      of: find.byKey(const ValueKey('preview-panel')),
+      matching: find.byType(Text),
+    );
+    final style = tester.widget<Text>(text).style;
+    final gesture = await tester.startGesture(tester.getCenter(handle));
+    await gesture.moveBy(const Offset(40, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(20, 0));
+    await tester.pump();
+    final live = tester
+        .widget<SceneRuntime>(find.byType(SceneRuntime))
+        .document
+        .nodes
+        .first;
+    expect(live.rect.width, closeTo(0.3 + 60 / canvas.width, 1e-8));
+    expect(live.rect.height, 0.4);
+    expect(live.transform.isIdentity, isTrue);
+    expect(double.parse(inspector.getField('Width').text), live.rect.width);
+    expect(inspector.hasDraft, isFalse);
+    expect(tester.widget<Text>(text).style, style);
+    expect(find.text('Saved'), findsOneWidget);
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+    expect(inspector.getField('Width').text, '0.3');
+    await tester.drag(handle, const Offset(60, 0));
+    await tester.pumpAndSettle();
+    final changed = tester
+        .widget<StudioPreview>(find.byType(StudioPreview))
+        .document;
+    expect(changed.nodes.first.rect.width, closeTo(live.rect.width, 1e-8));
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Saved'), findsOneWidget);
+    expect(
+      tester
+          .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Undo'))
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.text('Redo'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save scene'));
+    await tester.pumpAndSettle();
+    expect(
+      encodeSceneDocument(decodeSceneDocument(file.readAsStringSync())),
+      encodeSceneDocument(changed),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'aspect lock and Shift preserve ratio, hidden selections have no handles',
+    (tester) async {
+      await openStudio(tester);
+      await tester.tap(find.byKey(const ValueKey('lock-aspect-ratio')));
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(const ValueKey('resize-bottomRight')),
+        const Offset(50, 10),
+      );
+      await tester.pumpAndSettle();
+      var node = tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .nodes
+          .first;
+      expect(node.rect.width / node.rect.height, closeTo(0.75, 1e-8));
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('lock-aspect-ratio')));
+      await tester.pumpAndSettle();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.drag(
+        find.byKey(const ValueKey('resize-bottomRight')),
+        const Offset(50, 10),
+      );
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pumpAndSettle();
+      node = tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .nodes
+          .first;
+      expect(node.rect.width / node.rect.height, closeTo(0.75, 1e-8));
+      await tester.tap(find.byKey(const ValueKey('preview-label')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('State: Login'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('resize-right')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('cancelled drags preserve the scene and history', (tester) async {
     await openStudio(tester);
