@@ -8,6 +8,7 @@ import 'terrace_visuals.dart';
 
 /// Seed used before extraction runs and when the wallpaper cannot be sampled.
 const _fallbackSeed = Color(0xff83cddd);
+const _fontFamily = 'packages/theme_default/SpaceGrotesk';
 ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
   final colorScheme = ColorScheme.fromSeed(
     seedColor: seed ?? _fallbackSeed,
@@ -20,8 +21,10 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
     materialTheme: ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      fontFamily: _fontFamily,
       scaffoldBackgroundColor: Colors.transparent,
       textTheme: Typography.whiteMountainView.apply(
+        fontFamily: _fontFamily,
         bodyColor: text,
         displayColor: text,
       ),
@@ -57,7 +60,7 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
       ),
       visualDensity: VisualDensity.standard,
     ),
-    panelRadius: 12,
+    panelRadius: 4,
     mediumMotion: const Duration(milliseconds: 480),
     standardCurve: Curves.easeInOutCubic,
     minHitTarget: 44,
@@ -87,7 +90,7 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
 
 OutlineInputBorder _fieldBorder(Color color, double width) {
   return OutlineInputBorder(
-    borderRadius: BorderRadius.circular(8),
+    borderRadius: BorderRadius.circular(4),
     borderSide: BorderSide(color: color, width: width),
   );
 }

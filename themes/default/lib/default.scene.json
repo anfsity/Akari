@@ -42,7 +42,7 @@
       "renderOrder": 10,
       "motion": "fade",
       "properties": {
-        "text": "AKARI  /  ABOVE THE CITY"
+        "text": "ABOVE THE CITY"
       }
     },
     {
@@ -76,22 +76,6 @@
       }
     },
     {
-      "id": "wake_hint",
-      "component": "terraceLabel",
-      "rect": {
-        "x": 0.09,
-        "y": 0.61,
-        "width": 0.32,
-        "height": 0.035
-      },
-      "renderOrder": 10,
-      "motion": "fade",
-      "visibleWhen": "isDormant",
-      "properties": {
-        "text": "PRESS ANY KEY  /  CLICK TO ENTER"
-      }
-    },
-    {
       "id": "power_actions",
       "component": "powerActions",
       "rect": {
@@ -109,8 +93,8 @@
       }
     },
     {
-      "id": "glass_panel",
-      "component": "terracePortal",
+      "id": "login_panel",
+      "component": "terracePanel",
       "rect": {
         "x": 0.065,
         "y": 0.23,
@@ -118,7 +102,7 @@
         "height": 0.57
       },
       "renderOrder": 30,
-      "motion": "fadeScale",
+      "motion": "fade",
       "visibleWhen": {
         "not": "isDormant"
       }
@@ -140,24 +124,6 @@
       "properties": {
         "text": "Welcome back.",
         "variant": "large"
-      }
-    },
-    {
-      "id": "entrance_label",
-      "component": "terraceLabel",
-      "rect": {
-        "x": 0.09,
-        "y": 0.38,
-        "width": 0.3,
-        "height": 0.03
-      },
-      "renderOrder": 40,
-      "motion": "fadeSlide",
-      "visibleWhen": {
-        "not": "isDormant"
-      },
-      "properties": {
-        "text": "YOUR NEXT CHAPTER STARTS HERE"
       }
     },
     {
@@ -277,21 +243,6 @@
       "motion": "fade",
       "properties": {
         "variant": "inline"
-      }
-    },
-    {
-      "id": "scene_footer",
-      "component": "terraceLabel",
-      "rect": {
-        "x": 0.085,
-        "y": 0.9,
-        "width": 0.55,
-        "height": 0.035
-      },
-      "renderOrder": 10,
-      "motion": "fade",
-      "properties": {
-        "text": "HELLO WORLD  /  A MOMENT BEFORE BEGINNING"
       }
     }
   ]
