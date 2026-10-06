@@ -83,6 +83,7 @@ class PrimaryAction extends StatelessWidget {
     required this.service,
     required this.auth,
     required this.onRespond,
+    required this.onStartSession,
     required this.onRetry,
     super.key,
   });
@@ -90,6 +91,7 @@ class PrimaryAction extends StatelessWidget {
   final ServiceSlots service;
   final AuthPromptSlots auth;
   final VoidCallback onRespond;
+  final VoidCallback onStartSession;
   final ValueChanged<GreeterRecovery> onRetry;
 
   @override
@@ -104,6 +106,10 @@ class PrimaryAction extends StatelessWidget {
         : switch (auth.mode) {
             AuthMode.prompting => (
               onRespond,
+              const Icon(Icons.arrow_forward, size: 30),
+            ),
+            AuthMode.sessionSelection => (
+              onStartSession,
               const Icon(Icons.arrow_forward, size: 30),
             ),
             AuthMode.submitting => (
@@ -123,7 +129,6 @@ class PrimaryAction extends StatelessWidget {
             ),
             AuthMode.error ||
             AuthMode.userSelection ||
-            AuthMode.sessionSelection ||
             AuthMode.handingOff => null,
           };
     if (action == null) {

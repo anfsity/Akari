@@ -24,6 +24,7 @@ class GreeterHost {
     required this.onRetry,
     required this.onRetrySessionCatalog,
     required this.onRespondToPrompt,
+    required this.onStartSession,
   });
 
   final ValueListenable<ServiceSlots> serviceSlots;
@@ -39,4 +40,5 @@ class GreeterHost {
   final ValueChanged<GreeterRecovery> onRetry;
   final VoidCallback onRetrySessionCatalog;
   final VoidCallback onRespondToPrompt;
+  final VoidCallback onStartSession;
 }

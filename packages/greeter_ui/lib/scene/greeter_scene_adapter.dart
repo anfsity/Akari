@@ -172,6 +172,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
         onRetrySessionCatalog: () =>
             _dispatch(const RetrySessionCatalogCommand()),
         onRespondToPrompt: _respondToPrompt,
+        onStartSession: () => _dispatch(const StartSelectedSessionCommand()),
       ),
       activePredicates: _activeScenePredicates.value,
       activePredicatesListenable: _activeScenePredicates,
@@ -267,6 +268,11 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
         event.logicalKey == LogicalKeyboardKey.numpadEnter) {
       if (widget.feature.authPromptSlots.value.mode == AuthMode.prompting) {
         _respondToPrompt();
+        return KeyEventResult.handled;
+      }
+      if (widget.feature.authPromptSlots.value.mode ==
+          AuthMode.sessionSelection) {
+        _dispatch(const StartSelectedSessionCommand());
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;

@@ -36,7 +36,7 @@ class ServiceLabel extends StatelessWidget {
 
 ## 响应用户操作
 
-用户选择账户、切换桌面、提交密码或操作电源时，组件调用对应的宿主回调：`onSelectUser`、`onSelectSession`、`onRespondToPrompt` 和 `onRequestPowerAction`。根据对应 slot 的状态决定控件是否可用，并保留键盘操作、焦点和无障碍支持。登录功能层和后端会处理身份验证及 D-Bus 通信。
+用户选择账户、切换桌面、提交密码、启动桌面会话或操作电源时，组件调用对应的宿主回调：`onSelectUser`、`onSelectSession`、`onRespondToPrompt`、`onStartSession` 和 `onRequestPowerAction`。根据对应 slot 的状态决定控件是否可用，并保留键盘操作、焦点和无障碍支持。登录功能层和后端会处理身份验证及 D-Bus 通信。
 
 输入凭据的 widget 可以使用宿主提供的 `credentialController` 和 `credentialFocusNode`。它们由宿主管理和释放，主题组件不要调用它们的 `dispose`。密码等输入也不要复制到场景属性、样式配置或日志中。
 

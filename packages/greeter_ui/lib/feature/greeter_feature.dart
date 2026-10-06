@@ -448,6 +448,11 @@ class GreeterFeature {
       );
       _effects.add(const ExitAfterHandoffEffect());
     } on Object catch (error) {
+      // A Failed signal can invalidate this attempt before the method reply.
+      // Preserve its authentication recovery instead of offering a session retry.
+      if (attemptId != _attemptId) {
+        return;
+      }
       _showSessionError(
         _getGreeterError(
           error,
