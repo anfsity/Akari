@@ -70,6 +70,9 @@ session compensates for the host monitor's scale; a tiled window can have a
 different viewport. Move it to another monitor or resize it to check that the
 viewport and compensated scale update while the theme keeps running.
 
+For actual login-screen images, use `Print` or `Shift+Print` in the
+[TTY capture workflow](greetd-testing.md#capture-the-actual-tty-login-screen).
+
 ## Capture a fixed resolution
 
 ```sh

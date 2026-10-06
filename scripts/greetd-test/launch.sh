@@ -14,6 +14,7 @@ export AKARI_FLUTTER_LOG="$AKARI_LOG_DIR/flutter.log"
 export AKARI_WINDOW_MODE=fullscreen
 export AKARI_DISPLAY_LAYOUT="$test_root/display-layout.json"
 export AKARI_DISPLAY_LAYOUT_RUNNER="$test_root/display-layout.py"
+export AKARI_SCREENSHOT_RUNNER="$test_root/screenshot.py"
 export AKARI_DISPLAY_SOURCE=greetd-login
 export AKARI_TEST_RUN="$run_dir"
 export XDG_STATE_HOME="$test_root/state"

@@ -60,6 +60,33 @@ akari greetd-test status --format json
 
 接下来可以按[显示测试](display-testing.md#compare-a-nested-session-with-standalone-login)的步骤，在桌面上复现登录时的显示配置，或生成固定分辨率截图。
 
+<a id="capture-the-actual-tty-login-screen"></a>
+
+## 截取真实 TTY 登录画面
+
+重新运行 `akari greetd-test install` 安装当前截图脚本，并确保系统已安装
+`grim`。在实际登录画面上按 `Print`，会为每块活动屏幕保存一张 PNG；
+按 `Shift+Print` 会延迟 3 秒，便于展开账户或 session 菜单后截图。
+快捷键由登录会话的 Sway 处理，不会唤醒休眠界面或关闭菜单。
+
+截图保存在当前运行的 `greeter/session-*/screenshots/<timestamp>-*/` 下。
+每次截图创建新目录，恢复 SDDM 后仍保留，可直接从桌面读取，无需 sudo。
+UID 1000、默认日志位置下，可用以下命令查看：
+
+```sh
+ls /var/tmp/akari-greetd-test-1000/current/greeter/session-*/screenshots/
+akari greetd-test logs --run current --file screenshot
+```
+
+每个目录包含 `output-1.png` 等图像和 `capture.json`；后者记录图像对应的
+显示器、当时的实际模式、逻辑尺寸和缩放。每块屏幕独立使用自身缩放截图，
+避免混合 DPI 时被 grim 的默认最高缩放放大。截图时不会修改启动时的
+`display-profile.json`，因此热插拔后的捕获也有自己独立的显示参数。
+
+调整样式时以这些真实画面为参照。回到 Hyprland 后，使用
+`akari run sway --theme themes/default --display-profile login`，在同一块
+显示器上将嵌套窗口全屏再对比；普通预览窗口的逻辑视口可能不同。
+
 检查最近一次启动尝试，或恢复流程使用的测试：
 
 ```sh
@@ -68,7 +95,7 @@ akari greetd-test logs --run current --file backend -n 100
 akari greetd-test logs --run current --file flutter --follow
 ```
 
-`logs` 默认选择调用者最近的启动尝试及其 `start.log`。即使测试已恢复，`--run current` 仍会选中上次启用恢复的测试。`--file` 接受 `start`、`backend`、`flutter`、`sway`、`lifecycle`、`restore` 和 `journal`。登录界面日志会选择最新会话；旧会话文件仍保留在已保存的运行路径下。`--lines`（`-n`）默认为 100；`--follow`（`-f`）会跟踪所选文件，包括稍后才创建的文件，但不会自动切换会话。
+`logs` 默认选择调用者最近的启动尝试及其 `start.log`。即使测试已恢复，`--run current` 仍会选中上次启用恢复的测试。`--file` 接受 `start`、`backend`、`flutter`、`sway`、`lifecycle`、`screenshot`、`restore` 和 `journal`。登录界面日志会选择最新会话；旧会话文件仍保留在已保存的运行路径下。`--lines`（`-n`）默认为 100；`--follow`（`-f`）会跟踪所选文件，包括稍后才创建的文件，但不会自动切换会话。
 
 启动测试时可设置自定义日志位置（相对路径以命令调用目录为准）：
 
@@ -86,6 +113,7 @@ akari greetd-test start --log-dir /var/tmp/my-akari-test
 
 ```sh
 python3 test/support/greetd_test_workflow_test.py
+python3 test/support/greetd_screenshot_test.py
 python3 test/support/display_profile_test.py
 python3 test/support/display_layout_test.py
 python3 test/support/sway_session_test.py
