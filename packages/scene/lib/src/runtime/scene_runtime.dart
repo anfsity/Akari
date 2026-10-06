@@ -187,7 +187,7 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
   late bool _visible;
   Widget? _prewarmedChild;
 
-  bool get _animates =>
+  bool get _animatesPresence =>
       widget.motionBuilder != null &&
       widget.motionBuilder!.animatesPresence &&
       widget.spec.preset != SceneMotionPreset.none &&
@@ -207,7 +207,7 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
     _progress = _controller.drive(CurveTween(curve: widget.spec.curve));
     _controller.addStatusListener(_handleStatus);
     if (widget.visible) {
-      if (_animates) {
+      if (_animatesPresence) {
         _controller.forward();
       } else {
         _controller.value = 1;
@@ -270,7 +270,7 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
     _visible = visible;
     // Reuse the current controller value on reversal. Restarting at an endpoint
     // would jump when a new predicate update interrupts an enter or exit.
-    if (!_animates) {
+    if (!_animatesPresence) {
       _controller.value = visible ? 1 : 0;
     } else if (visible) {
       _controller.forward();
@@ -305,32 +305,27 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
 
   @override
   Widget build(BuildContext context) {
-    if (!_animates) {
-      if (_visible) {
-        return _buildChild(context);
-      }
-      if (!widget.prewarmHiddenNodes) {
-        return const SizedBox.shrink();
-      }
-      return _hideFromInteraction(
-        Opacity(opacity: 0, child: _buildChild(context)),
-      );
-    }
     if (!_visible &&
-        _controller.status == AnimationStatus.dismissed &&
-        !widget.prewarmHiddenNodes) {
+        !widget.prewarmHiddenNodes &&
+        (!_animatesPresence ||
+            _controller.status == AnimationStatus.dismissed)) {
       return const SizedBox.shrink();
     }
-    final animated = widget.motionBuilder!.build(
-      context,
-      widget.spec,
-      _progress,
-      _buildChild(context),
-    );
+    final child = _buildChild(context);
+    final motionBuilder = widget.motionBuilder;
+    // Interaction effects still wrap nodes whose presence changes immediately.
+    final animated =
+        motionBuilder != null &&
+            widget.spec.preset != SceneMotionPreset.none &&
+            !widget.spec.reducedMotion
+        ? motionBuilder.build(context, widget.spec, _progress, child)
+        : child;
     if (_visible) {
       return animated;
     }
-    return _hideFromInteraction(animated);
+    return _hideFromInteraction(
+      _animatesPresence ? animated : Opacity(opacity: 0, child: animated),
+    );
   }
 
   Widget _hideFromInteraction(Widget child) {

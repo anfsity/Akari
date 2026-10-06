@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -405,6 +406,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Starting session...'), findsOneWidget);
+  });
+
+  testWidgets('the confirm arrow scales on pointer hover', (tester) async {
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
+    await tester.pumpAndSettle();
+    await _wake(tester);
+    await tester.tap(find.byTooltip('Choose account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
+
+    final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await pointer.addPointer(location: Offset.zero);
+    addTearDown(pointer.removePointer);
+    await pointer.moveTo(tester.getCenter(find.byIcon(Icons.arrow_forward)));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale,
+      1.02,
+    );
+
+    await pointer.moveTo(Offset.zero);
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 1);
   });
 
   testWidgets('power actions remain independently reachable', (tester) async {
