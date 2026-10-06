@@ -46,22 +46,26 @@ Future<void> main(List<String> arguments) async {
       final reportName = 'scene_report_$cycle.json';
       final reportPath = '${output.path}/$reportName';
       final timelinePath = '${output.path}/scene_interactions_timeline.json';
-      await _execute([
-        ...flutter,
-        'drive',
-        '-d',
-        'linux',
-        '--profile',
-        '--no-dds',
-        '--dart-define=AKARI_BACKEND=demo',
-        '--dart-define=AKARI_PERF_REPORT_PATH=$reportPath',
-        if (options.trace) ...[
-          '--dart-define=AKARI_PERF_TRACE_TIMELINE=true',
-          '--dart-define=AKARI_PERF_TIMELINE_PATH=$timelinePath',
+      await _execute(
+        [
+          ...flutter,
+          'drive',
+          '-d',
+          'linux',
+          '--profile',
+          '--no-dds',
+          '--dart-define=AKARI_BACKEND=demo',
+          '--dart-define=AKARI_PERF_REPORT_PATH=$reportPath',
+          if (options.trace) ...[
+            '--dart-define=AKARI_PERF_TRACE_TIMELINE=true',
+            '--dart-define=AKARI_PERF_TIMELINE_PATH=$timelinePath',
+          ],
+          '--driver=${themeDirectory.path}/perf/test_driver/integration_test.dart',
+          '--target=${themeDirectory.path}/perf/integration_test/scene_performance_test.dart',
         ],
-        '--driver=${themeDirectory.path}/perf/test_driver/integration_test.dart',
-        '--target=${themeDirectory.path}/perf/integration_test/scene_performance_test.dart',
-      ], host);
+        host,
+        environment: const {'AKARI_DISPLAY_MODE': 'single'},
+      );
       reports.add(reportPath);
       artifacts.add({'name': 'cycle_$cycle', 'path': reportName});
     }
@@ -146,11 +150,16 @@ Future<void> main(List<String> arguments) async {
   );
 }
 
-Future<void> _execute(List<String> command, Directory directory) async {
+Future<void> _execute(
+  List<String> command,
+  Directory directory, {
+  Map<String, String>? environment,
+}) async {
   final process = await Process.start(
     command.first,
     command.skip(1).toList(),
     workingDirectory: directory.path,
+    environment: environment,
     mode: ProcessStartMode.inheritStdio,
   );
   final status = await process.exitCode;
