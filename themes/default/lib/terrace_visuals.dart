@@ -81,7 +81,16 @@ class _TerraceBackdropState extends State<_TerraceBackdrop> {
                   (event.localPosition.dy / constraints.maxHeight - 0.5) * 8,
                 );
               }),
-        onExit: (_) => setState(() => _target = Offset.zero),
+        onExit: reducedMotion
+            ? null
+            : (event) {
+                // Opening a popup also removes the wallpaper from hover. Keep
+                // its offset then; reset only when the pointer leaves the view.
+                final bounds = Offset.zero & constraints.biggest;
+                if (!bounds.contains(event.localPosition)) {
+                  setState(() => _target = Offset.zero);
+                }
+              },
         child: ClipRect(
           child: TweenAnimationBuilder<Offset>(
             tween: Tween(

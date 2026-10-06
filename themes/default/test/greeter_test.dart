@@ -18,6 +18,31 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
 
 void main() {
+  testWidgets('opening choices preserves the wallpaper pointer offset', (
+    tester,
+  ) async {
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
+    await tester.pumpAndSettle();
+    await _wake(tester);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: const Offset(600, 100));
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(const Offset(700, 140));
+    await tester.pumpAndSettle();
+    final motion = find.byType(TweenAnimationBuilder<Offset>);
+    final offset = tester
+        .widget<TweenAnimationBuilder<Offset>>(motion)
+        .tween
+        .end;
+    expect(offset, isNot(Offset.zero));
+    await tester.tap(find.byTooltip('Choose account'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TweenAnimationBuilder<Offset>>(motion).tween.end,
+      offset,
+    );
+  });
+
   testWidgets('a wide account image fills the circular account marker', (
     tester,
   ) async {
