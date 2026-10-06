@@ -61,6 +61,7 @@ if [[ -n "$layout" ]]; then
   printf '%s\n' "$layout" > "$test_root/display-layout.json"
   chmod 0644 "$test_root/display-layout.json"
 fi
+install -d -m 0755 "$test_root/scripts"
 install -m 0755 "$repo_root/scripts/debug-dbus.sh" "$repo_root/scripts/lib.sh" "$test_root/scripts/"
 rm -f "$test_root/mock-power"
 echo "Installed test files; previous version: $backup"

@@ -291,6 +291,16 @@ if name == 'dart':
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("old")
 
+    def test_installer_creates_scripts_directory_for_new_installation(self):
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        scripts = self.installation / "scripts"
+        self.assertEqual(scripts.stat().st_mode & 0o777, 0o755)
+        for name in ["debug-dbus.sh", "lib.sh"]:
+            installed = scripts / name
+            self.assertEqual(installed.read_bytes(), (SOURCE.parent / name).read_bytes())
+            self.assertEqual(installed.stat().st_mode & 0o777, 0o755)
+
     def test_installer_builds_without_existing_artifacts_and_rebuilds_on_repeat(self):
         self.create_old_installation()
         for version in ["new", "newer"]:
