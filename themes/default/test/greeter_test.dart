@@ -16,6 +16,23 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
 
 void main() {
+  testWidgets('waking retains the sharp wallpaper configuration', (
+    tester,
+  ) async {
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
+    await tester.pumpAndSettle();
+    final wallpaper = find.byWidgetPredicate(
+      (widget) => widget is Image && widget.image is AssetImage,
+    );
+    final image = tester.widget<Image>(wallpaper);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(tester.widget<Image>(wallpaper), same(image));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(tester.widget<Image>(wallpaper), same(image));
+    await tester.pumpAndSettle();
+  });
+
   for (final size in [
     const Size(800, 600),
     const Size(1280, 720),
