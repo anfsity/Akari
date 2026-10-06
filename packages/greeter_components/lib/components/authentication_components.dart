@@ -80,12 +80,14 @@ class CredentialField extends StatelessWidget {
 
 class PrimaryAction extends StatelessWidget {
   const PrimaryAction({
+    required this.service,
     required this.auth,
     required this.onRespond,
     required this.onRetry,
     super.key,
   });
 
+  final ServiceSlots service;
   final AuthPromptSlots auth;
   final VoidCallback onRespond;
   final ValueChanged<GreeterRecovery> onRetry;
@@ -94,31 +96,36 @@ class PrimaryAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final error = auth.error;
-    final action = switch (auth.mode) {
-      AuthMode.prompting => (
-        onRespond,
-        const Icon(Icons.arrow_forward, size: 30),
-      ),
-      AuthMode.submitting => (
-        null,
-        SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: colorScheme.onPrimary,
-          ),
-        ),
-      ),
-      AuthMode.error when error != null => (
-        () => onRetry(error.recovery),
-        const Icon(Icons.refresh, size: 30),
-      ),
-      AuthMode.error ||
-      AuthMode.userSelection ||
-      AuthMode.sessionSelection ||
-      AuthMode.handingOff => null,
-    };
+    final action = service.mode == ServiceMode.unavailable
+        ? (
+            () => onRetry(GreeterRecovery.reconnectService),
+            const Icon(Icons.refresh, size: 30),
+          )
+        : switch (auth.mode) {
+            AuthMode.prompting => (
+              onRespond,
+              const Icon(Icons.arrow_forward, size: 30),
+            ),
+            AuthMode.submitting => (
+              null,
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.onPrimary,
+                ),
+              ),
+            ),
+            AuthMode.error when error != null => (
+              () => onRetry(error.recovery),
+              const Icon(Icons.refresh, size: 30),
+            ),
+            AuthMode.error ||
+            AuthMode.userSelection ||
+            AuthMode.sessionSelection ||
+            AuthMode.handingOff => null,
+          };
     if (action == null) {
       return const SizedBox.shrink();
     }
