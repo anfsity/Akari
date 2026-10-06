@@ -227,7 +227,9 @@ class GreeterFeature {
   }
 
   void _sleepGreeter() {
-    if (_state.dormant || _state.authMode == AuthMode.handingOff) {
+    if (_state.dormant ||
+        _state.serviceMode != ServiceMode.ready ||
+        _state.authMode == AuthMode.handingOff) {
       return;
     }
     // Hiding the form does not abandon its PAM conversation. Cancelling an

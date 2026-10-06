@@ -18,6 +18,11 @@ void main() {
     expect(feature.state.serviceMode, ServiceMode.unavailable);
     expect(find.text('Service disconnected'), findsOneWidget);
 
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(feature.state.dormant, isFalse);
+    expect(find.byIcon(Icons.refresh).hitTestable(), findsOneWidget);
+
     gateway.serviceUnavailable = false;
     await tester.tap(find.byIcon(Icons.refresh));
     await tester.pumpAndSettle();
