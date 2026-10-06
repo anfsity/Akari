@@ -150,19 +150,21 @@ class TerraceActionMotion extends SceneMotionBuilder {
 }
 
 class TerracePanel extends StatelessWidget {
-  const TerracePanel({super.key});
+  const TerracePanel({required this.radius, super.key});
+
+  final double radius;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
       ),
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Color(0x160e3047), Color(0x780e3047)],
+        colors: [Color(0xb30e2536), Color(0x8c0e2536)],
       ),
     ),
   );

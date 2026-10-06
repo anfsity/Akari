@@ -100,51 +100,55 @@ class TerraceSessionPicker extends StatelessWidget {
       child: Text('No desktop sessions available.'),
     ),
     CatalogMode.ready || CatalogMode.empty => LayoutBuilder(
-      builder: (context, constraints) => _TerraceMenu<SessionSummary>(
-        tooltip: 'Choose a session',
-        minWidth: constraints.maxWidth,
-        entries: [
-          for (final item in session.sessions)
-            PopupMenuItem<SessionSummary>(
-              value: item,
-              onTap: () => onSelect(item),
-              padding: EdgeInsets.zero,
-              child: _ChoiceRow(
-                label: item.name,
-                selected: session.selected?.id == item.id,
-                leading: const Icon(Icons.desktop_windows_outlined, size: 18),
+      builder: (context, constraints) {
+        final inputTheme = InputDecorationTheme.of(context);
+        final border = inputTheme.enabledBorder! as OutlineInputBorder;
+        return _TerraceMenu<SessionSummary>(
+          tooltip: 'Choose a session',
+          minWidth: constraints.maxWidth,
+          entries: [
+            for (final item in session.sessions)
+              PopupMenuItem<SessionSummary>(
+                value: item,
+                onTap: () => onSelect(item),
+                padding: EdgeInsets.zero,
+                child: _ChoiceRow(
+                  label: item.name,
+                  selected: session.selected?.id == item.id,
+                  leading: const Icon(Icons.desktop_windows_outlined, size: 18),
+                ),
+              ),
+          ],
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: inputTheme.fillColor,
+              borderRadius: border.borderRadius,
+              border: Border.fromBorderSide(border.borderSide),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.desktop_windows_outlined,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      session.selected?.name ?? 'Choose session',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (session.sessions.length > 1)
+                    const Icon(Icons.expand_more, size: 18),
+                ],
               ),
             ),
-        ],
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Theme.of(context).inputDecorationTheme.fillColor,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.desktop_windows_outlined,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    session.selected?.name ?? 'Choose session',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (session.sessions.length > 1)
-                  const Icon(Icons.expand_more, size: 18),
-              ],
-            ),
-          ),
-        ),
-      ),
+        );
+      },
     ),
   };
 }
@@ -171,7 +175,7 @@ class _TerraceMenu<T> extends StatelessWidget {
     position: PopupMenuPosition.under,
     offset: const Offset(0, 8),
     constraints: BoxConstraints(minWidth: minWidth, maxWidth: minWidth),
-    menuPadding: const EdgeInsets.all(4),
+    menuPadding: const EdgeInsets.all(6),
     popUpAnimationStyle: MediaQuery.disableAnimationsOf(context)
         ? AnimationStyle.noAnimation
         : const AnimationStyle(

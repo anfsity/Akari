@@ -14,7 +14,7 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
     seedColor: seed ?? _fallbackSeed,
     brightness: Brightness.dark,
   );
-  final surface = const Color(0xff102e43);
+  final surface = const Color(0xff0e2536);
   final surfaceVariant = colorScheme.surfaceContainerHighest;
   final text = colorScheme.onSurface;
   final tokens = ThemeTokens(
@@ -30,8 +30,8 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
         shadowColor: Colors.transparent,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
-          side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.3)),
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.2)),
         ),
         textStyle: TextStyle(
           fontFamily: _fontFamily,
@@ -46,17 +46,17 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surface.withValues(alpha: 0.86),
+        fillColor: surface.withValues(alpha: 0.72),
         hintStyle: TextStyle(
-          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.72),
+          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
           fontSize: 16,
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 18),
         border: _fieldBorder(Colors.transparent, 0),
-        enabledBorder: _fieldBorder(Colors.white.withValues(alpha: 0.22), 1),
+        enabledBorder: _fieldBorder(Colors.white.withValues(alpha: 0.16), 1),
         focusedBorder: _fieldBorder(colorScheme.primary, 1.5),
         disabledBorder: _fieldBorder(
-          colorScheme.outline.withValues(alpha: 0.24),
+          colorScheme.outline.withValues(alpha: 0.3),
           1,
         ),
         isDense: true,
@@ -76,7 +76,7 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
       ),
       visualDensity: VisualDensity.standard,
     ),
-    panelRadius: 4,
+    panelRadius: 24,
     mediumMotion: const Duration(milliseconds: 480),
     standardCurve: Curves.easeInOutCubic,
     minHitTarget: 44,
@@ -106,7 +106,7 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
 
 OutlineInputBorder _fieldBorder(Color color, double width) {
   return OutlineInputBorder(
-    borderRadius: BorderRadius.circular(4),
+    borderRadius: BorderRadius.circular(12),
     borderSide: BorderSide(color: color, width: width),
   );
 }

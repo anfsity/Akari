@@ -19,7 +19,7 @@ class TerraceComponents implements GreeterThemeComponents {
   Widget build(BuildContext context, SceneNode node) =>
       switch (node.componentId) {
         'terraceClock' => const _TerraceClock(),
-        'terracePanel' => const TerracePanel(),
+        'terracePanel' => TerracePanel(radius: theme.tokens.panelRadius),
         'terraceLabel' => _TerraceLabel(
           text: node.properties['text']!,
           large: node.properties['variant'] == 'large',
@@ -47,7 +47,7 @@ class TerraceComponents implements GreeterThemeComponents {
               account.selected?.displayName ?? 'Choose account',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w300),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w400),
             ),
           ),
         ),
@@ -70,9 +70,9 @@ class _TerraceLabel extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(
-          fontSize: large ? 52 : 11,
+          fontSize: large ? 48 : 11,
           fontWeight: large ? FontWeight.w300 : FontWeight.w500,
-          letterSpacing: large ? -1.5 : 2.6,
+          letterSpacing: large ? -1.8 : 2,
           height: 1.15,
           color: Colors.white.withValues(alpha: large ? 0.96 : 0.72),
         ),
