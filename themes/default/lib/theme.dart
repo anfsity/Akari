@@ -77,7 +77,7 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
         SceneMotionPreset.fade: FadeMotionBuilder(),
         SceneMotionPreset.fadeSlide: TerraceEntranceMotion(),
         SceneMotionPreset.fadeScale: TerraceEntranceMotion(),
-        SceneMotionPreset.hoverLift: HoverLiftMotionBuilder(),
+        SceneMotionPreset.hoverLift: TerraceActionMotion(),
         SceneMotionPreset.focusGlow: FocusGlowMotionBuilder(),
       },
     ),
