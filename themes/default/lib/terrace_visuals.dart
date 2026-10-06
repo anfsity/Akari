@@ -113,7 +113,7 @@ class _TerraceBackdropState extends State<_TerraceBackdrop> {
   }
 }
 
-/// Panel/clock settle first, followed by the heading, then the controls. All
+/// Panels settle first, followed by the text, then the controls. All
 /// layers share reversible runtime progress so interrupted wakes stay smooth.
 class TerraceEntranceMotion extends SceneMotionBuilder {
   const TerraceEntranceMotion();
@@ -129,23 +129,32 @@ class TerraceEntranceMotion extends SceneMotionBuilder {
     final entrance = progress.drive(
       CurveTween(curve: Interval(surface ? 0 : 0.12, surface ? 0.82 : 1)),
     );
+    // Keep glyph scale stable so the raster cache can reuse text while it
+    // moves. Only the panel surface needs expansion; headings spring in place.
+    final content = RepaintBoundary(child: child);
     return FadeTransition(
       opacity: entrance.drive(CurveTween(curve: Curves.easeOutCubic)),
       child: SlideTransition(
-        position: Tween<Offset>(
-          begin: Offset(surface ? -0.02 : 0, surface ? 0 : 0.16),
-          end: Offset.zero,
-        ).animate(entrance.drive(CurveTween(curve: Curves.easeOutCubic))),
-        child: ScaleTransition(
-          alignment: Alignment.centerLeft,
-          scale: Tween<double>(
-            begin: surface ? 0.96 : 0.985,
-            end: 1,
-          ).animate(entrance.drive(CurveTween(curve: Curves.easeOutBack))),
-          // Cache the static content inside the moving layer; the scene's
-          // outer boundary otherwise repaints text at every scale/slide step.
-          child: RepaintBoundary(child: child),
-        ),
+        position:
+            Tween<Offset>(
+              begin: Offset(surface ? -0.02 : 0, surface ? 0 : 0.16),
+              end: Offset.zero,
+            ).animate(
+              entrance.drive(
+                CurveTween(
+                  curve: surface ? Curves.easeOutCubic : Curves.easeOutBack,
+                ),
+              ),
+            ),
+        child: surface
+            ? ScaleTransition(
+                alignment: Alignment.centerLeft,
+                scale: Tween<double>(begin: 0.96, end: 1).animate(
+                  entrance.drive(CurveTween(curve: Curves.easeOutBack)),
+                ),
+                child: content,
+              )
+            : content,
       ),
     );
   }
