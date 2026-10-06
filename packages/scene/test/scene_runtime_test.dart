@@ -1,9 +1,102 @@
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scene/scene.dart';
 
 void main() {
+  for (final prewarm in [false, true]) {
+    testWidgets('applies hover motion with prewarming $prewarm', (
+      tester,
+    ) async {
+      final predicates = ValueNotifier<Set<ScenePredicate>>({
+        ScenePredicate.isDormant,
+      });
+      addTearDown(predicates.dispose);
+      final document = _document(
+        nodes: const [
+          SceneNode(
+            id: 'hover',
+            componentId: 'decoration',
+            rect: SceneRect(x: 0.2, y: 0.2, width: 0.2, height: 0.2),
+            motion: SceneMotionPreset.hoverLift,
+            visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
+          ),
+        ],
+      );
+      final theme = ThemeBundle(
+        tokens: _tokens(),
+        motions: const {SceneMotionPreset.hoverLift: HoverLiftMotionBuilder()},
+      );
+      await tester.pumpWidget(
+        _runtimeWithTheme(
+          document,
+          theme,
+          activePredicates: predicates.value,
+          activePredicatesListenable: predicates,
+          prewarmHiddenNodes: prewarm,
+        ),
+      );
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+      final target = find.byKey(const ValueKey('hover'));
+      await mouse.moveTo(tester.getCenter(target));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale,
+        1.02,
+      );
+
+      predicates.value = {};
+      await tester.pumpAndSettle();
+      expect(target.hitTestable(), findsNothing);
+      if (prewarm) {
+        expect(target, findsOneWidget);
+        expect(
+          find.ancestor(of: target, matching: find.byType(ExcludeFocus)),
+          findsOneWidget,
+        );
+        expect(
+          find.ancestor(of: target, matching: find.byType(ExcludeSemantics)),
+          findsOneWidget,
+        );
+      } else {
+        expect(target, findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('suppresses hover motion when animations are disabled', (
+    tester,
+  ) async {
+    final document = _document(
+      nodes: const [
+        SceneNode(
+          id: 'hover',
+          componentId: 'decoration',
+          rect: SceneRect(x: 0.2, y: 0.2, width: 0.2, height: 0.2),
+          motion: SceneMotionPreset.hoverLift,
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      _runtimeWithTheme(
+        document,
+        ThemeBundle(
+          tokens: _tokens(),
+          motions: const {
+            SceneMotionPreset.hoverLift: HoverLiftMotionBuilder(),
+          },
+        ),
+        disableAnimations: true,
+      ),
+    );
+    expect(find.text('hover'), findsOneWidget);
+    expect(find.byType(AnimatedScale), findsNothing);
+  });
   testWidgets('keeps node elements mounted across identity transforms', (
     tester,
   ) async {
@@ -395,20 +488,24 @@ Widget _runtimeWithTheme(
   ValueListenable<Set<ScenePredicate>>? activePredicatesListenable,
   double? backgroundBlurSigma,
   bool prewarmHiddenNodes = false,
+  bool disableAnimations = false,
 }) {
   return MaterialApp(
     home: Scaffold(
-      body: SceneRuntime(
-        document: document,
-        theme: theme,
-        activePredicates: activePredicates,
-        activePredicatesListenable: activePredicatesListenable,
-        prewarmHiddenNodes: prewarmHiddenNodes,
-        backgroundBlurSigma: backgroundBlurSigma == null
-            ? null
-            : AlwaysStoppedAnimation<double>(backgroundBlurSigma),
-        nodeBuilder: (context, node) =>
-            SizedBox.expand(key: ValueKey(node.id), child: Text(node.id)),
+      body: MediaQuery(
+        data: MediaQueryData(disableAnimations: disableAnimations),
+        child: SceneRuntime(
+          document: document,
+          theme: theme,
+          activePredicates: activePredicates,
+          activePredicatesListenable: activePredicatesListenable,
+          prewarmHiddenNodes: prewarmHiddenNodes,
+          backgroundBlurSigma: backgroundBlurSigma == null
+              ? null
+              : AlwaysStoppedAnimation<double>(backgroundBlurSigma),
+          nodeBuilder: (context, node) =>
+              SizedBox.expand(key: ValueKey(node.id), child: Text(node.id)),
+        ),
       ),
     ),
   );
