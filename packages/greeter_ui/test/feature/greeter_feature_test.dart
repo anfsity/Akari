@@ -444,6 +444,48 @@ void main() {
 
     feature.dispose();
   });
+
+  test(
+    'preserves authentication recovery when session failure ends the attempt',
+    () async {
+      final gateway = _FakeGreeterGateway();
+      final feature = await _createPromptedFeature(gateway);
+      addTearDown(feature.dispose);
+      final sessionStart = Completer<void>();
+      gateway.startSessionFuture = sessionStart.future;
+      gateway.emit(
+        const BackendStateChanged(
+          attemptId: 'attempt-1',
+          state: BackendAuthState.authenticated,
+          detail: '',
+        ),
+      );
+      await _flushEvents();
+
+      gateway.emit(
+        const BackendStateChanged(
+          attemptId: 'attempt-1',
+          state: BackendAuthState.failed,
+          detail: 'Session failed',
+        ),
+      );
+      await _flushEvents();
+      sessionStart.completeError(
+        const GreeterGatewayException('Session failed'),
+      );
+      await _flushEvents();
+
+      expect(feature.state.authMode, AuthMode.error);
+      expect(
+        feature.state.authError?.recovery,
+        GreeterRecovery.retryAuthentication,
+      );
+      await feature.dispatch(const RetryAuthenticationCommand());
+      await _flushEvents();
+      expect(feature.state.authMode, AuthMode.prompting);
+      expect(gateway.beginAuthenticationCalls, 2);
+    },
+  );
   test('auto-selects the only available account', () async {
     final gateway = _FakeGreeterGateway()
       ..users = const [UserSummary(id: 'alice', displayName: 'Alice')];
@@ -598,6 +640,7 @@ class _FakeGreeterGateway implements GreeterGateway {
   Object? sessionsError;
   Object? powerActionError;
   Object? startSessionError;
+  Future<void>? startSessionFuture;
   int startSessionCalls = 0;
   BackendStateSnapshot snapshot = const BackendStateSnapshot(
     state: BackendAuthState.idle,
@@ -681,6 +724,7 @@ class _FakeGreeterGateway implements GreeterGateway {
   @override
   Future<void> startSession(String attemptId, String sessionId) async {
     startSessionCalls++;
+    await startSessionFuture;
     final error = startSessionError;
     if (error != null) {
       throw error;

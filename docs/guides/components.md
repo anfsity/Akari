@@ -47,8 +47,8 @@ extra boundary only when profiling demonstrates a need.
 ## Dispatch semantic actions
 
 Components call host callbacks such as `onSelectUser`, `onSelectSession`,
-`onRespondToPrompt`, and `onRequestPowerAction`. Enable controls using the
-appropriate slots and preserve native keyboard, focus, and accessibility behavior.
+`onRespondToPrompt`, `onStartSession`, and `onRequestPowerAction`. Enable controls
+using the appropriate slots and preserve native keyboard, focus, and accessibility behavior.
 Authentication state, transport objects, and D-Bus calls belong to the greeter
 feature and backend.
 
