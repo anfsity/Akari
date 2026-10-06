@@ -149,6 +149,7 @@ const cliOptions = {
       'flutter',
       'sway',
       'lifecycle',
+      'screenshot',
       'restore',
       'journal',
     ],
