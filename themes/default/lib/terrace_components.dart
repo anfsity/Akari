@@ -5,6 +5,7 @@ import 'package:greeter_components/greeter_components.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import 'terrace_visuals.dart';
+import 'terrace_menus.dart';
 
 /// Scene-specific presentation, borrowing the standard authentication controls
 /// so prompt, recovery and session semantics retain one authoritative path.
@@ -25,9 +26,17 @@ class TerraceComponents implements GreeterThemeComponents {
         ),
         'terraceAccount' => SceneRegion<AccountPickerSlots>(
           valueListenable: theme.host.accountPickerSlots,
-          builder: (context, account) => _TerraceAccount(
+          builder: (context, account) => TerraceAccountPicker(
             account: account,
             onSelect: theme.host.onSelectUser,
+          ),
+        ),
+        'sessionPicker' => SceneRegion<SessionPickerSlots>(
+          valueListenable: theme.host.sessionPickerSlots,
+          builder: (context, session) => TerraceSessionPicker(
+            session: session,
+            onSelect: theme.host.onSelectSession,
+            onRetry: theme.host.onRetrySessionCatalog,
           ),
         ),
         'accountName' => SceneRegion<AccountPickerSlots>(
@@ -125,83 +134,4 @@ class _TerraceClockState extends State<_TerraceClock> {
       ),
     ),
   );
-}
-
-/// An anchored account marker opens choices at the same point in the scene,
-/// preserving spatial context and native menu keyboard navigation.
-class _TerraceAccount extends StatelessWidget {
-  const _TerraceAccount({required this.account, required this.onSelect});
-
-  final AccountPickerSlots account;
-  final ValueChanged<UserSummary> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-    return PopupMenuButton<UserSummary>(
-      tooltip: 'Choose account',
-      enabled: account.canSelect,
-      position: PopupMenuPosition.under,
-      popUpAnimationStyle: MediaQuery.disableAnimationsOf(context)
-          ? AnimationStyle.noAnimation
-          : const AnimationStyle(
-              duration: Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-            ),
-      color: const Color(0xff102e43),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: accent.withValues(alpha: 0.3)),
-      ),
-      itemBuilder: (context) => [
-        for (final user in account.users)
-          PopupMenuItem<UserSummary>(
-            value: user,
-            onTap: () => onSelect(user),
-            child: Row(
-              children: [
-                Icon(
-                  account.selected?.id == user.id
-                      ? Icons.check
-                      : Icons.person_outline,
-                  size: 18,
-                  color: accent,
-                ),
-                const SizedBox(width: 12),
-                Flexible(child: Text(user.displayName)),
-              ],
-            ),
-          ),
-      ],
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xb3102e43),
-              border: Border.all(color: accent.withValues(alpha: 0.6)),
-              boxShadow: [
-                BoxShadow(
-                  color: accent.withValues(alpha: 0.12),
-                  blurRadius: 20,
-                ),
-              ],
-            ),
-            child: ClipOval(
-              child: account.selected == null
-                  ? Icon(Icons.person_outline, color: accent, size: 24)
-                  : Center(
-                      child: AccountPortrait(
-                        user: account.selected!,
-                        accent: accent,
-                        fontSize: 24,
-                      ),
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
