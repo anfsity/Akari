@@ -39,6 +39,17 @@ class TerraceComponents implements GreeterThemeComponents {
             onRetry: theme.host.onRetrySessionCatalog,
           ),
         ),
+        'credentialField' => SceneRegion<AuthPromptSlots>(
+          valueListenable: theme.host.authPromptSlots,
+          builder: (context, auth) => TerraceCredentialFeedback(
+            auth: auth,
+            child: CredentialField(
+              auth: auth,
+              controller: theme.host.credentialController,
+              focusNode: theme.host.credentialFocusNode,
+            ),
+          ),
+        ),
         'accountName' => SceneRegion<AccountPickerSlots>(
           valueListenable: theme.host.accountPickerSlots,
           builder: (context, account) => Align(
