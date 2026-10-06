@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
-import 'dart:ui' show PlatformDispatcher;
+import 'dart:ui' show PlatformDispatcher, PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
@@ -134,6 +134,20 @@ void main() {
 
     Future<void> captureJourney() async {
       await captureNamedPhase('startup', captureStartup);
+      final sceneSize = tester.getSize(find.byType(MyApp));
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: sceneSize.center(Offset.zero));
+      addTearDown(mouse.removePointer);
+      await tester.pumpAndSettle(_frameInterval);
+      await captureNamedPhase(
+        'background_motion',
+        () => capturePhase(
+          'background_motion',
+          () => mouse.moveTo(
+            Offset(sceneSize.width * 0.65, sceneSize.height * 0.2),
+          ),
+        ),
+      );
       await captureNamedPhase('wake', captureWake);
       await captureNamedPhase(
         'account_picker_open',
