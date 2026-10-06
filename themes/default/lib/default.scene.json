@@ -55,7 +55,7 @@
         "height": 0.16
       },
       "renderOrder": 10,
-      "motion": "fadeScale",
+      "motion": "fadeSlide",
       "visibleWhen": "isDormant"
     },
     {
