@@ -50,9 +50,15 @@ class ThemeDefinition {
     final components = this.components(
       GreeterThemeContext(host: host, tokens: tokens),
     );
-    final backgroundBlurSigma = wakeProgress
-        .drive(CurveTween(curve: Curves.easeOutCubic))
-        .drive(Tween<double>(begin: 0, end: document.background.blurSigma));
+    // A sharp background has no wake-dependent work. Subscribing to a constant
+    // zero tween would rebuild its renderer on every transition frame.
+    final backgroundBlurSigma = document.background.blurSigma == 0
+        ? null
+        : wakeProgress
+              .drive(CurveTween(curve: Curves.easeOutCubic))
+              .drive(
+                Tween<double>(begin: 0, end: document.background.blurSigma),
+              );
     return SceneRuntime(
       document: document,
       theme: bundle,

@@ -17,12 +17,15 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
   const ImageBackgroundRenderer({
     this.resolveImage = _assetImageProvider,
     this.alignment = Alignment.center,
+    this.filterQuality = FilterQuality.high,
   });
 
   final SceneImageProviderResolver resolveImage;
 
   /// Focal point retained when cover fitting crops a wide wallpaper.
   final Alignment alignment;
+
+  final FilterQuality filterQuality;
 
   @override
   Widget build(BuildContext context, SceneBackground background) {
@@ -35,7 +38,7 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
       image: resolveImage(asset),
       fit: BoxFit.cover,
       alignment: alignment,
-      filterQuality: FilterQuality.high,
+      filterQuality: filterQuality,
       gaplessPlayback: true,
       errorBuilder: (context, error, stackTrace) {
         return SolidBackgroundRenderer().build(context, background);
@@ -61,9 +64,8 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
       children: [
         image,
         ColoredBox(
-          color: Color(background.color).withValues(
-            alpha: background.scrimOpacity.clamp(0, 1),
-          ),
+          color: Color(background.color)
+              .withValues(alpha: background.scrimOpacity.clamp(0, 1)),
         ),
       ],
     );

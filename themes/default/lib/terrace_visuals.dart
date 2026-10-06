@@ -10,8 +10,10 @@ class TerraceBackgroundRenderer extends BackgroundRenderer {
   Widget build(BuildContext context, SceneBackground background) =>
       _TerraceBackdrop(
         wallpaper: RepaintBoundary(
-          child: const ImageBackgroundRenderer(alignment: Alignment(0.72, 0))
-              .build(context, background.copyWith(blurSigma: 0)),
+          child: const ImageBackgroundRenderer(
+            alignment: Alignment(0.72, 0),
+            filterQuality: FilterQuality.low,
+          ).build(context, background.copyWith(blurSigma: 0)),
         ),
       );
 }
