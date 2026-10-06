@@ -23,6 +23,22 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
       colorScheme: colorScheme,
       fontFamily: _fontFamily,
       scaffoldBackgroundColor: Colors.transparent,
+      splashFactory: NoSplash.splashFactory,
+      popupMenuTheme: PopupMenuThemeData(
+        color: surface,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4),
+          side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.3)),
+        ),
+        textStyle: TextStyle(
+          fontFamily: _fontFamily,
+          fontSize: 14,
+          color: text,
+        ),
+      ),
       textTheme: Typography.whiteMountainView.apply(
         fontFamily: _fontFamily,
         bodyColor: text,
