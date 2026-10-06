@@ -103,12 +103,14 @@ class AccountPortrait extends StatelessWidget {
     required this.user,
     required this.accent,
     required this.fontSize,
+    this.fontWeight = FontWeight.w700,
     super.key,
   });
 
   final UserSummary user;
   final Color accent;
   final double fontSize;
+  final FontWeight fontWeight;
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +133,7 @@ class AccountPortrait extends StatelessWidget {
         style: TextStyle(
           color: accent,
           fontSize: fontSize,
-          fontWeight: FontWeight.w700,
+          fontWeight: fontWeight,
         ),
       ),
     );
