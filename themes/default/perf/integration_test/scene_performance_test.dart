@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -30,7 +31,7 @@ const _reportPath = String.fromEnvironment(
 );
 
 void main() {
-  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = _ScenePerformanceBinding();
 
   testWidgets('captures scene interaction frame timings', (tester) async {
     final interactionTimings = <FrameTiming>[];
@@ -43,7 +44,7 @@ void main() {
     var timingFrameCount = 0;
     var activePhase = 'startup';
     var captureFramePhases = true;
-    var captureActionResponseFrame = false;
+    Completer<void>? actionFrame;
     void onFrame(Duration _) {
       if (captureFramePhases) {
         final frameNumber = PlatformDispatcher.instance.frameData.frameNumber;
@@ -52,9 +53,10 @@ void main() {
         }
         phaseAtFrameStart[frameNumber] = (
           phase: activePhase,
-          actionResponse: captureActionResponseFrame,
+          actionResponse: actionFrame != null,
         );
-        captureActionResponseFrame = false;
+        actionFrame?.complete();
+        actionFrame = null;
       }
     }
 
@@ -89,12 +91,13 @@ void main() {
       activePhase = phase;
       // Capture one response frame per action before later animation frames.
       // Its UI-thread cost stays measurable even when transitions dominate p95.
-      captureActionResponseFrame = true;
+      final firstFrame = Completer<void>();
+      actionFrame = firstFrame;
       try {
         await interaction();
-        await tester.pump(_frameInterval);
+        await firstFrame.future.timeout(const Duration(seconds: 10));
       } finally {
-        captureActionResponseFrame = false;
+        actionFrame = null;
       }
       await tester.pumpAndSettle(_frameInterval);
       await Future<void>.delayed(const Duration(milliseconds: 150));
@@ -251,6 +254,47 @@ void main() {
     await output.writeAsString(jsonEncode(report));
     binding.reportData = report;
   });
+}
+
+/// Allow application-requested frames without the live test binding's extra
+/// frame after every draw. That automatic reschedule otherwise keeps a static
+/// scene rendering and makes the idle and vsync measurements describe the test
+/// harness. Requests made by application code during a draw still pass through.
+class _ScenePerformanceBinding extends IntegrationTestWidgetsFlutterBinding {
+  _ScenePerformanceBinding() {
+    framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.benchmarkLive;
+  }
+
+  @override
+  void handleDrawFrame() => _runWithFramePolicy(
+    LiveTestWidgetsFlutterBindingFramePolicy.benchmark,
+    super.handleDrawFrame,
+  );
+
+  @override
+  void scheduleFrame() => _runWithFramePolicy(
+    LiveTestWidgetsFlutterBindingFramePolicy.benchmarkLive,
+    super.scheduleFrame,
+  );
+
+  @override
+  void scheduleForcedFrame() => _runWithFramePolicy(
+    LiveTestWidgetsFlutterBindingFramePolicy.benchmarkLive,
+    super.scheduleForcedFrame,
+  );
+
+  void _runWithFramePolicy(
+    LiveTestWidgetsFlutterBindingFramePolicy policy,
+    VoidCallback action,
+  ) {
+    final previous = framePolicy;
+    framePolicy = policy;
+    try {
+      action();
+    } finally {
+      framePolicy = previous;
+    }
+  }
 }
 
 Map<String, Object?> _summarize(Iterable<FrameTiming> frames) {
