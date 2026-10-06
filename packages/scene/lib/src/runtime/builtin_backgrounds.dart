@@ -14,9 +14,15 @@ typedef SceneImageProviderResolver = ImageProvider Function(String asset);
 ImageProvider _assetImageProvider(String asset) => AssetImage(asset);
 
 class ImageBackgroundRenderer extends BackgroundRenderer {
-  const ImageBackgroundRenderer({this.resolveImage = _assetImageProvider});
+  const ImageBackgroundRenderer({
+    this.resolveImage = _assetImageProvider,
+    this.alignment = Alignment.center,
+  });
 
   final SceneImageProviderResolver resolveImage;
+
+  /// Focal point retained when cover fitting crops a wide wallpaper.
+  final Alignment alignment;
 
   @override
   Widget build(BuildContext context, SceneBackground background) {
@@ -28,6 +34,7 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
     Widget image = Image(
       image: resolveImage(asset),
       fit: BoxFit.cover,
+      alignment: alignment,
       filterQuality: FilterQuality.high,
       gaplessPlayback: true,
       errorBuilder: (context, error, stackTrace) {
