@@ -51,6 +51,9 @@ fvm dart run tool/akari.dart run sway --theme themes/default \
 
 在 Hyprland 中，使用桌面常用快捷键将嵌套窗口切换为全屏。对比时应使用与独立测试相同的物理显示器和模式。会话会补偿宿主显示器的缩放；平铺窗口的视口可能不同。将窗口移至另一台显示器或调整大小，可检查视口及补偿后缩放在主题运行期间是否同步更新。
 
+真实登录画面可用 `Print` 或 `Shift+Print` 截取，详见
+[TTY 截图流程](greetd-testing.md#capture-the-actual-tty-login-screen)。
+
 ## 拍摄固定分辨率的截图
 
 ```sh

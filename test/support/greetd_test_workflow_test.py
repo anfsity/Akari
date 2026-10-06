@@ -218,7 +218,7 @@ class InstallerTest(unittest.TestCase):
         script = (SOURCE / "install.sh").read_text()
         script = script.replace('[[ "$EUID" -ne 0 ]]', 'false')
         (self.source / "install.sh").write_text(script)
-        for name in ["start.sh", "restore.sh", "launch.sh", "greetd.toml", "sway.conf", "display-layout.py", "display_profile.py"]:
+        for name in ["start.sh", "restore.sh", "launch.sh", "greetd.toml", "sway.conf", "display-layout.py", "display_profile.py", "screenshot.py"]:
             shutil.copy2(SOURCE / name, self.source / name)
         layout_script = self.source / 'display-layout.py'
         layout_script.write_text(layout_script.read_text().replace(
@@ -300,6 +300,8 @@ if name == 'dart':
             installed = scripts / name
             self.assertEqual(installed.read_bytes(), (SOURCE.parent / name).read_bytes())
             self.assertEqual(installed.stat().st_mode & 0o777, 0o755)
+        self.assertEqual((self.installation / 'screenshot.py').read_bytes(),
+                         (SOURCE / 'screenshot.py').read_bytes())
 
     def test_installer_builds_without_existing_artifacts_and_rebuilds_on_repeat(self):
         self.create_old_installation()

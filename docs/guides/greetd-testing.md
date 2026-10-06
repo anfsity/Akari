@@ -129,6 +129,35 @@ developer's home directory.
 Continue with [display testing](display-testing.md#compare-a-nested-session-with-standalone-login)
 to compare that capture in a desktop session or produce fixed-resolution images.
 
+## Capture the actual TTY login screen
+
+Reinstall with `akari greetd-test install` to include the current capture script,
+and install `grim` on the system. On the actual login screen, press `Print` to
+save a PNG for every active display. `Shift+Print` waits three seconds, giving
+you time to open an account or session menu. The login compositor handles these
+keys without waking the dormant UI or dismissing a menu.
+
+Each capture creates a new directory beneath the current run's
+`greeter/session-*/screenshots/<timestamp>-*/`. Images survive SDDM restoration
+and are readable from the desktop without sudo. For UID 1000 and the default
+log root:
+
+```sh
+ls /var/tmp/akari-greetd-test-1000/current/greeter/session-*/screenshots/
+akari greetd-test logs --run current --file screenshot
+```
+
+Each directory contains `output-1.png`, etc., plus `capture.json` mapping images
+to displays and recording their current modes, logical dimensions and scales.
+Each display uses its own capture scale, avoiding grim's default highest-scale
+resampling on mixed-DPI setups. This does not change the startup
+`display-profile.json`; captures after hotplug retain their own display metadata.
+
+Use these actual images as your styling reference. Back on Hyprland, compare
+with `akari run sway --theme themes/default --display-profile login` fullscreen
+on the same monitor; an ordinary preview window can have a different logical
+viewport.
+
 Inspect the latest startup attempt or the test used by recovery:
 
 ```sh
@@ -139,7 +168,7 @@ akari greetd-test logs --run current --file flutter --follow
 
 `logs` defaults to the caller's latest startup attempt and its `start.log`.
 `--run current` selects the last armed test, even after restoration. `--file`
-accepts `start`, `backend`, `flutter`, `sway`, `lifecycle`, `restore` and `journal`.
+accepts `start`, `backend`, `flutter`, `sway`, `lifecycle`, `screenshot`, `restore` and `journal`.
 Greeter logs select the newest session; older session files remain at the saved
 run path. `--lines` (`-n`) defaults to 100; `--follow` (`-f`) follows the selected
 file, including its later creation. It does not switch sessions automatically.
@@ -178,6 +207,7 @@ Validate harness control flow without root or live system changes:
 
 ```sh
 python3 test/support/greetd_test_workflow_test.py
+python3 test/support/greetd_screenshot_test.py
 python3 test/support/display_profile_test.py
 python3 test/support/display_layout_test.py
 python3 test/support/sway_session_test.py

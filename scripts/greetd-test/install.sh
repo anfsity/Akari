@@ -37,7 +37,7 @@ else
 fi
 backup="$test_root/backups/$(date +%Y%m%d-%H%M%S)-$$"
 install -d -m 0755 "$backup"
-for path in frontend backend scripts start.sh restore.sh launch.sh greetd.toml sway.conf display-layout.json display-layout.py display_profile.py mock-power; do
+for path in frontend backend scripts start.sh restore.sh launch.sh greetd.toml sway.conf display-layout.json display-layout.py display_profile.py screenshot.py mock-power; do
   if [[ -e "$test_root/$path" ]]; then
     cp -a "$test_root/$path" "$backup/"
   fi
@@ -56,7 +56,7 @@ source, root = Path(sys.argv[1]), Path(sys.argv[2])
 PY
 chmod 0644 "$test_root/greetd.toml"
 install -m 0644 "$source_dir/sway.conf" "$test_root/"
-install -m 0644 "$source_dir/display-layout.py" "$source_dir/display_profile.py" "$test_root/"
+install -m 0644 "$source_dir/display-layout.py" "$source_dir/display_profile.py" "$source_dir/screenshot.py" "$test_root/"
 if [[ -n "$layout" ]]; then
   printf '%s\n' "$layout" > "$test_root/display-layout.json"
   chmod 0644 "$test_root/display-layout.json"
