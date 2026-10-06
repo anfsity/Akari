@@ -320,20 +320,21 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
             !widget.spec.reducedMotion
         ? motionBuilder.build(context, widget.spec, _progress, child)
         : child;
-    if (_visible) {
-      return animated;
-    }
-    return _hideFromInteraction(
-      _animatesPresence ? animated : Opacity(opacity: 0, child: animated),
-    );
-  }
-
-  Widget _hideFromInteraction(Widget child) {
     // Exiting nodes remain visible until motion settles, but stop accepting
-    // input immediately. Transparent or prewarmed nodes also leave traversal
-    // and accessibility so they cannot trap focus or announce hidden content.
+    // input immediately. Keep these wrappers mounted on both sides of the
+    // transition: removing them would discard prewarmed component state and
+    // rebuild input, focus and menu subtrees on every wake.
     return IgnorePointer(
-      child: ExcludeFocus(child: ExcludeSemantics(child: child)),
+      ignoring: !_visible,
+      child: ExcludeFocus(
+        excluding: !_visible,
+        child: ExcludeSemantics(
+          excluding: !_visible,
+          child: _animatesPresence
+              ? animated
+              : Opacity(opacity: _visible ? 1 : 0, child: animated),
+        ),
+      ),
     );
   }
 

@@ -6,6 +6,62 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scene/scene.dart';
 
 void main() {
+  for (final preset in [SceneMotionPreset.none, SceneMotionPreset.fade]) {
+    testWidgets('prewarmed state survives presence changes with $preset', (
+      tester,
+    ) async {
+      final predicates = ValueNotifier<Set<ScenePredicate>>({});
+      addTearDown(predicates.dispose);
+      const componentKey = ValueKey('retained-input');
+      final controller = TextEditingController(text: 'retained');
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SceneRuntime(
+              document: _document(
+                nodes: [
+                  SceneNode(
+                    id: 'input',
+                    componentId: 'decoration',
+                    rect: const SceneRect(
+                      x: 0.1,
+                      y: 0.1,
+                      width: 0.4,
+                      height: 0.2,
+                    ),
+                    motion: preset,
+                    visibleWhen: const ScenePredicateCondition(
+                      ScenePredicate.isDormant,
+                    ),
+                  ),
+                ],
+              ),
+              theme: ThemeBundle(
+                tokens: _tokens(),
+                motions: const {SceneMotionPreset.fade: FadeMotionBuilder()},
+              ),
+              activePredicatesListenable: predicates,
+              prewarmHiddenNodes: true,
+              nodeBuilder: (context, node) =>
+                  TextField(key: componentKey, controller: controller),
+            ),
+          ),
+        ),
+      );
+      final originalState = tester.state(find.byKey(componentKey));
+      for (final visible in [true, false, true]) {
+        predicates.value = visible ? {ScenePredicate.isDormant} : {};
+        await tester.pumpAndSettle();
+        expect(tester.state(find.byKey(componentKey)), same(originalState));
+        expect(
+          find.byKey(componentKey).hitTestable(),
+          visible ? findsOneWidget : findsNothing,
+        );
+      }
+    });
+  }
+
   for (final prewarm in [false, true]) {
     testWidgets('applies hover motion with prewarming $prewarm', (
       tester,
