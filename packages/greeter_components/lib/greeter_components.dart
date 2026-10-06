@@ -6,3 +6,4 @@
 library;
 
 export 'components/greeter_components.dart' show StandardGreeterComponents;
+export 'components/account_components.dart' show AccountPortrait;

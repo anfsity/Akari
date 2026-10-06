@@ -188,7 +188,17 @@ class _TerraceAccount extends StatelessWidget {
                 ),
               ],
             ),
-            child: Icon(Icons.person_outline, color: accent, size: 24),
+            child: ClipOval(
+              child: account.selected == null
+                  ? Icon(Icons.person_outline, color: accent, size: 24)
+                  : Center(
+                      child: AccountPortrait(
+                        user: account.selected!,
+                        accent: accent,
+                        fontSize: 24,
+                      ),
+                    ),
+            ),
           ),
         ),
       ),

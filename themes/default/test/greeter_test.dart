@@ -10,12 +10,45 @@ import 'package:greeter_ui/feature/greeter_state.dart';
 import 'package:greeter_ui/feature/ports/greeter_gateway.dart';
 
 import 'package:greeter/app/app.dart';
+import 'package:greeter_components/greeter_components.dart';
 
 import 'package:theme_default/theme.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
 
 void main() {
+  testWidgets(
+    'selected account uses the backend portrait and initial fallback',
+    (tester) async {
+      final feature = GreeterFeature(
+        gateway: _SingleUserGateway(iconPath: '/missing/avatar.png'),
+      );
+      addTearDown(feature.dispose);
+      await feature.initialize();
+      final theme = buildDefaultTheme();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme.materialTheme,
+          home: Scaffold(
+            body: GreeterSceneAdapter(feature: feature, theme: theme),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _wake(tester);
+      final portrait = tester.widget<AccountPortrait>(
+        find.byType(AccountPortrait),
+      );
+      expect(portrait.user.iconPath, '/missing/avatar.png');
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('A'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('waking retains the sharp wallpaper configuration', (
     tester,
   ) async {
@@ -552,6 +585,9 @@ Future<void> _wake(WidgetTester tester) async {
 
 /// A one-account backend so the greeter starts with every default set.
 class _SingleUserGateway implements GreeterGateway {
+  _SingleUserGateway({this.iconPath = ''});
+
+  final String iconPath;
   final StreamController<GreeterEvent> _events =
       StreamController<GreeterEvent>.broadcast();
 
@@ -568,8 +604,8 @@ class _SingleUserGateway implements GreeterGateway {
       const BackendStateSnapshot(state: BackendAuthState.idle, detail: '');
 
   @override
-  Future<List<UserSummary>> listUsers() async => const [
-    UserSummary(id: 'alice', displayName: 'Alice'),
+  Future<List<UserSummary>> listUsers() async => [
+    UserSummary(id: 'alice', displayName: 'Alice', iconPath: iconPath),
   ];
 
   @override
