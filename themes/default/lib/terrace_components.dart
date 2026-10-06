@@ -18,7 +18,7 @@ class TerraceComponents implements GreeterThemeComponents {
   Widget build(BuildContext context, SceneNode node) =>
       switch (node.componentId) {
         'terraceClock' => const _TerraceClock(),
-        'terracePortal' => const TerracePortal(),
+        'terracePanel' => const TerracePanel(),
         'terraceLabel' => _TerraceLabel(
           text: node.properties['text']!,
           large: node.properties['variant'] == 'large',
@@ -116,7 +116,7 @@ class _TerraceClockState extends State<_TerraceClock> {
         '${_now.hour.toString().padLeft(2, '0')}:${_now.minute.toString().padLeft(2, '0')}',
         style: const TextStyle(
           fontSize: 132,
-          fontWeight: FontWeight.w100,
+          fontWeight: FontWeight.w300,
           letterSpacing: -6,
           height: 1,
           color: Color(0xffeefaff),

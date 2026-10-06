@@ -99,9 +99,8 @@ class _TerraceBackdropState extends State<_TerraceBackdrop> {
   }
 }
 
-/// All entrance layers share the runtime's reversible progress. A small yaw
-/// and depth offset suggest approaching a marker on the terrace, without moving
-/// the native credential field or recreating its focus and controller.
+/// Presence uses the runtime's reversible progress; a short planar slide keeps
+/// the clock-to-login transition continuous without inventing depth in the art.
 class TerraceEntranceMotion extends SceneMotionBuilder {
   const TerraceEntranceMotion();
 
@@ -111,26 +110,16 @@ class TerraceEntranceMotion extends SceneMotionBuilder {
     SceneMotionSpec spec,
     Animation<double> progress,
     Widget child,
-  ) {
-    return FadeTransition(
-      opacity: progress,
-      child: AnimatedBuilder(
-        animation: progress,
-        child: child,
-        builder: (context, child) {
-          final remaining = 1 - progress.value;
-          return Transform(
-            alignment: Alignment.centerLeft,
-            transform: Matrix4.identity()
-              ..setEntry(3, 2, 0.0007)
-              ..translateByDouble(-18 * remaining, 6 * remaining, 0, 1)
-              ..rotateY(-0.06 * remaining),
-            child: child,
-          );
-        },
-      ),
-    );
-  }
+  ) => FadeTransition(
+    opacity: progress,
+    child: SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(-0.025, 0),
+        end: Offset.zero,
+      ).animate(progress),
+      child: child,
+    ),
+  );
 }
 
 class TerraceActionMotion extends SceneMotionBuilder {
@@ -148,68 +137,21 @@ class TerraceActionMotion extends SceneMotionBuilder {
   );
 }
 
-class TerracePortal extends StatelessWidget {
-  const TerracePortal({super.key});
+class TerracePanel extends StatelessWidget {
+  const TerracePanel({super.key});
 
   @override
-  Widget build(BuildContext context) => CustomPaint(
-    painter: _PortalPainter(Theme.of(context).colorScheme.primary),
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
+      ),
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0x160e3047), Color(0x780e3047)],
+      ),
+    ),
   );
-}
-
-class _PortalPainter extends CustomPainter {
-  const _PortalPainter(this.accent);
-
-  final Color accent;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bounds = Offset.zero & size;
-    final plane = Path()
-      ..moveTo(0, size.height * 0.025)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width * 0.97, size.height)
-      ..lineTo(0, size.height * 0.965)
-      ..close();
-    canvas.drawPath(
-      plane,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0x080e3047), Color(0xb30e3047)],
-        ).createShader(bounds),
-    );
-    final line = Paint()
-      ..color = accent.withValues(alpha: 0.34)
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(
-      Path()
-        ..moveTo(0, size.height * 0.14)
-        ..lineTo(0, size.height * 0.025)
-        ..lineTo(size.width * 0.18, size.height * 0.02),
-      line,
-    );
-    canvas.drawPath(
-      Path()
-        ..moveTo(size.width * 0.68, size.height * 0.99)
-        ..lineTo(size.width * 0.97, size.height)
-        ..lineTo(size.width * 0.973, size.height * 0.88),
-      line,
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.07, size.height * 0.965),
-      Offset(size.width * 0.57, size.height * 0.984),
-      Paint()
-        ..strokeWidth = 1.5
-        ..shader = LinearGradient(
-          colors: [accent.withValues(alpha: 0.6), accent.withValues(alpha: 0)],
-        ).createShader(bounds),
-    );
-  }
-
-  @override
-  bool shouldRepaint(_PortalPainter oldDelegate) =>
-      oldDelegate.accent != accent;
 }
