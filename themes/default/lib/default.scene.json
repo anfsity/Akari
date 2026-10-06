@@ -42,7 +42,7 @@
       "renderOrder": 10,
       "motion": "fade",
       "properties": {
-        "text": "ABOVE THE CITY"
+        "text": "AKARI / ABOVE THE CITY"
       }
     },
     {
@@ -73,6 +73,22 @@
       "properties": {
         "text": "Hello, world.",
         "variant": "large"
+      }
+    },
+    {
+      "id": "wake_hint",
+      "component": "terraceLabel",
+      "rect": {
+        "x": 0.09,
+        "y": 0.605,
+        "width": 0.32,
+        "height": 0.025
+      },
+      "renderOrder": 10,
+      "motion": "fade",
+      "visibleWhen": "isDormant",
+      "properties": {
+        "text": "PRESS ANY KEY TO SIGN IN"
       }
     },
     {
@@ -127,11 +143,29 @@
       }
     },
     {
+      "id": "entrance_caption",
+      "component": "terraceLabel",
+      "rect": {
+        "x": 0.09,
+        "y": 0.395,
+        "width": 0.3,
+        "height": 0.025
+      },
+      "renderOrder": 40,
+      "motion": "fadeSlide",
+      "visibleWhen": {
+        "not": "isDormant"
+      },
+      "properties": {
+        "text": "SIGN IN TO YOUR DESKTOP"
+      }
+    },
+    {
       "id": "avatar",
       "component": "terraceAccount",
       "rect": {
         "x": 0.09,
-        "y": 0.455,
+        "y": 0.445,
         "width": 0.042,
         "height": 0.065
       },
@@ -147,9 +181,9 @@
       "id": "account_name",
       "component": "accountName",
       "rect": {
-        "x": 0.15,
-        "y": 0.455,
-        "width": 0.25,
+        "x": 0.16,
+        "y": 0.445,
+        "width": 0.24,
         "height": 0.065
       },
       "renderOrder": 40,
@@ -163,8 +197,8 @@
       "component": "sessionPicker",
       "rect": {
         "x": 0.09,
-        "y": 0.555,
-        "width": 0.24,
+        "y": 0.54,
+        "width": 0.31,
         "height": 0.055
       },
       "renderOrder": 40,
@@ -183,7 +217,7 @@
       "component": "credentialField",
       "rect": {
         "x": 0.09,
-        "y": 0.65,
+        "y": 0.625,
         "width": 0.25,
         "height": 0.06
       },
@@ -203,7 +237,7 @@
       "component": "primaryAction",
       "rect": {
         "x": 0.355,
-        "y": 0.65,
+        "y": 0.625,
         "width": 0.045,
         "height": 0.06
       },
@@ -235,9 +269,9 @@
       "component": "status",
       "rect": {
         "x": 0.09,
-        "y": 0.735,
+        "y": 0.71,
         "width": 0.31,
-        "height": 0.04
+        "height": 0.055
       },
       "renderOrder": 40,
       "motion": "fade",
