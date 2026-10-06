@@ -278,6 +278,47 @@ class _TerraceCredentialFeedbackState extends State<TerraceCredentialFeedback>
   );
 }
 
+class TerraceChoiceLabel extends StatelessWidget {
+  const TerraceChoiceLabel({
+    required this.id,
+    required this.label,
+    this.style,
+    super.key,
+  });
+
+  final String? id;
+  final String label;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 220),
+    switchInCurve: Curves.easeOutCubic,
+    switchOutCurve: Curves.easeInCubic,
+    layoutBuilder: (child, previous) =>
+        Stack(alignment: Alignment.centerLeft, children: [...previous, ?child]),
+    transitionBuilder: (child, animation) => FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.35),
+          end: Offset.zero,
+        ).animate(animation),
+        child: child,
+      ),
+    ),
+    child: Text(
+      label,
+      key: ValueKey(id),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: style,
+    ),
+  );
+}
+
 class TerracePanel extends StatelessWidget {
   const TerracePanel({required this.radius, super.key});
 
