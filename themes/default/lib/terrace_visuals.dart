@@ -8,13 +8,18 @@ class TerraceBackgroundRenderer extends BackgroundRenderer {
 
   @override
   Widget build(BuildContext context, SceneBackground background) =>
-      _TerraceBackdrop(background: background);
+      _TerraceBackdrop(
+        wallpaper: RepaintBoundary(
+          child: const ImageBackgroundRenderer(alignment: Alignment(0.72, 0))
+              .build(context, background.copyWith(blurSigma: 0)),
+        ),
+      );
 }
 
 class _TerraceBackdrop extends StatefulWidget {
-  const _TerraceBackdrop({required this.background});
+  const _TerraceBackdrop({required this.wallpaper});
 
-  final SceneBackground background;
+  final Widget wallpaper;
 
   @override
   State<_TerraceBackdrop> createState() => _TerraceBackdropState();
@@ -54,11 +59,7 @@ class _TerraceBackdropState extends State<_TerraceBackdrop> {
                   offset: offset,
                   child: Transform.scale(scale: 1.025, child: child),
                 ),
-                child: RepaintBoundary(
-                  child: const ImageBackgroundRenderer(
-                    alignment: Alignment(0.72, 0),
-                  ).build(context, widget.background.copyWith(blurSigma: 0)),
-                ),
+                child: widget.wallpaper,
               ),
               const DecoratedBox(
                 decoration: BoxDecoration(
@@ -128,6 +129,21 @@ class TerraceEntranceMotion extends SceneMotionBuilder {
       ),
     );
   }
+}
+
+class TerraceActionMotion extends SceneMotionBuilder {
+  const TerraceActionMotion();
+
+  @override
+  Widget build(
+    BuildContext context,
+    SceneMotionSpec spec,
+    Animation<double> progress,
+    Widget child,
+  ) => FadeTransition(
+    opacity: progress,
+    child: const HoverLiftMotionBuilder().build(context, spec, progress, child),
+  );
 }
 
 class TerracePortal extends StatelessWidget {
