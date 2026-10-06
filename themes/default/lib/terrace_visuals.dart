@@ -142,7 +142,9 @@ class TerraceEntranceMotion extends SceneMotionBuilder {
             begin: surface ? 0.96 : 0.985,
             end: 1,
           ).animate(entrance.drive(CurveTween(curve: Curves.easeOutBack))),
-          child: child,
+          // Cache the static content inside the moving layer; the scene's
+          // outer boundary otherwise repaints text at every scale/slide step.
+          child: RepaintBoundary(child: child),
         ),
       ),
     );
@@ -188,7 +190,7 @@ class TerraceActionMotion extends SceneMotionBuilder {
         reducedMotion: spec.reducedMotion,
       ),
       progress,
-      child,
+      RepaintBoundary(child: child),
     ),
   );
 }
@@ -274,7 +276,7 @@ class _TerraceCredentialFeedbackState extends State<TerraceCredentialFeedback>
         ),
       );
     },
-    child: widget.child,
+    child: RepaintBoundary(child: widget.child),
   );
 }
 
