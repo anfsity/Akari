@@ -58,10 +58,11 @@ class StandardGreeterComponents implements GreeterThemeComponents {
           focusNode: host.credentialFocusNode,
         ),
       ),
-      'primaryAction' => SceneRegion<AuthPromptSlots>(
-        valueListenable: host.authPromptSlots,
-        builder: (context, auth) => PrimaryAction(
-          auth: auth,
+      'primaryAction' => ListenableBuilder(
+        listenable: Listenable.merge([host.serviceSlots, host.authPromptSlots]),
+        builder: (context, child) => PrimaryAction(
+          service: host.serviceSlots.value,
+          auth: host.authPromptSlots.value,
           onRespond: host.onRespondToPrompt,
           onRetry: host.onRetry,
         ),
