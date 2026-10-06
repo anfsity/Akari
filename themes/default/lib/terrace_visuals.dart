@@ -1,5 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:scene/scene.dart';
+import 'package:theme_sdk/theme_sdk.dart';
 
 /// The sky stays in focus. Local shadows provide contrast without a full-screen
 /// blur pass, and pointer motion moves the cached wallpaper rather than inputs.
@@ -188,6 +190,91 @@ class TerraceActionMotion extends SceneMotionBuilder {
       progress,
       child,
     ),
+  );
+}
+
+/// Keep the native field and focus mounted while a rejection moves its surface.
+/// Only new credential errors trigger motion; unrelated slot updates and waking
+/// an existing error must not replay it. Frames repaint without field rebuilds.
+class TerraceCredentialFeedback extends StatefulWidget {
+  const TerraceCredentialFeedback({
+    required this.auth,
+    required this.child,
+    super.key,
+  });
+
+  final AuthPromptSlots auth;
+  final Widget child;
+
+  @override
+  State<TerraceCredentialFeedback> createState() =>
+      _TerraceCredentialFeedbackState();
+}
+
+class _TerraceCredentialFeedbackState extends State<TerraceCredentialFeedback>
+    with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 380),
+  );
+
+  @override
+  void didUpdateWidget(TerraceCredentialFeedback oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final error = widget.auth.error;
+    final rejected =
+        error != null &&
+        (error.kind == GreeterErrorKind.authentication ||
+            error.kind == GreeterErrorKind.input) &&
+        error != oldWidget.auth.error;
+    final promptRejected =
+        widget.auth.promptError != null &&
+        widget.auth.promptError != oldWidget.auth.promptError;
+    if ((rejected || promptRejected) &&
+        !MediaQuery.disableAnimationsOf(context)) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
+    builder: (context, child) {
+      final progress = _controller.value;
+      final envelope = (1 - progress) * (1 - progress);
+      return Transform.translate(
+        offset: Offset(math.sin(progress * math.pi * 6) * 9 * envelope, 0),
+        child: DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            borderRadius:
+                (InputDecorationTheme.of(context).enabledBorder!
+                        as OutlineInputBorder)
+                    .borderRadius,
+            border: Border.all(
+              color: Theme.of(context).colorScheme.error
+                  .withValues(alpha: math.sin(progress * math.pi) * 0.85),
+            ),
+          ),
+          child: child,
+        ),
+      );
+    },
+    child: widget.child,
   );
 }
 
