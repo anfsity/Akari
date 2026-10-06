@@ -9,11 +9,49 @@ class TerraceBackgroundRenderer extends BackgroundRenderer {
   @override
   Widget build(BuildContext context, SceneBackground background) =>
       _TerraceBackdrop(
-        wallpaper: RepaintBoundary(
-          child: const ImageBackgroundRenderer(
-            alignment: Alignment(0.72, 0),
-            filterQuality: FilterQuality.low,
-          ).build(context, background.copyWith(blurSigma: 0)),
+        wallpaper: Transform.scale(
+          scale: 1.025,
+          // Cache the image and its atmosphere together. Keeping gradients
+          // outside would blend two full-screen layers on every parallax frame.
+          child: RepaintBoundary(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                const ImageBackgroundRenderer(
+                  alignment: Alignment(0.72, 0),
+                  filterQuality: FilterQuality.low,
+                ).build(context, background.copyWith(blurSigma: 0)),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Color(0xb30b263c),
+                        Color(0x380b263c),
+                        Color(0x000b263c),
+                      ],
+                      stops: [0, 0.48, 0.78],
+                    ),
+                  ),
+                ),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0x2007192c),
+                        Colors.transparent,
+                        Color(0xb307192c),
+                      ],
+                      stops: [0, 0.6, 1],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
 }
@@ -45,53 +83,18 @@ class _TerraceBackdropState extends State<_TerraceBackdrop> {
               }),
         onExit: (_) => setState(() => _target = Offset.zero),
         child: ClipRect(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              TweenAnimationBuilder<Offset>(
-                tween: Tween(
-                  begin: Offset.zero,
-                  end: reducedMotion ? Offset.zero : _target,
-                ),
-                duration: reducedMotion
-                    ? Duration.zero
-                    : const Duration(milliseconds: 700),
-                curve: Curves.easeOutCubic,
-                builder: (context, offset, child) => Transform.translate(
-                  offset: offset,
-                  child: Transform.scale(scale: 1.025, child: child),
-                ),
-                child: widget.wallpaper,
-              ),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Color(0xb30b263c),
-                      Color(0x380b263c),
-                      Color(0x000b263c),
-                    ],
-                    stops: [0, 0.48, 0.78],
-                  ),
-                ),
-              ),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0x2007192c),
-                      Colors.transparent,
-                      Color(0xb307192c),
-                    ],
-                    stops: [0, 0.6, 1],
-                  ),
-                ),
-              ),
-            ],
+          child: TweenAnimationBuilder<Offset>(
+            tween: Tween(
+              begin: Offset.zero,
+              end: reducedMotion ? Offset.zero : _target,
+            ),
+            duration: reducedMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 700),
+            curve: Curves.easeOutCubic,
+            builder: (context, offset, child) =>
+                Transform.translate(offset: offset, child: child),
+            child: widget.wallpaper,
           ),
         ),
       ),
