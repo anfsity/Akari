@@ -17,6 +17,29 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
 
 void main() {
+  testWidgets('Escape closes each choice menu without sleeping the greeter', (
+    tester,
+  ) async {
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
+    await tester.pumpAndSettle();
+    await _wake(tester);
+    final feature = tester
+        .widget<GreeterSceneAdapter>(find.byType(GreeterSceneAdapter))
+        .feature;
+    for (final tooltip in ['Choose account', 'Choose a session']) {
+      await tester.tap(find.byTooltip(tooltip));
+      await tester.pumpAndSettle();
+      expect(
+        find.byWidgetPredicate((widget) => widget is PopupMenuEntry),
+        findsWidgets,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(feature.state.dormant, isFalse);
+      expect(find.byTooltip(tooltip).hitTestable(), findsOneWidget);
+    }
+  });
+
   testWidgets(
     'selected account uses the backend portrait and initial fallback',
     (tester) async {
