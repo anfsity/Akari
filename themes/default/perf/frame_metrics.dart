@@ -1,6 +1,7 @@
 typedef FrameMetricSample = Map<String, double>;
 
 const measuredInteractionPhases = [
+  'background_motion',
   'wake',
   'account_picker_open',
   'account_select',
