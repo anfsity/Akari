@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:scene/scene.dart';
-import 'package:greeter_components/greeter_components.dart';
 import 'package:theme_sdk/theme_sdk.dart' show ThemeDefinition;
 
 import 'default.scene.g.dart';
+import 'terrace_components.dart';
+import 'terrace_visuals.dart';
 
 /// Seed used before extraction runs and when the wallpaper cannot be sampled.
-const _fallbackSeed = Color(0xffb79cff);
+const _fallbackSeed = Color(0xff83cddd);
 ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
   final colorScheme = ColorScheme.fromSeed(
     seedColor: seed ?? _fallbackSeed,
     brightness: Brightness.dark,
   );
-  final surface = colorScheme.surfaceContainerLow;
+  final surface = const Color(0xff102e43);
   final surfaceVariant = colorScheme.surfaceContainerHighest;
   final text = colorScheme.onSurface;
   final tokens = ThemeTokens(
@@ -26,15 +27,15 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surface,
+        fillColor: surface.withValues(alpha: 0.86),
         hintStyle: TextStyle(
           color: colorScheme.onSurfaceVariant.withValues(alpha: 0.72),
           fontSize: 16,
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 18),
         border: _fieldBorder(Colors.transparent, 0),
-        enabledBorder: _fieldBorder(Colors.white.withValues(alpha: 0.06), 1),
-        focusedBorder: _fieldBorder(colorScheme.primary, 2),
+        enabledBorder: _fieldBorder(Colors.white.withValues(alpha: 0.22), 1),
+        focusedBorder: _fieldBorder(colorScheme.primary, 1.5),
         disabledBorder: _fieldBorder(
           colorScheme.outline.withValues(alpha: 0.24),
           1,
@@ -56,9 +57,9 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
       ),
       visualDensity: VisualDensity.standard,
     ),
-    panelRadius: 28,
-    mediumMotion: const Duration(milliseconds: 260),
-    standardCurve: Curves.easeOutCubic,
+    panelRadius: 12,
+    mediumMotion: const Duration(milliseconds: 480),
+    standardCurve: Curves.easeInOutCubic,
     minHitTarget: 44,
     surfaceColor: surface,
     surfaceVariantColor: surfaceVariant,
@@ -69,24 +70,24 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
     bundle: ThemeBundle(
       tokens: tokens,
       backgrounds: const {
-        SceneBackgroundKind.image: ImageBackgroundRenderer(),
+        SceneBackgroundKind.image: TerraceBackgroundRenderer(),
         SceneBackgroundKind.solid: SolidBackgroundRenderer(),
       },
       motions: const {
         SceneMotionPreset.fade: FadeMotionBuilder(),
-        SceneMotionPreset.fadeSlide: FadeSlideMotionBuilder(),
-        SceneMotionPreset.fadeScale: FadeScaleMotionBuilder(),
+        SceneMotionPreset.fadeSlide: TerraceEntranceMotion(),
+        SceneMotionPreset.fadeScale: TerraceEntranceMotion(),
         SceneMotionPreset.hoverLift: HoverLiftMotionBuilder(),
         SceneMotionPreset.focusGlow: FocusGlowMotionBuilder(),
       },
     ),
-    components: StandardGreeterComponents.new,
+    components: TerraceComponents.new,
   );
 }
 
 OutlineInputBorder _fieldBorder(Color color, double width) {
   return OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
+    borderRadius: BorderRadius.circular(8),
     borderSide: BorderSide(color: color, width: width),
   );
 }
