@@ -54,10 +54,9 @@ class TerraceComponents implements GreeterThemeComponents {
           valueListenable: theme.host.accountPickerSlots,
           builder: (context, account) => Align(
             alignment: Alignment.centerLeft,
-            child: Text(
-              account.selected?.displayName ?? 'Choose account',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: TerraceChoiceLabel(
+              id: account.selected?.id,
+              label: account.selected?.displayName ?? 'Choose account',
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w400),
             ),
           ),
