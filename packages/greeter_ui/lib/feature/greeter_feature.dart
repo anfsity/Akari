@@ -93,7 +93,7 @@ class GreeterFeature {
   Future<void> dispatch(GreeterCommand command) async {
     switch (command) {
       case SelectUserCommand(:final user):
-        _selectUser(user);
+        await _selectUser(user);
       case BeginAuthenticationCommand():
         await _beginAuthentication();
       case RespondToPromptCommand(:final response):
@@ -237,23 +237,32 @@ class GreeterFeature {
   }
 
   bool get _canSelectUser {
-    if (_state.serviceMode != ServiceMode.ready || _state.dormant) {
+    if (_state.serviceMode != ServiceMode.ready ||
+        _state.dormant ||
+        _beginInFlight ||
+        _sessionStartInFlight) {
       return false;
     }
-    if (_state.authMode == AuthMode.userSelection) {
-      return !_beginInFlight;
+    if (_state.authMode == AuthMode.userSelection ||
+        _state.authMode == AuthMode.prompting) {
+      return true;
     }
     return _state.authMode == AuthMode.error &&
-        _state.authError?.recovery == GreeterRecovery.retryAuthentication &&
-        _attemptId == null &&
-        !_beginInFlight &&
-        !_sessionStartInFlight;
+        (_state.authError?.recovery == GreeterRecovery.retryAuthentication ||
+            _state.authError?.recovery == GreeterRecovery.retryPrompt);
   }
 
-  void _selectUser(UserSummary user) {
+  Future<void> _selectUser(UserSummary user) async {
     if (!_canSelectUser ||
-        !_state.users.any((candidate) => candidate.id == user.id)) {
+        !_state.users.any((candidate) => candidate.id == user.id) ||
+        (_attemptId != null && _state.selectedUser?.id == user.id)) {
       return;
+    }
+    if (_attemptId != null) {
+      await _cancelAuthentication();
+      if (_state.serviceMode != ServiceMode.ready) {
+        return;
+      }
     }
     _replace(
       _state.copyWith(
@@ -368,6 +377,15 @@ class GreeterFeature {
     // Invalidate locally before awaiting cancellation; late prompts from the
     // abandoned conversation must no longer be able to restore the input UI.
     _attemptId = null;
+    _replace(
+      _state.copyWith(
+        authMode: AuthMode.submitting,
+        backendAuthState: BackendAuthState.cancelling,
+        clearPrompt: true,
+        clearAuthError: true,
+        clearPromptError: true,
+      ),
+    );
     try {
       await _gateway.cancel(attemptId);
     } on Object catch (error) {
