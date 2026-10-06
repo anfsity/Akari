@@ -111,8 +111,8 @@ class _TerraceBackdropState extends State<_TerraceBackdrop> {
   }
 }
 
-/// Presence uses the runtime's reversible progress; a short planar slide keeps
-/// the clock-to-login transition continuous without inventing depth in the art.
+/// Panel/clock settle first, followed by the heading, then the controls. All
+/// layers share reversible runtime progress so interrupted wakes stay smooth.
 class TerraceEntranceMotion extends SceneMotionBuilder {
   const TerraceEntranceMotion();
 
@@ -122,15 +122,45 @@ class TerraceEntranceMotion extends SceneMotionBuilder {
     SceneMotionSpec spec,
     Animation<double> progress,
     Widget child,
+  ) {
+    final surface = spec.preset == SceneMotionPreset.fadeScale;
+    final entrance = progress.drive(
+      CurveTween(curve: Interval(surface ? 0 : 0.12, surface ? 0.82 : 1)),
+    );
+    return FadeTransition(
+      opacity: entrance.drive(CurveTween(curve: Curves.easeOutCubic)),
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: Offset(surface ? -0.02 : 0, surface ? 0 : 0.16),
+          end: Offset.zero,
+        ).animate(entrance.drive(CurveTween(curve: Curves.easeOutCubic))),
+        child: ScaleTransition(
+          alignment: Alignment.centerLeft,
+          scale: Tween<double>(
+            begin: surface ? 0.96 : 0.985,
+            end: 1,
+          ).animate(entrance.drive(CurveTween(curve: Curves.easeOutBack))),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class TerraceFadeMotion extends SceneMotionBuilder {
+  const TerraceFadeMotion();
+
+  @override
+  Widget build(
+    BuildContext context,
+    SceneMotionSpec spec,
+    Animation<double> progress,
+    Widget child,
   ) => FadeTransition(
-    opacity: progress,
-    child: SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(-0.025, 0),
-        end: Offset.zero,
-      ).animate(progress),
-      child: child,
+    opacity: progress.drive(
+      CurveTween(curve: const Interval(0.24, 1, curve: Curves.easeOutCubic)),
     ),
+    child: child,
   );
 }
 
@@ -144,8 +174,20 @@ class TerraceActionMotion extends SceneMotionBuilder {
     Animation<double> progress,
     Widget child,
   ) => FadeTransition(
-    opacity: progress,
-    child: const HoverLiftMotionBuilder().build(context, spec, progress, child),
+    opacity: progress.drive(
+      CurveTween(curve: const Interval(0.24, 1, curve: Curves.easeOutCubic)),
+    ),
+    child: const HoverLiftMotionBuilder().build(
+      context,
+      (
+        preset: spec.preset,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        reducedMotion: spec.reducedMotion,
+      ),
+      progress,
+      child,
+    ),
   );
 }
 

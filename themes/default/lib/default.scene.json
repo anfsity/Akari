@@ -55,7 +55,7 @@
         "height": 0.16
       },
       "renderOrder": 10,
-      "motion": "fade",
+      "motion": "fadeScale",
       "visibleWhen": "isDormant"
     },
     {
@@ -85,7 +85,7 @@
         "height": 0.025
       },
       "renderOrder": 10,
-      "motion": "fade",
+      "motion": "fadeSlide",
       "visibleWhen": "isDormant",
       "properties": {
         "text": "PRESS ANY KEY TO SIGN IN"
@@ -118,7 +118,7 @@
         "height": 0.57
       },
       "renderOrder": 30,
-      "motion": "fade",
+      "motion": "fadeScale",
       "visibleWhen": {
         "not": "isDormant"
       }
@@ -152,7 +152,7 @@
         "height": 0.025
       },
       "renderOrder": 40,
-      "motion": "fadeSlide",
+      "motion": "fade",
       "visibleWhen": {
         "not": "isDormant"
       },
@@ -170,7 +170,7 @@
         "height": 0.065
       },
       "renderOrder": 40,
-      "motion": "fadeSlide",
+      "motion": "fade",
       "visibleWhen": {
         "not": "isDormant"
       },
@@ -187,7 +187,7 @@
         "height": 0.065
       },
       "renderOrder": 40,
-      "motion": "fadeSlide",
+      "motion": "fade",
       "visibleWhen": {
         "not": "isDormant"
       }
