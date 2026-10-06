@@ -16,6 +16,88 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
 
 void main() {
+  for (final size in [
+    const Size(800, 600),
+    const Size(1280, 720),
+    const Size(1920, 1080),
+    const Size(2560, 1080),
+  ]) {
+    testWidgets('scene controls remain usable at $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
+      await tester.pumpAndSettle();
+      await _wake(tester);
+      await tester.tap(find.byTooltip('Choose account'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Alice'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TextField).hitTestable(), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_forward).hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('wake can reverse mid-transition without losing the prompt', (
+    tester,
+  ) async {
+    final feature = GreeterFeature(gateway: _SingleUserGateway());
+    addTearDown(feature.dispose);
+    await feature.initialize();
+    final theme = buildDefaultTheme();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme.materialTheme,
+        home: Scaffold(
+          body: GreeterSceneAdapter(feature: feature, theme: theme),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump(const Duration(milliseconds: 120));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump(const Duration(milliseconds: 80));
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyH);
+    await tester.pumpAndSettle();
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, 'h');
+    expect(field.focusNode!.hasFocus, isTrue);
+    expect(feature.state.authMode, AuthMode.prompting);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('reduced motion keeps the scene static on pointer movement', (
+    tester,
+  ) async {
+    final theme = buildDefaultTheme();
+    final feature = GreeterFeature(gateway: _SingleUserGateway());
+    addTearDown(feature.dispose);
+    await feature.initialize();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme.materialTheme,
+        home: MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: Scaffold(
+            body: GreeterSceneAdapter(feature: feature, theme: theme),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _wake(tester);
+    final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await pointer.addPointer(location: Offset.zero);
+    addTearDown(pointer.removePointer);
+    await pointer.moveTo(const Offset(700, 100));
+    await tester.pump();
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isTrue);
+  });
+
   testWidgets(
     'hot reload refreshes theme while retaining authentication and credentials',
     (tester) async {
