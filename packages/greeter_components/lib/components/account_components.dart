@@ -113,22 +113,26 @@ class AccountPortrait extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (user.iconPath.isEmpty) {
-      return _initial();
+      return _getInitial();
     }
     return Image.file(
       File(user.iconPath),
+      width: double.infinity,
+      height: double.infinity,
       fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => _initial(),
+      errorBuilder: (context, error, stackTrace) => _getInitial(),
     );
   }
 
-  Widget _initial() {
-    return Text(
-      user.displayName.characters.first.toUpperCase(),
-      style: TextStyle(
-        color: accent,
-        fontSize: fontSize,
-        fontWeight: FontWeight.w700,
+  Widget _getInitial() {
+    return Center(
+      child: Text(
+        user.displayName.characters.first.toUpperCase(),
+        style: TextStyle(
+          color: accent,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
