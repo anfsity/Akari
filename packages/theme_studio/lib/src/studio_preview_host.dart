@@ -44,6 +44,7 @@ class StudioPreviewHost {
     onRetry: (_) {},
     onRetrySessionCatalog: () {},
     onRespondToPrompt: () {},
+    onStartSession: () {},
   );
 
   void dispose() {

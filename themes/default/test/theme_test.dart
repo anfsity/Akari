@@ -22,6 +22,7 @@ void main() {
         [
           ScenePredicate.isAuthPrompting,
           ScenePredicate.isAuthSubmitting,
+          ScenePredicate.isSessionSelection,
           ScenePredicate.isAuthError,
         ].contains(auth),
         reason: auth.name,

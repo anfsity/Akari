@@ -64,6 +64,7 @@ class StandardGreeterComponents implements GreeterThemeComponents {
           service: host.serviceSlots.value,
           auth: host.authPromptSlots.value,
           onRespond: host.onRespondToPrompt,
+          onStartSession: host.onStartSession,
           onRetry: host.onRetry,
         ),
       ),
