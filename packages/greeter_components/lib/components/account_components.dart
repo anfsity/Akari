@@ -39,7 +39,7 @@ class AccountAvatar extends StatelessWidget {
               child: Center(
                 child: selected == null
                     ? Icon(Icons.person_outline, size: 40, color: accent)
-                    : _AccountAvatarImage(
+                    : AccountPortrait(
                         user: selected,
                         accent: accent,
                         fontSize: 48,
@@ -96,11 +96,14 @@ void _showAccountPicker(
   );
 }
 
-class _AccountAvatarImage extends StatelessWidget {
-  const _AccountAvatarImage({
+/// Backend-provided portrait, with the same initial fallback for absent or
+/// unreadable files in both account markers and account choices.
+class AccountPortrait extends StatelessWidget {
+  const AccountPortrait({
     required this.user,
     required this.accent,
     required this.fontSize,
+    super.key,
   });
 
   final UserSummary user;
@@ -162,18 +165,15 @@ class _UserTile extends StatelessWidget {
               CircleAvatar(
                 radius: 16,
                 backgroundColor: selected ? accent : tokens.surfaceVariantColor,
-                foregroundImage: user.iconPath.isEmpty
-                    ? null
-                    : FileImage(File(user.iconPath)),
-                onForegroundImageError: user.iconPath.isEmpty
-                    ? null
-                    : (error, stackTrace) {},
-                child: Text(
-                  user.displayName.characters.first.toUpperCase(),
-                  style: TextStyle(
-                    color: selected ? scheme.onPrimary : accent,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                child: ClipOval(
+                  child: SizedBox.expand(
+                    child: Center(
+                      child: AccountPortrait(
+                        user: user,
+                        accent: selected ? scheme.onPrimary : accent,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
                 ),
               ),
