@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
@@ -17,6 +18,38 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
 
 void main() {
+  testWidgets('a wide account image fills the circular account marker', (
+    tester,
+  ) async {
+    final feature = GreeterFeature(
+      gateway: _SingleUserGateway(
+        iconPath: File('assets/(71187447)Hello world.png').absolute.path,
+      ),
+    );
+    addTearDown(feature.dispose);
+    await feature.initialize();
+    final theme = buildDefaultTheme();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme.materialTheme,
+        home: Scaffold(
+          body: GreeterSceneAdapter(feature: feature, theme: theme),
+        ),
+      ),
+    );
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pumpAndSettle();
+    await _wake(tester);
+    final portrait = find.byType(AccountPortrait);
+    final image = find.descendant(of: portrait, matching: find.byType(Image));
+    final imageSize = tester.getSize(image);
+    expect(imageSize, tester.getSize(portrait));
+    expect(imageSize.width, imageSize.height);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Escape closes each choice menu without sleeping the greeter', (
     tester,
   ) async {
