@@ -222,6 +222,7 @@ void main() {
       expect(accountChanges, [
         (selectedId: 'alice', canSelect: true),
         (selectedId: 'alice', canSelect: false),
+        (selectedId: 'alice', canSelect: true),
       ]);
       expect(sessionChanges, 0);
       expect(feature.state.authMode, AuthMode.prompting);
@@ -248,6 +249,66 @@ void main() {
 
     feature.dispose();
   });
+
+  test(
+    'account switching waits for cancellation and ignores old prompts',
+    () async {
+      final gateway = _FakeGreeterGateway();
+      final feature = await _createPromptedFeature(gateway);
+      addTearDown(feature.dispose);
+      final cancellation = Completer<void>();
+      gateway.cancellationFuture = cancellation.future;
+
+      final switching = feature.dispatch(SelectUserCommand(gateway.users.last));
+      expect(feature.state.backendAuthState, BackendAuthState.cancelling);
+      expect(feature.accountPickerSlots.value.canSelect, isFalse);
+      expect(gateway.beginAuthenticationCalls, 1);
+      gateway.emit(
+        const BackendPromptReceived(
+          attemptId: 'attempt-1',
+          kind: PromptKind.visible,
+          text: 'Old prompt',
+        ),
+      );
+      await _flushEvents();
+      expect(feature.state.prompt, isNull);
+
+      cancellation.complete();
+      await switching;
+      await _flushEvents();
+      expect(gateway.cancelledAttemptId, 'attempt-1');
+      expect(gateway.beginAuthenticationCalls, 2);
+      expect(feature.state.selectedUser?.id, 'bob');
+      expect(feature.state.authMode, AuthMode.prompting);
+      gateway.emit(
+        const BackendPromptReceived(
+          attemptId: 'attempt-1',
+          kind: PromptKind.visible,
+          text: 'Old prompt',
+        ),
+      );
+      await _flushEvents();
+      expect(feature.state.prompt?.text, 'Password');
+    },
+  );
+
+  test(
+    'failed cancellation prevents authentication for the new account',
+    () async {
+      final gateway = _FakeGreeterGateway();
+      final feature = await _createPromptedFeature(gateway);
+      addTearDown(feature.dispose);
+      gateway.cancellationFuture = Future.error(
+        const GreeterGatewayException('Cancellation failed'),
+      );
+
+      await feature.dispatch(SelectUserCommand(gateway.users.last));
+
+      expect(gateway.beginAuthenticationCalls, 1);
+      expect(feature.state.serviceMode, ServiceMode.unavailable);
+      expect(feature.state.selectedUser?.id, 'alice');
+    },
+  );
 
   test('keeps a rejected credential message until the next response', () async {
     final gateway = _FakeGreeterGateway();
@@ -533,6 +594,7 @@ class _FakeGreeterGateway implements GreeterGateway {
   String? cancelledAttemptId;
   PowerAction? requestedPowerAction;
   Future<List<SessionSummary>>? sessionsFuture;
+  Future<void>? cancellationFuture;
   Object? sessionsError;
   Object? powerActionError;
   Object? startSessionError;
@@ -571,30 +633,31 @@ class _FakeGreeterGateway implements GreeterGateway {
   @override
   Future<String> beginAuthentication(String username) async {
     beginAuthenticationCalls++;
-    attemptId = 'attempt-1';
+    final attemptId = 'attempt-$beginAuthenticationCalls';
+    this.attemptId = attemptId;
     _events.add(
-      const BackendStateChanged(
-        attemptId: 'attempt-1',
+      BackendStateChanged(
+        attemptId: attemptId,
         state: BackendAuthState.creatingSession,
         detail: '',
       ),
     );
     _events.add(
-      const BackendPromptReceived(
-        attemptId: 'attempt-1',
+      BackendPromptReceived(
+        attemptId: attemptId,
         kind: PromptKind.secret,
         text: 'Password',
       ),
     );
     _events.add(
-      const BackendStateChanged(
-        attemptId: 'attempt-1',
+      BackendStateChanged(
+        attemptId: attemptId,
         state: BackendAuthState.waitingForInput,
         detail: '',
       ),
     );
     await Future<void>.delayed(Duration.zero);
-    return attemptId!;
+    return attemptId;
   }
 
   @override
@@ -605,6 +668,7 @@ class _FakeGreeterGateway implements GreeterGateway {
   @override
   Future<void> cancel(String attemptId) async {
     cancelledAttemptId = attemptId;
+    await cancellationFuture;
     _events.add(
       BackendStateChanged(
         attemptId: attemptId,

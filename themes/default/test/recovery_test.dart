@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:greeter_ui/feature/greeter_feature.dart';
 import 'package:greeter_ui/feature/greeter_state.dart';
@@ -29,6 +30,41 @@ void main() {
     expect(tester.widget<TextField>(find.byType(TextField)).enabled, isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('switches account and clears the previous credential', (
+    tester,
+  ) async {
+    final gateway = _RecoveryGateway();
+    final feature = await _mountGreeter(tester, gateway);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Choose account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'alice-secret');
+
+    await tester.tap(find.byTooltip('Choose account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bob'));
+    await tester.pumpAndSettle();
+
+    expect(gateway.cancelCalls, 1);
+    expect(feature.state.selectedUser?.id, 'bob');
+    expect(feature.state.authMode, AuthMode.prompting);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, isEmpty);
+    expect(field.focusNode!.hasFocus, isTrue);
+
+    await tester.enterText(find.byType(TextField), 'bob-secret');
+    await tester.tap(find.byTooltip('Choose account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bob').last);
+    await tester.pumpAndSettle();
+    expect(gateway.cancelCalls, 1);
+    expect(field.controller!.text, 'bob-secret');
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<GreeterFeature> _mountGreeter(
@@ -54,6 +90,7 @@ Future<GreeterFeature> _mountGreeter(
 class _RecoveryGateway extends DemoGreeterGateway {
   bool serviceUnavailable = false;
   int stateCalls = 0;
+  int cancelCalls = 0;
 
   @override
   Future<BackendStateSnapshot> getState() async {
@@ -62,5 +99,11 @@ class _RecoveryGateway extends DemoGreeterGateway {
       throw const GreeterGatewayException('Service disconnected');
     }
     return super.getState();
+  }
+
+  @override
+  Future<void> cancel(String attemptId) async {
+    cancelCalls++;
+    await super.cancel(attemptId);
   }
 }

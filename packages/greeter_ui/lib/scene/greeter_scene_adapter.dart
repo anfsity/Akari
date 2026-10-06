@@ -383,6 +383,12 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   }
 
   void _dispatch(GreeterCommand command) {
+    if (command is SelectUserCommand &&
+        command.user.id !=
+            widget.feature.accountPickerSlots.value.selected?.id) {
+      _credentialController.clear();
+      _credentialFocusNode.unfocus();
+    }
     if (command is SelectUserCommand || command is SelectSessionCommand) {
       _typeahead.clear();
     }
