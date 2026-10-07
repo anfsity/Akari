@@ -54,6 +54,7 @@ sequenceDiagram
     B-->>UI: a(ssas) session records
 
     UI->>B: BeginAuthentication(username)
+    B-->>UI: attempt_id (accepted before PAM I/O)
     B->>G: create_session JSON frame
     G-->>B: auth_message / success / error
     B-->>UI: StateChanged and/or Prompt
@@ -177,7 +178,8 @@ This discovery step identifies available session candidates; it does not guarant
 * **Behavior**:
   * Replaces an active attempt only when the same D-Bus unique sender owns it. Other callers receive `AccessDenied`.
   * Connects to the underlying `greetd` socket and transmits `create_session`.
-  * Generates and returns a unique `attempt_id` (UUID v4 or monotonic token).
+  * Generates and returns a unique `attempt_id` before waiting for greetd/PAM I/O, so the UI can display passive authentication progress and cancel a scan.
+  * The reply acknowledges acceptance, not authentication success. Subsequent connection and authentication failures arrive as `StateChanged(Failed)` for that attempt. Clients must subscribe before calling and buffer signals that precede the reply.
 
 ##### `Respond(String attempt_id, String response) -> Void`
 * **Description**: Submits credential input (e.g., password or OTP token) for an ongoing PAM challenge.

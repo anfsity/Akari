@@ -52,6 +52,7 @@ sequenceDiagram
     B-->>UI: a(ssas) session records
 
     UI->>B: BeginAuthentication(username)
+    B-->>UI: attempt_id（在 PAM I/O 前接受请求）
     B->>G: create_session JSON frame
     G-->>B: auth_message / success / error
     B-->>UI: StateChanged and/or Prompt
@@ -158,7 +159,8 @@ source         桌面入口文件的绝对路径
 ##### `BeginAuthentication(String username) -> String attempt_id`
 
 - **说明**：为指定的 `username` 启动 PAM 身份验证事务。
-- **行为**：只有同一 D-Bus unique sender 拥有活动尝试时，才可以替换该尝试；其他调用方会收到 `AccessDenied`。连接底层 greetd socket 并发送 `create_session`。生成并返回唯一 `attempt_id`（UUID v4 或单调递增 token）。
+- **行为**：只有同一 D-Bus unique sender 拥有活动尝试时，才可以替换该尝试；其他调用方会收到 `AccessDenied`。在等待 greetd/PAM I/O 前生成并返回唯一 `attempt_id`，然后连接 greetd socket 并发送 `create_session`，以便 UI 实时显示识别提示或取消扫描。
+- **回复含义**：返回编号表示已接受请求，不代表认证成功。后续连接或认证失败通过该尝试的 `StateChanged(Failed)` 信号报告。客户端必须先订阅信号，并缓存早于方法回复到达的事件。
 
 ##### `Respond(String attempt_id, String response) -> Void`
 
