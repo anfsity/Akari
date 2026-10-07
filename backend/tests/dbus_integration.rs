@@ -9,6 +9,7 @@ use std::{
 
 static TEST_LOCK: std::sync::OnceLock<tokio::sync::Mutex<()>> = std::sync::OnceLock::new();
 
+use futures_util::StreamExt;
 use serde_json::Value;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -43,6 +44,7 @@ async fn auth_roundtrip() {
         .call("BeginAuthentication", &("alice",))
         .await
         .expect("begin authentication should succeed");
+    wait_for_state(&proxy, "WaitingForInput").await;
     let state: (String, String) = proxy
         .call("GetState", &())
         .await
@@ -139,7 +141,9 @@ async fn same_caller_can_replace_an_attempt() {
         .call("BeginAuthentication", &("alice",))
         .await
         .unwrap();
+    wait_for_state(&proxy, "WaitingForInput").await;
     let second: String = proxy.call("BeginAuthentication", &("bob",)).await.unwrap();
+    wait_for_state(&proxy, "WaitingForInput").await;
     assert_ne!(first, second);
     assert!(
         proxy
@@ -166,11 +170,13 @@ async fn owner_disconnect_releases_attempt_for_another_client() {
         .call("BeginAuthentication", &("alice",))
         .await
         .unwrap();
+    wait_for_state(&make_proxy(&owner).await, "WaitingForInput").await;
     owner.close().await.unwrap();
     let other = zbus::Connection::session().await.unwrap();
     let proxy = make_proxy(&other).await;
     wait_for_state(&proxy, "Idle").await;
     let attempt: String = proxy.call("BeginAuthentication", &("bob",)).await.unwrap();
+    wait_for_state(&proxy, "WaitingForInput").await;
     proxy.call::<_, _, ()>("Cancel", &(attempt,)).await.unwrap();
     server.finish().await;
 }
@@ -206,9 +212,9 @@ async fn owner_disconnect_interrupts_pending_greetd_io() {
         .await
         .unwrap()
         .unwrap();
+    assert!(begin.await.unwrap().is_ok());
     owner.close().await.unwrap();
     server.finish().await;
-    assert!(begin.await.unwrap().is_err());
     let observer = zbus::Connection::session().await.unwrap();
     wait_for_state(&make_proxy(&observer).await, "Idle").await;
 }
@@ -299,6 +305,7 @@ async fn greeter_bus_disconnect_cleans_authentication_and_exits() {
         .call("BeginAuthentication", &("alice",))
         .await
         .unwrap();
+    wait_for_state(&make_proxy(&connection).await, "WaitingForInput").await;
     bus.stop();
     server.finish().await;
     assert!(!backend.wait_for_exit().await.success());
@@ -388,11 +395,12 @@ async fn greetd_connection_failure_retains_source_in_logs() {
     let socket = directory.join("missing-greetd.sock");
     let backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let result = make_proxy(&connection)
-        .await
+    let proxy = make_proxy(&connection).await;
+    let result = proxy
         .call::<_, _, String>("BeginAuthentication", &("alice",))
         .await;
-    assert!(result.is_err());
+    assert!(result.is_ok());
+    wait_for_state(&proxy, "Failed").await;
     let logs = backend.get_logs();
     assert!(logs.contains("authentication transaction failed"));
     assert!(logs.contains("attempt-0000000000000001"));
@@ -461,7 +469,8 @@ async fn auth_error_without_user_input_does_not_retry() {
     )
     .await
     .unwrap();
-    assert!(result.is_err());
+    assert!(result.is_ok());
+    wait_for_state(&proxy, "Failed").await;
     let state: (String, String) = proxy.call("GetState", &()).await.unwrap();
     assert_eq!(state.0, "Failed");
     server.finish().await;
@@ -482,6 +491,7 @@ async fn wrong_password_prompts_again() {
         .call("BeginAuthentication", &("alice",))
         .await
         .expect("begin authentication should succeed");
+    wait_for_state(&proxy, "WaitingForInput").await;
     let state: (String, String) = proxy
         .call("GetState", &())
         .await
@@ -535,6 +545,7 @@ async fn respond_early() {
     let proxy = make_proxy(&connection).await;
 
     let begin_connection = zbus::Connection::session().await.unwrap();
+    let owner = begin_connection.clone();
     let begin = tokio::spawn(async move {
         let attempt_proxy = make_proxy(&begin_connection).await;
         attempt_proxy
@@ -547,6 +558,92 @@ async fn respond_early() {
     assert!(result.is_err());
     let _ = begin.await.unwrap();
     server.finish().await;
+    drop(owner);
+}
+
+#[tokio::test]
+async fn facial_authentication_progress_and_password_fallback() {
+    let _guard = lock().lock().await;
+    for password_fallback in [false, true] {
+        let directory = temp_dir("face-auth");
+        let socket = directory.join("greetd.sock");
+        let sessions = temp_dir("face-sessions");
+        write_session(&sessions, "test.desktop", "Test");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let (finish_scan, scan_finished) = tokio::sync::oneshot::channel();
+        let server = spawn_server(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let request = read_request(&mut stream).await;
+            assert_eq!(request["type"], "create_session");
+            assert_eq!(request["username"], "alice");
+            write_response(
+                &mut stream,
+                serde_json::json!({
+                    "type": "auth_message",
+                    "auth_message_type": "info",
+                    "auth_message": "Attempting facial authentication"
+                }),
+            )
+            .await;
+            let acknowledgment = read_request(&mut stream).await;
+            assert_eq!(acknowledgment["type"], "post_auth_message_response");
+            assert!(acknowledgment.get("response").is_none());
+            scan_finished.await.unwrap();
+            if password_fallback {
+                write_response(
+                    &mut stream,
+                    serde_json::json!({
+                        "type": "auth_message", "auth_message_type": "error",
+                        "auth_message": "Face detection timeout reached"
+                    }),
+                )
+                .await;
+                let acknowledgment = read_request(&mut stream).await;
+                assert!(acknowledgment.get("response").is_none());
+                send_secret_prompt(&mut stream).await;
+                assert_eq!(read_request(&mut stream).await["response"], "password");
+            }
+            write_response(&mut stream, serde_json::json!({"type": "success"})).await;
+            assert_eq!(read_request(&mut stream).await["type"], "start_session");
+            write_response(&mut stream, serde_json::json!({"type": "success"})).await;
+        });
+        let mut backend = start_backend_for_sessions(&socket, &sessions);
+        let connection = connect_backend().await;
+        let proxy = make_proxy(&connection).await;
+        let mut prompts = proxy.receive_signal("Prompt").await.unwrap();
+        let attempt: String = tokio::time::timeout(
+            Duration::from_secs(2),
+            proxy.call("BeginAuthentication", &("alice",)),
+        )
+        .await
+        .expect("attempt ID must be returned before the scan finishes")
+        .unwrap();
+        let prompt = tokio::time::timeout(Duration::from_secs(2), prompts.next())
+            .await
+            .unwrap()
+            .unwrap();
+        let (prompt_attempt, kind, text): (String, String, String) =
+            prompt.body().deserialize().unwrap();
+        assert_eq!(prompt_attempt, attempt);
+        assert_eq!(kind, "info");
+        assert_eq!(text, "Attempting facial authentication");
+        wait_for_state(&proxy, "SubmittingResponse").await;
+        finish_scan.send(()).unwrap();
+        if password_fallback {
+            wait_for_state(&proxy, "WaitingForInput").await;
+            proxy
+                .call::<_, _, ()>("Respond", &(attempt.clone(), "password"))
+                .await
+                .unwrap();
+        }
+        wait_for_state(&proxy, "Authenticated").await;
+        proxy
+            .call::<_, _, ()>("StartSession", &(attempt, "wayland:test"))
+            .await
+            .unwrap();
+        server.finish().await;
+        assert!(backend.wait_for_exit().await.success());
+    }
 }
 
 #[tokio::test]
@@ -594,6 +691,7 @@ async fn cancel_to_idle() {
         .call("BeginAuthentication", &("alice",))
         .await
         .unwrap();
+    wait_for_state(&proxy, "WaitingForInput").await;
     let result: zbus::Result<()> = proxy.call("Cancel", &(attempt_id,)).await;
     assert!(result.is_ok());
 
@@ -616,6 +714,7 @@ async fn sigterm_cancels_authentication_and_exits() {
         .call("BeginAuthentication", &("alice",))
         .await
         .unwrap();
+    wait_for_state(&proxy, "WaitingForInput").await;
     assert!(
         Command::new("kill")
             .args(["-TERM", &backend.child.id().to_string()])
