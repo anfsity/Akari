@@ -112,10 +112,10 @@
       "id": "login_panel",
       "component": "terracePanel",
       "rect": {
-        "x": 0.065,
-        "y": 0.23,
-        "width": 0.37,
-        "height": 0.57
+        "x": 0.06,
+        "y": 0.26,
+        "width": 0.335,
+        "height": 0.48
       },
       "renderOrder": 30,
       "motion": "fadeScale",
@@ -127,10 +127,10 @@
       "id": "entrance_heading",
       "component": "terraceLabel",
       "rect": {
-        "x": 0.09,
-        "y": 0.295,
-        "width": 0.3,
-        "height": 0.07
+        "x": 0.085,
+        "y": 0.305,
+        "width": 0.285,
+        "height": 0.06
       },
       "renderOrder": 40,
       "motion": "fadeSlide",
@@ -146,10 +146,10 @@
       "id": "entrance_caption",
       "component": "terraceLabel",
       "rect": {
-        "x": 0.09,
-        "y": 0.395,
-        "width": 0.3,
-        "height": 0.025
+        "x": 0.085,
+        "y": 0.377,
+        "width": 0.285,
+        "height": 0.022
       },
       "renderOrder": 40,
       "motion": "fade",
@@ -164,8 +164,8 @@
       "id": "avatar",
       "component": "terraceAccount",
       "rect": {
-        "x": 0.09,
-        "y": 0.445,
+        "x": 0.085,
+        "y": 0.425,
         "width": 0.042,
         "height": 0.065
       },
@@ -181,9 +181,9 @@
       "id": "account_name",
       "component": "accountName",
       "rect": {
-        "x": 0.16,
-        "y": 0.445,
-        "width": 0.24,
+        "x": 0.145,
+        "y": 0.425,
+        "width": 0.225,
         "height": 0.065
       },
       "renderOrder": 40,
@@ -196,9 +196,9 @@
       "id": "session_picker",
       "component": "sessionPicker",
       "rect": {
-        "x": 0.09,
-        "y": 0.54,
-        "width": 0.31,
+        "x": 0.085,
+        "y": 0.513,
+        "width": 0.285,
         "height": 0.055
       },
       "renderOrder": 40,
@@ -216,9 +216,9 @@
       "id": "credential_field",
       "component": "credentialField",
       "rect": {
-        "x": 0.09,
-        "y": 0.625,
-        "width": 0.25,
+        "x": 0.085,
+        "y": 0.59,
+        "width": 0.225,
         "height": 0.06
       },
       "renderOrder": 40,
@@ -236,8 +236,8 @@
       "id": "primary_action",
       "component": "primaryAction",
       "rect": {
-        "x": 0.355,
-        "y": 0.625,
+        "x": 0.325,
+        "y": 0.59,
         "width": 0.045,
         "height": 0.06
       },
@@ -268,10 +268,10 @@
       "id": "status",
       "component": "status",
       "rect": {
-        "x": 0.09,
-        "y": 0.71,
-        "width": 0.31,
-        "height": 0.055
+        "x": 0.085,
+        "y": 0.67,
+        "width": 0.285,
+        "height": 0.045
       },
       "renderOrder": 40,
       "motion": "fade",
