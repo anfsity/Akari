@@ -246,7 +246,9 @@ class GreeterFeature {
       return false;
     }
     if (_state.authMode == AuthMode.userSelection ||
-        _state.authMode == AuthMode.prompting) {
+        _state.authMode == AuthMode.prompting ||
+        (_state.authMode == AuthMode.submitting &&
+            _state.prompt?.kind == PromptKind.info)) {
       return true;
     }
     return _state.authMode == AuthMode.error &&
@@ -569,7 +571,18 @@ class GreeterFeature {
         } else if (kind == PromptKind.error) {
           _replace(_state.copyWith(promptError: text));
         } else {
-          _effects.add(ShowNoticeEffect(text));
+          // PAM owns passive authentication and acknowledges these messages
+          // in the backend. Keep its instructions visible for the whole scan
+          // instead of asking for input or hiding them in a transient notice.
+          _replace(
+            _state.copyWith(
+              authMode: AuthMode.submitting,
+              prompt: (kind: kind, text: text),
+              clearAuthError: true,
+              clearPromptError: true,
+            ),
+          );
+          _effects.add(const ClearCredentialEffect());
         }
     }
   }

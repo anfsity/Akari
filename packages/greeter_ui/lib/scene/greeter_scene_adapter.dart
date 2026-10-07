@@ -406,6 +406,10 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       return;
     }
     switch (effect) {
+      case ClearCredentialEffect():
+        _credentialController.clear();
+        _typeahead.clear();
+        _credentialFocusNode.unfocus();
       case RequestFocusEffect(:final field):
         if (field == 'credential') {
           _flushTypeaheadAndFocus();

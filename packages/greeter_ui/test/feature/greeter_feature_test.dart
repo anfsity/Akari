@@ -107,10 +107,10 @@ void main() {
     );
     await Future<void>.delayed(Duration.zero);
 
-    expect(
-      effects.whereType<ShowNoticeEffect>().map((effect) => effect.message),
-      contains('Authentication is continuing.'),
-    );
+    expect(feature.state.authMode, AuthMode.submitting);
+    expect(feature.state.prompt?.text, 'Authentication is continuing.');
+    expect(effects.whereType<ShowNoticeEffect>(), isEmpty);
+    expect(effects.whereType<ClearCredentialEffect>(), hasLength(1));
     expect(feature.state.promptError, 'The provider is unavailable.');
 
     gateway.emit(
@@ -127,6 +127,111 @@ void main() {
     await effectSubscription.cancel();
     feature.dispose();
   });
+
+  test(
+    'passive authentication starts the session without a response',
+    () async {
+      final gateway = _FakeGreeterGateway()
+        ..initialPrompt = (
+          kind: PromptKind.info,
+          text: 'Attempting facial authentication',
+        );
+      final feature = await _createPromptedFeature(gateway);
+      addTearDown(feature.dispose);
+      final effects = <FeatureEffect>[];
+      final subscription = feature.effects.listen(effects.add);
+      addTearDown(subscription.cancel);
+
+      expect(feature.state.authMode, AuthMode.submitting);
+      expect(feature.state.prompt, gateway.initialPrompt);
+      expect(feature.accountPickerSlots.value.canSelect, isTrue);
+      await feature.dispatch(const RespondToPromptCommand(''));
+      expect(gateway.respondCalls, 0);
+      expect(feature.state.authError, isNull);
+
+      gateway.emit(
+        BackendStateChanged(
+          attemptId: gateway.attemptId!,
+          state: BackendAuthState.authenticated,
+          detail: '',
+        ),
+      );
+      await _flushEvents();
+
+      expect(gateway.startSessionCalls, 1);
+      expect(gateway.respondCalls, 0);
+      expect(feature.state.authMode, AuthMode.handingOff);
+      expect(feature.state.prompt, isNull);
+      expect(effects.whereType<ExitAfterHandoffEffect>(), hasLength(1));
+    },
+  );
+
+  test(
+    'a scan timeout falls back to the password in the same attempt',
+    () async {
+      final gateway = _FakeGreeterGateway()
+        ..initialPrompt = (
+          kind: PromptKind.info,
+          text: 'Attempting facial authentication',
+        );
+      final feature = await _createPromptedFeature(gateway);
+      addTearDown(feature.dispose);
+
+      gateway.emit(
+        BackendPromptReceived(
+          attemptId: gateway.attemptId!,
+          kind: PromptKind.error,
+          text: 'Face detection timeout reached',
+        ),
+      );
+      gateway.emit(
+        BackendPromptReceived(
+          attemptId: gateway.attemptId!,
+          kind: PromptKind.secret,
+          text: 'Password',
+        ),
+      );
+      await _flushEvents();
+
+      expect(feature.state.authMode, AuthMode.prompting);
+      expect(feature.state.prompt?.kind, PromptKind.secret);
+      expect(feature.state.promptError, 'Face detection timeout reached');
+      await feature.dispatch(const RespondToPromptCommand('password'));
+      expect(gateway.respondCalls, 1);
+      expect(gateway.beginAuthenticationCalls, 1);
+      expect(feature.state.promptError, isNull);
+    },
+  );
+
+  test(
+    'switching account cancels the scan and ignores its late result',
+    () async {
+      final gateway = _FakeGreeterGateway()
+        ..initialPrompt = (
+          kind: PromptKind.info,
+          text: 'Attempting facial authentication',
+        );
+      final feature = await _createPromptedFeature(gateway);
+      addTearDown(feature.dispose);
+
+      await feature.dispatch(SelectUserCommand(gateway.users.last));
+      await _flushEvents();
+      gateway.emit(
+        const BackendStateChanged(
+          attemptId: 'attempt-1',
+          state: BackendAuthState.authenticated,
+          detail: '',
+        ),
+      );
+      await _flushEvents();
+
+      expect(gateway.cancelledAttemptId, 'attempt-1');
+      expect(gateway.beginAuthenticationCalls, 2);
+      expect(feature.state.selectedUser?.id, 'bob');
+      expect(feature.state.authMode, AuthMode.submitting);
+      expect(gateway.startSessionCalls, 0);
+    },
+  );
 
   test('cancelling clears the current attempt and prompt', () async {
     final gateway = _FakeGreeterGateway();
@@ -634,6 +739,7 @@ class _FakeGreeterGateway implements GreeterGateway {
   int beginAuthenticationCalls = 0;
   String? attemptId;
   String? cancelledAttemptId;
+  PromptState initialPrompt = (kind: PromptKind.secret, text: 'Password');
   PowerAction? requestedPowerAction;
   Future<List<SessionSummary>>? sessionsFuture;
   Future<void>? cancellationFuture;
@@ -688,14 +794,16 @@ class _FakeGreeterGateway implements GreeterGateway {
     _events.add(
       BackendPromptReceived(
         attemptId: attemptId,
-        kind: PromptKind.secret,
-        text: 'Password',
+        kind: initialPrompt.kind,
+        text: initialPrompt.text,
       ),
     );
     _events.add(
       BackendStateChanged(
         attemptId: attemptId,
-        state: BackendAuthState.waitingForInput,
+        state: initialPrompt.kind == PromptKind.info
+            ? BackendAuthState.submittingResponse
+            : BackendAuthState.waitingForInput,
         detail: '',
       ),
     );

@@ -11,6 +11,10 @@ class RequestFocusEffect extends FeatureEffect {
   final String field;
 }
 
+class ClearCredentialEffect extends FeatureEffect {
+  const ClearCredentialEffect();
+}
+
 class ShowNoticeEffect extends FeatureEffect {
   const ShowNoticeEffect(this.message, {this.isError = false});
 

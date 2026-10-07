@@ -25,7 +25,11 @@ class GreeterStatusLine extends StatelessWidget {
       ServiceMode.ready => switch (auth.mode) {
         AuthMode.error => auth.error?.message ?? 'Authentication failed.',
         AuthMode.prompting => auth.promptError ?? session.error?.message ?? '',
-        AuthMode.submitting => 'Working...',
+        AuthMode.submitting =>
+          auth.promptError ??
+              (auth.prompt?.kind == PromptKind.info
+                  ? auth.prompt!.text
+                  : 'Signing in...'),
         AuthMode.handingOff => 'Starting session...',
         _ => session.error?.message ?? '',
       },
@@ -35,15 +39,25 @@ class GreeterStatusLine extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return Center(
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.primary,
-          fontSize: 14,
-          shadows: const [Shadow(color: Color(0xaa000000), blurRadius: 8)],
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      child: Center(
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color:
+                service.mode == ServiceMode.unavailable ||
+                    auth.mode == AuthMode.error ||
+                    auth.promptError != null ||
+                    session.error != null
+                ? scheme.error
+                : scheme.primary,
+            fontSize: 14,
+          ),
         ),
       ),
     );

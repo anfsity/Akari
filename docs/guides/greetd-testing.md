@@ -9,6 +9,30 @@ and power actions call logind, performing actual suspend, reboot and shutdown.
 Boot configuration stays on SDDM. Desktop development with `akari run` still
 uses mock authentication and mock power by default.
 
+## Facial authentication
+
+Akari starts authentication when the greeter wakes with an account and session
+selected. A face provider's PAM messages stay visible during recognition;
+successful PAM authentication starts the selected desktop without a password
+submission. If the PAM stack proceeds to a password prompt after a timeout or
+missing camera, the field returns with keyboard focus in the same attempt.
+
+Install and configure [Howdy](https://github.com/boltgolt/howdy) on the host, enroll
+the actual login account with `sudo howdy -U USERNAME add`, and integrate its
+module into `/etc/pam.d/greetd` following the distribution's Howdy instructions.
+Place facial authentication before the existing password rules with a PAM
+control that allows success to complete authentication and failure to continue
+to the password rules. Preserve the existing account and session rules.
+
+Enable `detection_notice = true` in Howdy's `[core]` configuration so the provider
+announces when recognition begins. Akari displays these instructions without
+guessing the provider from their wording; translated messages work the same way.
+Camera configuration, enrollment, recognition timeouts and fallback policy belong
+to the provider and PAM. Akari does not capture camera frames or store face models.
+Preview and mock mode do not perform facial recognition.
+
+## Install and run the harness
+
 Install the repository-bound `akari` launcher as described in
 [Development Tooling](../reference/cli.md). `akari greetd-test --help` lists
 all operations; each operation has its own help and bash/zsh completion.
