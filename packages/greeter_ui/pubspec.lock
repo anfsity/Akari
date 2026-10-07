@@ -68,7 +68,7 @@ packages:
     source: sdk
     version: "0.0.0"
   greeter_components:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       path: "../greeter_components"
       relative: true

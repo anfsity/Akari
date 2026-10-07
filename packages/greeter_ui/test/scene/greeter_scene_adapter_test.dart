@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:greeter_components/greeter_components.dart';
 import 'package:greeter_ui/greeter_ui.dart';
-import 'package:scene/scene.dart';
 import 'package:theme_default/theme.dart';
+import 'package:theme_sdk/theme_sdk.dart';
 
 void main() {
   testWidgets('glass panel uses an opaque Material surface', (tester) async {
@@ -62,7 +63,12 @@ void main() {
         ),
       ],
     );
-    final theme = buildDefaultTheme(document: document);
+    final theme = ThemeDefinition(
+      id: 'standard-session-test',
+      document: document,
+      bundle: buildDefaultTheme().bundle,
+      components: StandardGreeterComponents.new,
+    );
     final feature = GreeterFeature(gateway: DemoGreeterGateway());
     addTearDown(feature.dispose);
     await feature.initialize();
