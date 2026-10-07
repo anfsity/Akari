@@ -483,17 +483,36 @@ async fn run_actor(
                     emitter,
                     reply,
                 } => {
-                    let result = handle_begin(
+                    let attempt_id = match create_attempt(
                         &mut actor,
                         caller,
-                        username,
-                        emitter,
+                        username.clone(),
+                        &emitter,
                         &snapshots,
                         &controls,
                         &command_sender,
                     )
+                    .await
+                    {
+                        Ok(attempt_id) => attempt_id,
+                        Err(error) => {
+                            send_reply(reply, Err(error));
+                            return;
+                        }
+                    };
+                    // Bind the UI to the attempt before PAM starts waiting for
+                    // a camera or other passive factor. Protocol failures are
+                    // then reported through the attempt's state signals.
+                    send_reply(reply, Ok(attempt_id.clone()));
+                    let _ = run_authentication(
+                        &mut actor,
+                        &attempt_id,
+                        &username,
+                        emitter,
+                        &snapshots,
+                        &controls,
+                    )
                     .await;
-                    send_reply(reply, result);
                 }
                 AuthCommand::Respond {
                     caller,
@@ -619,11 +638,11 @@ async fn run_actor(
     let _ = cancel_current(&mut actor, None, None, false, None, &snapshots, &controls).await;
 }
 
-async fn handle_begin(
+async fn create_attempt(
     actor: &mut ActorState,
     caller: String,
     username: String,
-    emitter: SignalEmitter<'static>,
+    emitter: &SignalEmitter<'static>,
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
     commands: &mpsc::WeakSender<AuthCommand>,
@@ -643,7 +662,7 @@ async fn handle_begin(
     let watcher_token = CancellationToken::new();
     let attempt_id = actor
         .auth
-        .begin_authentication(username.clone())
+        .begin_authentication(username)
         .map_err(map_begin_error)?;
     tracing::Span::current().record("attempt_id", &attempt_id);
     actor.attempt = Some(AttemptResources {
@@ -660,24 +679,36 @@ async fn handle_begin(
         attempt_id: attempt_id.clone(),
         cancellation: cancellation.clone(),
     }));
-    emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, &attempt_id)).await;
+    emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, &attempt_id)).await;
     spawn_caller_watcher(
         emitter.connection().clone(),
         caller,
         attempt_id.clone(),
         watcher_token,
-        cancellation.clone(),
+        cancellation,
         commands.clone(),
     );
 
-    // Connection and create_session are part of this actor command. A failed
-    // or cancelled exchange therefore reaches cleanup before the next command.
+    Ok(attempt_id)
+}
+
+async fn run_authentication(
+    actor: &mut ActorState,
+    attempt_id: &str,
+    username: &str,
+    emitter: SignalEmitter<'static>,
+    snapshots: &watch::Sender<AuthSnapshot>,
+    controls: &watch::Sender<Option<AttemptControl>>,
+) -> fdo::Result<()> {
+    let cancellation = actor.get_attempt().cancellation.clone();
+    // I/O stays in the same actor command after acceptance, so cancellation
+    // still finishes cleanup before a replacement transaction can start.
     let transport = match GreetdTransport::connect(&cancellation).await {
         Ok(transport) => transport,
         Err(GreetdError::Cancelled) => {
             return Err(finish_cancellation(
                 actor,
-                &attempt_id,
+                attempt_id,
                 Some(&emitter),
                 snapshots,
                 controls,
@@ -686,7 +717,7 @@ async fn handle_begin(
         }
         Err(error) => {
             return Err(
-                fail_transaction(actor, &attempt_id, error, &emitter, snapshots, controls).await,
+                fail_transaction(actor, attempt_id, error, &emitter, snapshots, controls).await,
             );
         }
     };
@@ -698,14 +729,14 @@ async fn handle_begin(
 
     let response = actor
         .get_transport()
-        .create_session(&username, &cancellation)
+        .create_session(username, &cancellation)
         .await;
     let response = match response {
         Ok(response) => response,
         Err(GreetdError::Cancelled) => {
             return Err(finish_cancellation(
                 actor,
-                &attempt_id,
+                attempt_id,
                 Some(&emitter),
                 snapshots,
                 controls,
@@ -714,22 +745,21 @@ async fn handle_begin(
         }
         Err(error) => {
             return Err(
-                fail_transaction(actor, &attempt_id, error, &emitter, snapshots, controls).await,
+                fail_transaction(actor, attempt_id, error, &emitter, snapshots, controls).await,
             );
         }
     };
 
     consume_response(
         actor,
-        &attempt_id,
+        attempt_id,
         response,
         emitter,
         &cancellation,
         snapshots,
         controls,
     )
-    .await?;
-    Ok(attempt_id)
+    .await
 }
 
 async fn handle_respond(
