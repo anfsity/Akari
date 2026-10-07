@@ -114,7 +114,7 @@
       "rect": {
         "x": 0.06,
         "y": 0.26,
-        "width": 0.335,
+        "width": 0.45,
         "height": 0.48
       },
       "renderOrder": 30,
@@ -129,7 +129,7 @@
       "rect": {
         "x": 0.085,
         "y": 0.305,
-        "width": 0.285,
+        "width": 0.4,
         "height": 0.06
       },
       "renderOrder": 40,
@@ -148,7 +148,7 @@
       "rect": {
         "x": 0.085,
         "y": 0.377,
-        "width": 0.285,
+        "width": 0.4,
         "height": 0.022
       },
       "renderOrder": 40,
@@ -183,7 +183,7 @@
       "rect": {
         "x": 0.145,
         "y": 0.425,
-        "width": 0.225,
+        "width": 0.34,
         "height": 0.065
       },
       "renderOrder": 40,
@@ -198,7 +198,7 @@
       "rect": {
         "x": 0.085,
         "y": 0.513,
-        "width": 0.285,
+        "width": 0.4,
         "height": 0.055
       },
       "renderOrder": 40,
@@ -218,7 +218,7 @@
       "rect": {
         "x": 0.085,
         "y": 0.59,
-        "width": 0.225,
+        "width": 0.34,
         "height": 0.06
       },
       "renderOrder": 40,
@@ -236,7 +236,7 @@
       "id": "primary_action",
       "component": "primaryAction",
       "rect": {
-        "x": 0.325,
+        "x": 0.44,
         "y": 0.59,
         "width": 0.045,
         "height": 0.06
@@ -270,7 +270,7 @@
       "rect": {
         "x": 0.085,
         "y": 0.67,
-        "width": 0.285,
+        "width": 0.4,
         "height": 0.045
       },
       "renderOrder": 40,
