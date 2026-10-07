@@ -14,6 +14,8 @@ dependencies:
     path: ../theme_sdk
 
 dev_dependencies:
+  greeter_components:
+    path: ../greeter_components
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
