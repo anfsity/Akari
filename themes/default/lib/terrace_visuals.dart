@@ -339,13 +339,11 @@ class TerracePanel extends StatelessWidget {
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-      ),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Color(0xb30e2536), Color(0x8c0e2536)],
+        colors: [Color(0x704b819b), Color(0x40345674)],
       ),
     ),
   );

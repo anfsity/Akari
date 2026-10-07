@@ -14,7 +14,7 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
     seedColor: seed ?? _fallbackSeed,
     brightness: Brightness.dark,
   );
-  final surface = const Color(0xff0e2536);
+  final surface = const Color(0xff25465e);
   final surfaceVariant = colorScheme.surfaceContainerHighest;
   final text = colorScheme.onSurface;
   final tokens = ThemeTokens(
@@ -46,7 +46,7 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surface.withValues(alpha: 0.72),
+        fillColor: surface.withValues(alpha: 0.55),
         hintStyle: TextStyle(
           color: colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
           fontSize: 16,
@@ -76,7 +76,7 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
       ),
       visualDensity: VisualDensity.standard,
     ),
-    panelRadius: 24,
+    panelRadius: 20,
     mediumMotion: const Duration(milliseconds: 420),
     standardCurve: Curves.linear,
     minHitTarget: 44,
