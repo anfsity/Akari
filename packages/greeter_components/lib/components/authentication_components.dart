@@ -16,6 +16,27 @@ class CredentialField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    if (auth.mode == AuthMode.submitting &&
+        auth.prompt?.kind == PromptKind.info) {
+      return Semantics(
+        liveRegion: true,
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.person_search_outlined, color: scheme.primary),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  'Verifying identity...',
+                  style: TextStyle(color: scheme.onSurface, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final enabled = auth.mode == AuthMode.prompting;
     final hintText = auth.mode == AuthMode.prompting
         ? auth.prompt?.text ?? 'Password'
