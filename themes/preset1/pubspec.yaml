@@ -1,0 +1,41 @@
+name: theme_preset1
+description: Hand-painted life and death scene with dispersed greeter controls.
+publish_to: none
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  scene:
+    path: ../../packages/scene
+  greeter_components:
+    path: ../../packages/greeter_components
+  theme_sdk:
+    path: ../../packages/theme_sdk
+
+dev_dependencies:
+  greeter:
+    path: ../..
+  greeter_ui:
+    path: ../../packages/greeter_ui
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  build_runner: ^2.4.13
+  flutter_lints: ^6.0.0
+  scene_codegen:
+    path: ../../packages/scene_codegen
+
+flutter:
+  uses-material-design: true
+  licenses:
+    - assets/fonts/OFL.txt
+  fonts:
+    - family: SpaceGrotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Regular.otf
+        - asset: assets/fonts/SpaceGrotesk-Medium.otf
+          weight: 500
