@@ -1,0 +1,264 @@
+{
+  "id": "preset1",
+  "version": 2,
+  "canvas": {
+    "fit": "contain",
+    "useSafeArea": false,
+    "referenceWidth": 1920,
+    "referenceHeight": 1080
+  },
+  "background": {
+    "kind": "solid",
+    "color": "#d9e2ee",
+    "scrimOpacity": 0,
+    "blurSigma": 0
+  },
+  "nodes": [
+    {
+      "id": "day_clock",
+      "component": "presetClock",
+      "rect": {
+        "x": 0.32,
+        "y": 0.16,
+        "width": 0.36,
+        "height": 0.13
+      },
+      "renderOrder": 20,
+      "motion": "fadeSlide",
+      "visibleWhen": "isDormant"
+    },
+    {
+      "id": "life",
+      "component": "inscription",
+      "rect": {
+        "x": 0.4,
+        "y": 0.32,
+        "width": 0.2,
+        "height": 0.1
+      },
+      "renderOrder": 20,
+      "motion": "fadeSlide",
+      "properties": {
+        "title": "LIFE",
+        "subtitle": "\u751f \u6d3b"
+      },
+      "visibleWhen": "isDormant"
+    },
+    {
+      "id": "death",
+      "component": "inscription",
+      "rect": {
+        "x": 0.4,
+        "y": 0.66,
+        "width": 0.2,
+        "height": 0.09
+      },
+      "renderOrder": 20,
+      "motion": "fadeSlide",
+      "properties": {
+        "title": "DEATH",
+        "subtitle": "\u6b7b",
+        "tone": "light"
+      },
+      "visibleWhen": "isDormant"
+    },
+    {
+      "id": "night_clock",
+      "component": "presetClock",
+      "rect": {
+        "x": 0.32,
+        "y": 0.79,
+        "width": 0.36,
+        "height": 0.13
+      },
+      "renderOrder": 20,
+      "motion": "fadeSlide",
+      "properties": {
+        "variant": "reflected"
+      },
+      "visibleWhen": "isDormant"
+    },
+    {
+      "id": "wake_hint",
+      "component": "inscription",
+      "rect": {
+        "x": 0.05,
+        "y": 0.93,
+        "width": 0.3,
+        "height": 0.025
+      },
+      "renderOrder": 20,
+      "motion": "fade",
+      "properties": {
+        "title": "PRESS ANY KEY TO AWAKEN",
+        "tone": "light"
+      },
+      "visibleWhen": "isDormant"
+    },
+    {
+      "id": "login_clock",
+      "component": "presetClock",
+      "rect": {
+        "x": 0.7,
+        "y": 0.07,
+        "width": 0.24,
+        "height": 0.12
+      },
+      "renderOrder": 20,
+      "motion": "fadeSlide",
+      "properties": {
+        "variant": "compact"
+      },
+      "visibleWhen": {
+        "not": "isDormant"
+      }
+    },
+    {
+      "id": "identity",
+      "component": "account",
+      "rect": {
+        "x": 0.16,
+        "y": 0.28,
+        "width": 0.3,
+        "height": 0.115
+      },
+      "renderOrder": 20,
+      "motion": "fadeSlide",
+      "visibleWhen": {
+        "not": "isDormant"
+      },
+      "interactive": true,
+      "focusOrder": 10
+    },
+    {
+      "id": "life_login",
+      "component": "inscription",
+      "rect": {
+        "x": 0.24,
+        "y": 0.41,
+        "width": 0.14,
+        "height": 0.03
+      },
+      "renderOrder": 20,
+      "motion": "fadeSlide",
+      "properties": {
+        "title": "L I F E"
+      },
+      "visibleWhen": {
+        "not": "isDormant"
+      }
+    },
+    {
+      "id": "destination",
+      "component": "session",
+      "rect": {
+        "x": 0.69,
+        "y": 0.5,
+        "width": 0.24,
+        "height": 0.115
+      },
+      "renderOrder": 20,
+      "motion": "fadeSlide",
+      "visibleWhen": {
+        "not": "isDormant"
+      },
+      "interactive": true,
+      "focusOrder": 20
+    },
+    {
+      "id": "credential",
+      "component": "credential",
+      "rect": {
+        "x": 0.33,
+        "y": 0.68,
+        "width": 0.28,
+        "height": 0.1
+      },
+      "renderOrder": 20,
+      "motion": "fadeSlide",
+      "visibleWhen": {
+        "not": "isDormant"
+      },
+      "interactive": true,
+      "focusOrder": 30
+    },
+    {
+      "id": "status",
+      "component": "status",
+      "rect": {
+        "x": 0.3,
+        "y": 0.79,
+        "width": 0.34,
+        "height": 0.055
+      },
+      "renderOrder": 20,
+      "motion": "fade",
+      "visibleWhen": {
+        "not": "isDormant"
+      }
+    },
+    {
+      "id": "enter",
+      "component": "enter",
+      "rect": {
+        "x": 0.7,
+        "y": 0.8,
+        "width": 0.1,
+        "height": 0.1
+      },
+      "renderOrder": 20,
+      "motion": "fadeSlide",
+      "visibleWhen": {
+        "all": [
+          {
+            "not": "isDormant"
+          },
+          {
+            "any": [
+              "isAuthPrompting",
+              "isAuthSubmitting",
+              "isSessionSelection",
+              "isAuthError",
+              "isServiceUnavailable"
+            ]
+          }
+        ]
+      },
+      "interactive": true,
+      "focusOrder": 40
+    },
+    {
+      "id": "return_hint",
+      "component": "inscription",
+      "rect": {
+        "x": 0.05,
+        "y": 0.93,
+        "width": 0.29,
+        "height": 0.025
+      },
+      "renderOrder": 20,
+      "motion": "fade",
+      "properties": {
+        "title": "ESC \u00b7 RETURN TO STILLNESS",
+        "tone": "light"
+      },
+      "visibleWhen": {
+        "not": "isDormant"
+      }
+    },
+    {
+      "id": "power",
+      "component": "power",
+      "rect": {
+        "x": 0.82,
+        "y": 0.91,
+        "width": 0.13,
+        "height": 0.065
+      },
+      "renderOrder": 20,
+      "motion": "fade",
+      "interactive": true,
+      "focusOrder": 50
+    }
+  ]
+}
