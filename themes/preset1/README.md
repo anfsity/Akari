@@ -1,7 +1,7 @@
 # Preset 1 — Life / Death
 
 A fully procedural interpretation of the supplied diagonal life/death wallpaper.
-The background, cherry branches, blossoms, light streaks, rain, drifting petals
+The background, cherry branches, blossoms, light streaks, rain, rising petals
 and angular weekday lettering are hand-authored Canvas drawing. Wet glass and
 flowing water use a fragment shader sampling the painted light streaks.
 Space Grotesk body text includes its OFL license.
