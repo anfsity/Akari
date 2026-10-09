@@ -1,0 +1,19 @@
+[Unit]
+Description=Akari login manager
+After=systemd-user-sessions.service plymouth-quit-wait.service getty@tty1.service
+Conflicts=getty@tty1.service sddm.service greetd.service
+StartLimitIntervalSec=30
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/greetd --config /etc/akari/greetd.toml
+IgnoreSIGPIPE=no
+SendSIGHUP=yes
+TimeoutStopSec=30
+KeyringMode=shared
+Restart=always
+RestartSec=1
+
+[Install]
+Alias=display-manager.service
