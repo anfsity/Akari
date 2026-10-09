@@ -98,7 +98,7 @@
         "x": 0.8,
         "y": 0.055,
         "width": 0.15,
-        "height": 0.045
+        "height": 0.06
       },
       "renderOrder": 20,
       "focusOrder": 60,
@@ -128,9 +128,9 @@
       "component": "terraceLabel",
       "rect": {
         "x": 0.085,
-        "y": 0.305,
+        "y": 0.29,
         "width": 0.4,
-        "height": 0.06
+        "height": 0.08
       },
       "renderOrder": 40,
       "motion": "fadeSlide",
@@ -166,8 +166,8 @@
       "rect": {
         "x": 0.085,
         "y": 0.425,
-        "width": 0.042,
-        "height": 0.065
+        "width": 0.05,
+        "height": 0.078
       },
       "renderOrder": 40,
       "focusOrder": 10,
@@ -181,10 +181,10 @@
       "id": "account_name",
       "component": "accountName",
       "rect": {
-        "x": 0.145,
+        "x": 0.154,
         "y": 0.425,
-        "width": 0.34,
-        "height": 0.065
+        "width": 0.331,
+        "height": 0.078
       },
       "renderOrder": 40,
       "motion": "fade",
@@ -199,7 +199,7 @@
         "x": 0.085,
         "y": 0.513,
         "width": 0.4,
-        "height": 0.055
+        "height": 0.065
       },
       "renderOrder": 40,
       "focusOrder": 20,
@@ -219,7 +219,7 @@
         "x": 0.085,
         "y": 0.59,
         "width": 0.34,
-        "height": 0.06
+        "height": 0.072
       },
       "renderOrder": 40,
       "focusOrder": 30,
@@ -236,10 +236,10 @@
       "id": "primary_action",
       "component": "primaryAction",
       "rect": {
-        "x": 0.44,
+        "x": 0.433,
         "y": 0.59,
-        "width": 0.045,
-        "height": 0.06
+        "width": 0.052,
+        "height": 0.072
       },
       "renderOrder": 40,
       "focusOrder": 40,
@@ -269,7 +269,7 @@
       "component": "status",
       "rect": {
         "x": 0.085,
-        "y": 0.67,
+        "y": 0.69,
         "width": 0.4,
         "height": 0.045
       },
