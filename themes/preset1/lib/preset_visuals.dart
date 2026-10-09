@@ -389,6 +389,15 @@ class PresetWeatherPainter extends CustomPainter {
       phase: random.nextDouble() * math.pi * 2,
     );
   });
+  static final _rain = List.generate(300, (i) {
+    final random = math.Random(i * 53 + 901);
+    return (
+      x: random.nextDouble() * 2160,
+      y: random.nextDouble() * 1360,
+      depth: random.nextDouble(),
+      cycles: 36 + random.nextInt(29),
+    );
+  });
   static final _night = _getNightPath();
   static final _petal = Path()
     ..moveTo(-1, 0)
@@ -425,14 +434,17 @@ class PresetWeatherPainter extends CustomPainter {
       canvas.restore();
     }
     canvas.clipPath(_night);
-    final rain = Paint()
-      ..strokeWidth = .7
-      ..color = const Color(0x246f778e);
-    for (var i = 0; i < 110; i++) {
-      final p = _particles[i];
-      final y = (p.y + progress * 1220 * (9 + p.cycles)) % 1220 - 70;
-      final x = (p.x + progress * 2020) % 2020 - 50;
-      canvas.drawLine(Offset(x, y), Offset(x + 8, y + 27 + p.size * 6), rain);
+    final rain = Paint()..strokeCap = StrokeCap.round;
+    // Wrap beyond the canvas, including the longest streak's tail, so drops
+    // re-enter from above instead of visibly teleporting across the dark field.
+    for (final drop in _rain) {
+      final y = (drop.y + progress * 1360 * drop.cycles) % 1360 - 140;
+      final x = (drop.x + y * .12 + progress * 2160) % 2160 - 120;
+      final length = 35 + drop.depth * 85;
+      rain
+        ..strokeWidth = .65 + drop.depth * .55
+        ..color = Color.fromRGBO(185, 193, 213, .16 + drop.depth * .18);
+      canvas.drawLine(Offset(x, y), Offset(x + length * .12, y + length), rain);
     }
     canvas.restore();
   }
