@@ -8,6 +8,8 @@ import 'default.scene.g.dart';
 import 'terrace_visuals.dart';
 import 'terrace_menus.dart';
 
+const _contentScale = 1.3;
+
 /// Scene-specific presentation, borrowing the standard authentication controls
 /// so prompt, recovery and session semantics retain one authoritative path.
 class TerraceComponents implements GreeterThemeComponents {
@@ -64,12 +66,18 @@ class TerraceComponents implements GreeterThemeComponents {
       ),
       _ => _controls.build(context, node),
     };
-    // Node placement follows the viewport; native controls must use the same
-    // authored bounds so their text, icons and padding keep those proportions.
+    // Smaller logical bounds enlarge text, icons and padding together while
+    // scene rectangles continue to own placement and control geometry.
     return FittedBox(
       child: SizedBox(
-        width: node.rect.width * defaultSceneDocument.canvas.referenceWidth,
-        height: node.rect.height * defaultSceneDocument.canvas.referenceHeight,
+        width:
+            node.rect.width *
+            defaultSceneDocument.canvas.referenceWidth /
+            _contentScale,
+        height:
+            node.rect.height *
+            defaultSceneDocument.canvas.referenceHeight /
+            _contentScale,
         child: component,
       ),
     );
