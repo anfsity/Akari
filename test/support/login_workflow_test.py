@@ -126,6 +126,16 @@ class LoginWorkflowTest(unittest.TestCase):
         self.assertEqual((self.manager.INSTALLATION / 'current').resolve(), original)
         self.assertEqual((self.manager.INSTALLATION / 'previous').resolve(), updated)
 
+    def test_restrictive_installer_umask_keeps_runtime_paths_accessible(self):
+        previous = os.umask(0o077)
+        try:
+            self.install()
+        finally:
+            os.umask(previous)
+        for path in [self.manager.INSTALLATION, self.manager.INSTALLATION / 'releases',
+                     self.manager.CONFIGURATION, self.manager.STATE, self.manager.LOGS]:
+            self.assertEqual(path.stat().st_mode & 0o777, 0o755, str(path))
+
     def test_failed_deploy_keeps_previous_release_and_service(self):
         self.install()
         original = (self.manager.INSTALLATION / 'current').resolve()
