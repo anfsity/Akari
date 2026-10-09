@@ -32,6 +32,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  shaders:
+    - packages/theme_preset1/shaders/wet_surface.frag
   licenses:
     - assets/fonts/OFL.txt
   fonts:
