@@ -186,29 +186,32 @@ void main() {
     },
   );
 
-  test('rain visibly moves within half a second and wraps continuously', () async {
-    final start = await _renderWeatherFrame(0);
-    final falling = await _renderWeatherFrame(.5 / 120);
-    final wrapped = await _renderWeatherFrame(1);
-    final width = _weatherFrameSize.width.toInt();
-    final height = _weatherFrameSize.height.toInt();
-    var changedRainPixels = 0;
-    var wrapDifference = 0;
-    for (var pixel = 0; pixel < width * height; pixel++) {
-      final alpha = pixel * 4 + 3;
-      // This lower-right region contains rain and dark petals, without UI or
-      // artwork. Alpha above 40 excludes the faint petals from the measurement.
-      if (pixel % width >= width * .5 && pixel ~/ width >= height * .55) {
-        if ((start[alpha] > 40 || falling[alpha] > 40) &&
-            (start[alpha] - falling[alpha]).abs() > 10) {
-          changedRainPixels++;
+  test(
+    'rain visibly moves within half a second and wraps continuously',
+    () async {
+      final start = await _renderWeatherFrame(0);
+      final falling = await _renderWeatherFrame(.5 / 120);
+      final wrapped = await _renderWeatherFrame(1);
+      final width = _weatherFrameSize.width.toInt();
+      final height = _weatherFrameSize.height.toInt();
+      var changedRainPixels = 0;
+      var wrapDifference = 0;
+      for (var pixel = 0; pixel < width * height; pixel++) {
+        final alpha = pixel * 4 + 3;
+        // This lower-right region contains weather without UI or artwork. Fine
+        // rain is translucent; the changed area must exceed sparse petal edges.
+        if (pixel % width >= width * .5 && pixel ~/ width >= height * .55) {
+          if ((start[alpha] > 12 || falling[alpha] > 12) &&
+              (start[alpha] - falling[alpha]).abs() > 7) {
+            changedRainPixels++;
+          }
         }
+        wrapDifference += (start[alpha] - wrapped[alpha]).abs();
       }
-      wrapDifference += (start[alpha] - wrapped[alpha]).abs();
-    }
-    expect(changedRainPixels, greaterThan(500));
-    expect(wrapDifference / (width * height), lessThan(.01));
-  });
+      expect(changedRainPixels, greaterThan(500));
+      expect(wrapDifference / (width * height), lessThan(.01));
+    },
+  );
 }
 
 Future<Uint8List> _renderWeatherFrame(double progress) async {

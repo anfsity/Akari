@@ -389,13 +389,16 @@ class PresetWeatherPainter extends CustomPainter {
       phase: random.nextDouble() * math.pi * 2,
     );
   });
-  static final _rain = List.generate(300, (i) {
+  static final _rain = List.generate(720, (i) {
     final random = math.Random(i * 53 + 901);
     return (
       x: random.nextDouble() * 2160,
       y: random.nextDouble() * 1360,
       depth: random.nextDouble(),
       cycles: 36 + random.nextInt(29),
+      length: i < 90
+          ? 20 + random.nextDouble() * 38
+          : 2 + random.nextDouble() * 15,
     );
   });
   static final _night = _getNightPath();
@@ -440,11 +443,14 @@ class PresetWeatherPainter extends CustomPainter {
     for (final drop in _rain) {
       final y = (drop.y + progress * 1360 * drop.cycles) % 1360 - 140;
       final x = (drop.x + y * .12 + progress * 2160) % 2160 - 120;
-      final length = 35 + drop.depth * 85;
       rain
-        ..strokeWidth = .65 + drop.depth * .55
-        ..color = Color.fromRGBO(185, 193, 213, .16 + drop.depth * .18);
-      canvas.drawLine(Offset(x, y), Offset(x + length * .12, y + length), rain);
+        ..strokeWidth = .3 + drop.depth * .55
+        ..color = Color.fromRGBO(185, 193, 213, .06 + drop.depth * .17);
+      canvas.drawLine(
+        Offset(x, y),
+        Offset(x + drop.length * .12, y + drop.length),
+        rain,
+      );
     }
     canvas.restore();
   }
