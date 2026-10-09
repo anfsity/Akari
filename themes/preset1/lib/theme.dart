@@ -51,9 +51,12 @@ ThemeDefinition buildPreset1Theme({Color? seed}) {
             shape: const RoundedRectangleBorder(
               side: BorderSide(color: Color(0xff666979)),
             ),
-            textStyle: const TextStyle(
-              fontFamily: presetFont,
-              color: presetPaper,
+            labelTextStyle: const WidgetStatePropertyAll(
+              TextStyle(
+                fontFamily: presetFont,
+                fontSize: 20,
+                color: presetPaper,
+              ),
             ),
           ),
           textButtonTheme: TextButtonThemeData(
