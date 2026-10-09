@@ -288,6 +288,35 @@ elif command == 'swaymsg':
         self.assertTrue((self.root / 'sway-exited').exists())
         self.assertIn('Frontend exited: 0', (self.root / 'lifecycle.log').read_text())
 
+    def test_launch_pins_release_and_publishes_readable_real_login_logs(self):
+        release = self.root / 'release'
+        (release / 'scripts').mkdir(parents=True)
+        (self.root / 'logs').mkdir()
+        source = (REPOSITORY / 'scripts/login/launch.sh').read_text()
+        (release / 'launch.sh').write_text(source.replace(
+            '/var/log/akari/greeter', str(self.root / 'logs')))
+        boundary = release / 'scripts/debug-dbus.sh'
+        boundary.write_text(f'''#!{sys.executable}
+import json, os, pathlib
+logs = pathlib.Path(os.environ['AKARI_LOG_DIR'])
+print(json.dumps({{'release': os.environ['AKARI_RELEASE'],
+                  'mode': os.environ['AKARI_BACKEND_MODE'],
+                  'nested_backend': os.environ.get('WLR_BACKENDS'),
+                  'log_permissions': logs.stat().st_mode & 0o777}}))
+''')
+        boundary.chmod(0o755)
+        current = self.root / 'current'
+        current.symlink_to(release)
+        result = subprocess.run(['bash', str(current / 'launch.sh')],
+                                env={**os.environ, 'WLR_BACKENDS': 'headless'},
+                                capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        sessions = list((self.root / 'logs').glob('session-*'))
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(json.loads((sessions[0] / 'sway.log').read_text()), {
+            'release': str(release), 'mode': 'real', 'nested_backend': None,
+            'log_permissions': 0o755})
+
     def test_backend_exit_terminates_frontend_and_releases_compositor(self):
         result = self.run_greeter(LONG_FRONTEND='1', FAIL_BACKEND='1')
         self.assertEqual(result.returncode, 143, result.stderr)
