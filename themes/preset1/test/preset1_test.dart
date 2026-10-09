@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +9,8 @@ import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
 import 'package:theme_preset1/preset_visuals.dart';
 import 'package:theme_preset1/theme.dart';
 import 'package:theme_sdk/theme_sdk.dart';
+
+const _weatherFrameSize = Size(1920, 1080);
 
 void main() {
   for (final size in [
@@ -181,6 +185,45 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  test('rain visibly moves within half a second and wraps continuously', () async {
+    final start = await _renderWeatherFrame(0);
+    final falling = await _renderWeatherFrame(.5 / 120);
+    final wrapped = await _renderWeatherFrame(1);
+    final width = _weatherFrameSize.width.toInt();
+    final height = _weatherFrameSize.height.toInt();
+    var changedRainPixels = 0;
+    var wrapDifference = 0;
+    for (var pixel = 0; pixel < width * height; pixel++) {
+      final alpha = pixel * 4 + 3;
+      // This lower-right region contains rain and dark petals, without UI or
+      // artwork. Alpha above 40 excludes the faint petals from the measurement.
+      if (pixel % width >= width * .5 && pixel ~/ width >= height * .55) {
+        if ((start[alpha] > 40 || falling[alpha] > 40) &&
+            (start[alpha] - falling[alpha]).abs() > 10) {
+          changedRainPixels++;
+        }
+      }
+      wrapDifference += (start[alpha] - wrapped[alpha]).abs();
+    }
+    expect(changedRainPixels, greaterThan(500));
+    expect(wrapDifference / (width * height), lessThan(.01));
+  });
+}
+
+Future<Uint8List> _renderWeatherFrame(double progress) async {
+  final recorder = ui.PictureRecorder();
+  PresetWeatherPainter(AlwaysStoppedAnimation(progress))
+      .paint(Canvas(recorder), _weatherFrameSize);
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(
+    _weatherFrameSize.width.toInt(),
+    _weatherFrameSize.height.toInt(),
+  );
+  final pixels = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  image.dispose();
+  picture.dispose();
+  return pixels!.buffer.asUint8List();
 }
 
 // Weather intentionally never settles. Advance enough real frame boundaries

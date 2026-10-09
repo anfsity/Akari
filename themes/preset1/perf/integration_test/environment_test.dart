@@ -60,13 +60,18 @@ void main() {
     for (var cycle = 0; cycle < 3; cycle++) {
       phase = 'dormant';
       await wait(2500);
-      if (cycle == 0) await capture('dormant');
+      if (cycle == 0) {
+        await capture('dormant');
+        await wait(500);
+        await capture('dormant_rain');
+      }
       phase = 'wake';
       await sendKey('space');
       await wait();
       if (cycle == 0) {
         await tester.tap(find.byTooltip('Choose account'));
         await wait(500);
+        await capture('account_menu');
         await tester.tap(find.text('Alice').last);
         await wait(500);
       }
@@ -86,6 +91,7 @@ void main() {
       phase = 'session_menu';
       await tester.tap(find.byTooltip('Choose a session'));
       await wait();
+      if (cycle == 0) await capture('session_menu');
       await sendKey('Escape');
       await wait(500);
       phase = 'error';

@@ -37,9 +37,11 @@ in `lib/preset_components.dart`; display lettering is in `lib/weekday_lettering.
 
 The static artwork has a separate repaint boundary. Blur is used only when
 painting the cached light streaks. A single weather controller drives 170
-petals and 110 rain streaks without rebuilding widgets. Its 120-second loop is
-continuous across the wrap. Reduced motion, disabled ticker mode and hidden
-application lifecycle states stop the controller. Clocks update once a minute.
+petals and 300 rain streaks without rebuilding widgets. Rain has its own seeded
+depth and speed distribution, with brighter, longer streaks falling across the
+dark field. Its 120-second loop is continuous across the wrap. Reduced motion,
+disabled ticker mode and hidden application lifecycle states stop the controller.
+Clocks update once a minute.
 
 Verification:
 
@@ -57,17 +59,20 @@ scale compensation as `run sway`, runs a profile build through three journeys,
 and records screenshots plus frame timings for dormant animation, waking,
 typing, menus, errors and recovery. Engine frame numbers associate delayed
 timings with the phase that actually produced the frame.
+Both choice menus and two dormant frames 500 ms apart are retained for visual
+verification of anchoring and falling rain.
 
 Each phase requires at least 90 samples, p95 build under 8 ms, p95 raster under
 12 ms, p95 total frame latency under 33.334 ms, p95 frame interval under 25 ms,
 and fewer than 20% of frames exceeding a 16.667 ms total budget. Reports and
 screenshots are registered in the CLI run report. Widget tests also cover
-800×600, 1280×720, 1920×1080 and 2560×1080, interrupted transitions, menu focus,
-credential clearing, service recovery and stopping weather animation.
+800×600, 1280×720, 1920×1080, 2467×1580 and 2560×1080, interrupted transitions,
+menu anchoring and focus, proportional controls, credential clearing, service
+recovery, visible rain movement, loop continuity and stopping weather animation.
 
-The 2026-10-09 local profile run passed all three journeys with 2,475 measured
-frames at inner scale 0.625 and a Flutter render size of 2467×1580. All phases
-had a 16.667 ms p95 frame interval; build p95 ranged from 0.776 to 1.443 ms,
-raster p95 from 5.000 to 5.377 ms, and total latency p95 from 7.619 to 12.551 ms.
-Two frames exceeded 16.667 ms (0.08%). These are measurements from the local
-nested compositor, not a guarantee for other GPUs or display sizes.
+The 2026-10-09 fullscreen Sway profile run passed all three journeys with 2,553
+measured frames at inner scale 0.625 and a Flutter render size of 2560×1440.
+All phases had a 16.667 ms p95 frame interval; build p95 ranged from 0.947 to
+1.260 ms, raster p95 from 5.282 to 5.558 ms, and total latency p95 from 7.852
+to 12.872 ms. Nine frames exceeded 16.667 ms (0.35%). These are measurements
+from the local nested compositor, not a guarantee for other GPUs or display sizes.

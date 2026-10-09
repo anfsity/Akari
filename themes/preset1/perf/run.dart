@@ -100,7 +100,10 @@ Future<void> main() async {
     for (final name in [
       'report.json',
       'dormant.png',
+      'dormant_rain.png',
       'login.png',
+      'account_menu.png',
+      'session_menu.png',
       'error.png',
       'sway/display-report.json',
     ])
