@@ -151,6 +151,7 @@ void main() {
     const Size(800, 600),
     const Size(1280, 720),
     const Size(1920, 1080),
+    const Size(2467, 1580),
     const Size(2560, 1080),
   ]) {
     testWidgets('scene controls remain usable at $size', (tester) async {
@@ -170,6 +171,76 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('controls and choice menus scale with the Sway viewport', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.view.physicalSize = const Size(1920, 1080);
+    await tester.pumpWidget(MyApp(themeBuilder: buildDefaultTheme));
+    await tester.pumpAndSettle();
+    final greetingHeight = tester.getRect(find.text('Hello World')).height;
+    await _wake(tester);
+    await tester.tap(find.byTooltip('Choose account'));
+    await tester.pumpAndSettle();
+    final menuLabelHeight = tester.getRect(find.text('Alice')).height;
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
+    final accountHeight = tester.getRect(find.text('Alice')).height;
+    final iconHeight = tester.getRect(find.byIcon(Icons.arrow_forward)).height;
+    final credentialHeight = tester.getRect(find.byType(EditableText)).height;
+
+    tester.view.physicalSize = const Size(2467, 1580);
+    await tester.pumpAndSettle();
+    final scale = 2467 / 1920;
+    expect(
+      tester.getRect(find.text('Alice')).height,
+      closeTo(accountHeight * scale, .01),
+    );
+    expect(
+      tester.getRect(find.byIcon(Icons.arrow_forward)).height,
+      closeTo(iconHeight * scale, .01),
+    );
+    expect(
+      tester.getRect(find.byType(EditableText)).height,
+      closeTo(credentialHeight * scale, .01),
+    );
+    for (final tooltip in ['Choose account', 'Choose a session']) {
+      final anchor = tester.getRect(find.byTooltip(tooltip));
+      await tester.tap(find.byTooltip(tooltip));
+      await tester.pumpAndSettle();
+      final menu = tester.getRect(find.byType(SingleChildScrollView));
+      expect(menu.left, closeTo(anchor.left, .01));
+      expect(menu.top, closeTo(anchor.bottom + 8, .01));
+      expect(
+        tester
+            .getRect(
+              find.byWidgetPredicate((widget) => widget is PopupMenuItem).first,
+            )
+            .height,
+        closeTo(48 * scale, .01),
+      );
+      if (tooltip == 'Choose account') {
+        expect(
+          tester.getRect(find.text('Alice').last).height,
+          closeTo(menuLabelHeight * scale, .01),
+        );
+      } else {
+        expect(menu.width, closeTo(anchor.width, .01));
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+    }
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(find.text('Hello World')).height,
+      closeTo(greetingHeight * scale, .01),
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('wake can reverse mid-transition without losing the prompt', (
     tester,

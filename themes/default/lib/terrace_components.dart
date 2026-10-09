@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:greeter_components/greeter_components.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
+import 'default.scene.g.dart';
 import 'terrace_visuals.dart';
 import 'terrace_menus.dart';
 
@@ -16,53 +17,63 @@ class TerraceComponents implements GreeterThemeComponents {
   final StandardGreeterComponents _controls;
 
   @override
-  Widget build(BuildContext context, SceneNode node) =>
-      switch (node.componentId) {
-        'terraceClock' => const _TerraceClock(),
-        'terracePanel' => TerracePanel(radius: theme.tokens.panelRadius),
-        'terraceLabel' => _TerraceLabel(
-          text: node.properties['text']!,
-          large: node.properties['variant'] == 'large',
+  Widget build(BuildContext context, SceneNode node) {
+    final component = switch (node.componentId) {
+      'terraceClock' => const _TerraceClock(),
+      'terracePanel' => TerracePanel(radius: theme.tokens.panelRadius),
+      'terraceLabel' => _TerraceLabel(
+        text: node.properties['text']!,
+        large: node.properties['variant'] == 'large',
+      ),
+      'terraceAccount' => SceneRegion<AccountPickerSlots>(
+        valueListenable: theme.host.accountPickerSlots,
+        builder: (context, account) => TerraceAccountPicker(
+          account: account,
+          onSelect: theme.host.onSelectUser,
         ),
-        'terraceAccount' => SceneRegion<AccountPickerSlots>(
-          valueListenable: theme.host.accountPickerSlots,
-          builder: (context, account) => TerraceAccountPicker(
-            account: account,
-            onSelect: theme.host.onSelectUser,
-          ),
+      ),
+      'sessionPicker' => SceneRegion<SessionPickerSlots>(
+        valueListenable: theme.host.sessionPickerSlots,
+        builder: (context, session) => TerraceSessionPicker(
+          session: session,
+          onSelect: theme.host.onSelectSession,
+          onRetry: theme.host.onRetrySessionCatalog,
         ),
-        'sessionPicker' => SceneRegion<SessionPickerSlots>(
-          valueListenable: theme.host.sessionPickerSlots,
-          builder: (context, session) => TerraceSessionPicker(
-            session: session,
-            onSelect: theme.host.onSelectSession,
-            onRetry: theme.host.onRetrySessionCatalog,
-          ),
-        ),
-        'credentialField' => SceneRegion<AuthPromptSlots>(
-          valueListenable: theme.host.authPromptSlots,
-          builder: (context, auth) => TerraceCredentialFeedback(
+      ),
+      'credentialField' => SceneRegion<AuthPromptSlots>(
+        valueListenable: theme.host.authPromptSlots,
+        builder: (context, auth) => TerraceCredentialFeedback(
+          auth: auth,
+          child: CredentialField(
             auth: auth,
-            child: CredentialField(
-              auth: auth,
-              controller: theme.host.credentialController,
-              focusNode: theme.host.credentialFocusNode,
-            ),
+            controller: theme.host.credentialController,
+            focusNode: theme.host.credentialFocusNode,
           ),
         ),
-        'accountName' => SceneRegion<AccountPickerSlots>(
-          valueListenable: theme.host.accountPickerSlots,
-          builder: (context, account) => Align(
-            alignment: Alignment.centerLeft,
-            child: TerraceChoiceLabel(
-              id: account.selected?.id,
-              label: account.selected?.displayName ?? 'Choose account',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w400),
-            ),
+      ),
+      'accountName' => SceneRegion<AccountPickerSlots>(
+        valueListenable: theme.host.accountPickerSlots,
+        builder: (context, account) => Align(
+          alignment: Alignment.centerLeft,
+          child: TerraceChoiceLabel(
+            id: account.selected?.id,
+            label: account.selected?.displayName ?? 'Choose account',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w400),
           ),
         ),
-        _ => _controls.build(context, node),
-      };
+      ),
+      _ => _controls.build(context, node),
+    };
+    // Node placement follows the viewport; native controls must use the same
+    // authored bounds so their text, icons and padding keep those proportions.
+    return FittedBox(
+      child: SizedBox(
+        width: node.rect.width * defaultSceneDocument.canvas.referenceWidth,
+        height: node.rect.height * defaultSceneDocument.canvas.referenceHeight,
+        child: component,
+      ),
+    );
+  }
 }
 
 class _TerraceLabel extends StatelessWidget {
