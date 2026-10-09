@@ -75,9 +75,8 @@ Save work, log out of the desktop, log in on tty3, then run:
 akari greetd-test start
 ```
 
-Preflight uses `SUDO_TTY` to identify the original terminal even when sudo creates
-a PTY. It rejects live graphical user sessions, ignores sessions already closing,
-checks SDDM boot configuration, and records diagnostics before changing services.
+Preflight checks SDDM boot configuration and records diagnostics before changing
+services. It does not inspect the caller's terminal or login sessions.
 Recovery is armed before SDDM stops. A failed setup restores it immediately;
 systemd's `ExecStopPost` restores it when the test service exits; an independent
 ten-minute timer remains the fallback while the service is running. A successful
@@ -100,7 +99,7 @@ sudo /opt/akari-test/restore.sh
 The CLI, timer and exit callback all use this single recovery implementation.
 `install`, `start` and `restore` accept `--dry-run` to print the command that would
 run without requesting sudo or changing files. Preflight still runs during an
-actual start. The CLI does not change the TTY or live-desktop requirements.
+actual start.
 
 Inspect installed artifacts, SDDM, the test service, the recovery timer and saved
 log paths with:
