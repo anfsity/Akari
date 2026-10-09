@@ -69,6 +69,8 @@ Future<int> runGreetdTestCommand(
       : File('${root.path}/${command.name.split(' ').last}.sh');
   final scriptArguments = [
     if (command.name == 'greetd-test install') root.path,
+    if (values.containsKey('--theme'))
+      Directory(values['--theme']!).absolute.path,
     if (values.containsKey('--scale')) ...['--scale', values['--scale']!],
     if (values.containsKey('--log-dir')) ...[
       '--log-dir',

@@ -84,7 +84,9 @@ the corresponding script.
 
 Use `akari greetd-test install`, `start`, `restore`, `status` and `logs` for
 standalone login testing. This command family calls the installed test lifecycle
-scripts directly and keeps diagnostics outside repository run reports. Only
+scripts directly and keeps diagnostics outside repository run reports.
+`greetd-test install --theme PATH` (or `-t PATH`) builds and installs the selected
+theme project, defaulting to the repository's `themes/default`. Only
 installation needs repository build artifacts; status/log queries and service
 control do not acquire theme locks or create development run directories.
 The `akari` launcher still needs the repository and SDK. Emergency recovery

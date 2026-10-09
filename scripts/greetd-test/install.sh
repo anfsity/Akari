@@ -3,6 +3,7 @@ set -euo pipefail
 source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$source_dir/../.." && pwd)"
 test_root="${1:?Installation directory is required. Use akari greetd-test install.}"
+theme_path="${2:-$repo_root/themes/default}"
 if [[ "$EUID" -ne 0 ]]; then
   echo 'Run this installer with sudo to build and install the test artifacts.' >&2
   exit 1
@@ -14,19 +15,33 @@ for unit in akari-test.service akari-restore.timer; do
   fi
 done
 build_user="${SUDO_USER:-$(stat -c '%U' "$repo_root")}"
-printf 'Building the current default theme and production backend as %s...\n' "$build_user"
+printf 'Building theme %s and production backend as %s...\n' "$theme_path" "$build_user"
 # Build as the caller so SDK and repository caches retain their user ownership.
 # Direct root invocation uses the repository owner for the same reason.
-runuser -u "$build_user" -- bash -c '
+build_report="$(runuser -u "$build_user" -- bash -c '
   set -euo pipefail
   cd -- "$1"
   source scripts/lib.sh
   export PATH="$HOME/.cargo/bin:$PATH"
-  akari_run_dev_cli "$1" build --theme "$1/themes/default" --mode release --platform linux --jobs 4
-' bash "$repo_root"
+  akari_run_dev_cli "$1" build --theme "$2" --mode release --platform linux --jobs 4 --format json
+' bash "$repo_root" "$theme_path")" || {
+  status=$?
+  printf '%s\n' "$build_report" >&2
+  exit "$status"
+}
 
 backend="$repo_root/build/out/backend"
-bundle="$repo_root/build/out/default"
+# Theme package names determine build links and may differ from directory names.
+bundle="$(python3 - "$repo_root" "$build_report" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+root, report = Path(sys.argv[1]), json.loads(sys.argv[2])
+print(f"Build report: {root / report['report_path']}", file=sys.stderr)
+print(root / report['artifacts']['bundle_link'])
+PY
+)"
 test -x "$backend"
 test -x "$bundle/greeter"
 if layout="$(runuser -u "$build_user" -- python3 "$source_dir/display-layout.py" capture)"; then

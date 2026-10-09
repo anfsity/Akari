@@ -67,6 +67,10 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       '--log-dir',
     ]);
     expect(
+      await completeBashWords(['akari', 'greetd-test', 'install', '--t']),
+      ['--theme'],
+    );
+    expect(
       await completeBashWords(['akari', 'greetd-test', 'logs', '--run', 'c']),
       ['current'],
     );
@@ -114,6 +118,16 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(
       await completeBashWords(['akari', 'run', 'studio', '--theme=theme']),
       ['--theme=theme with spaces'],
+    );
+    expect(
+      await completeBashWords([
+        'akari',
+        'greetd-test',
+        'install',
+        '-t',
+        'theme',
+      ]),
+      ['theme with spaces'],
     );
     expect(
       await completeBashWords(['akari', 'verify', '--report', 'report']),

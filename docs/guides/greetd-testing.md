@@ -43,10 +43,16 @@ Build and install while no previous test or timer is active:
 
 ```sh
 akari greetd-test install
+akari greetd-test install --theme themes/preset1
 ```
 
-The installer first builds the current repository's default theme and production
-backend in Linux release mode with four build jobs. It runs the build as the sudo
+Select a theme project with `--theme PATH` (or `-t PATH`); the default is
+the current repository's `themes/default`. Relative paths use the invocation
+directory, and projects outside the repository are supported. `start` uses the
+installed theme; change it by running `install` again with the desired project.
+
+The installer first builds the selected theme and production backend in Linux
+release mode with four build jobs. It runs the build as the sudo
 caller (or the repository owner when invoked directly as root), keeping SDK and
 repository caches owned by that user. SDK selection uses the same repository
 configuration and `AKARI_FLUTTER_BIN` / `AKARI_DART_BIN` overrides as the CLI.

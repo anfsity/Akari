@@ -113,7 +113,12 @@ Future<void> main(List<String> arguments) async {
       ]);
       expect(result.exitCode, 0, reason: '${result.stderr}');
       expect(result.stdout, contains('Usage: akari greetd-test'));
-      expect(result.stdout, isNot(contains('--theme')));
+      expect(
+        result.stdout,
+        target == 'install'
+            ? contains('-t, --theme')
+            : isNot(contains('--theme')),
+      );
       expect(result.stdout, isNot(contains('--report')));
       if (target == 'start') {
         expect(result.stdout, contains('--scale'));
@@ -128,6 +133,30 @@ Future<void> main(List<String> arguments) async {
     ]) {
       expect((await runFixture(arguments)).exitCode, 2);
     }
+  });
+
+  test('install forwards theme paths literally through sudo', () async {
+    const theme = r'theme with $(touch unexpected)';
+    for (final options in [
+      ['--theme', theme],
+      ['-t', theme],
+      ['--theme=$theme'],
+    ]) {
+      final result = await runFixture(['install', ...options]);
+      expect(result.exitCode, 17, reason: '${result.stderr}');
+      expect(
+        jsonDecode(await File('${temporary.path}/calls.json').readAsString()),
+        [
+          '--',
+          'bash',
+          '${Directory.current.path}/scripts/greetd-test/install.sh',
+          installation.path,
+          '${temporary.path}/$theme',
+        ],
+      );
+    }
+    expect(File('${temporary.path}/unexpected').existsSync(), isFalse);
+    expect(Directory('${temporary.path}/build').existsSync(), isFalse);
   });
 
   test(
@@ -169,6 +198,7 @@ Future<void> main(List<String> arguments) async {
             '${Directory.current.path}/tool/akari.dart',
             'greetd-test',
             target,
+            if (target == 'install') ...['--theme', 'relative theme'],
             if (target == 'start') ...[
               '--scale',
               '1.5',
@@ -184,6 +214,12 @@ Future<void> main(List<String> arguments) async {
         final plan =
             jsonDecode(result.stdout as String) as Map<String, dynamic>;
         expect(plan['command'], 'greetd-test $target');
+        if (target == 'install') {
+          expect(
+            (plan['invocation'] as List).last,
+            '${temporary.path}/relative theme',
+          );
+        }
         if (target == 'start') {
           expect(
             plan['invocation'],

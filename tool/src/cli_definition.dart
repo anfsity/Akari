@@ -242,7 +242,7 @@ const cliCommands = [
   CliCommand(
     'greetd-test install',
     'Build, back up and install the test environment; save desktop display order.',
-    options: ['--dry-run'],
+    options: ['--theme', '--dry-run'],
     reportsRun: false,
   ),
   CliCommand(

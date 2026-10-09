@@ -245,18 +245,22 @@ if name == 'runuser':
     sys.exit(subprocess.run(args[args.index('--') + 1:], env=env).returncode)
 if name == 'dart':
     repo = pathlib.Path(os.getcwd())
+    theme = os.environ.get('SELECTED_THEME', str(repo / 'themes/default'))
+    bundle = 'build/out/' + os.environ.get('THEME_NAME', 'default')
     assert args == [str(repo / 'tool/akari.dart'), 'build', '--theme',
-                    str(repo / 'themes/default'), '--mode', 'release',
-                    '--platform', 'linux', '--jobs', '4'], args
+                    theme, '--mode', 'release', '--platform', 'linux',
+                    '--jobs', '4', '--format', 'json'], args
     assert os.environ['HOME'] == str(root / 'builder-home')
     assert os.environ['PATH'].split(':')[0] == str(root / 'builder-home/.cargo/bin')
     version = (repo / 'source-version').read_text()
-    for relative in ['build/out/default/greeter', 'build/out/default/lib/libapp.so',
+    for relative in [bundle + '/greeter', bundle + '/lib/libapp.so',
                      'build/out/backend']:
         path = repo / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(version)
         path.chmod(0o755)
+    print(json.dumps({'artifacts': {'bundle_link': bundle},
+                      'report_path': 'build/tool/runs/fixture/report.json'}))
     sys.exit(1 if os.environ.get('FAIL_BUILD') else 0)
 ''')
         handler.chmod(0o755)
@@ -270,9 +274,9 @@ if name == 'dart':
             "AKARI_DART_BIN": str(self.bin / "dart"),
         }
 
-    def run_installer(self, **environment):
+    def run_installer(self, *arguments, **environment):
         return subprocess.run(
-            ["bash", str(self.source / "install.sh"), str(self.installation)], cwd=self.root,
+            ["bash", str(self.source / "install.sh"), str(self.installation), *arguments], cwd=self.root,
             env={**self.environment, **environment}, capture_output=True,
             text=True, timeout=10,
         )
@@ -321,6 +325,32 @@ if name == 'dart':
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         owner = pwd.getpwuid(self.repo.stat().st_uid).pw_name
         self.assertIn(f'"-u", "{owner}"', (self.root / "calls").read_text())
+
+    def test_installer_uses_reported_bundle_for_an_external_theme(self):
+        self.create_old_installation()
+        theme = self.root / 'external theme with $(touch unexpected)'
+        default = self.repo / 'build/out/default'
+        default.mkdir(parents=True)
+        (default / 'greeter').write_text('default')
+        result = self.run_installer(str(theme), SELECTED_THEME=str(theme),
+                                    THEME_NAME='custom_theme')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for relative in ['frontend/greeter', 'frontend/lib/libapp.so', 'backend']:
+            self.assertEqual((self.installation / relative).read_text(), 'new')
+        self.assertEqual((default / 'greeter').read_text(), 'default')
+        self.assertFalse((self.repo / 'unexpected').exists())
+        self.assertIn('Build report:', result.stderr)
+
+    def test_failed_custom_theme_build_preserves_installation(self):
+        self.create_old_installation()
+        theme = self.root / 'external theme'
+        result = self.run_installer(str(theme), SELECTED_THEME=str(theme),
+                                    THEME_NAME='custom_theme', FAIL_BUILD='1')
+        self.assertNotEqual(result.returncode, 0)
+        for relative in ['frontend/greeter', 'frontend/lib/libapp.so', 'backend']:
+            self.assertEqual((self.installation / relative).read_text(), 'old')
+        self.assertFalse((self.installation / 'backups').exists())
+        self.assertIn('report.json', result.stderr)
 
     def test_failed_build_preserves_installation_even_with_existing_artifacts(self):
         self.create_old_installation()
