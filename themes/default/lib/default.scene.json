@@ -12,7 +12,7 @@
     "asset": "packages/theme_default/assets/(71187447)Hello world.png",
     "color": "#081b2b",
     "scrimOpacity": 0.08,
-    "blurSigma": 0
+    "blurSigma": 0.0
   },
   "nodes": [
     {
@@ -71,7 +71,7 @@
       "motion": "fadeSlide",
       "visibleWhen": "isDormant",
       "properties": {
-        "text": "Hello, world.",
+        "text": "Hello World",
         "variant": "large"
       }
     },
@@ -101,9 +101,9 @@
         "height": 0.045
       },
       "renderOrder": 20,
+      "focusOrder": 60,
       "motion": "fade",
       "interactive": true,
-      "focusOrder": 60,
       "properties": {
         "variant": "icon-row"
       }
@@ -170,12 +170,12 @@
         "height": 0.065
       },
       "renderOrder": 40,
+      "focusOrder": 10,
       "motion": "fade",
       "visibleWhen": {
         "not": "isDormant"
       },
-      "interactive": true,
-      "focusOrder": 10
+      "interactive": true
     },
     {
       "id": "account_name",
@@ -202,12 +202,12 @@
         "height": 0.055
       },
       "renderOrder": 40,
+      "focusOrder": 20,
       "motion": "fade",
       "visibleWhen": {
         "not": "isDormant"
       },
       "interactive": true,
-      "focusOrder": 20,
       "properties": {
         "variant": "pill"
       }
@@ -222,12 +222,12 @@
         "height": 0.06
       },
       "renderOrder": 40,
+      "focusOrder": 30,
       "motion": "fade",
       "visibleWhen": {
         "not": "isDormant"
       },
       "interactive": true,
-      "focusOrder": 30,
       "properties": {
         "variant": "outline"
       }
@@ -242,6 +242,7 @@
         "height": 0.06
       },
       "renderOrder": 40,
+      "focusOrder": 40,
       "motion": "hoverLift",
       "visibleWhen": {
         "all": [
@@ -259,7 +260,6 @@
         ]
       },
       "interactive": true,
-      "focusOrder": 40,
       "properties": {
         "variant": "round-arrow"
       }
