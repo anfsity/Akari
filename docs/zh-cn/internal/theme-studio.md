@@ -10,7 +10,7 @@ fvm dart run tool/akari.dart run studio --theme themes/default
 fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 ```
 
-`studio` 是 `run` 的一个目标。`akari run --help` 会列出目标，`akari run studio --help` 会显示其选项。如果当前 Shell 仍不支持补全，可使用 `akari install --shell zsh` 刷新安装脚本，然后在该 Shell 运行 `. ~/.local/share/akari/env.zsh`。bash 用户请使用 `--shell bash`，并加载 `~/.local/share/akari/env.bash`。
+`studio` 是 `run` 的一个目标。`akari run --help` 会列出目标，`akari run studio --help` 会显示其选项。如果当前 Shell 仍不支持补全，可使用 `akari install cli --shell zsh` 刷新安装脚本，然后在该 Shell 运行 `. ~/.local/share/akari/env.zsh`。bash 用户请使用 `--shell bash`，并加载 `~/.local/share/akari/env.bash`。
 
 CLI 会解析主题、生成场景 Dart 代码，并在 `build/tool/hosts/<encoded-canonical-theme-path>/studio/` 中创建可复用宿主。编辑器使用模拟显示数据，不依赖后端或 D-Bus。正式应用不包含编辑器，也不依赖编辑器的 UI 库。`--dry-run` 会打印执行计划；`--format json` 和 `--report PATH` 使用通用工具报告约定。Studio 使用 debug 模式。保存 Dart 代码或资源后，修改会通过热重载生效；保存场景 JSON 后，工具会重新生成场景代码。热重载会保留编辑器当前文档和撤销历史。使用 **Reload from disk** 可加载其他编辑器所做的更改。
 

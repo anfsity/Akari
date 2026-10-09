@@ -33,7 +33,7 @@ bash scripts/check-toolchain.sh
 ## 用 `akari` 命令简化操作
 
 ```sh
-fvm dart run tool/akari.dart install --shell zsh
+fvm dart run tool/akari.dart install cli --shell zsh
 ```
 
 使用 bash 时，把选项改成 `--shell bash`。安装后打开新终端，或加载命令输出中列出的环境文件，就能直接使用 `akari`。这个命令绑定当前仓库路径；移动仓库后需要重新安装。

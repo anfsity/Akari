@@ -19,7 +19,7 @@ From the repository root, use `fvm dart run tool/akari.dart COMMAND`. After
 | `generate-scenes` | Generate typed Dart from scene JSON | `--theme` |
 | `verify-perf` / `perf` | Run the theme's declared performance gate | `--theme`, arguments after `--` |
 | `trace-perf` / `trace` | Run the theme's declared performance trace | `--theme`, arguments after `--` |
-| `install` | Install the repository-bound launcher and completion | `--shell`, `--prefix`, `--rc` |
+| `install cli` | Install the repository-bound launcher and completion | `--shell`, `--prefix`, `--rc` |
 | `completion` | Print a completion script | `--shell` |
 | `greetd-test` | Manage standalone login testing | [Operation-specific options](../guides/greetd-testing.md) |
 
@@ -61,9 +61,9 @@ fvm dart run tool/akari.dart perf -t themes/default -- --cycles 5
 Install a repository-bound `akari` command and shell completion at user level:
 
 ```sh
-fvm dart run tool/akari.dart install --shell zsh
+fvm dart run tool/akari.dart install cli --shell zsh
 # Or, for bash:
-fvm dart run tool/akari.dart install --shell bash
+fvm dart run tool/akari.dart install cli --shell bash
 ```
 
 The launcher is written to `~/.local/bin/akari` and completion support to
@@ -73,7 +73,7 @@ Open a new shell or source the printed environment script to activate it.
 The launcher works from any directory, preserves relative argument paths, and
 uses the repository SDK and its `AKARI_*_BIN` overrides. Its repository must
 remain available at the installed path; reinstall after moving the repository.
-`install --prefix PATH --rc PATH` selects installation and startup file locations.
+`install cli --prefix PATH --rc PATH` selects installation and startup file locations.
 
 Completion covers commands and aliases, command-specific long and short options,
 enum values, and paths. It stops after `--`, where arguments belong to the theme.

@@ -46,7 +46,7 @@ Future<void> main(List<String> arguments) async {
     }
 
     final repoRoot = _findRepoRoot();
-    if (command == 'install' || command == 'completion') {
+    if (command == 'install cli' || command == 'completion') {
       final values = getCliOptionValues(definition, commandArguments);
       final shell = values['--shell'] ?? 'zsh';
       if (command == 'completion') {
