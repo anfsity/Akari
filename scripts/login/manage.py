@@ -94,7 +94,7 @@ def create_installation(source, bundle, backend, layout):
         greeter = pwd.getpwnam(GREETER)
     if greeter.pw_uid == 0:
         raise ValueError('The greeter account must be unprivileged.')
-    for directory in [STATE, LOGS.parent, CONFIGURATION, INSTALLATION / 'releases']:
+    for directory in [STATE, LOGS.parent, CONFIGURATION, INSTALLATION, INSTALLATION / 'releases']:
         directory.mkdir(parents=True, exist_ok=True)
         directory.chmod(0o755)
     for directory in [STATE / 'greeter', LOGS]:
