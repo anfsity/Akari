@@ -186,6 +186,11 @@ void main() {
     await tester.tap(find.byTooltip('Choose account'));
     await tester.pumpAndSettle();
     final menuLabelHeight = tester.getRect(find.text('Alice')).height;
+    final menuRowHeight = tester
+        .getRect(
+          find.byWidgetPredicate((widget) => widget is PopupMenuItem).first,
+        )
+        .height;
     await tester.tap(find.text('Alice'));
     await tester.pumpAndSettle();
     final accountHeight = tester.getRect(find.text('Alice')).height;
@@ -220,7 +225,7 @@ void main() {
               find.byWidgetPredicate((widget) => widget is PopupMenuItem).first,
             )
             .height,
-        closeTo(48 * scale, .01),
+        closeTo(menuRowHeight * scale, .01),
       );
       if (tooltip == 'Choose account') {
         expect(
