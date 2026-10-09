@@ -42,6 +42,22 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(await completeBashWords(['akari', 'run', 'st']), ['studio']);
     expect(await completeBashWords(['akari', 'run', '']), ['sway', 'studio']);
     expect(await completeBashWords(['akari', 'run', 'sw']), ['sway']);
+    expect(await completeBashWords(['akari', 'install', 'c']), ['cli']);
+    expect(await completeBashWords(['akari', 'install', '--t']), ['--theme']);
+    expect(await completeBashWords(['akari', 'install', 'cli', '--s']), [
+      '--shell',
+    ]);
+    expect(await completeBashWords(['akari', 'login', '']), [
+      'enable',
+      'disable',
+      'rollback',
+      'status',
+      'logs',
+    ]);
+    expect(
+      await completeBashWords(['akari', 'login', 'logs', '--component', 'b']),
+      ['backend'],
+    );
     expect(
       await completeBashWords([
         'akari',
@@ -129,10 +145,9 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       ]),
       ['theme with spaces'],
     );
-    expect(
-      await completeBashWords(['akari', 'verify', '--report', 'report']),
-      ['report with spaces.json'],
-    );
+    expect(await completeBashWords(['akari', 'verify', '--report', 'report']), [
+      'report with spaces.json',
+    ]);
     expect(
       await completeBashWords(['akari', 'verify', '-t', 'report']),
       isEmpty,
@@ -160,10 +175,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     ]);
     expect(buffers[5].trimRight(), 'akari run studio');
     expect(buffers[6].trimRight(), 'akari run studio --theme=');
-    expect(
-      buffers[7].trimRight(),
-      r'akari run studio -t theme\ with\ spaces/',
-    );
+    expect(buffers[7].trimRight(), r'akari run studio -t theme\ with\ spaces/');
     expect(buffers[8].trimRight(), r'akari build -t theme\ with\ spaces/');
     expect(buffers[9].trimRight(), 'akari greetd-test restore');
     expect(buffers[10].trimRight(), 'akari greetd-test start --log-dir=');

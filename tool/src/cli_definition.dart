@@ -90,13 +90,13 @@ const cliOptions = {
   '--help': CliOption('--help', 'Show help.', short: '-h'),
   '--shell': CliOption(
     '--shell',
-    'Shell for completion (install default: zsh).',
+    'Shell for completion (install cli default: zsh).',
     valueName: 'SHELL',
     values: ['zsh', 'bash'],
   ),
   '--prefix': CliOption(
     '--prefix',
-    'Installation prefix (default: ~/.local).',
+    'Shell launcher installation prefix (default: ~/.local).',
     valueName: 'PATH',
     directory: true,
   ),
@@ -161,6 +161,12 @@ const cliOptions = {
     valueName: 'COUNT',
   ),
   '--follow': CliOption('--follow', 'Follow the selected log.', short: '-f'),
+  '--component': CliOption(
+    '--component',
+    'Production log component (default: service journal).',
+    valueName: 'NAME',
+    values: ['service', 'backend', 'flutter', 'sway'],
+  ),
 };
 
 const cliCommands = [
@@ -223,9 +229,56 @@ const cliCommands = [
     forwardsArguments: true,
   ),
   CliCommand(
+    'install',
+    'Build and install the production login environment without switching services.',
+    options: ['--theme', '--jobs', '--dry-run'],
+    reportsRun: false,
+  ),
+  CliCommand(
     'install cli',
     'Install the akari launcher and shell completion.',
     options: ['--shell', '--prefix', '--rc'],
+    reportsRun: false,
+  ),
+  CliCommand(
+    'uninstall',
+    'Remove an inactive production installation; retain preferences and logs.',
+    options: ['--dry-run'],
+    reportsRun: false,
+  ),
+  CliCommand(
+    'login',
+    'Manage the production login service.',
+    reportsRun: false,
+  ),
+  CliCommand(
+    'login enable',
+    'Select Akari for the next boot and save the previous login service.',
+    options: ['--dry-run'],
+    reportsRun: false,
+  ),
+  CliCommand(
+    'login disable',
+    'Restore the previous login service for the next boot.',
+    options: ['--dry-run'],
+    reportsRun: false,
+  ),
+  CliCommand(
+    'login rollback',
+    'Select the previous installed release for the next greeter launch.',
+    options: ['--dry-run'],
+    reportsRun: false,
+  ),
+  CliCommand(
+    'login status',
+    'Show the installed release, boot login service and runtime state.',
+    options: ['--format'],
+    reportsRun: false,
+  ),
+  CliCommand(
+    'login logs',
+    'Read the production service journal or newest greeter logs.',
+    options: ['--component', '--lines', '--follow'],
     reportsRun: false,
   ),
   CliCommand(

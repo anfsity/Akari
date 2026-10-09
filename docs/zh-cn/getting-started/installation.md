@@ -39,3 +39,7 @@ fvm dart run tool/akari.dart install cli --shell zsh
 使用 bash 时，把选项改成 `--shell bash`。安装后打开新终端，或加载命令输出中列出的环境文件，就能直接使用 `akari`。这个命令绑定当前仓库路径；移动仓库后需要重新安装。
 
 接下来阅读[快速开始](quick-start.md)。如需使用其他 SDK 路径，请参阅 [CLI 参考](../reference/cli.md)。
+
+## 用 Akari 管理开机登录
+
+安装 systemd、greetd 和 Sway 后，以普通用户运行 `akari install` 构建并部署正式环境，再运行 `akari login enable` 选择下次开机使用 Akari。这两个命令都不会停止当前桌面。依赖、配置、日志及恢复原显示管理器的说明见[正式登录安装](../reference/cli.md#production-login-installation)。

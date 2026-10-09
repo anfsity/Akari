@@ -19,6 +19,11 @@ Test behavior that matters: scene validation, state transitions, attempt isolati
 slot notifications, focus and keyboard interaction, resource lifetime, and
 performance. Avoid tests that encode exact visual placement.
 
+`test/login_cli_test.dart` also runs `test/support/login_workflow_test.py`.
+These checks simulate systemd and account boundaries while exercising deployment,
+failed switches, restoration, rollback, permissions and greeter child cleanup.
+They do not change the host's display manager or replace manual DRM/PAM testing.
+
 ## Mock integration
 
 ```sh

@@ -48,3 +48,11 @@ reinstall it after moving the repository.
 
 Proceed to the [quick start](quick-start.md). For alternate SDK locations, see
 the [CLI reference](../reference/cli.md).
+
+## Use Akari for boot login
+
+With systemd, greetd and Sway installed, run `akari install` as your regular user
+to build and deploy the production environment. Then run `akari login enable`
+to select it for the next boot. Neither command stops the current desktop.
+See [production login installation](../reference/cli.md#production-login-installation)
+for prerequisites, configuration, logs and restoration of the previous manager.
