@@ -208,13 +208,17 @@ class _TerraceMenuState<T> extends State<_TerraceMenu<T>> {
     final navigator = Navigator.of(context);
     final overlay = navigator.overlay!.context.findRenderObject()! as RenderBox;
     final button = context.findRenderObject()! as RenderBox;
-    final anchor =
-        button.localToGlobal(Offset.zero, ancestor: overlay) & button.size;
+    final anchor = MatrixUtils.transformRect(
+      button.getTransformTo(overlay),
+      Offset.zero & button.size,
+    );
+    final scale = anchor.width / button.size.width;
     setState(() => _open = true);
     await navigator.push(
       _TerraceChoiceRoute<T>(
         anchor: anchor,
-        width: widget.minWidth,
+        width: widget.minWidth * scale,
+        scale: scale,
         entries: widget.entries,
         label: widget.tooltip,
         barrierLabel: MaterialLocalizations.of(context)
@@ -247,6 +251,7 @@ class _TerraceChoiceRoute<T> extends PopupRoute<T> {
   _TerraceChoiceRoute({
     required this.anchor,
     required this.width,
+    required this.scale,
     required this.entries,
     required this.label,
     required this.barrierLabel,
@@ -259,6 +264,7 @@ class _TerraceChoiceRoute<T> extends PopupRoute<T> {
 
   final Rect anchor;
   final double width;
+  final double scale;
   final List<PopupMenuEntry<T>> entries;
   final String label;
   final CapturedThemes themes;
@@ -292,42 +298,65 @@ class _TerraceChoiceRoute<T> extends PopupRoute<T> {
             width,
             MediaQuery.paddingOf(context),
           ),
-          child: Shortcuts(
-            shortcuts: const {
-              SingleActivator(LogicalKeyboardKey.arrowDown): NextFocusIntent(),
-              SingleActivator(LogicalKeyboardKey.arrowUp):
-                  PreviousFocusIntent(),
-            },
-            child: FadeTransition(
-              opacity: animation.drive(
-                CurveTween(
-                  curve: const Interval(0, 0.55, curve: Curves.easeOutCubic),
+          // The overlay sits outside the scaled scene. Convert its limits to
+          // authored units so popup rows share the selector's visual scale.
+          child: LayoutBuilder(
+            builder: (context, constraints) => FittedBox(
+              alignment: Alignment.topLeft,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: constraints.minWidth / scale,
+                  maxWidth: constraints.maxWidth / scale,
+                  maxHeight: constraints.maxHeight / scale,
                 ),
-              ),
-              child: ScaleTransition(
-                alignment: Alignment.topLeft,
-                scale: Tween<double>(begin: 0.94, end: 1).animate(
-                  animation.drive(CurveTween(curve: Curves.easeOutBack)),
-                ),
-                child: Material(
-                  color: popup.color,
-                  shape: popup.shape,
-                  clipBehavior: Clip.antiAlias,
-                  textStyle: popup.textStyle,
-                  child: Semantics(
-                    role: SemanticsRole.menu,
-                    scopesRoute: true,
-                    namesRoute: true,
-                    label: label,
-                    explicitChildNodes: true,
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(6),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          for (var index = 0; index < entries.length; index++)
-                            _createEntryTransition(animation, index),
-                        ],
+                child: Shortcuts(
+                  shortcuts: const {
+                    SingleActivator(LogicalKeyboardKey.arrowDown):
+                        NextFocusIntent(),
+                    SingleActivator(LogicalKeyboardKey.arrowUp):
+                        PreviousFocusIntent(),
+                  },
+                  child: FadeTransition(
+                    opacity: animation.drive(
+                      CurveTween(
+                        curve: const Interval(
+                          0,
+                          0.55,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      ),
+                    ),
+                    child: ScaleTransition(
+                      alignment: Alignment.topLeft,
+                      scale: Tween<double>(begin: 0.94, end: 1).animate(
+                        animation.drive(CurveTween(curve: Curves.easeOutBack)),
+                      ),
+                      child: Material(
+                        color: popup.color,
+                        shape: popup.shape,
+                        clipBehavior: Clip.antiAlias,
+                        textStyle: popup.textStyle,
+                        child: Semantics(
+                          role: SemanticsRole.menu,
+                          scopesRoute: true,
+                          namesRoute: true,
+                          label: label,
+                          explicitChildNodes: true,
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(6),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                for (
+                                  var index = 0;
+                                  index < entries.length;
+                                  index++
+                                )
+                                  _createEntryTransition(animation, index),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
