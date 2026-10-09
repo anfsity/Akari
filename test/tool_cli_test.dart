@@ -643,6 +643,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
   test(
     'json format writes only the machine-readable run report to stdout',
     () async {
+      final theme = await _createThemeProject(tempRoot);
       final fakeDart = File('${tempRoot.path}/dart');
       await fakeDart.writeAsString(
         '#!/bin/sh\nprintf "fake sdk stdout\\n"\nprintf "fake sdk stderr\\n" >&2\n',
@@ -651,7 +652,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
       expect(chmod.exitCode, 0, reason: chmod.stderr.toString());
 
       final result = await _runTool(
-        ['generate-scenes', '--format', 'json'],
+        ['generate-scenes', '--theme', theme.path, '--format', 'json'],
         environment: {'AKARI_DART_BIN': fakeDart.path},
       );
       expect(result.exitCode, 0, reason: result.stderr);
@@ -668,7 +669,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         }
       });
       final steps = (report['steps'] as List).cast<Map<String, dynamic>>();
-      expect(steps, hasLength(2));
+      expect(steps, hasLength(1));
       for (final step in steps) {
         final stdoutLog = File(
           '${Directory.current.path}/${step['stdout_log']}',
