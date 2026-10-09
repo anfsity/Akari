@@ -5,6 +5,7 @@ set -euo pipefail
 export AKARI_RELEASE="$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")"
 umask 022
 export AKARI_LOG_DIR="$(mktemp -d /var/log/akari/greeter/session-XXXXXXXX)"
+chmod 0755 "$AKARI_LOG_DIR"
 export AKARI_BACKEND_MODE=real
 export AKARI_BACKEND_BIN="$AKARI_RELEASE/backend"
 export AKARI_APP="$AKARI_RELEASE/frontend/greeter"
