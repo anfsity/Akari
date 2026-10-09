@@ -13,6 +13,12 @@ retain prompt handling, password masking, authentication recovery and power
 actions. Escape closes a menu first; otherwise it returns to dormant mode and
 clears credentials. Tab follows account → desktop → credential → continue → power.
 
+Sway is the visual reference for both dormant and login modes. Components scale
+from their authored scene bounds, keeping text and icons proportional to the
+composition rather than fixed at small logical sizes on larger Sway viewports.
+Choice menus anchor to the visible controls, and their native popup text uses
+the Material 3 label style.
+
 From the repository root:
 
 ```sh

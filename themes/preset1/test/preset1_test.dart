@@ -71,6 +71,31 @@ void main() {
     });
   }
 
+  testWidgets('native controls keep their proportions in the Sway viewport', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.view.physicalSize = const Size(1920, 1080);
+    await _mount(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await _advance(tester);
+    await _select(tester, 'Choose account', 'Alice');
+    final labelHeight = tester.getRect(find.text('Alice')).height;
+    final iconHeight = tester.getRect(find.byIcon(Icons.arrow_forward)).height;
+    tester.view.physicalSize = const Size(2467, 1580);
+    await _advance(tester);
+    expect(
+      tester.getRect(find.text('Alice')).height / 2467,
+      closeTo(labelHeight / 1920, .0001),
+    );
+    expect(
+      tester.getRect(find.byIcon(Icons.arrow_forward)).height / 2467,
+      closeTo(iconHeight / 1920, .0001),
+    );
+  });
+
   testWidgets(
     'popup Escape, account changes and interrupted wake preserve input ownership',
     (tester) async {
