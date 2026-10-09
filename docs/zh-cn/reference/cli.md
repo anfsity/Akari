@@ -61,7 +61,7 @@ fvm dart run tool/akari.dart install --shell bash
 
 补全支持命令、别名、各命令的长短选项、可选值和路径。遇到 `--` 后便会停止补全，因为之后的参数属于主题。解析器、帮助文本和生成脚本共用 `tool/src/cli_definition.dart`。修改该定义后需重新安装，刷新已安装的补全脚本。手动注册时，运行 `akari completion --shell zsh` 或 `--shell bash` 会输出对应脚本。
 
-独立登录测试使用 `akari greetd-test install`、`start`、`restore`、`status` 和 `logs`。此命令组直接调用已安装的测试生命周期脚本，将诊断信息保存在仓库运行报告之外。只有安装操作需要仓库构建产物；状态/日志查询和服务控制不会获取主题锁，也不会创建开发运行目录。`akari` 启动器本身仍需要仓库和 SDK。紧急恢复命令 `sudo /opt/akari-test/restore.sh` 可独立于二者运行。操作选项和前置条件见[独立 greetd 测试](../guides/greetd-testing.md)。
+独立登录测试使用 `akari greetd-test install`、`start`、`restore`、`status` 和 `logs`。此命令组直接调用已安装的测试生命周期脚本，将诊断信息保存在仓库运行报告之外。`greetd-test install --theme PATH`（或 `-t PATH`）会构建并安装所选主题项目，默认使用仓库的 `themes/default`。只有安装操作需要仓库构建产物；状态/日志查询和服务控制不会获取主题锁，也不会创建开发运行目录。`akari` 启动器本身仍需要仓库和 SDK。紧急恢复命令 `sudo /opt/akari-test/restore.sh` 可独立于二者运行。操作选项和前置条件见[独立 greetd 测试](../guides/greetd-testing.md)。
 
 ## 构建、预览和运行
 

@@ -21,9 +21,12 @@ description: 构建和安装真实登录测试工具、捕获显示器信息、�
 
 ```sh
 akari greetd-test install
+akari greetd-test install --theme themes/preset1
 ```
 
-安装命令会先以 Linux release 模式构建默认主题和正式版后端，使用四个并行任务。若从 sudo 命令运行，使用 sudo 的调用者构建；若直接以 root 运行，则使用仓库所有者构建，以便 SDK 和仓库缓存仍归该用户所有。SDK 选择遵循相同的仓库配置和 CLI 覆盖项 `AKARI_FLUTTER_BIN` / `AKARI_DART_BIN`。构建失败时会在修改任何已安装文件或备份前中止。
+通过 `--theme PATH`（或 `-t PATH`）选择主题项目，默认使用当前仓库的 `themes/default`。相对路径以命令调用目录为准，也支持仓库外的主题项目。`start` 使用已安装的主题；切换主题时重新运行 `install` 并指定所需项目。
+
+安装命令会先以 Linux release 模式构建所选主题和正式版后端，使用四个并行任务。若从 sudo 命令运行，使用 sudo 的调用者构建；若直接以 root 运行，则使用仓库所有者构建，以便 SDK 和仓库缓存仍归该用户所有。SDK 选择遵循相同的仓库配置和 CLI 覆盖项 `AKARI_FLUTTER_BIN` / `AKARI_DART_BIN`。构建失败时会在修改任何已安装文件或备份前中止。
 
 构建成功后，安装器会将旧前端、后端、脚本和配置备份到 `/opt/akari-test/backups/` 下。它不会切换显示管理器。安装器要求现有测试环境中包含 `greeter` 账户和可写目录 `/opt/akari-test/state`。
 
