@@ -35,7 +35,7 @@ akari greetd-test install
 akari greetd-test start
 ```
 
-启动前会通过 `SUDO_TTY` 检查你所在的终端，即使 sudo 创建了 PTY 也能正确识别。它会拒绝仍有图形用户会话运行的情况（忽略正在关闭的会话）、检查 SDDM 启动配置，并在修改服务前记录诊断信息。停止 SDDM 前会先启用恢复机制。设置失败时会立即恢复；测试服务退出时由 systemd 的 `ExecStopPost` 恢复；服务运行期间另有一个独立的十分钟计时器兜底。登录成功后，登录界面会退出，greetd 继续管理用户桌面会话。
+启动前会检查 SDDM 启动配置，并在修改服务前记录诊断信息；不会检测调用者终端或登录会话。停止 SDDM 前会先启用恢复机制。设置失败时会立即恢复；测试服务退出时由 systemd 的 `ExecStopPost` 恢复；服务运行期间另有一个独立的十分钟计时器兜底。登录成功后，登录界面会退出，greetd 继续管理用户桌面会话。
 
 要手动恢复，请切换到 tty3 并运行：
 
@@ -49,7 +49,7 @@ akari greetd-test restore
 sudo /opt/akari-test/restore.sh
 ```
 
-CLI、计时器和退出回调共用这一套恢复实现。`install`、`start` 和 `restore` 接受 `--dry-run`，只打印将要执行的命令，不会请求 sudo 或修改文件。真正执行 `start` 时仍会运行前置检查。CLI 不会更改 TTY 或活动桌面要求。
+CLI、计时器和退出回调共用这一套恢复实现。`install`、`start` 和 `restore` 接受 `--dry-run`，只打印将要执行的命令，不会请求 sudo 或修改文件。真正执行 `start` 时仍会运行前置检查。
 
 使用以下命令检查已安装资源、SDDM、测试服务、恢复计时器和日志路径：
 

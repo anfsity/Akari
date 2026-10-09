@@ -41,23 +41,7 @@ exec > >(tee -a "$run_dir/start.log") 2>&1
 trap 'status=$?; printf "Startup failed at line %s (status %s).\n" "$LINENO" "$status"; exit "$status"' ERR
 printf 'Test logs: %s\nStartup log: %s/start.log\n' "$run_dir" "$run_dir"
 
-# sudo may give the command a PTY. SUDO_TTY identifies the invoking console.
-terminal="${SUDO_TTY:-$(tty 2>/dev/null || true)}"
-printf 'Started at %s; caller terminal: %s\n' "$(date --iso-8601=seconds)" "$terminal"
-case "$terminal" in
-  /dev/tty[2-6]) ;;
-  *) echo 'Log out of the desktop, log in on tty3, and start the test there.'; exit 1 ;;
-esac
-
-for session in $(loginctl list-sessions --no-legend --no-pager | awk '{print $1}'); do
-  properties="$(loginctl show-session "$session" -p Class -p Type -p State)"
-  printf 'Session %s:\n%s\n' "$session" "$properties"
-  if [[ "$properties" == *'Class=user'* && "$properties" != *'State=closing'* ]] &&
-     [[ "$properties" == *'Type=wayland'* || "$properties" == *'Type=x11'* ]]; then
-    echo "Desktop session $session is still running. Log out before testing."
-    exit 1
-  fi
-done
+printf 'Started at %s\n' "$(date --iso-8601=seconds)"
 
 if [[ "$(systemctl get-default)" != graphical.target ]] ||
    [[ "$(systemctl is-enabled sddm.service)" != enabled ]] ||

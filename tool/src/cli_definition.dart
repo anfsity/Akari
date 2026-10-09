@@ -247,7 +247,7 @@ const cliCommands = [
   ),
   CliCommand(
     'greetd-test start',
-    'Check the TTY and desktop, arm recovery and start the test service.',
+    'Check service configuration, arm recovery and start the test service.',
     options: ['--scale', '--log-dir', '--dry-run'],
     reportsRun: false,
   ),

@@ -45,9 +45,8 @@ if name == 'systemctl':
 elif name == 'systemd-run':
     if '--unit=akari-restore' in args: (root / 'timer').touch()
     if '--unit=akari-test' in args and os.environ.get('FAIL_START'): sys.exit(1)
-elif name == 'loginctl':
-    if args[0] == 'list-sessions': print('11 1000 alice seat0 tty3')
-    else: print(os.environ.get('SESSION', 'Class=user\\nType=tty\\nState=active'))
+elif name in ['loginctl', 'tty']:
+    sys.exit('Startup must not probe login sessions or the caller terminal.')
 elif name == 'readlink':
     print('/usr/lib/systemd/system/sddm.service' if args[-1] ==
           '/etc/systemd/system/display-manager.service' else
@@ -70,7 +69,7 @@ elif name == 'journalctl': print('test journal')
 elif name == 'sway': print('test compositor output')
 ''')
         handler.chmod(0o755)
-        for name in ["systemctl", "systemd-run", "loginctl", "readlink", "install", "runuser", "journalctl", "sway"]:
+        for name in ["systemctl", "systemd-run", "loginctl", "tty", "readlink", "install", "runuser", "journalctl", "sway"]:
             (self.bin / name).symlink_to(handler)
         for name in ["start.sh", "restore.sh", "launch.sh"]:
             script = (SOURCE / name).read_text()
@@ -88,7 +87,6 @@ elif name == 'sway': print('test compositor output')
             **os.environ,
             "PATH": f"{self.bin}:{os.environ['PATH']}",
             "TEST_ROOT": str(self.root),
-            "SUDO_TTY": "/dev/tty3",
             "SUDO_USER": pwd.getpwuid(os.getuid()).pw_name,
         }
 
@@ -105,16 +103,17 @@ elif name == 'sway': print('test compositor output')
         path = self.root / "calls"
         return path.read_text() if path.exists() else ""
 
-    def test_start_uses_sudo_tty_and_arms_recovery_first(self):
-        result = self.run_script("start.sh", "--scale", "1.5")
+    def test_start_skips_session_and_terminal_probes_and_arms_recovery_first(self):
+        result = self.run_script("start.sh", "--scale", "1.5", SUDO_TTY="/dev/pts/2")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         calls = self.calls()
+        self.assertNotIn('loginctl ', calls)
+        self.assertNotIn('tty ', calls)
         self.assertLess(calls.index('--unit=akari-restore'), calls.index('stop sddm.service'))
         self.assertLess(calls.index('stop sddm.service'), calls.index('--unit=akari-test'))
         self.assertIn('restore.sh --service-stopped', calls)
         current = self.logs / "current"
         self.assertIn('output * scale 1.5', (current / 'sway.conf').read_text())
-        self.assertIn('/dev/tty3', (current / 'start.log').read_text())
         self.assertEqual(json.loads((current / "config.json").read_text()),
                          {"scale": 1.5, "logRoot": str(self.logs), "source": "greetd-login"})
         self.assertEqual((current / "start.log").stat().st_mode & 0o777, 0o644)
@@ -137,8 +136,6 @@ elif name == 'sway': print('test compositor output')
 
     def test_preflight_rejections_do_not_stop_sddm(self):
         for args, environment in [
-            ([], {"SUDO_TTY": "/dev/pts/2"}),
-            ([], {"SESSION": "Class=user\nType=wayland\nState=active"}),
             (["--scale", "0"], {}),
             (["--scale", "1; exit 0"], {}),
             (["--log-dir", "relative/logs"], {}),
@@ -149,16 +146,12 @@ elif name == 'sway': print('test compositor output')
                 self.assertNotEqual(result.returncode, 0)
                 self.assertNotIn('stop sddm.service', self.calls())
 
-    def test_closing_desktop_session_does_not_block_test(self):
-        result = self.run_script("start.sh", SESSION="Class=user\nType=wayland\nState=closing")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
     def test_failed_attempt_is_discoverable_without_replacing_recovery_run(self):
         self.assertEqual(self.run_script("start.sh").returncode, 0)
         runs = self.logs
         armed_run = (runs / "current").resolve()
 
-        result = self.run_script("start.sh", SUDO_TTY="/dev/pts/2")
+        result = self.run_script("start.sh")
         self.assertNotEqual(result.returncode, 0)
         latest_run = (runs / "latest").resolve()
         self.assertNotEqual(latest_run, armed_run)
@@ -168,7 +161,7 @@ elif name == 'sway': print('test compositor output')
         self.assertEqual((self.root / f"latest-run-{uid}").resolve(), latest_run)
         self.assertIn(f"Test logs: {latest_run}", result.stdout)
         self.assertIn(f"Startup log: {latest_run}/start.log", result.stdout)
-        self.assertIn("Log out of the desktop", (latest_run / "start.log").read_text())
+        self.assertIn("akari-restore.timer is already active", (latest_run / "start.log").read_text())
         self.assertEqual(latest_run.stat().st_mode & 0o777, 0o755)
         self.assertEqual((latest_run / "start.log").stat().st_mode & 0o777, 0o644)
 
