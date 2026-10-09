@@ -14,6 +14,8 @@ fvm dart run tool/akari.dart verify --theme themes/fallback
 
 测试应覆盖场景校验、状态转换、登录尝试隔离、slot 通知、焦点、键盘交互、资源释放和性能。不要让测试依赖固定的像素位置。
 
+`test/login_cli_test.dart` 也会运行 `test/support/login_workflow_test.py`，模拟 systemd 和账户边界，检查正式部署、切换失败、恢复、版本回退、权限及登录子进程清理。这些检查不会修改主机显示管理器；DRM 和 PAM 行为仍通过实际登录验证。
+
 ## 测试前后端交互
 
 ```sh

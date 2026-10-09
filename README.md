@@ -67,6 +67,20 @@ Rust backend at `build/out/backend`. Keep the full Flutter bundle together when
 distributing it. For real login testing, follow the
 [greetd testing guide](docs/guides/greetd-testing.md).
 
+To use Akari as the default login screen on a systemd host with greetd and Sway:
+
+```sh
+fvm dart run tool/akari.dart install --theme themes/default
+fvm dart run tool/akari.dart login enable
+```
+
+Installation builds as your regular user and requests sudo for deployment.
+Enabling selects Akari for the next boot; the current desktop keeps running.
+`login disable` restores the previous boot login service. See
+[production deployment](docs/reference/cli.md#production-login-installation)
+for configuration, logs, rollback, and recovery. The user-level shell launcher
+and completion are installed separately with `install cli --shell zsh`.
+
 See the [CLI reference](docs/reference/cli.md) for options, nested Sway sessions,
 and the optional `akari` shell launcher.
 

@@ -20,11 +20,17 @@ description: 查命令、选项、显示配置和运行报告。
 | `generate-scenes` | 从场景 JSON 生成类型化 Dart | `--theme` |
 | `verify-perf` / `perf` | 运行主题声明的性能检查 | `--theme`、`--` 后的参数 |
 | `trace-perf` / `trace` | 运行主题声明的性能跟踪 | `--theme`、`--` 后的参数 |
+| `install` | 构建并部署正式登录环境 | `--theme`、`--jobs`、`--dry-run` |
 | `install cli` | 安装绑定到当前仓库的启动器和补全脚本 | `--shell`、`--prefix`、`--rc` |
+| `uninstall` | 卸载已停止运行的正式环境 | `--dry-run` |
+| `login enable` / `login disable` | 选择 Akari 或恢复原来的开机登录服务 | `--dry-run` |
+| `login rollback` | 选择上一个已安装版本 | `--dry-run` |
+| `login status` | 查看安装和服务状态 | `--format` |
+| `login logs` | 查看服务 journal 或最新登录界面日志 | `--component`、`--lines`、`--follow` |
 | `completion` | 输出命令补全脚本 | `--shell` |
 | `greetd-test` | 管理独立登录测试 | [各操作的选项](../guides/greetd-testing.md) |
 
-构建、预览、运行目标、验证、场景生成和性能命令还接受 `--format text|json`、`--report PATH` 和 `--dry-run`。所有命令都接受 `--help`（`-h`）。`install`、`completion` 和 `greetd-test` 命令组有各自的输出和选项约定。
+构建、预览、运行目标、验证、场景生成和性能命令还接受 `--format text|json`、`--report PATH` 和 `--dry-run`。所有命令都接受 `--help`（`-h`）。安装、`login`、`completion` 和 `greetd-test` 命令组有各自的输出和选项约定。
 
 `run sway` 和 `run studio` 是 `run` 的目标；使用 `akari run TARGET --help` 查看它们支持的选项。Studio 始终以 debug 模式运行且不启动后端，不接受 `--mode` 或 `--backend`。它的开发用户指南暂存于仓库的 [Studio 说明](https://github.com/anfsity/Akari/blob/main/docs/internal/theme-studio.md)。
 
@@ -44,6 +50,48 @@ fvm dart run tool/akari.dart trace-perf
 fvm dart run tool/akari.dart build -t themes/default -m release -j 4
 fvm dart run tool/akari.dart perf -t themes/default -- --cycles 5
 ```
+
+<a id="production-login-installation"></a>
+
+## 安装正式登录环境
+
+`install` 现在用于部署正式登录环境。原来的启动器安装改为 `install cli`；`install --shell` 不再接受。请在使用 systemd 的 Linux 主机上，以普通用户运行安装命令。运行环境需要 `/usr/bin/greetd`、`/usr/bin/sway`、Python 3、`swaymsg`、`dbus-run-session` 和 `busctl`。通过发行版安装 greetd 的 `/etc/pam.d/greetd`；Akari 使用这份 PAM 策略，不修改认证规则。
+
+```sh
+akari install --theme themes/default --jobs 4
+akari login enable
+akari login status
+```
+
+`install` 先以 Linux release 模式构建所选主题和正式版后端，再请求 sudo 部署完整 Flutter 程序包和 Rust 可执行文件。构建失败时不会修改已安装环境。相对主题路径以命令调用目录为准；SDK 选择遵循普通构建命令，包括 `AKARI_FLUTTER_BIN` 和 `AKARI_DART_BIN`。
+
+安装会创建独立的 `akari-greeter` 系统账户，将各版本放到 `/opt/akari/releases/`，用 `current` 符号链接选择运行版本。`akari.service` 使用 `/etc/akari/greetd.toml` 启动 greetd，登录界面使用 `/etc/akari/sway.conf` 在 Sway 内运行。原有 `/etc/greetd/config.toml` 和 `/opt/akari-test` 测试资源不变。登录偏好保存在 `/var/lib/akari/greeter/`。
+
+安装不会切换开机登录服务。`login enable` 要求现有默认 target 为 `graphical.target`，先保存原显示管理器的符号链接和启用状态，再启用 `akari.service` 替代它。它不启动、停止或重启任何服务；准备好后重启系统使用 Akari。`login disable` 恢复已记录的开机登录服务，同样不会中断当前桌面。切换失败时会立即尝试恢复；若恢复也失败，保留快照，可再次运行 `login disable`。
+
+首次安装会在可用时捕获当前 Sway 或 Hyprland 的显示器顺序。后续安装保留 `/etc/akari` 下的配置，包括 `display-layout.json`。可在 `sway.conf` 配置显示模式和缩放，在 `display-layout.json` 配置输出名称顺序及 `x` 或 `y` 排列轴。如果没有捕获布局，则使用 Sway 自动排列。
+
+```sh
+akari login logs
+akari login logs --component backend --lines 200
+akari login logs --component flutter --follow
+akari login status --format json
+akari login rollback
+akari login disable
+akari uninstall
+```
+
+`login logs` 默认读取 `akari.service` 的 journal，访问权限由主机配置决定。`backend`、`flutter` 和 `sway` 读取 `/var/log/akari/greeter/session-*/` 下最新一次登录界面的日志，无需 sudo。`--follow` 跟踪选中的这次会话文件。每次登录界面启动都会创建独立日志。后端、前端和合成器使用私有总线；前端退出或后端断开时释放 Sway，让 greetd 启动桌面或重新提供登录界面。
+
+重新安装会保留旧版本，在部署成功后切换 `current`。`login rollback` 交换 `current` 和 `previous`，下一次启动登录界面时使用所选版本；已经运行的登录界面继续使用原版本。回退不修改系统配置和偏好。旧版本与会话日志会保留在磁盘上。`uninstall` 要求服务已停止运行，恢复已记录的开机登录服务，并删除部署产物和 `/etc/akari` 配置；账户、偏好和日志保留。
+
+`install`、`uninstall`、`login enable`、`login disable` 和 `login rollback` 接受 `--dry-run`，只输出 JSON 计划，不构建、不请求 sudo，也不修改文件。状态和日志操作只读。CLI 启动器仍依赖仓库和 SDK，已安装的登录服务独立运行。在 TTY 中恢复时，也可以直接调用已安装的控制器：
+
+```sh
+sudo python3 /opt/akari/manage.py disable
+```
+
+这会恢复下一次开机的登录服务；随后重启系统，退出当前由 Akari 管理的会话并回到原显示管理器。
 
 <a id="shell-launcher-and-completion"></a>
 

@@ -19,14 +19,20 @@ From the repository root, use `fvm dart run tool/akari.dart COMMAND`. After
 | `generate-scenes` | Generate typed Dart from scene JSON | `--theme` |
 | `verify-perf` / `perf` | Run the theme's declared performance gate | `--theme`, arguments after `--` |
 | `trace-perf` / `trace` | Run the theme's declared performance trace | `--theme`, arguments after `--` |
+| `install` | Build and deploy the production login environment | `--theme`, `--jobs`, `--dry-run` |
 | `install cli` | Install the repository-bound launcher and completion | `--shell`, `--prefix`, `--rc` |
+| `uninstall` | Remove an inactive production installation | `--dry-run` |
+| `login enable` / `login disable` | Select Akari or restore the previous boot login service | `--dry-run` |
+| `login rollback` | Select the previous installed release | `--dry-run` |
+| `login status` | Inspect deployment and service state | `--format` |
+| `login logs` | Read the service journal or latest greeter logs | `--component`, `--lines`, `--follow` |
 | `completion` | Print a completion script | `--shell` |
 | `greetd-test` | Manage standalone login testing | [Operation-specific options](../guides/greetd-testing.md) |
 
 Build, preview, run targets, verification, scene generation, and performance
 commands also accept `--format text|json`, `--report PATH`, and `--dry-run`.
-Every command accepts `--help` (`-h`). `install`, `completion`, and the
-`greetd-test` family use their own output and option contracts.
+Every command accepts `--help` (`-h`). Installation, `login`, `completion`, and
+the `greetd-test` family use their own output and option contracts.
 
 `run sway` and `run studio` are targets of `run`, so use
 `akari run TARGET --help` to see their accepted options. Studio always runs in
@@ -55,6 +61,87 @@ they pass them literally to the theme's runner.
 fvm dart run tool/akari.dart build -t themes/default -m release -j 4
 fvm dart run tool/akari.dart perf -t themes/default -- --cycles 5
 ```
+
+## Production login installation
+
+`install` now deploys the production login environment. The previous launcher
+installation command is `install cli`; `install --shell` is no longer accepted.
+Run installation as your regular user on Linux with systemd, greetd at
+`/usr/bin/greetd`, Sway at `/usr/bin/sway`, Python 3, `swaymsg`, `dbus-run-session`,
+and `busctl`. Install greetd's PAM configuration at `/etc/pam.d/greetd` through
+your distribution. Akari uses that policy for authentication and does not edit it.
+
+```sh
+akari install --theme themes/default --jobs 4
+akari login enable
+akari login status
+```
+
+`install` builds the selected theme and production backend in Linux release mode,
+then requests sudo to deploy the complete Flutter bundle and Rust executable.
+Build failure leaves the installed environment untouched. Relative theme paths
+belong to the invocation directory. SDK selection follows the ordinary build
+command, including `AKARI_FLUTTER_BIN` and `AKARI_DART_BIN`.
+
+The installation uses a separate `akari-greeter` system account, release directories
+beneath `/opt/akari/releases/`, and a `current` symlink. The service runs greetd
+with `/etc/akari/greetd.toml`; the greeter runs in Sway with
+`/etc/akari/sway.conf`. Existing `/etc/greetd/config.toml` and test resources in
+`/opt/akari-test` are untouched. Greeter preferences live beneath
+`/var/lib/akari/greeter/`.
+
+Installation leaves the boot login service unchanged. `login enable` requires
+`graphical.target` as the existing default target, records the prior display-manager
+symlink and enable state, then enables `akari.service` in its place. It does not
+start, stop, or restart services. Reboot when ready to use Akari. `login disable`
+restores the recorded boot login service, also without interrupting the desktop.
+A failed switch attempts restoration immediately; if restoration fails, the
+snapshot remains available for retrying `login disable`.
+
+The first installation captures the current Sway or Hyprland monitor order when
+available. Subsequent installations preserve `/etc/akari` configuration, including
+`display-layout.json`. Edit `sway.conf` for output modes and scales, and
+`display-layout.json` for the ordered output names and `x` or `y` axis. If no
+layout was captured, Sway arranges outputs automatically.
+
+```sh
+akari login logs
+akari login logs --component backend --lines 200
+akari login logs --component flutter --follow
+akari login status --format json
+akari login rollback
+akari login disable
+akari uninstall
+```
+
+`login logs` defaults to the `akari.service` journal; access follows the host's
+journal permissions. `backend`, `flutter`, and `sway` read the newest session
+under `/var/log/akari/greeter/session-*/`, readable without sudo. `--follow`
+follows that selected session's file. Each greeter launch creates separate logs.
+The backend, frontend and compositor run on a private bus; frontend exit or loss
+of the backend releases Sway so greetd can start the desktop or launch a fresh
+greeter.
+
+Reinstalling retains old releases and switches `current` after deployment succeeds.
+`login rollback` exchanges `current` and `previous`; the next greeter launch uses
+the selected release. A running greeter keeps its original release. Rollback
+does not alter system configuration or preferences. Old releases and session
+logs remain on disk. `uninstall` requires an inactive service, restores any recorded
+boot login service, and removes the deployment and `/etc/akari` configuration;
+it retains the greeter account, preferences, and logs.
+
+`install`, `uninstall`, `login enable`, `login disable`, and `login rollback`
+accept `--dry-run`, which prints a JSON plan without building, requesting sudo,
+or changing files. Status and logs are read-only. The CLI launcher still needs
+this repository and its SDK; the installed login service does not. Recovery
+from a TTY can use the installed controller directly:
+
+```sh
+sudo python3 /opt/akari/manage.py disable
+```
+
+This restores the next boot's login service. Reboot afterward to leave a running
+Akari-managed session and return to the previous manager.
 
 ## Shell launcher and completion
 
