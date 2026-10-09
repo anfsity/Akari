@@ -39,7 +39,7 @@ headless compositor tests do not require a live Wayland desktop.
 ## Optional shell launcher
 
 ```sh
-fvm dart run tool/akari.dart install --shell zsh
+fvm dart run tool/akari.dart install cli --shell zsh
 ```
 
 For bash, use `--shell bash`. Open a new shell or source the environment file

@@ -20,7 +20,7 @@ description: 查命令、选项、显示配置和运行报告。
 | `generate-scenes` | 从场景 JSON 生成类型化 Dart | `--theme` |
 | `verify-perf` / `perf` | 运行主题声明的性能检查 | `--theme`、`--` 后的参数 |
 | `trace-perf` / `trace` | 运行主题声明的性能跟踪 | `--theme`、`--` 后的参数 |
-| `install` | 安装绑定到当前仓库的启动器和补全脚本 | `--shell`、`--prefix`、`--rc` |
+| `install cli` | 安装绑定到当前仓库的启动器和补全脚本 | `--shell`、`--prefix`、`--rc` |
 | `completion` | 输出命令补全脚本 | `--shell` |
 | `greetd-test` | 管理独立登录测试 | [各操作的选项](../guides/greetd-testing.md) |
 
@@ -52,12 +52,12 @@ fvm dart run tool/akari.dart perf -t themes/default -- --cycles 5
 在用户级目录中安装绑定到仓库的 `akari` 命令和 Shell 补全：
 
 ```sh
-fvm dart run tool/akari.dart install --shell zsh
+fvm dart run tool/akari.dart install cli --shell zsh
 # 或使用 bash：
-fvm dart run tool/akari.dart install --shell bash
+fvm dart run tool/akari.dart install cli --shell bash
 ```
 
-启动器写入 `~/.local/bin/akari`，补全脚本写入 `~/.local/share/akari/`。安装过程会向 `.zshrc`（遵循 `ZDOTDIR`）或 `.bashrc` 追加一行 source 命令；重复安装不会重复添加。打开新 Shell，或加载输出的环境脚本以启用它。该启动器可以从任意目录运行，会保留相对参数路径，并使用当前仓库的 SDK 及 `AKARI_*_BIN` 覆盖项。安装后，仓库需要保留在原来的位置；移动仓库后请重新安装。`install --prefix PATH --rc PATH` 用于选择安装目录和启动文件。
+启动器写入 `~/.local/bin/akari`，补全脚本写入 `~/.local/share/akari/`。安装过程会向 `.zshrc`（遵循 `ZDOTDIR`）或 `.bashrc` 追加一行 source 命令；重复安装不会重复添加。打开新 Shell，或加载输出的环境脚本以启用它。该启动器可以从任意目录运行，会保留相对参数路径，并使用当前仓库的 SDK 及 `AKARI_*_BIN` 覆盖项。安装后，仓库需要保留在原来的位置；移动仓库后请重新安装。`install cli --prefix PATH --rc PATH` 用于选择安装目录和启动文件。
 
 补全支持命令、别名、各命令的长短选项、可选值和路径。遇到 `--` 后便会停止补全，因为之后的参数属于主题。解析器、帮助文本和生成脚本共用 `tool/src/cli_definition.dart`。修改该定义后需重新安装，刷新已安装的补全脚本。手动注册时，运行 `akari completion --shell zsh` 或 `--shell bash` 会输出对应脚本。
 

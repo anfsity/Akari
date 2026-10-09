@@ -223,7 +223,7 @@ const cliCommands = [
     forwardsArguments: true,
   ),
   CliCommand(
-    'install',
+    'install cli',
     'Install the akari launcher and shell completion.',
     options: ['--shell', '--prefix', '--rc'],
     reportsRun: false,

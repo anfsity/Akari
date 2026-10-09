@@ -14,7 +14,7 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 
 `studio` is a `run` target. `akari run --help` lists it, and
 `akari run studio --help` shows its options. If an existing shell does not
-complete it, refresh the installed scripts with `akari install --shell zsh`, then run
+complete it, refresh the installed scripts with `akari install cli --shell zsh`, then run
 `. ~/.local/share/akari/env.zsh` in that shell. For bash, use `--shell bash`
 and source `~/.local/share/akari/env.bash` instead.
 
