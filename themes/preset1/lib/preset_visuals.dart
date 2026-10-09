@@ -484,7 +484,7 @@ class PresetWeatherPainter extends CustomPainter {
       final x =
           (p.x + progress * 2000 + math.sin(angle * 9 + p.phase) * 22) % 2000 -
           40;
-      final y = (p.y + progress * 1160 * p.cycles) % 1160 - 40;
+      final y = (p.y - progress * 1160 * p.cycles) % 1160 - 40;
       final light = y < 920 - x * 710 / 1920;
       petalPaint.color = light
           ? const Color(0x66737780)

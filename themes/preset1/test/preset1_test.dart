@@ -186,6 +186,32 @@ void main() {
     },
   );
 
+  test('petals drift upward in the light field', () async {
+    final start = await _renderWeatherFrame(0);
+    final later = await _renderWeatherFrame(.5 / 120);
+    final width = _weatherFrameSize.width.toInt();
+    var upwardOverlap = 0;
+    var downwardOverlap = 0;
+    // The pale upper-left field contains petals without rain. Match their
+    // rendered silhouettes across a range of flutter and drift distances.
+    for (var dx = -5; dx <= 12; dx++) {
+      for (var dy = 1; dy <= 16; dy++) {
+        var upward = 0;
+        var downward = 0;
+        for (var y = 100; y < 500; y += 2) {
+          for (var x = 100; x < 700; x += 2) {
+            final alpha = start[(y * width + x) * 4 + 3];
+            upward += alpha * later[((y - dy) * width + x + dx) * 4 + 3];
+            downward += alpha * later[((y + dy) * width + x + dx) * 4 + 3];
+          }
+        }
+        if (upward > upwardOverlap) upwardOverlap = upward;
+        if (downward > downwardOverlap) downwardOverlap = downward;
+      }
+    }
+    expect(upwardOverlap, greaterThan(downwardOverlap * 1.2));
+  });
+
   test(
     'rain visibly moves within half a second and wraps continuously',
     () async {
