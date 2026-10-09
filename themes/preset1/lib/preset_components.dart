@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:greeter_components/greeter_components.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
+import 'preset1.scene.g.dart';
 import 'preset_style.dart';
 import 'weekday_lettering.dart';
 
@@ -19,7 +20,7 @@ class PresetComponents implements GreeterThemeComponents {
   @override
   Widget build(BuildContext context, SceneNode node) {
     final host = theme.host;
-    return switch (node.componentId) {
+    final component = switch (node.componentId) {
       'presetClock' => PresetClock(
         reflected: node.properties['variant'] == 'reflected',
         compact: node.properties['variant'] == 'compact',
@@ -73,7 +74,7 @@ class PresetComponents implements GreeterThemeComponents {
         children: [
           const Text(
             'E N T E R',
-            style: TextStyle(fontSize: 11, color: presetPaper),
+            style: TextStyle(fontSize: 12, color: presetPaper),
           ),
           const SizedBox(height: 5),
           Expanded(
@@ -109,7 +110,7 @@ class PresetComponents implements GreeterThemeComponents {
                     child: Text(
                       power.error!.message,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: Theme.of(context).colorScheme.error,
                       ),
                     ),
@@ -119,6 +120,16 @@ class PresetComponents implements GreeterThemeComponents {
       ),
       _ => _standard.build(context, node),
     };
+    // The runtime scales node placement, but leaves native text and icons at
+    // fixed logical sizes. Scale the composition from its authored bounds too,
+    // so Sway's output size changes placement and legibility together.
+    return FittedBox(
+      child: SizedBox(
+        width: node.rect.width * preset1SceneDocument.canvas.referenceWidth,
+        height: node.rect.height * preset1SceneDocument.canvas.referenceHeight,
+        child: component,
+      ),
+    );
   }
 }
 
@@ -151,6 +162,7 @@ class _SceneChoice<T> extends StatelessWidget {
         onSelected: onSelected,
         itemBuilder: (context) => entries,
         position: PopupMenuPosition.under,
+        constraints: const BoxConstraints(minWidth: 256, maxWidth: 420),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Column(
@@ -159,7 +171,7 @@ class _SceneChoice<T> extends StatelessWidget {
               Text(
                 caption,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   letterSpacing: 4,
                   color: color.withValues(alpha: .7),
                 ),
@@ -177,7 +189,7 @@ class _SceneChoice<T> extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(Icons.expand_more, size: 16, color: color),
+                  Icon(Icons.expand_more, size: 18, color: color),
                 ],
               ),
             ],
@@ -200,7 +212,7 @@ class _PresetCredential extends StatelessWidget {
       children: [
         const Text(
           'U N L O C K',
-          style: TextStyle(fontSize: 11, color: Color(0xffa9adbf)),
+          style: TextStyle(fontSize: 12, color: Color(0xffa9adbf)),
         ),
         const SizedBox(height: 8),
         Expanded(
@@ -261,7 +273,7 @@ class PresetInscription extends StatelessWidget {
           Text(
             title,
             style: TextStyle(
-              fontSize: subtitle.isEmpty ? 10 : 25,
+              fontSize: subtitle.isEmpty ? 12 : 25,
               letterSpacing: subtitle.isEmpty ? 3 : 13,
               color: light ? presetPaper : presetInk,
             ),
@@ -344,7 +356,7 @@ class _PresetClockState extends State<PresetClock> {
     final day = WeekdayLettering(
       text: days[_now.weekday - 1],
       color: color,
-      height: widget.compact ? 22 : 52,
+      height: widget.compact ? 24 : 48,
     );
     final date = Text(
       '${_now.day} ${months[_now.month - 1]} ${_now.year}',
@@ -363,7 +375,7 @@ class _PresetClockState extends State<PresetClock> {
       child: FittedBox(
         fit: BoxFit.contain,
         child: SizedBox(
-          width: widget.compact ? 380 : 600,
+          width: widget.compact ? 380 : 640,
           height: widget.compact ? 130 : 140,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
