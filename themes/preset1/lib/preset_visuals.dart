@@ -14,9 +14,9 @@ class PresetBackgroundRenderer extends BackgroundRenderer {
       const PresetEnvironment();
 }
 
-/// The painted artwork has its own raster boundary. Only weather repaints on
-/// each tick, so the soft light and botanical detail never need a per-frame
-/// blur pass. Both layers share the same authored 1920 x 1080 coordinates.
+/// The water samples a single raster of the artwork rather than blurring on
+/// each tick. Blossoms stay in their own raster boundary above the wet surface.
+/// All layers share the same authored 1920 x 1080 coordinates.
 class PresetEnvironment extends StatefulWidget {
   const PresetEnvironment({super.key});
 
@@ -28,6 +28,9 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _weather;
   late final PresetWeatherPainter _painter;
+  PresetSurfacePainter? _surfacePainter;
+  ui.FragmentShader? _surfaceShader;
+  ui.Image? _surfaceImage;
   bool _visible = true;
 
   @override
@@ -39,6 +42,32 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
     );
     _painter = PresetWeatherPainter(_weather);
     WidgetsBinding.instance.addObserver(this);
+    _createSurface();
+  }
+
+  Future<void> _createSurface() async {
+    final program = await ui.FragmentProgram.fromAsset(
+      'packages/theme_preset1/shaders/wet_surface.frag',
+    );
+    final recorder = ui.PictureRecorder();
+    const PresetArtworkPainter().paint(
+      Canvas(recorder),
+      const Size(1920, 1080),
+    );
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(1920, 1080);
+    picture.dispose();
+    if (!mounted) {
+      image.dispose();
+      return;
+    }
+    final shader = program.fragmentShader()
+      ..setImageSampler(0, image, filterQuality: FilterQuality.low);
+    setState(() {
+      _surfaceImage = image;
+      _surfaceShader = shader;
+      _surfacePainter = PresetSurfacePainter(_weather, shader);
+    });
   }
 
   @override
@@ -71,6 +100,8 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _weather.dispose();
+    _surfaceShader?.dispose();
+    _surfaceImage?.dispose();
     super.dispose();
   }
 
@@ -84,6 +115,16 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
             const RepaintBoundary(
               child: CustomPaint(
                 painter: PresetArtworkPainter(),
+                isComplex: true,
+              ),
+            ),
+            if (_surfacePainter case final painter?)
+              RepaintBoundary(
+                child: CustomPaint(painter: painter, willChange: true),
+              ),
+            const RepaintBoundary(
+              child: CustomPaint(
+                painter: PresetBranchPainter(),
                 isComplex: true,
               ),
             ),
@@ -104,8 +145,8 @@ Path _getNightPath() => Path()
   ..lineTo(0, 1080)
   ..close();
 
-/// All artwork is authored in paths, gradients and seeded strokes. The static
-/// blur softens streak edges once; the live rain uses only unfiltered lines.
+/// The same cached light streaks provide the water texture and its still frame.
+/// Refraction and flow displace that texture without another blur pass.
 class PresetArtworkPainter extends CustomPainter {
   const PresetArtworkPainter();
 
@@ -145,25 +186,21 @@ class PresetArtworkPainter extends CustomPainter {
           ..maskFilter = MaskFilter.blur(BlurStyle.normal, width * .7),
       );
     }
-    // Fine broken strokes beneath the rain give the dark half a wet surface.
-    final grain = Paint()
-      ..color = const Color(0x12545b6e)
-      ..strokeWidth = .65;
-    for (var i = 0; i < 240; i++) {
-      final x = random.nextDouble() * 1920;
-      final y = random.nextDouble() * 1080;
-      canvas.drawLine(
-        Offset(x, y),
-        Offset(x + 1, y + 5 + random.nextDouble() * 20),
-        grain,
-      );
-    }
     canvas.restore();
-    _paintBranch(canvas);
     canvas.restore();
   }
 
-  void _paintBranch(Canvas canvas) {
+  @override
+  bool shouldRepaint(PresetArtworkPainter oldDelegate) => false;
+}
+
+class PresetBranchPainter extends CustomPainter {
+  const PresetBranchPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 1920, size.height / 1080);
     final stems = <(Path, double)>[
       (
         Path()
@@ -369,10 +406,36 @@ class PresetArtworkPainter extends CustomPainter {
       );
       canvas.restore();
     }
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(PresetArtworkPainter oldDelegate) => false;
+  bool shouldRepaint(PresetBranchPainter oldDelegate) => false;
+}
+
+class PresetSurfacePainter extends CustomPainter {
+  PresetSurfacePainter(this.time, this.shader) : super(repaint: time);
+
+  final Animation<double> time;
+  final ui.FragmentShader shader;
+  static final _night = _getNightPath();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    shader.setFloat(0, time.value);
+    canvas.save();
+    canvas.scale(size.width / 1920, size.height / 1080);
+    canvas.clipPath(_night);
+    canvas.drawRect(
+      const Rect.fromLTWH(0, 0, 1920, 1080),
+      Paint()..shader = shader,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(PresetSurfacePainter oldDelegate) =>
+      time != oldDelegate.time || shader != oldDelegate.shader;
 }
 
 class PresetWeatherPainter extends CustomPainter {
