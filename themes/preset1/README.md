@@ -2,8 +2,9 @@
 
 A fully procedural interpretation of the supplied diagonal life/death wallpaper.
 The background, cherry branches, blossoms, light streaks, rain, drifting petals
-and angular weekday lettering are hand-authored Canvas drawing. No generated
-image or video is used. Space Grotesk body text includes its OFL license.
+and angular weekday lettering are hand-authored Canvas drawing. Wet glass and
+flowing water use a fragment shader sampling the painted light streaks.
+Space Grotesk body text includes its OFL license.
 
 Dormant mode keeps the mirrored clock composition. Waking reveals a second
 composition: identity in the pale field, desktop choice on the dark right side,
@@ -34,14 +35,19 @@ The scene is editable in `lib/preset1.scene.json`. The static artwork and the
 weather use the same 1920×1080 coordinate space and adapt to the scene bounds.
 `lib/preset_visuals.dart` owns drawing and animation; component presentation is
 in `lib/preset_components.dart`; display lettering is in `lib/weekday_lettering.dart`.
+`lib/shaders/wet_surface.frag` owns glass refraction and the diagonal water current.
 
-The static artwork has a separate repaint boundary. Blur is used only when
-painting the cached light streaks. A single weather controller drives 170
-petals and 300 rain streaks without rebuilding widgets. Rain has its own seeded
-depth and speed distribution, with brighter, longer streaks falling across the
-dark field. Its 120-second loop is continuous across the wrap. Reduced motion,
-disabled ticker mode and hidden application lifecycle states stop the controller.
-Clocks update once a minute.
+The static artwork and blossoms have separate repaint boundaries. Blur is used
+only when painting the cached light streaks. The environment owns a single
+1920×1080 texture and its shader for its lifetime; resizing scales the authored
+coordinates without recreating those resources. A single weather controller
+drives 170 petals, 630 fine raindrops and 90 longer distant streaks, sliding glass
+drops and the water current without rebuilding widgets. Rain falls quickly;
+glass drops slide slowly with varying speeds, curved trails and refracted rims.
+Small condensation beads stay on the glass while highlights and ripples travel
+along the diagonal current underneath. The 120-second loop is continuous across
+the wrap. Reduced motion, disabled ticker mode and hidden application lifecycle
+states stop the controller. Clocks update once a minute.
 
 Verification:
 
@@ -68,11 +74,13 @@ and fewer than 20% of frames exceeding a 16.667 ms total budget. Reports and
 screenshots are registered in the CLI run report. Widget tests also cover
 800×600, 1280×720, 1920×1080, 2467×1580 and 2560×1080, interrupted transitions,
 menu anchoring and focus, proportional controls, credential clearing, service
-recovery, visible rain movement, loop continuity and stopping weather animation.
+recovery, visible rain movement and stopping weather animation. Rendered surface
+tests also check water flow, independent glass-drop movement, diagonal clipping,
+loop continuity and texture alignment at different viewport scales.
 
-The 2026-10-09 fullscreen Sway profile run passed all three journeys with 2,553
-measured frames at inner scale 0.625 and a Flutter render size of 2560×1440.
-All phases had a 16.667 ms p95 frame interval; build p95 ranged from 0.947 to
-1.260 ms, raster p95 from 5.282 to 5.558 ms, and total latency p95 from 7.852
-to 12.872 ms. Nine frames exceeded 16.667 ms (0.35%). These are measurements
+The 2026-10-09 wet-surface Sway profile run passed all three journeys with 2,564
+measured frames at inner scale 0.625 and a Flutter render size of 2467×1580.
+All phases had a 16.667 ms p95 frame interval; build p95 ranged from 1.308 to
+1.787 ms, raster p95 from 5.460 to 6.110 ms, and total latency p95 from 8.483
+to 14.135 ms. Twenty-two frames exceeded 16.667 ms (0.86%). These are measurements
 from the local nested compositor, not a guarantee for other GPUs or display sizes.
