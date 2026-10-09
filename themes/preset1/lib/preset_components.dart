@@ -142,15 +142,15 @@ class _SceneChoice<T> extends StatelessWidget {
   final bool enabled;
 
   @override
-  Widget build(BuildContext context) => PopupMenuButton<T>(
-    tooltip: label,
-    enabled: enabled,
-    onSelected: onSelected,
-    itemBuilder: (context) => entries,
-    position: PopupMenuPosition.under,
-    child: Center(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
+  Widget build(BuildContext context) => Center(
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: PopupMenuButton<T>(
+        tooltip: label,
+        enabled: enabled,
+        onSelected: onSelected,
+        itemBuilder: (context) => entries,
+        position: PopupMenuPosition.under,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Column(

@@ -13,6 +13,7 @@ void main() {
     const Size(800, 600),
     const Size(1280, 720),
     const Size(1920, 1080),
+    const Size(2467, 1580),
     const Size(2560, 1080),
   ]) {
     testWidgets('dispersed controls support login at $size', (tester) async {
@@ -35,6 +36,38 @@ void main() {
       await _advance(tester);
       expect(feature.state.authMode, AuthMode.handingOff);
       expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final size in [const Size(1920, 1080), const Size(2467, 1580)]) {
+    testWidgets('choice menus stay below their visible labels at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await _mount(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await _advance(tester);
+      await _select(tester, 'Choose account', 'Alice');
+      for (final choice in [
+        (tooltip: 'Choose account', text: 'Alice'),
+        (tooltip: 'Choose a session', text: 'Hyprland'),
+      ]) {
+        final label = tester.getRect(find.text(choice.text));
+        await tester.tap(find.byTooltip(choice.tooltip));
+        await _advance(tester);
+        final item = tester.getRect(
+          find.byWidgetPredicate((widget) => widget is PopupMenuItem).first,
+        );
+        expect(item.left, lessThan(label.center.dx));
+        expect(item.right, greaterThan(label.center.dx));
+        expect(item.top, greaterThanOrEqualTo(label.bottom));
+        expect(item.top - label.bottom, lessThan(40));
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await _advance(tester);
+      }
     });
   }
 
