@@ -72,6 +72,12 @@ const cliOptions = {
     valueName: 'MODE',
     values: ['mock', 'real'],
   ),
+  '--keyring': CliOption(
+    '--keyring',
+    'Configure installed keyring PAM modules (default: auto); offer installation when missing.',
+    valueName: 'PROVIDER',
+    values: ['auto', 'gnome', 'kwallet', 'none'],
+  ),
   '--format': CliOption(
     '--format',
     'Console output format (default: text).',
@@ -231,7 +237,7 @@ const cliCommands = [
   CliCommand(
     'install',
     'Build and install the production login environment without switching services.',
-    options: ['--theme', '--jobs', '--dry-run'],
+    options: ['--theme', '--jobs', '--keyring', '--dry-run'],
     reportsRun: false,
   ),
   CliCommand(
