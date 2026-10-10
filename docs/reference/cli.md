@@ -69,7 +69,8 @@ installation command is `install cli`; `install --shell` is no longer accepted.
 Run installation as your regular user on Linux with systemd, greetd at
 `/usr/bin/greetd`, Sway at `/usr/bin/sway`, Python 3, `swaymsg`, `dbus-run-session`,
 and `busctl`. Install greetd's PAM configuration at `/etc/pam.d/greetd` through
-your distribution. Akari uses that policy for authentication and does not edit it.
+your distribution. Akari retains that authentication policy and adds optional
+keyring integration as described below.
 
 ```sh
 akari install --theme themes/default --jobs 4
@@ -82,6 +83,36 @@ then requests sudo to deploy the complete Flutter bundle and Rust executable.
 Build failure leaves the installed environment untouched. Relative theme paths
 belong to the invocation directory. SDK selection follows the ordinary build
 command, including `AKARI_FLUTTER_BIN` and `AKARI_DART_BIN`.
+
+`install --keyring auto` (the default) detects GNOME Keyring and KWallet by their
+PAM modules, `pam_gnome_keyring.so` and `pam_kwallet5.so`, including multiarch
+library paths. It configures each installed provider in `/etc/pam.d/greetd`.
+If neither module is present, a terminal prompt offers to install GNOME Keyring,
+KWallet, or skip. Package installation supports Arch, Debian/Ubuntu and Fedora;
+other distributions require manual package installation. The installer checks
+the module again after installing packages before configuring PAM.
+
+Use `--keyring gnome` or `--keyring kwallet` to select only that provider. A missing
+selected provider requires approval at the terminal before installing packages.
+Without a terminal, `auto` skips missing providers and an explicit missing provider
+fails. `--keyring none` removes only Akari's managed keyring block. Existing direct
+rules and rules in included PAM policies are retained without duplication.
+Added rules use `optional` for authentication and session startup; KWallet uses
+`auto_start force_run` for greetd. The first changed PAM policy is backed up at
+`/var/lib/akari/greetd.pam.before-keyring`. Deployment failure restores the prior
+PAM content; uninstall removes only Akari's block and preserves other edits.
+Installed keyring packages and the backup are retained.
+
+Automatic unlocking requires the keyring password to match the login password.
+Passwordless or biometric authentication does not supply that password.
+See [GNOME's PAM documentation](https://wiki.gnome.org/Projects/GnomeKeyring/Pam).
+KWallet also needs the desktop's `pam_kwallet_init` autostart to complete startup;
+see the [KDE integration sources](https://invent.kde.org/plasma/kwallet-pam).
+To configure PAM without rebuilding, use the repository controller:
+
+```sh
+sudo python3 scripts/login/manage.py configure-keyring --keyring gnome
+```
 
 The installation uses a separate `akari-greeter` system account, release directories
 beneath `/opt/akari/releases/`, and a `current` symlink. The service runs greetd

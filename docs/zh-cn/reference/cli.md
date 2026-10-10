@@ -55,7 +55,7 @@ fvm dart run tool/akari.dart perf -t themes/default -- --cycles 5
 
 ## 安装正式登录环境
 
-`install` 现在用于部署正式登录环境。原来的启动器安装改为 `install cli`；`install --shell` 不再接受。请在使用 systemd 的 Linux 主机上，以普通用户运行安装命令。运行环境需要 `/usr/bin/greetd`、`/usr/bin/sway`、Python 3、`swaymsg`、`dbus-run-session` 和 `busctl`。通过发行版安装 greetd 的 `/etc/pam.d/greetd`；Akari 使用这份 PAM 策略，不修改认证规则。
+`install` 现在用于部署正式登录环境。原来的启动器安装改为 `install cli`；`install --shell` 不再接受。请在使用 systemd 的 Linux 主机上，以普通用户运行安装命令。运行环境需要 `/usr/bin/greetd`、`/usr/bin/sway`、Python 3、`swaymsg`、`dbus-run-session` 和 `busctl`。通过发行版安装 greetd 的 `/etc/pam.d/greetd`；Akari 保留原有认证策略，并添加下述可选的密钥环集成。
 
 ```sh
 akari install --theme themes/default --jobs 4
@@ -64,6 +64,16 @@ akari login status
 ```
 
 `install` 先以 Linux release 模式构建所选主题和正式版后端，再请求 sudo 部署完整 Flutter 程序包和 Rust 可执行文件。构建失败时不会修改已安装环境。相对主题路径以命令调用目录为准；SDK 选择遵循普通构建命令，包括 `AKARI_FLUTTER_BIN` 和 `AKARI_DART_BIN`。
+
+`install --keyring auto`（默认）通过 `pam_gnome_keyring.so` 和 `pam_kwallet5.so` 检测 GNOME Keyring 与 KWallet，支持多架构库路径，并将已安装的提供方配置到 `/etc/pam.d/greetd`。两者都缺失时，在终端询问安装 GNOME Keyring、KWallet 或跳过。自动安装支持 Arch、Debian/Ubuntu 和 Fedora；其他发行版需手动安装软件包。安装后会重新检测 PAM 模块，确认存在才写配置。
+
+使用 `--keyring gnome` 或 `--keyring kwallet` 只配置指定提供方。指定的模块缺失时，必须在终端同意后才安装软件包。无终端时，`auto` 跳过缺失模块，显式指定的缺失模块则报错。`--keyring none` 只移除 Akari 管理的密钥环配置块。原有直接规则和 include 引入的 PAM 规则会保留，不重复添加。新增 auth 与 session 规则使用 `optional`；KWallet 使用 `auto_start force_run` 适配 greetd。首次修改前将 PAM 配置备份到 `/var/lib/akari/greetd.pam.before-keyring`。部署失败时恢复此前的 PAM 内容；卸载只移除 Akari 的配置块，保留其他编辑、已安装的密钥环软件包和备份。
+
+自动解锁要求密钥环密码与登录密码一致；无密码或生物识别登录不会提供该密码，见 [GNOME 的 PAM 文档](https://wiki.gnome.org/Projects/GnomeKeyring/Pam)。KWallet 还需要桌面的 `pam_kwallet_init` 自启动完成初始化，见 [KDE 集成源码](https://invent.kde.org/plasma/kwallet-pam)。无需重新构建即可通过仓库控制器配置 PAM：
+
+```sh
+sudo python3 scripts/login/manage.py configure-keyring --keyring gnome
+```
 
 安装会创建独立的 `akari-greeter` 系统账户，将各版本放到 `/opt/akari/releases/`，用 `current` 符号链接选择运行版本。`akari.service` 使用 `/etc/akari/greetd.toml` 启动 greetd，登录界面使用 `/etc/akari/sway.conf` 在 Sway 内运行。原有 `/etc/greetd/config.toml` 和 `/opt/akari-test` 测试资源不变。登录偏好保存在 `/var/lib/akari/greeter/`。
 

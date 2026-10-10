@@ -30,8 +30,21 @@ class LoginWorkflowTest(unittest.TestCase):
             'UNIT': 'etc/systemd/system/akari.service',
             'DISPLAY_MANAGER': 'etc/systemd/system/display-manager.service',
             'SNAPSHOT': 'var/lib/akari/display-manager.json',
+            'PAM': 'etc/pam.d/greetd',
+            'LOCK': 'run/lock/akari-login.lock',
         }.items():
             setattr(self.manager, name, self.root / relative)
+        self.manager.LOCK.parent.mkdir(parents=True)
+        self.manager.PAM.parent.mkdir(parents=True)
+        self.original_pam = ('#%PAM-1.0\n\nauth required pam_unix.so\n'
+                             'account required pam_unix.so\nsession required pam_systemd.so\n')
+        self.manager.PAM.write_text(self.original_pam)
+        self.manager.PAM.chmod(0o640)
+        self.module_root = self.root / 'usr/lib'
+        self.modules = self.module_root / 'security'
+        self.modules.mkdir(parents=True)
+        (self.modules / 'pam_gnome_keyring.so').touch()
+        self.manager.PAM_MODULE_ROOTS = [self.module_root]
         self.manager.UNIT.parent.mkdir(parents=True)
         self.manager.DISPLAY_MANAGER.symlink_to('/usr/lib/systemd/system/sddm.service')
         self.bundle = self.root / 'bundle with spaces'
@@ -91,8 +104,8 @@ class LoginWorkflowTest(unittest.TestCase):
             raise subprocess.CalledProcessError(status, arguments)
         return result
 
-    def install(self, layout=None):
-        self.manager.create_installation(REPOSITORY, self.bundle, self.backend, layout)
+    def install(self, layout=None, keyring='auto'):
+        self.manager.create_installation(REPOSITORY, self.bundle, self.backend, layout, keyring)
 
     def test_install_deploys_complete_bundle_and_preserves_system_login(self):
         self.install()
@@ -106,6 +119,161 @@ class LoginWorkflowTest(unittest.TestCase):
         self.assertEqual(os.readlink(self.manager.DISPLAY_MANAGER), '/usr/lib/systemd/system/sddm.service')
         self.assertEqual(self.enabled, {'sddm.service'})
         self.assertFalse(self.manager.SNAPSHOT.exists())
+        pam = self.manager.PAM.read_text()
+        self.assertTrue(pam.startswith(self.original_pam))
+        self.assertIn('auth       optional     pam_gnome_keyring.so\n', pam)
+        self.assertIn('session    optional     pam_gnome_keyring.so auto_start\n', pam)
+        self.assertNotIn('kwallet', pam)
+        self.assertEqual(self.manager.PAM.stat().st_mode & 0o777, 0o640)
+        self.assertEqual((self.manager.STATE / 'greetd.pam.before-keyring').read_text(), self.original_pam)
+
+    def test_keyring_detection_supports_multiarch_modules_and_requires_pam(self):
+        (self.modules / 'pam_gnome_keyring.so').unlink()
+        (self.module_root / 'gnome-keyring').touch()
+        self.assertEqual(self.manager.get_installed_keyrings(), [])
+        multiarch = self.module_root / 'aarch64-linux-gnu/security'
+        multiarch.mkdir(parents=True)
+        (multiarch / 'pam_gnome_keyring.so').touch()
+        (multiarch / 'pam_kwallet5.so').touch()
+        self.assertEqual(self.manager.get_installed_keyrings(), ['gnome', 'kwallet'])
+
+    def test_both_installed_providers_are_configured_and_selection_can_change(self):
+        (self.modules / 'pam_kwallet5.so').touch()
+        self.install()
+        pam = self.manager.PAM.read_text()
+        self.assertIn('session    optional     pam_kwallet5.so auto_start force_run\n', pam)
+        self.install(keyring='gnome')
+        pam = self.manager.PAM.read_text()
+        self.assertNotIn('kwallet', pam)
+        self.assertEqual(pam.count('pam_gnome_keyring.so'), 2)
+        self.install(keyring='none')
+        self.assertEqual(self.manager.PAM.read_text(), self.original_pam)
+
+    def test_reinstall_is_idempotent_and_uninstall_preserves_user_pam_edits(self):
+        self.install()
+        configured = self.manager.PAM.read_text()
+        self.install()
+        self.assertEqual(self.manager.PAM.read_text(), configured)
+        addition = '\nsession optional pam_env.so\n'
+        self.manager.PAM.write_text(configured + addition)
+        self.manager.remove_installation()
+        self.assertEqual(self.manager.PAM.read_text(), self.original_pam + addition)
+
+    def test_existing_direct_and_included_rules_are_not_duplicated(self):
+        auth = self.manager.PAM.parent / 'common-auth'
+        auth.write_text('auth [success=ok default=ignore] /usr/lib/security/pam_gnome_keyring.so\n'
+                        'auth include greetd\n')
+        session = self.manager.PAM.parent / 'common-session'
+        session.write_text('-session optional pam_gnome_keyring.so auto_start\n')
+        original = self.original_pam + '@include common-auth\nsession substack common-session\n'
+        self.manager.PAM.write_text(original)
+        self.install()
+        self.assertEqual(self.manager.PAM.read_text(), original)
+        self.assertFalse((self.manager.STATE / 'greetd.pam.before-keyring').exists())
+        # Fill only the missing phase, retaining an administrator's auth rule.
+        original = self.original_pam + 'auth optional pam_gnome_keyring.so\n'
+        self.manager.PAM.write_text(original)
+        self.install()
+        pam = self.manager.PAM.read_text()
+        self.assertTrue(pam.startswith(original))
+        self.assertEqual(pam.count('pam_gnome_keyring.so'), 2)
+
+    def test_symlinked_pam_policy_is_updated_without_replacing_link(self):
+        target = self.manager.PAM.with_name('greetd-policy')
+        self.manager.PAM.rename(target)
+        self.manager.PAM.symlink_to(target.name)
+        self.install()
+        self.assertTrue(self.manager.PAM.is_symlink())
+        self.assertIn('pam_gnome_keyring.so', target.read_text())
+        self.assertEqual(target.stat().st_mode & 0o777, 0o640)
+
+    def test_missing_modules_prompt_for_installation_then_recheck(self):
+        (self.modules / 'pam_gnome_keyring.so').unlink()
+        def install_package(arguments, **kwargs):
+            self.assertEqual(arguments, ['pacman', '-S', '--needed', 'kwallet-pam'])
+            self.assertTrue(kwargs['check'])
+            (self.modules / 'pam_kwallet5.so').touch()
+        with patch.object(self.manager.sys.stdin, 'isatty', return_value=True), \
+                patch('builtins.input', side_effect=['invalid', 'k']), \
+                patch.object(self.manager.platform, 'freedesktop_os_release', return_value={'ID': 'arch'}), \
+                patch.object(self.manager.subprocess, 'run', side_effect=install_package):
+            self.assertEqual(self.manager.select_keyrings('auto'), ['kwallet'])
+
+    def test_declined_and_unattended_installation_never_runs_package_manager(self):
+        (self.modules / 'pam_gnome_keyring.so').unlink()
+        with patch.object(self.manager.sys.stdin, 'isatty', return_value=True), \
+                patch('builtins.input', return_value=''):
+            self.assertEqual(self.manager.select_keyrings('auto'), [])
+            self.assertEqual(self.manager.select_keyrings('gnome'), [])
+        with patch.object(self.manager.sys.stdin, 'isatty', return_value=False):
+            self.assertEqual(self.manager.select_keyrings('auto'), [])
+            with self.assertRaisesRegex(ValueError, 'PAM module is missing'):
+                self.manager.select_keyrings('gnome')
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.manager.PAM.read_text(), self.original_pam)
+
+    def test_failed_or_incomplete_package_installation_leaves_pam_untouched(self):
+        (self.modules / 'pam_gnome_keyring.so').unlink()
+        with patch.object(self.manager.sys.stdin, 'isatty', return_value=True), \
+                patch('builtins.input', return_value='yes'), \
+                patch.object(self.manager.platform, 'freedesktop_os_release', return_value={'ID': 'arch'}):
+            self.failures.append(['-S', '--needed', 'gnome-keyring'])
+            with self.assertRaises(subprocess.CalledProcessError):
+                self.install(keyring='gnome')
+            with self.assertRaisesRegex(ValueError, 'did not provide'):
+                self.install(keyring='gnome')
+        self.assertEqual(self.manager.PAM.read_text(), self.original_pam)
+        self.assertFalse(self.manager.INSTALLATION.exists())
+
+    def test_package_commands_follow_distribution_and_include_pam_package(self):
+        cases = [
+            ({'ID': 'arch'}, 'gnome', ['pacman', '-S', '--needed', 'gnome-keyring']),
+            ({'ID': 'manjaro', 'ID_LIKE': 'arch'}, 'kwallet', ['pacman', '-S', '--needed', 'kwallet-pam']),
+            ({'ID': 'ubuntu', 'ID_LIKE': 'debian'}, 'gnome', ['apt-get', 'install', 'gnome-keyring', 'libpam-gnome-keyring']),
+            ({'ID': 'debian'}, 'kwallet', ['apt-get', 'install', 'libpam-kwallet5']),
+            ({'ID': 'fedora'}, 'gnome', ['dnf', 'install', 'gnome-keyring', 'gnome-keyring-pam']),
+            ({'ID': 'fedora'}, 'kwallet', ['dnf', 'install', 'pam-kwallet']),
+        ]
+        for distribution, provider, command in cases:
+            with self.subTest(distribution=distribution, provider=provider), \
+                    patch.object(self.manager.platform, 'freedesktop_os_release', return_value=distribution):
+                self.assertEqual(self.manager.get_keyring_install_command(provider), command)
+        with patch.object(self.manager.platform, 'freedesktop_os_release', return_value={'ID': 'other'}):
+            with self.assertRaisesRegex(ValueError, 'manually'):
+                self.manager.get_keyring_install_command('gnome')
+
+    def test_malformed_managed_block_fails_before_deployment(self):
+        broken = self.original_pam + self.manager.KEYRING_START + 'auth optional pam_gnome_keyring.so\n'
+        self.manager.PAM.write_text(broken)
+        with self.assertRaisesRegex(ValueError, 'Malformed'):
+            self.install()
+        self.assertEqual(self.manager.PAM.read_text(), broken)
+        self.assertFalse(self.manager.INSTALLATION.exists())
+
+    def test_failure_after_pam_update_restores_previous_pam(self):
+        self.install(keyring='none')
+        original = (self.manager.INSTALLATION / 'current').resolve()
+        with patch.object(self.manager, 'write_json', side_effect=OSError('injected state write failure')):
+            with self.assertRaisesRegex(OSError, 'injected'):
+                self.install()
+        self.assertEqual(self.manager.PAM.read_text(), self.original_pam)
+        self.assertEqual((self.manager.INSTALLATION / 'current').resolve(), original)
+
+    def test_configure_keyring_command_only_updates_pam(self):
+        with patch.object(self.manager.sys, 'argv', ['manage.py', 'configure-keyring', '--keyring', 'gnome']), \
+                patch.object(self.manager.os, 'geteuid', return_value=0):
+            self.assertEqual(self.manager.main(), 0)
+        self.assertIn('pam_gnome_keyring.so', self.manager.PAM.read_text())
+        self.assertFalse(self.manager.INSTALLATION.exists())
+        self.assertEqual(self.calls, [])
+
+    def test_failed_atomic_pam_write_keeps_original_policy_and_cleans_temporary_file(self):
+        configuration = self.manager.get_keyring_pam_configuration(self.original_pam, ['gnome'])
+        with patch.object(Path, 'replace', side_effect=OSError('injected rename failure')):
+            with self.assertRaisesRegex(OSError, 'injected rename failure'):
+                self.manager.update_pam(configuration)
+        self.assertEqual(self.manager.PAM.read_text(), self.original_pam)
+        self.assertEqual(list(self.manager.PAM.parent.glob('.greetd-*')), [])
 
     def test_upgrade_preserves_config_and_state_and_can_rollback(self):
         self.install()
