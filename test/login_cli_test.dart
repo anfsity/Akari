@@ -133,6 +133,8 @@ Future<void> main(List<String> arguments) async {
           'python3',
           '${Directory.current.path}/scripts/login/manage.py',
           'install',
+          '--keyring',
+          'auto',
           '--source',
           Directory.current.path,
           '--bundle',
@@ -153,6 +155,26 @@ Future<void> main(List<String> arguments) async {
     expect(result.exitCode, 23);
     expect(result.stderr, contains('build failed before deployment'));
     expect(File('${temporary.path}/sudo.json').existsSync(), isFalse);
+  });
+
+  test('explicit keyring selection reaches privileged controller', () async {
+    final result = await runFixture(['install', '--keyring', 'gnome']);
+    expect(result.exitCode, 17, reason: '${result.stderr}');
+    final invocation = jsonDecode(
+      await File('${temporary.path}/sudo.json').readAsString(),
+    ) as List;
+    expect(invocation, containsAllInOrder(['install', '--keyring', 'gnome']));
+    final dryRun = await runFixture([
+      'install',
+      '--keyring',
+      'kwallet',
+      '--dry-run',
+    ]);
+    expect(dryRun.exitCode, 0);
+    expect(
+      (jsonDecode(dryRun.stdout as String) as Map)['invocation'],
+      containsAllInOrder(['install', '--keyring', 'kwallet']),
+    );
   });
 
   test('dry runs never build or request privilege', () async {
@@ -252,6 +274,8 @@ Future<void> main(List<String> arguments) async {
       ['install', '--shell', 'zsh'],
       ['install', '-j', '0'],
       ['install', '--mode', 'debug'],
+      ['install', '--keyring', 'other'],
+      ['enable', '--keyring', 'gnome'],
       ['enable', '--theme', 'themes/default'],
       ['logs', '--lines', '0'],
       ['logs', '--component', 'unknown'],

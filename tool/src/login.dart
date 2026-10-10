@@ -52,6 +52,7 @@ Future<int> runLoginCommand(
     'python3',
     script.path,
     operation,
+    if (operation == 'install') ...['--keyring', values['--keyring'] ?? 'auto'],
     if (values.containsKey('--format')) ...['--format', values['--format']!],
     if (values.containsKey('--component')) ...[
       '--component',
