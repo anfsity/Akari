@@ -8,7 +8,8 @@ import 'src/cli_usage.dart';
 import 'src/command_plans.dart';
 import 'src/greetd_test.dart';
 import 'src/login.dart';
-import 'src/run_report.dart';
+import 'src/execution/report.dart';
+import 'src/commands/development.dart';
 import 'src/shell_completion.dart';
 import 'src/theme_project.dart';
 
@@ -160,7 +161,7 @@ Future<int> _runThemeCommand(
         : 'real',
   );
   if (options.dryRun) {
-    writeRunPlan(
+    RunReport(
       command: command,
       reportPath: options.reportPath,
       repoRoot: repoRoot,
@@ -168,7 +169,8 @@ Future<int> _runThemeCommand(
       steps: steps,
       artifactPaths: artifactPaths,
       displayProfile: displayProfile,
-    );
+      format: options.format,
+    ).writePlan();
     return 0;
   }
 

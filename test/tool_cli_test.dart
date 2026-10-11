@@ -4,7 +4,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../tool/src/command_plans.dart';
-import '../tool/src/run_report.dart';
+import '../tool/src/execution/model.dart';
+import '../tool/src/commands/development.dart';
 import '../tool/src/sdk_commands.dart';
 import '../tool/src/theme_project.dart';
 import '../tool/src/theme_host.dart';
@@ -26,7 +27,8 @@ void main() {
     final runner = File('${tempRoot.path}/interactive.dart');
     await runner.writeAsString('''
 import 'dart:io';
-import '${Directory.current.uri}tool/src/run_report.dart';
+import '${Directory.current.uri}tool/src/execution/model.dart';
+import '${Directory.current.uri}tool/src/commands/development.dart';
 Future<void> main() async {
   exitCode = await runDevCommand(
     command: 'interactive', format: RunOutputFormat.text, reportPath: null,
