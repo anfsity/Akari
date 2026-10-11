@@ -61,13 +61,11 @@ class SceneEditor extends ChangeNotifier {
     if (!applyDraft()) return false;
     document.nodes.firstWhere((node) => node.id == id);
     if (selectedId == id) return true;
-    _revision = (
+    _applyRevision((
       document: document,
       encoded: _revision.encoded,
       selectedId: id,
-    );
-    inspector.resetNode(selectedNode, canvas: document.canvas);
-    notifyListeners();
+    ));
     return true;
   }
 
@@ -123,7 +121,15 @@ class SceneEditor extends ChangeNotifier {
     if (encoded == _revision.encoded) return;
     _undo.add(_revision);
     _redo.clear();
-    _revision = (document: updated, encoded: encoded, selectedId: selectedId);
+    _applyRevision((
+      document: updated,
+      encoded: encoded,
+      selectedId: selectedId,
+    ));
+  }
+
+  void _applyRevision(_SceneRevision revision) {
+    _revision = revision;
     inspector.resetNode(selectedNode, canvas: document.canvas);
     notifyListeners();
   }
@@ -131,17 +137,13 @@ class SceneEditor extends ChangeNotifier {
   void undo() {
     if (!applyDraft() || !canUndo) return;
     _redo.add(_revision);
-    _revision = _undo.removeLast();
-    inspector.resetNode(selectedNode, canvas: document.canvas);
-    notifyListeners();
+    _applyRevision(_undo.removeLast());
   }
 
   void redo() {
     if (!applyDraft() || !canRedo) return;
     _undo.add(_revision);
-    _revision = _redo.removeLast();
-    inspector.resetNode(selectedNode, canvas: document.canvas);
-    notifyListeners();
+    _applyRevision(_redo.removeLast());
   }
 
   bool save() {
@@ -173,18 +175,17 @@ class SceneEditor extends ChangeNotifier {
     final source = file.readAsStringSync();
     final document = decodeSceneDocument(source);
     _source = source;
-    _revision = (
+    final revision = (
       document: document,
       encoded: encodeSceneDocument(document),
       selectedId: document.nodes.any((node) => node.id == selectedId)
           ? selectedId
           : document.nodes.first.id,
     );
-    _savedDocument = _revision.encoded;
+    _savedDocument = revision.encoded;
     _undo.clear();
     _redo.clear();
-    inspector.resetNode(selectedNode, canvas: document.canvas);
-    notifyListeners();
+    _applyRevision(revision);
   }
 
   @override
