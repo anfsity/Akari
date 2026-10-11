@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'cli_definition.dart';
+import 'definition.dart';
 
 void writeCliUsage([CliCommand? command]) {
   final Iterable<CliOption> options;

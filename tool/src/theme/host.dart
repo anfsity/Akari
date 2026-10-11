@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
-import 'theme_project.dart';
+import 'project.dart';
+import 'model.dart';
 
 /// Assembles a reusable executable host with a direct import of one theme.
 /// Shared Dart sources are linked for live edits; native sources and generated
@@ -13,10 +14,11 @@ void createThemeHost({
   required Directory repoRoot,
   required ThemePackage theme,
   required Directory output,
-  required bool preview,
-  bool studio = false,
+  required ThemeHostKind kind,
   Map<String, Object?> devDependencies = const {},
 }) {
+  final studio = kind == ThemeHostKind.studio;
+  final preview = kind == ThemeHostKind.preview;
   output.createSync(recursive: true);
   final lib = Directory('${output.path}/lib')..createSync(recursive: true);
   final sources = studio

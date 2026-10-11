@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../tool/src/theme_perf.dart';
-import '../tool/src/theme_project.dart';
+import '../tool/src/commands/performance.dart';
+import '../tool/src/theme/project.dart';
 
 void main() {
   late Directory temporary;

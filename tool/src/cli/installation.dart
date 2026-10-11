@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'shell_completion.dart';
+import 'completion.dart';
 
 Future<void> installCli({
   required Directory repoRoot,

@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../tool/src/greetd_test.dart';
+import '../tool/src/commands/greetd_test.dart';
 import '../tool/src/sdk_commands.dart';
 
 void main() {
@@ -47,8 +47,8 @@ elif name == 'systemctl':
     runner = File('${temporary.path}/runner.dart');
     await runner.writeAsString('''
 import 'dart:io';
-import '${Directory.current.uri}tool/src/greetd_test.dart';
-import '${Directory.current.uri}tool/src/cli_definition.dart';
+import '${Directory.current.uri}tool/src/commands/greetd_test.dart';
+import '${Directory.current.uri}tool/src/cli/definition.dart';
 Future<void> main(List<String> arguments) async {
   try {
     exitCode = await runGreetdTestCommand(

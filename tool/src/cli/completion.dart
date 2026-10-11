@@ -1,4 +1,4 @@
-import 'cli_definition.dart';
+import 'definition.dart';
 
 String getShellCompletion(String shell) =>
     shell == 'zsh' ? _getZshCompletion() : _getBashCompletion();

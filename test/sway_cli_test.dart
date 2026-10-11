@@ -1,9 +1,13 @@
+import '../tool/src/theme/display_profile.dart';
+
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../tool/src/run_report.dart';
+import '../tool/src/execution/model.dart';
+import '../tool/src/commands/development.dart';
+import '../tool/src/commands/plan.dart';
 
 void main() {
   late Directory temp;
@@ -140,33 +144,37 @@ void main() {
       for (final matched in [true, false]) {
         final run = matched ? 'matched' : 'mismatch';
         final displayFile = File('${temp.path}/$run/display-report.json');
-        final status = await runDevCommand(
-          command: 'run sway',
+        final status = await runPlan(
+          RunPlan(
+            command: 'run sway',
+            displayProfile: {
+              'source': {'kind': 'reference'},
+            },
+            artifactPaths: {'display_report': '$run/display-report.json'},
+            steps: [
+              RunStep(
+                id: 'theme.sway',
+                command: const ['session'],
+                workingDirectory: '.',
+                environment: const {},
+                action: () async {
+                  await displayFile.writeAsString(
+                    jsonEncode({
+                      'matched': matched,
+                      'target': [1920, 1080],
+                      'actual': [1280, 720],
+                    }),
+                  );
+                },
+              ),
+            ],
+            collectResult: (result) =>
+                collectDisplayResult(displayFile, result),
+          ),
           format: RunOutputFormat.text,
           reportPath: null,
           repoRoot: temp,
           runDirectory: run,
-          displayProfile: {
-            'source': {'kind': 'reference'},
-          },
-          artifactPaths: {'display_report': '$run/display-report.json'},
-          steps: [
-            RunStep(
-              id: 'theme.sway',
-              command: const ['session'],
-              workingDirectory: '.',
-              environment: const {},
-              action: () async {
-                await displayFile.writeAsString(
-                  jsonEncode({
-                    'matched': matched,
-                    'target': [1920, 1080],
-                    'actual': [1280, 720],
-                  }),
-                );
-              },
-            ),
-          ],
         );
         expect(status, matched ? 0 : 1);
         final report = jsonDecode(
@@ -179,14 +187,20 @@ void main() {
   );
 
   test('successful session cannot omit the required display report', () async {
-    final status = await runDevCommand(
-      command: 'run sway',
+    final status = await runPlan(
+      RunPlan(
+        command: 'run sway',
+        artifactPaths: {'display_report': 'missing/display-report.json'},
+        steps: const [],
+        collectResult: (result) => collectDisplayResult(
+          File('${temp.path}/missing/display-report.json'),
+          result,
+        ),
+      ),
       format: RunOutputFormat.text,
       reportPath: null,
       repoRoot: temp,
       runDirectory: 'missing',
-      artifactPaths: {'display_report': 'missing/display-report.json'},
-      steps: const [],
     );
     expect(status, 1);
     final report = jsonDecode(
@@ -194,5 +208,4 @@ void main() {
     );
     expect(report['error'], contains('did not publish'));
   });
-
 }
