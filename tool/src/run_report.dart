@@ -65,8 +65,8 @@ class RunStep {
   const RunStep({
     required this.id,
     required this.command,
-    required this.workingDirectory,
-    required this.environment,
+    this.workingDirectory = '.',
+    this.environment = const {},
     this.dependencies,
     this.interactive = false,
     this.action,

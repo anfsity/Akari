@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -26,287 +25,342 @@ List<RunStep> buildStepsFor(
   Map<String, Object?>? displayProfile,
   String swayBackend = 'wayland',
 }) {
-  switch (command) {
-    case 'build':
-    case 'run':
-    case 'run sway':
-    case 'preview':
-    case 'run studio':
-      final studio = command == 'run studio';
-      final sway = command == 'run sway';
-      final greeter = command == 'run' || sway;
-      final demo = preview || studio;
-      final live = command != 'build';
-      final transport = greeter ? backendMode : 'real';
-      final theme = selectedTheme!;
-      final hostDirectory = getThemeHostDirectory(
-        theme,
+  return switch (command) {
+    'build' ||
+    'run' ||
+    'run sway' ||
+    'preview' ||
+    'run studio' => _buildThemeSteps(
+      command,
+      repoRoot,
+      runDirectory,
+      selectedTheme!,
+      buildTarget: buildTarget,
+      buildMode: buildMode,
+      preview: preview,
+      jobs: jobs,
+      backendMode: backendMode,
+      displayProfile: displayProfile,
+      swayBackend: swayBackend,
+    ),
+    'verify' => _buildVerificationSteps(repoRoot, runDirectory, selectedTheme),
+    'verify-perf' || 'trace-perf' => _buildPerformanceSteps(
+      command,
+      repoRoot,
+      runDirectory,
+      selectedTheme!,
+      themeArguments,
+    ),
+    'generate-scenes' => _sceneGenerationSteps(
+      repoRoot,
+      selectedTheme == null ? null : [selectedTheme],
+    ),
+    _ => throw StateError('No step plan for command $command.'),
+  };
+}
+
+List<RunStep> _buildThemeSteps(
+  String command,
+  Directory repoRoot,
+  String runDirectory,
+  ThemePackage theme, {
+  required String buildTarget,
+  required String buildMode,
+  required bool preview,
+  required int? jobs,
+  required String backendMode,
+  required Map<String, Object?>? displayProfile,
+  required String swayBackend,
+}) {
+  final studio = command == 'run studio';
+  final sway = command == 'run sway';
+  final greeter = command == 'run' || sway;
+  final demo = preview || studio;
+  final live = command != 'build';
+  final transport = greeter ? backendMode : 'real';
+  final hostDirectory = getThemeHostDirectory(
+    theme,
+    preview: demo,
+    studio: studio,
+  );
+  return [
+    if (!demo)
+      RunStep(
+        id: 'backend.build',
+        command: [
+          'cargo',
+          'build',
+          '--locked',
+          '--target-dir',
+          'target/akari-$transport',
+          if (buildMode != 'debug') '--release',
+          if (greeter && backendMode == 'mock') ...['--features', 'mock'],
+          if (jobs != null) ...['--jobs', '$jobs'],
+        ],
+        workingDirectory: 'backend',
+        dependencies: const [],
+      ),
+    RunStep(
+      id: 'theme.pub_get',
+      command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+      workingDirectory: theme.directory.path,
+      dependencies: const [],
+    ),
+    ..._sceneGenerationSteps(repoRoot, [theme]),
+    RunStep(
+      id: 'theme.host.generate',
+      command: [
+        ...getDartCommand(repoRoot),
+        'tool/theme_host.dart',
+        theme.directory.path,
+        _join(repoRoot.path, hostDirectory),
+        if (studio) '--studio' else if (preview) '--preview',
+      ],
+      action: () => createThemeHost(
+        repoRoot: repoRoot,
+        theme: theme,
+        output: Directory(_join(repoRoot.path, hostDirectory)),
         preview: demo,
         studio: studio,
-      );
-      return [
-        if (!demo)
-          _step(
-            'backend.build',
-            [
-              'cargo',
-              'build',
-              '--locked',
-              '--target-dir',
-              'target/akari-$transport',
-              if (buildMode != 'debug') '--release',
-              if (greeter && backendMode == 'mock') ...['--features', 'mock'],
-              if (jobs != null) ...['--jobs', '$jobs'],
-            ],
-            workingDirectory: 'backend',
-            dependencies: const [],
-          ),
-        _step(
-          'theme.pub_get',
-          [...getFlutterCommand(repoRoot), 'pub', 'get'],
-          workingDirectory: theme.directory.path,
-          dependencies: const [],
-        ),
-        ..._sceneGenerationSteps(repoRoot, [theme]),
-        _step(
-          'theme.host.generate',
-          [
+      ),
+    ),
+    RunStep(
+      id: 'theme.host.pub_get',
+      command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+      workingDirectory: hostDirectory,
+    ),
+    if (!live) ...[
+      RunStep(
+        id: 'flutter.build_$buildTarget',
+        command: [
+          ...getFlutterCommand(repoRoot),
+          'build',
+          buildTarget,
+          '--$buildMode',
+          '--no-pub',
+          '--dart-define=AKARI_BACKEND=${demo ? 'demo' : 'real'}',
+        ],
+        workingDirectory: hostDirectory,
+        environment: {if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs'},
+      ),
+      if (buildTarget == 'linux')
+        // Publishing requires both artifacts. The backend branch can run in
+        // parallel, so the previous frontend step alone is not sufficient.
+        RunStep(
+          id: 'build.links',
+          command: [
             ...getDartCommand(repoRoot),
-            'tool/theme_host.dart',
+            'tool/build_links.dart',
+            repoRoot.path,
             theme.directory.path,
-            _join(repoRoot.path, hostDirectory),
-            if (studio) '--studio' else if (preview) '--preview',
+            buildMode,
           ],
-          action: () => createThemeHost(
-            repoRoot: repoRoot,
-            theme: theme,
-            output: Directory(_join(repoRoot.path, hostDirectory)),
-            preview: demo,
-            studio: studio,
-          ),
+          dependencies: const ['backend.build', 'flutter.build_linux'],
+          action: () => updateBuildLinks(repoRoot, theme, buildMode),
         ),
-        _step('theme.host.pub_get', [
-          ...getFlutterCommand(repoRoot),
-          'pub',
-          'get',
-        ], workingDirectory: hostDirectory),
-        if (!live)
-          _step(
-            'flutter.build_$buildTarget',
-            [
-              ...getFlutterCommand(repoRoot),
-              'build',
-              buildTarget,
-              '--$buildMode',
-              '--no-pub',
-              '--dart-define=AKARI_BACKEND=${demo ? 'demo' : 'real'}',
-            ],
-            workingDirectory: hostDirectory,
-            environment: {if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs'},
-          ),
-        if (!live && buildTarget == 'linux')
-          // Publishing requires both artifacts. The backend branch can run in
-          // parallel, so the previous frontend step alone is not sufficient.
-          _step(
-            'build.links',
-            [
-              ...getDartCommand(repoRoot),
-              'tool/build_links.dart',
-              repoRoot.path,
-              theme.directory.path,
-              buildMode,
-            ],
-            dependencies: const ['backend.build', 'flutter.build_linux'],
-            action: () => updateBuildLinks(repoRoot, theme, buildMode),
-          ),
-        if (live)
-          _step(
-            'theme.${studio
-                ? 'studio'
-                : sway
-                ? 'sway'
-                : command}',
-            [
-              if (sway) ...[
-                'python3',
-                _join(repoRoot.path, 'scripts/sway-session.py'),
-                '--log-dir',
-                _join(repoRoot.path, '$runDirectory/sway'),
-                '--backend',
-                swayBackend,
-                '--',
-              ],
-              if (!demo) ...[
-                'bash',
-                _join(repoRoot.path, 'scripts/debug-dbus.sh'),
-              ],
-              ...getDartCommand(repoRoot),
-              _join(repoRoot.path, 'tool/theme_session.dart'),
-              theme.directory.path,
-              _join(repoRoot.path, hostDirectory),
-              buildMode,
-              demo ? 'demo' : 'real',
-            ],
-            workingDirectory: hostDirectory,
-            dependencies: [if (!demo) 'backend.build', 'theme.host.pub_get'],
-            interactive: true,
-            environment: {
-              'AKARI_DISPLAY_MODE': studio ? 'single' : 'mirror',
-              'AKARI_WINDOW_MODE':
-                  Platform.environment['AKARI_WINDOW_MODE'] ??
-                  (demo ? 'windowed' : 'fullscreen'),
-              if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs',
-              if (sway)
-                'AKARI_DISPLAY_PROFILE_JSON': jsonEncode(displayProfile!),
-              if (!demo) ...{
-                'AKARI_BACKEND_MODE': backendMode,
-                'AKARI_BACKEND_BIN': _join(
-                  repoRoot.path,
-                  'backend/target/akari-$transport/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
-                ),
-                'AKARI_LOG_DIR': _join(repoRoot.path, '$runDirectory/dbus'),
-              },
-            },
-          ),
-      ];
-    case 'verify':
-      final themes = selectedTheme == null
-          ? findThemePackages(repoRoot)
-          : [selectedTheme];
-      return [
-        _step('toolchain.check', ['bash', 'scripts/check-toolchain.sh']),
-        _step('backend.format', [
-          'cargo',
-          'fmt',
-          '--all',
-          '--',
-          '--check',
-        ], workingDirectory: 'backend'),
-        _step('backend.check', [
-          'cargo',
-          'check',
-          '--locked',
-        ], workingDirectory: 'backend'),
-        _step('backend.test', [
-          'cargo',
-          'test',
-          '--locked',
-          '--',
-          '--test-threads=1',
-        ], workingDirectory: 'backend'),
-        _step('backend.test_mock', [
-          'cargo',
-          'test',
-          '--locked',
-          '--features',
-          'mock',
-          '--',
-          '--test-threads=1',
-        ], workingDirectory: 'backend'),
-        for (final theme in themes)
-          _step('${theme.packageName}.pub_get', [
-            ...getFlutterCommand(repoRoot),
-            'pub',
-            'get',
-          ], workingDirectory: theme.directory.path),
-        ..._sceneGenerationSteps(repoRoot, themes),
-        _step('flutter.analyze', [
-          ...getFlutterCommand(repoRoot),
-          'analyze',
-          'lib',
-          'test',
-          'tool/src',
-          'tool/akari.dart',
-          'tool/theme_host.dart',
-          'tool/theme_session.dart',
-          'tool/dbus_gateway_smoke.dart',
-          if (selectedTheme == null) 'tool/dev_main.dart',
-        ]),
-        _step('flutter.test', [...getFlutterCommand(repoRoot), 'test']),
-        _step('scene_schema.analyze', [
-          ...getDartCommand(repoRoot),
-          'analyze',
-        ], workingDirectory: 'packages/scene_schema'),
-        _step('scene_schema.test', [
-          ...getDartCommand(repoRoot),
-          'test',
-        ], workingDirectory: 'packages/scene_schema'),
-        _step('scene_codegen.analyze', [
-          ...getDartCommand(repoRoot),
-          'analyze',
-        ], workingDirectory: 'packages/scene_codegen'),
-        _step('scene_codegen.test', [
-          ...getDartCommand(repoRoot),
-          'test',
-        ], workingDirectory: 'packages/scene_codegen'),
-        _step('scene.analyze', [
-          ...getFlutterCommand(repoRoot),
-          'analyze',
-        ], workingDirectory: 'packages/scene'),
-        _step('scene.test', [
-          ...getFlutterCommand(repoRoot),
-          'test',
-        ], workingDirectory: 'packages/scene'),
-        _step('greeter_ui.analyze', [
-          ...getFlutterCommand(repoRoot),
-          'analyze',
-        ], workingDirectory: 'packages/greeter_ui'),
-        _step('greeter_ui.test', [
-          ...getFlutterCommand(repoRoot),
-          'test',
-        ], workingDirectory: 'packages/greeter_ui'),
-        ..._getThemeVerificationSteps(repoRoot, themes),
-        _step(
-          'dbus.smoke',
-          [
-            'bash',
-            'scripts/debug-dbus.sh',
-            ...getDartCommand(repoRoot),
-            'run',
-            'tool/dbus_gateway_smoke.dart',
+    ] else
+      RunStep(
+        id:
+            'theme.${switch (command) {
+              'run studio' => 'studio',
+              'run sway' => 'sway',
+              _ => command,
+            }}',
+        command: [
+          if (sway) ...[
+            'python3',
+            _join(repoRoot.path, 'scripts/sway-session.py'),
+            '--log-dir',
+            _join(repoRoot.path, '$runDirectory/sway'),
+            '--backend',
+            swayBackend,
+            '--',
           ],
-          environment: {
+          if (!demo) ...['bash', _join(repoRoot.path, 'scripts/debug-dbus.sh')],
+          ...getDartCommand(repoRoot),
+          _join(repoRoot.path, 'tool/theme_session.dart'),
+          theme.directory.path,
+          _join(repoRoot.path, hostDirectory),
+          buildMode,
+          demo ? 'demo' : 'real',
+        ],
+        workingDirectory: hostDirectory,
+        dependencies: [if (!demo) 'backend.build', 'theme.host.pub_get'],
+        interactive: true,
+        environment: {
+          'AKARI_DISPLAY_MODE': studio ? 'single' : 'mirror',
+          'AKARI_WINDOW_MODE':
+              Platform.environment['AKARI_WINDOW_MODE'] ??
+              (demo ? 'windowed' : 'fullscreen'),
+          if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs',
+          if (sway) 'AKARI_DISPLAY_PROFILE_JSON': jsonEncode(displayProfile!),
+          if (!demo) ...{
+            'AKARI_BACKEND_MODE': backendMode,
+            'AKARI_BACKEND_BIN': _join(
+              repoRoot.path,
+              'backend/target/akari-$transport/${buildMode == 'debug' ? 'debug' : 'release'}/backend',
+            ),
             'AKARI_LOG_DIR': _join(repoRoot.path, '$runDirectory/dbus'),
           },
-        ),
-      ];
-    case 'verify-perf':
-    case 'trace-perf':
-      final theme = selectedTheme!;
-      final operation = command == 'verify-perf' ? 'verify' : 'trace';
-      final entrypoint = getThemePerfCommand(theme, operation);
-      final executable = switch (entrypoint.first) {
-        'dart' => getDartCommand(repoRoot),
-        'flutter' => getFlutterCommand(repoRoot),
-        final executable => [executable],
-      };
-      return [
-        _step('theme.pub_get', [
-          ...getFlutterCommand(repoRoot),
-          'pub',
-          'get',
-        ], workingDirectory: theme.directory.path),
-        ..._sceneGenerationSteps(repoRoot, [theme]),
-        _step(
-          'theme.perf.$operation',
-          [...executable, ...entrypoint.skip(1), ...themeArguments],
-          workingDirectory: theme.directory.path,
-          environment: {
-            'AKARI_PERF_OUTPUT_DIR': _join(
-              repoRoot.path,
-              '$runDirectory/perf',
-            ),
-          },
-        ),
-      ];
-    case 'generate-scenes':
-      return _sceneGenerationSteps(
-        repoRoot,
-        selectedTheme == null ? null : [selectedTheme],
-      );
-    default:
-      throw StateError('No step plan for command $command.');
-  }
+        },
+      ),
+  ];
+}
+
+List<RunStep> _buildVerificationSteps(
+  Directory repoRoot,
+  String runDirectory,
+  ThemePackage? selectedTheme,
+) {
+  final themes = selectedTheme == null
+      ? findThemePackages(repoRoot)
+      : [selectedTheme];
+  return [
+    RunStep(
+      id: 'toolchain.check',
+      command: ['bash', 'scripts/check-toolchain.sh'],
+    ),
+    RunStep(
+      id: 'backend.format',
+      command: ['cargo', 'fmt', '--all', '--', '--check'],
+      workingDirectory: 'backend',
+    ),
+    RunStep(
+      id: 'backend.check',
+      command: ['cargo', 'check', '--locked'],
+      workingDirectory: 'backend',
+    ),
+    RunStep(
+      id: 'backend.test',
+      command: ['cargo', 'test', '--locked', '--', '--test-threads=1'],
+      workingDirectory: 'backend',
+    ),
+    RunStep(
+      id: 'backend.test_mock',
+      command: [
+        'cargo',
+        'test',
+        '--locked',
+        '--features',
+        'mock',
+        '--',
+        '--test-threads=1',
+      ],
+      workingDirectory: 'backend',
+    ),
+    for (final theme in themes)
+      RunStep(
+        id: '${theme.packageName}.pub_get',
+        command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+        workingDirectory: theme.directory.path,
+      ),
+    ..._sceneGenerationSteps(repoRoot, themes),
+    RunStep(
+      id: 'flutter.analyze',
+      command: [
+        ...getFlutterCommand(repoRoot),
+        'analyze',
+        'lib',
+        'test',
+        'tool/src',
+        'tool/akari.dart',
+        'tool/theme_host.dart',
+        'tool/theme_session.dart',
+        'tool/dbus_gateway_smoke.dart',
+        if (selectedTheme == null) 'tool/dev_main.dart',
+      ],
+    ),
+    RunStep(
+      id: 'flutter.test',
+      command: [...getFlutterCommand(repoRoot), 'test'],
+    ),
+    RunStep(
+      id: 'scene_schema.analyze',
+      command: [...getDartCommand(repoRoot), 'analyze'],
+      workingDirectory: 'packages/scene_schema',
+    ),
+    RunStep(
+      id: 'scene_schema.test',
+      command: [...getDartCommand(repoRoot), 'test'],
+      workingDirectory: 'packages/scene_schema',
+    ),
+    RunStep(
+      id: 'scene_codegen.analyze',
+      command: [...getDartCommand(repoRoot), 'analyze'],
+      workingDirectory: 'packages/scene_codegen',
+    ),
+    RunStep(
+      id: 'scene_codegen.test',
+      command: [...getDartCommand(repoRoot), 'test'],
+      workingDirectory: 'packages/scene_codegen',
+    ),
+    RunStep(
+      id: 'scene.analyze',
+      command: [...getFlutterCommand(repoRoot), 'analyze'],
+      workingDirectory: 'packages/scene',
+    ),
+    RunStep(
+      id: 'scene.test',
+      command: [...getFlutterCommand(repoRoot), 'test'],
+      workingDirectory: 'packages/scene',
+    ),
+    RunStep(
+      id: 'greeter_ui.analyze',
+      command: [...getFlutterCommand(repoRoot), 'analyze'],
+      workingDirectory: 'packages/greeter_ui',
+    ),
+    RunStep(
+      id: 'greeter_ui.test',
+      command: [...getFlutterCommand(repoRoot), 'test'],
+      workingDirectory: 'packages/greeter_ui',
+    ),
+    ..._getThemeVerificationSteps(repoRoot, themes),
+    RunStep(
+      id: 'dbus.smoke',
+      command: [
+        'bash',
+        'scripts/debug-dbus.sh',
+        ...getDartCommand(repoRoot),
+        'run',
+        'tool/dbus_gateway_smoke.dart',
+      ],
+      environment: {
+        'AKARI_LOG_DIR': _join(repoRoot.path, '$runDirectory/dbus'),
+      },
+    ),
+  ];
+}
+
+List<RunStep> _buildPerformanceSteps(
+  String command,
+  Directory repoRoot,
+  String runDirectory,
+  ThemePackage theme,
+  List<String> themeArguments,
+) {
+  final operation = command == 'verify-perf' ? 'verify' : 'trace';
+  final entrypoint = getThemePerfCommand(theme, operation);
+  final executable = switch (entrypoint.first) {
+    'dart' => getDartCommand(repoRoot),
+    'flutter' => getFlutterCommand(repoRoot),
+    final executable => [executable],
+  };
+  return [
+    RunStep(
+      id: 'theme.pub_get',
+      command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+      workingDirectory: theme.directory.path,
+    ),
+    ..._sceneGenerationSteps(repoRoot, [theme]),
+    RunStep(
+      id: 'theme.perf.$operation',
+      command: [...executable, ...entrypoint.skip(1), ...themeArguments],
+      workingDirectory: theme.directory.path,
+      environment: {
+        'AKARI_PERF_OUTPUT_DIR': _join(repoRoot.path, '$runDirectory/perf'),
+      },
+    ),
+  ];
 }
 
 List<RunStep> _sceneGenerationSteps(
@@ -316,12 +370,11 @@ List<RunStep> _sceneGenerationSteps(
   final discoveredThemes = themes ?? findThemePackages(repoRoot);
   return [
     for (final theme in discoveredThemes)
-      _step('scenes.generate_${theme.packageName}', [
-        ...getDartCommand(repoRoot),
-        'run',
-        'build_runner',
-        'build',
-      ], workingDirectory: theme.directory.path),
+      RunStep(
+        id: 'scenes.generate_${theme.packageName}',
+        command: [...getDartCommand(repoRoot), 'run', 'build_runner', 'build'],
+        workingDirectory: theme.directory.path,
+      ),
   ];
 }
 
@@ -329,14 +382,17 @@ List<RunStep> _getThemeVerificationSteps(
   Directory repoRoot,
   List<ThemePackage> themes,
 ) {
-  final packageNames = ['greeter_components', 'theme_sdk', 'theme_studio'];
   return [
-    _step('theme_studio.pub_get', [
-      ...getFlutterCommand(repoRoot),
-      'pub',
-      'get',
-    ], workingDirectory: 'packages/theme_studio'),
-    for (final packageName in packageNames)
+    RunStep(
+      id: 'theme_studio.pub_get',
+      command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+      workingDirectory: 'packages/theme_studio',
+    ),
+    for (final packageName in [
+      'greeter_components',
+      'theme_sdk',
+      'theme_studio',
+    ])
       ..._getFlutterPackageVerificationSteps(
         repoRoot,
         Directory(_join(repoRoot.path, 'packages/$packageName')),
@@ -366,36 +422,18 @@ List<RunStep> _getFlutterPackageVerificationSteps(
   final flutter = getFlutterCommand(repoRoot);
 
   return [
-    _step('$packageName.analyze', [
-      ...flutter,
-      'analyze',
-    ], workingDirectory: directory.path),
+    RunStep(
+      id: '$packageName.analyze',
+      command: [...flutter, 'analyze'],
+      workingDirectory: directory.path,
+    ),
     if (hasTests)
-      _step('$packageName.test', [
-        ...flutter,
-        'test',
-      ], workingDirectory: directory.path),
+      RunStep(
+        id: '$packageName.test',
+        command: [...flutter, 'test'],
+        workingDirectory: directory.path,
+      ),
   ];
-}
-
-RunStep _step(
-  String id,
-  List<String> command, {
-  String workingDirectory = '.',
-  Map<String, String> environment = const {},
-  List<String>? dependencies,
-  bool interactive = false,
-  FutureOr<void> Function()? action,
-}) {
-  return RunStep(
-    id: id,
-    command: command,
-    workingDirectory: workingDirectory,
-    environment: environment,
-    dependencies: dependencies,
-    interactive: interactive,
-    action: action,
-  );
 }
 
 Map<String, String> artifactPathsFor(
