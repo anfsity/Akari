@@ -70,15 +70,7 @@ class StudioPreview extends StatefulWidget {
 
 class _StudioPreviewState extends State<StudioPreview> {
   final _canvas = GlobalKey();
-  ({
-    SceneNode source,
-    RenderBox canvas,
-    Offset start,
-    StudioCanvasTool tool,
-    NodeResizeHandle? handle,
-  })?
-  _drag;
-  SceneNode? _dragPreview;
+  _NodeDrag? _drag;
 
   void _startDrag(
     String id,
@@ -90,110 +82,39 @@ class _StudioPreviewState extends State<StudioPreview> {
     final canvas = _canvas.currentContext?.findRenderObject();
     if (canvas is! RenderBox) return;
     setState(() {
-      _drag = (
+      _drag = _NodeDrag(
         source: node,
         canvas: canvas,
         start: canvas.globalToLocal(details.globalPosition),
         tool: widget.tool,
         handle: handle,
       );
-      _dragPreview = node;
     });
   }
 
   void _updateDrag(DragUpdateDetails details) {
     final drag = _drag;
     if (drag == null) return;
-    final node = drag.source;
-    // Convert through the canvas, not the transformed node: rotation, scale
-    // and fit-to-workspace must not change the direction or speed of a drag.
-    final canvas = drag.canvas;
-    final delta = canvas.globalToLocal(details.globalPosition) - drag.start;
-    final updated = drag.handle != null
-        ? calculateResizedNode(
-            source: node,
-            canvasSize: canvas.size,
-            handle: drag.handle!,
-            delta: delta,
-            lockAspectRatio:
-                widget.lockAspectRatio ||
-                HardwareKeyboard.instance.isShiftPressed,
-            minHitTarget: widget.theme.bundle.tokens.minHitTarget,
-            gridSize: widget.preferences.snapToGrid
-                ? widget.preferences.gridSize.toDouble()
-                : null,
-          )
-        : switch (drag.tool) {
-            StudioCanvasTool.move => node.copyWith(
-              rect: calculateMovedRect(
-                rect: node.rect,
-                canvasSize: canvas.size,
-                delta: delta,
-                gridSize: widget.preferences.snapToGrid
-                    ? widget.preferences.gridSize.toDouble()
-                    : null,
-              ),
-            ),
-            StudioCanvasTool.scale => node.copyWith(
-              transform: node.transform.copyWith(
-                scaleX: _calculateScale(
-                  node.transform.scaleX,
-                  delta.dx / canvas.size.width,
-                ),
-                scaleY: _calculateScale(
-                  node.transform.scaleY,
-                  delta.dy / canvas.size.height,
-                ),
-              ),
-            ),
-            StudioCanvasTool.rotate => node.copyWith(
-              transform: node.transform.copyWith(
-                rotationZ:
-                    node.transform.rotationZ +
-                    360 * delta.dx / canvas.size.width,
-              ),
-            ),
-            StudioCanvasTool.rotate3d => node.copyWith(
-              transform: node.transform.copyWith(
-                rotationX:
-                    node.transform.rotationX -
-                    180 * delta.dy / canvas.size.height,
-                rotationY:
-                    node.transform.rotationY +
-                    180 * delta.dx / canvas.size.width,
-              ),
-            ),
-          };
-    final previous = _dragPreview!;
-    if (updated.rect.x == previous.rect.x &&
-        updated.rect.y == previous.rect.y &&
-        updated.rect.width == previous.rect.width &&
-        updated.rect.height == previous.rect.height &&
-        updated.transform.scaleX == previous.transform.scaleX &&
-        updated.transform.scaleY == previous.transform.scaleY &&
-        updated.transform.rotationX == previous.transform.rotationX &&
-        updated.transform.rotationY == previous.transform.rotationY &&
-        updated.transform.rotationZ == previous.transform.rotationZ) {
-      return;
-    }
-    setState(() => _dragPreview = updated);
+    final updated = drag.calculateNode(
+      details.globalPosition,
+      lockAspectRatio:
+          widget.lockAspectRatio || HardwareKeyboard.instance.isShiftPressed,
+      minHitTarget: widget.theme.bundle.tokens.minHitTarget,
+      gridSize: widget.preferences.snapToGrid
+          ? widget.preferences.gridSize.toDouble()
+          : null,
+    );
+    if (!drag.hasGeometryChange(updated)) return;
+    setState(() => drag.preview = updated);
     widget.onDragNodeChanged(updated);
   }
 
-  // Retain mirrored axes and keep a dragged scale usable even at the canvas
-  // edge. Scaling changes the transform, never the component's layout rect.
-  double _calculateScale(double source, double delta) =>
-      (source < 0 ? -1 : 1) * (source.abs() + delta * 3).clamp(0.01, 100.0);
-
   void _stopDrag({required bool commit}) {
-    final node = _dragPreview;
-    if (node == null) return;
-    if (!commit) widget.onDragNodeChanged(_drag!.source);
-    setState(() {
-      _drag = null;
-      _dragPreview = null;
-    });
-    if (commit) widget.onCommitDrag(node);
+    final drag = _drag;
+    if (drag == null) return;
+    if (!commit) widget.onDragNodeChanged(drag.source);
+    setState(() => _drag = null);
+    if (commit) widget.onCommitDrag(drag.preview);
   }
 
   final _simulation = StudioPreviewHost();
@@ -227,7 +148,7 @@ class _StudioPreviewState extends State<StudioPreview> {
   }
 
   SceneDocument _getPreviewDocument() {
-    final dragged = _dragPreview;
+    final dragged = _drag?.preview;
     if (dragged == null) return widget.document;
     return widget.document.copyWith(
       nodes: [
@@ -301,6 +222,99 @@ class _StudioPreviewState extends State<StudioPreview> {
         onCancelDrag: () => _stopDrag(commit: false),
         child: _components.build(context, node),
       );
+}
+
+/// One gesture owns its source and transient result together. Calculations
+/// always use the gesture's source, while notifications compare the last result.
+class _NodeDrag {
+  _NodeDrag({
+    required this.source,
+    required this.canvas,
+    required this.start,
+    required this.tool,
+    this.handle,
+  }) : preview = source;
+
+  final SceneNode source;
+  final RenderBox canvas;
+  final Offset start;
+  final StudioCanvasTool tool;
+  final NodeResizeHandle? handle;
+  SceneNode preview;
+
+  SceneNode calculateNode(
+    Offset globalPosition, {
+    required bool lockAspectRatio,
+    required double minHitTarget,
+    double? gridSize,
+  }) {
+    // Convert through the canvas so node transforms and viewport zoom do not
+    // change the direction or speed of the pointer's movement.
+    final delta = canvas.globalToLocal(globalPosition) - start;
+    if (handle case final handle?) {
+      return calculateResizedNode(
+        source: source,
+        canvasSize: canvas.size,
+        handle: handle,
+        delta: delta,
+        lockAspectRatio: lockAspectRatio,
+        minHitTarget: minHitTarget,
+        gridSize: gridSize,
+      );
+    }
+    return switch (tool) {
+      StudioCanvasTool.move => source.copyWith(
+        rect: calculateMovedRect(
+          rect: source.rect,
+          canvasSize: canvas.size,
+          delta: delta,
+          gridSize: gridSize,
+        ),
+      ),
+      StudioCanvasTool.scale => source.copyWith(
+        transform: source.transform.copyWith(
+          scaleX: _calculateScale(
+            source.transform.scaleX,
+            delta.dx / canvas.size.width,
+          ),
+          scaleY: _calculateScale(
+            source.transform.scaleY,
+            delta.dy / canvas.size.height,
+          ),
+        ),
+      ),
+      StudioCanvasTool.rotate => source.copyWith(
+        transform: source.transform.copyWith(
+          rotationZ:
+              source.transform.rotationZ + 360 * delta.dx / canvas.size.width,
+        ),
+      ),
+      StudioCanvasTool.rotate3d => source.copyWith(
+        transform: source.transform.copyWith(
+          rotationX:
+              source.transform.rotationX - 180 * delta.dy / canvas.size.height,
+          rotationY:
+              source.transform.rotationY + 180 * delta.dx / canvas.size.width,
+        ),
+      ),
+    };
+  }
+
+  bool hasGeometryChange(SceneNode node) =>
+      node.rect.x != preview.rect.x ||
+      node.rect.y != preview.rect.y ||
+      node.rect.width != preview.rect.width ||
+      node.rect.height != preview.rect.height ||
+      node.transform.scaleX != preview.transform.scaleX ||
+      node.transform.scaleY != preview.transform.scaleY ||
+      node.transform.rotationX != preview.transform.rotationX ||
+      node.transform.rotationY != preview.transform.rotationY ||
+      node.transform.rotationZ != preview.transform.rotationZ;
+
+  // Retain mirrored axes and keep scale usable at the canvas edge. Scaling
+  // changes the transform, while resizing changes the component's layout rect.
+  double _calculateScale(double source, double delta) =>
+      (source < 0 ? -1 : 1) * (source.abs() + delta * 3).clamp(0.01, 100.0);
 }
 
 /// Material and localization belong to the compiled theme preview. Editor

@@ -18,6 +18,29 @@ void main() {
     expect(seed, HSVColor.fromAHSV(1, 260, 0.55, 0.95).toColor());
   });
 
+  test('red hues across the wrap boundary outweigh one competing hue', () {
+    final seed = calculateAccentFromRgba(
+      _rgba(const [
+        [255, 5, 0],
+        [255, 0, 5],
+        [0, 255, 0],
+      ]),
+    );
+    final redHue = HSVColor.fromColor(const Color(0xffff0500)).hue;
+    expect(seed, HSVColor.fromAHSV(1, redHue, 0.55, 0.95).toColor());
+  });
+
+  test('bright neutral pixels produce a dark accent', () {
+    expect(
+      calculateAccentFromRgba(
+        _rgba(const [
+          [255, 255, 255],
+        ]),
+      ),
+      const Color(0xff404040),
+    );
+  });
+
   test('uses a neutral accent for empty input', () {
     expect(calculateAccentFromRgba(Uint8List(0)), const Color(0xffd0d0d0));
   });

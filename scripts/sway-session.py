@@ -108,6 +108,35 @@ def get_greeter_outputs(tree):
     return found
 
 
+def get_session_environment(parent_environment, runtime, backend, output_count):
+    """Isolate inner compositor state while retaining its outer Wayland socket."""
+    environment = dict(parent_environment)
+    outer_display = environment.get('WAYLAND_DISPLAY')
+    outer_runtime = environment.get('XDG_RUNTIME_DIR')
+    for key in ['DISPLAY', 'SWAYSOCK', 'WAYLAND_DISPLAY', 'WAYLAND_SOCKET',
+                'WLR_WAYLAND_DISPLAY', 'AKARI_DISPLAY_SOURCE', 'AKARI_TEST_RUN']:
+        environment.pop(key, None)
+    environment.update(XDG_RUNTIME_DIR=str(runtime), WLR_BACKENDS=backend,
+                       GDK_BACKEND='wayland', XDG_CURRENT_DESKTOP='Sway',
+                       XDG_SESSION_DESKTOP='sway', XDG_SESSION_TYPE='wayland',
+                       AKARI_WINDOW_MODE='fullscreen', AKARI_DISPLAY_MODE='mirror')
+    if backend == 'wayland':
+        message = 'Run nested Sway from a Wayland desktop, or select --sway-backend headless.'
+        if not outer_display:
+            raise ValueError(message)
+        display = Path(outer_display)
+        if not display.is_absolute():
+            if not outer_runtime:
+                raise ValueError(message)
+            display = Path(outer_runtime) / display
+        environment['WAYLAND_DISPLAY'] = str(display)
+        environment['WLR_WL_OUTPUTS'] = str(output_count)
+    else:
+        environment.update(WLR_HEADLESS_OUTPUTS=str(output_count), WLR_RENDERER='gles2',
+                           WLR_RENDERER_ALLOW_SOFTWARE='1', LIBGL_ALWAYS_SOFTWARE='1')
+    return environment
+
+
 def start_session(directory, backend, command):
     profile = json.loads(os.environ['AKARI_DISPLAY_PROFILE_JSON'])
     target = get_virtual_outputs(profile, backend)
@@ -128,25 +157,7 @@ def start_session(directory, backend, command):
               'target': target, 'actual': [], 'matched': False,
               'screenshots': [], 'log_directory': str(directory), 'checks': []}
     report_path = directory / 'display-report.json'
-    environment = dict(parent_environment)
-    outer_display = environment.get('WAYLAND_DISPLAY')
-    outer_runtime = environment.get('XDG_RUNTIME_DIR')
-    for key in ['DISPLAY', 'SWAYSOCK', 'WAYLAND_DISPLAY', 'WAYLAND_SOCKET',
-                'WLR_WAYLAND_DISPLAY', 'AKARI_DISPLAY_SOURCE', 'AKARI_TEST_RUN']:
-        environment.pop(key, None)
-    environment.update(XDG_RUNTIME_DIR=str(runtime), WLR_BACKENDS=backend,
-                       GDK_BACKEND='wayland', XDG_CURRENT_DESKTOP='Sway',
-                       XDG_SESSION_DESKTOP='sway', XDG_SESSION_TYPE='wayland',
-                       AKARI_WINDOW_MODE='fullscreen', AKARI_DISPLAY_MODE='mirror')
-    if backend == 'wayland':
-        if not outer_display or (not Path(outer_display).is_absolute() and not outer_runtime):
-            raise ValueError('Run nested Sway from a Wayland desktop, or select --sway-backend headless.')
-        environment['WAYLAND_DISPLAY'] = str(
-            Path(outer_display) if Path(outer_display).is_absolute() else Path(outer_runtime) / outer_display)
-        environment['WLR_WL_OUTPUTS'] = str(len(target))
-    else:
-        environment.update(WLR_HEADLESS_OUTPUTS=str(len(target)), WLR_RENDERER='gles2',
-                           WLR_RENDERER_ALLOW_SOFTWARE='1', LIBGL_ALWAYS_SOFTWARE='1')
+    environment = get_session_environment(parent_environment, runtime, backend, len(target))
     sway = app = None
     output_thread = None
     sway_log = app_log = None

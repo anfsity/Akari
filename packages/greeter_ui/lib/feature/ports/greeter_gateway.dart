@@ -6,26 +6,31 @@ sealed class GreeterEvent {
   const GreeterEvent();
 }
 
-class BackendStateChanged extends GreeterEvent {
+/// Authentication signals belong to one attempt; service loss is independent.
+sealed class AuthenticationEvent extends GreeterEvent {
+  const AuthenticationEvent({required this.attemptId});
+
+  final String attemptId;
+}
+
+class BackendStateChanged extends AuthenticationEvent {
   const BackendStateChanged({
-    required this.attemptId,
+    required super.attemptId,
     required this.state,
     required this.detail,
   });
 
-  final String attemptId;
   final BackendAuthState state;
   final String detail;
 }
 
-class BackendPromptReceived extends GreeterEvent {
+class BackendPromptReceived extends AuthenticationEvent {
   const BackendPromptReceived({
-    required this.attemptId,
+    required super.attemptId,
     required this.kind,
     required this.text,
   });
 
-  final String attemptId;
   final PromptKind kind;
   final String text;
 }

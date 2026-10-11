@@ -284,12 +284,7 @@ class GreeterFeature {
   /// Starts the backend conversation as soon as an account and session are
   /// both known, so the credential field is usable without a confirm step.
   void _beginAuthenticationIfReady() {
-    if (_state.dormant ||
-        _state.authMode != AuthMode.userSelection ||
-        _state.selectedUser == null ||
-        _state.selectedSession == null) {
-      return;
-    }
+    if (_state.dormant) return;
     unawaited(_beginAuthentication());
   }
 
@@ -494,20 +489,7 @@ class GreeterFeature {
 
   void _retryAuthentication() {
     _attemptId = null;
-    _replace(
-      _state.copyWith(
-        serviceMode: ServiceMode.ready,
-        authMode: AuthMode.userSelection,
-        clearPrompt: true,
-        clearAuthError: true,
-        clearPromptError: true,
-        clearCatalogError: _state.sessions.isNotEmpty,
-        catalogMode: _state.sessions.isNotEmpty
-            ? CatalogMode.ready
-            : _state.catalogMode,
-        backendAuthState: BackendAuthState.idle,
-      ),
-    );
+    _resetToUserSelection(serviceMode: ServiceMode.ready);
     _beginAuthenticationIfReady();
   }
 
@@ -534,6 +516,9 @@ class GreeterFeature {
   }
 
   void _handleEvent(GreeterEvent event) {
+    if (event case AuthenticationEvent(:final attemptId)) {
+      if (_queueEventDuringBegin(event) || attemptId != _attemptId) return;
+    }
     switch (event) {
       case BackendDisconnected():
         _attemptId = null;
@@ -549,41 +534,40 @@ class GreeterFeature {
             ),
           ),
         );
-      case BackendStateChanged(:final attemptId, :final state, :final detail):
-        if (_queueEventDuringBegin(event) || attemptId != _attemptId) {
-          return;
-        }
+      case BackendStateChanged(:final state, :final detail):
         _applyBackendState(state, detail);
-      case BackendPromptReceived(:final attemptId, :final kind, :final text):
-        if (_queueEventDuringBegin(event) || attemptId != _attemptId) {
-          return;
-        }
-        if (kind == PromptKind.visible || kind == PromptKind.secret) {
-          _replace(
-            _state.copyWith(
-              authMode: AuthMode.prompting,
-              prompt: (kind: kind, text: text),
-              backendAuthState: BackendAuthState.waitingForInput,
-              clearAuthError: true,
-            ),
-          );
-          _effects.add(const RequestFocusEffect('credential'));
-        } else if (kind == PromptKind.error) {
-          _replace(_state.copyWith(promptError: text));
-        } else {
-          // PAM owns passive authentication and acknowledges these messages
-          // in the backend. Keep its instructions visible for the whole scan
-          // instead of asking for input or hiding them in a transient notice.
-          _replace(
-            _state.copyWith(
-              authMode: AuthMode.submitting,
-              prompt: (kind: kind, text: text),
-              clearAuthError: true,
-              clearPromptError: true,
-            ),
-          );
-          _effects.add(const ClearCredentialEffect());
-        }
+      case BackendPromptReceived(:final kind, :final text):
+        _applyPrompt(kind, text);
+    }
+  }
+
+  void _applyPrompt(PromptKind kind, String text) {
+    switch (kind) {
+      case PromptKind.visible:
+      case PromptKind.secret:
+        _replace(
+          _state.copyWith(
+            authMode: AuthMode.prompting,
+            prompt: (kind: kind, text: text),
+            backendAuthState: BackendAuthState.waitingForInput,
+            clearAuthError: true,
+          ),
+        );
+        _effects.add(const RequestFocusEffect('credential'));
+      case PromptKind.error:
+        _replace(_state.copyWith(promptError: text));
+      case PromptKind.info:
+        // PAM acknowledges passive authentication in the backend. Keep its
+        // instructions visible for the scan without requesting credentials.
+        _replace(
+          _state.copyWith(
+            authMode: AuthMode.submitting,
+            prompt: (kind: kind, text: text),
+            clearAuthError: true,
+            clearPromptError: true,
+          ),
+        );
+        _effects.add(const ClearCredentialEffect());
     }
   }
 
@@ -596,7 +580,9 @@ class GreeterFeature {
   }
 
   void _applyBackendState(BackendAuthState state, String detail) {
-    if (state == BackendAuthState.failed) {
+    final failed = state == BackendAuthState.failed;
+    final clearPrompt = failed || state == BackendAuthState.authenticated;
+    if (failed) {
       _attemptId = null;
     }
     // Prompt carries the input kind and text; WaitingForInput only confirms
@@ -607,13 +593,13 @@ class GreeterFeature {
       BackendAuthState.promptPending ||
       BackendAuthState.submittingResponse ||
       BackendAuthState.resolvingSession ||
-      BackendAuthState.startingSession => AuthMode.submitting,
-      BackendAuthState.authenticated => AuthMode.submitting,
+      BackendAuthState.startingSession ||
+      BackendAuthState.authenticated ||
+      BackendAuthState.cancelling => AuthMode.submitting,
       BackendAuthState.handingOff => AuthMode.handingOff,
       BackendAuthState.failed => AuthMode.error,
-      BackendAuthState.cancelling => AuthMode.submitting,
       BackendAuthState.idle => AuthMode.userSelection,
-      BackendAuthState.waitingForInput => _state.authMode,
+      BackendAuthState.waitingForInput ||
       BackendAuthState.unknown => _state.authMode,
     };
 
@@ -621,20 +607,16 @@ class GreeterFeature {
       _state.copyWith(
         authMode: nextMode,
         backendAuthState: state,
-        authError: state == BackendAuthState.failed
+        authError: failed
             ? (
                 kind: GreeterErrorKind.authentication,
                 message: detail,
                 recovery: GreeterRecovery.retryAuthentication,
               )
             : null,
-        clearAuthError: state != BackendAuthState.failed,
-        clearPromptError:
-            state == BackendAuthState.authenticated ||
-            state == BackendAuthState.failed,
-        clearPrompt:
-            state == BackendAuthState.authenticated ||
-            state == BackendAuthState.failed,
+        clearAuthError: !failed,
+        clearPromptError: clearPrompt,
+        clearPrompt: clearPrompt,
       ),
     );
     if (state == BackendAuthState.authenticated) {
@@ -728,9 +710,13 @@ class GreeterFeature {
     return sessions.isEmpty ? null : sessions.first;
   }
 
-  void _resetToUserSelection({bool clearSelectedUser = false}) {
+  void _resetToUserSelection({
+    bool clearSelectedUser = false,
+    ServiceMode? serviceMode,
+  }) {
     _replace(
       _state.copyWith(
+        serviceMode: serviceMode,
         authMode: AuthMode.userSelection,
         clearSelectedUser: clearSelectedUser,
         clearPrompt: true,
@@ -771,31 +757,18 @@ class GreeterFeature {
       return;
     }
     _state = next;
-    // Notify only regions whose semantic content changed. Publishing every
-    // slot on every transition would rebuild unrelated controls and defeat
-    // the scene's independent build boundaries.
+    // ValueNotifier compares semantic slot equality before notifying, so
+    // unrelated transitions do not rebuild every region of the scene.
     final nextSlots = GreeterSceneSlots.fromState(
       next,
       canSelectUser: _canSelectUser,
     );
-    if (_serviceSlots.value != nextSlots.service) {
-      _serviceSlots.value = nextSlots.service;
-    }
-    if (_authPromptSlots.value != nextSlots.authPrompt) {
-      _authPromptSlots.value = nextSlots.authPrompt;
-    }
-    if (_accountPickerSlots.value != nextSlots.accountPicker) {
-      _accountPickerSlots.value = nextSlots.accountPicker;
-    }
-    if (_sessionPickerSlots.value != nextSlots.sessionPicker) {
-      _sessionPickerSlots.value = nextSlots.sessionPicker;
-    }
-    if (_powerSlots.value != nextSlots.power) {
-      _powerSlots.value = nextSlots.power;
-    }
-    if (_dormantSlots.value != next.dormant) {
-      _dormantSlots.value = next.dormant;
-    }
+    _serviceSlots.value = nextSlots.service;
+    _authPromptSlots.value = nextSlots.authPrompt;
+    _accountPickerSlots.value = nextSlots.accountPicker;
+    _sessionPickerSlots.value = nextSlots.sessionPicker;
+    _powerSlots.value = nextSlots.power;
+    _dormantSlots.value = next.dormant;
   }
 
   GreeterError _getGreeterError(

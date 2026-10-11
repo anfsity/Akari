@@ -679,7 +679,11 @@ async fn create_attempt(
         attempt_id: attempt_id.clone(),
         cancellation: cancellation.clone(),
     }));
-    emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, &attempt_id)).await;
+    emit_state_best_effort(
+        Some(emitter),
+        &AuthSnapshot::from_auth(&actor.auth, &attempt_id),
+    )
+    .await;
     spawn_caller_watcher(
         emitter.connection().clone(),
         caller,
@@ -703,24 +707,9 @@ async fn run_authentication(
     let cancellation = actor.get_attempt().cancellation.clone();
     // I/O stays in the same actor command after acceptance, so cancellation
     // still finishes cleanup before a replacement transaction can start.
-    let transport = match GreetdTransport::connect(&cancellation).await {
-        Ok(transport) => transport,
-        Err(GreetdError::Cancelled) => {
-            return Err(finish_cancellation(
-                actor,
-                attempt_id,
-                Some(&emitter),
-                snapshots,
-                controls,
-            )
-            .await);
-        }
-        Err(error) => {
-            return Err(
-                fail_transaction(actor, attempt_id, error, &emitter, snapshots, controls).await,
-            );
-        }
-    };
+    let result = GreetdTransport::connect(&cancellation).await;
+    let transport =
+        handle_transport_result(actor, attempt_id, result, &emitter, snapshots, controls).await?;
     actor
         .attempt
         .as_mut()
@@ -731,24 +720,8 @@ async fn run_authentication(
         .get_transport()
         .create_session(username, &cancellation)
         .await;
-    let response = match response {
-        Ok(response) => response,
-        Err(GreetdError::Cancelled) => {
-            return Err(finish_cancellation(
-                actor,
-                attempt_id,
-                Some(&emitter),
-                snapshots,
-                controls,
-            )
-            .await);
-        }
-        Err(error) => {
-            return Err(
-                fail_transaction(actor, attempt_id, error, &emitter, snapshots, controls).await,
-            );
-        }
-    };
+    let response =
+        handle_transport_result(actor, attempt_id, response, &emitter, snapshots, controls).await?;
 
     consume_response(
         actor,
@@ -784,31 +757,19 @@ async fn handle_respond(
         .transition(StateEvent::ResponseSubmitted)
         .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
+    emit_state_best_effort(
+        Some(&emitter),
+        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+    )
+    .await;
 
     let result = actor
         .get_transport()
         .post_auth_message_response(Some(response.as_str()), &cancellation)
         .await;
     drop(response);
-    let next_response = match result {
-        Ok(response) => response,
-        Err(GreetdError::Cancelled) => {
-            return Err(finish_cancellation(
-                actor,
-                attempt_id,
-                Some(&emitter),
-                snapshots,
-                controls,
-            )
-            .await);
-        }
-        Err(error) => {
-            return Err(
-                fail_transaction(actor, attempt_id, error, &emitter, snapshots, controls).await,
-            );
-        }
-    };
+    let next_response =
+        handle_transport_result(actor, attempt_id, result, &emitter, snapshots, controls).await?;
 
     consume_response(
         actor,
@@ -834,7 +795,11 @@ async fn resolve_session(
         .transition(StateEvent::StartSessionRequested)
         .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, attempt_id)).await;
+    emit_state_best_effort(
+        Some(emitter),
+        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+    )
+    .await;
     Ok(())
 }
 
@@ -851,7 +816,11 @@ async fn session_unavailable(
         .transition(StateEvent::SessionUnavailable { detail })
         .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, attempt_id)).await;
+    emit_state_best_effort(
+        Some(emitter),
+        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+    )
+    .await;
     Ok(())
 }
 
@@ -872,7 +841,11 @@ async fn session_resolution_failed(
         })
         .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, attempt_id)).await;
+    emit_state_best_effort(
+        Some(emitter),
+        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+    )
+    .await;
     detach_resources(actor, controls);
     Ok(())
 }
@@ -893,7 +866,11 @@ async fn handle_start_session(
         .transition(StateEvent::SessionResolved)
         .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
+    emit_state_best_effort(
+        Some(&emitter),
+        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+    )
+    .await;
 
     tracing::info!(%attempt_id, session_id = %session.session_id, source = %session.source.display(), state = actor.auth.state().as_str(), "starting desktop session");
     let environment = session_environment(&session);
@@ -901,24 +878,8 @@ async fn handle_start_session(
         .get_transport()
         .start_session(&session.exec, &environment, &cancellation)
         .await;
-    let response = match response {
-        Ok(response) => response,
-        Err(GreetdError::Cancelled) => {
-            return Err(finish_cancellation(
-                actor,
-                attempt_id,
-                Some(&emitter),
-                snapshots,
-                controls,
-            )
-            .await);
-        }
-        Err(error) => {
-            return Err(
-                fail_transaction(actor, attempt_id, error, &emitter, snapshots, controls).await,
-            );
-        }
-    };
+    let response =
+        handle_transport_result(actor, attempt_id, response, &emitter, snapshots, controls).await?;
 
     match response {
         GreetdResponse::Success => {
@@ -928,7 +889,11 @@ async fn handle_start_session(
                 .transition(StateEvent::SessionStarted)
                 .expect("authentication event matches the actor phase");
             publish_state(&actor.auth, attempt_id, snapshots);
-            emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
+            emit_state_best_effort(
+                Some(&emitter),
+                &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+            )
+            .await;
             detach_resources(actor, controls);
             Ok(())
         }
@@ -945,7 +910,11 @@ async fn handle_start_session(
                 })
                 .expect("authentication event matches the actor phase");
             publish_state(&actor.auth, attempt_id, snapshots);
-            emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
+            emit_state_best_effort(
+                Some(&emitter),
+                &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+            )
+            .await;
             detach_resources(actor, controls);
             Err(fdo::Error::Failed(detail))
         }
@@ -960,6 +929,28 @@ async fn handle_start_session(
             controls,
         )
         .await),
+    }
+}
+
+/// Transport failures always complete actor cleanup before returning to the
+/// command loop. Connection and frame exchanges use the same cancellation and
+/// failure transitions, so callers cannot accidentally leave an attempt alive.
+async fn handle_transport_result<T>(
+    actor: &mut ActorState,
+    attempt_id: &str,
+    result: Result<T, GreetdError>,
+    emitter: &SignalEmitter<'static>,
+    snapshots: &watch::Sender<AuthSnapshot>,
+    controls: &watch::Sender<Option<AttemptControl>>,
+) -> fdo::Result<T> {
+    match result {
+        Ok(value) => Ok(value),
+        Err(GreetdError::Cancelled) => {
+            Err(finish_cancellation(actor, attempt_id, Some(emitter), snapshots, controls).await)
+        }
+        Err(error) => {
+            Err(fail_transaction(actor, attempt_id, error, emitter, snapshots, controls).await)
+        }
     }
 }
 
@@ -994,7 +985,11 @@ async fn consume_response(
                     .transition(StateEvent::AuthenticationSucceeded)
                     .expect("authentication event matches the actor phase");
                 publish_state(&actor.auth, attempt_id, snapshots);
-                emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
+                emit_state_best_effort(
+                    Some(&emitter),
+                    &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+                )
+                .await;
                 return Ok(());
             }
             GreetdResponse::Error {
@@ -1005,38 +1000,23 @@ async fn consume_response(
                 // A rejected PAM conversation remains configured in greetd.
                 // Dropping its socket does not cancel that server-side session;
                 // reset it before retrying or accepting a later explicit begin.
-                match actor.get_transport().cancel_session(cancellation).await {
-                    Ok(GreetdResponse::Success) => {}
-                    Ok(_) => {
-                        return Err(fail_transaction(
-                            actor,
-                            attempt_id,
-                            GreetdError::UnexpectedResponse(
-                                "unexpected reply while cancelling rejected authentication"
-                                    .to_owned(),
-                            ),
-                            &emitter,
-                            snapshots,
-                            controls,
-                        )
-                        .await);
-                    }
-                    Err(GreetdError::Cancelled) => {
-                        return Err(finish_cancellation(
-                            actor,
-                            attempt_id,
-                            Some(&emitter),
-                            snapshots,
-                            controls,
-                        )
-                        .await);
-                    }
-                    Err(error) => {
-                        return Err(fail_transaction(
-                            actor, attempt_id, error, &emitter, snapshots, controls,
-                        )
-                        .await);
-                    }
+                let result = actor.get_transport().cancel_session(cancellation).await;
+                let cancel_response = handle_transport_result(
+                    actor, attempt_id, result, &emitter, snapshots, controls,
+                )
+                .await?;
+                if !matches!(cancel_response, GreetdResponse::Success) {
+                    return Err(fail_transaction(
+                        actor,
+                        attempt_id,
+                        GreetdError::UnexpectedResponse(
+                            "unexpected reply while cancelling rejected authentication".to_owned(),
+                        ),
+                        &emitter,
+                        snapshots,
+                        controls,
+                    )
+                    .await);
                 }
                 // Automatic info/error acknowledgments also use
                 // SubmittingResponse. Only a conversation with user input may
@@ -1056,8 +1036,11 @@ async fn consume_response(
                         })
                         .expect("authentication event matches the actor phase");
                     publish_state(&actor.auth, attempt_id, snapshots);
-                    emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id))
-                        .await;
+                    emit_state_best_effort(
+                        Some(&emitter),
+                        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+                    )
+                    .await;
                     emit_prompt_best_effort(&emitter, attempt_id, "error", detail, cancellation)
                         .await;
 
@@ -1068,53 +1051,24 @@ async fn consume_response(
                     resources.transport.take();
                     resources.user_response_submitted = false;
 
-                    let transport = match GreetdTransport::connect(cancellation).await {
-                        Ok(transport) => transport,
-                        Err(GreetdError::Cancelled) => {
-                            return Err(finish_cancellation(
-                                actor,
-                                attempt_id,
-                                Some(&emitter),
-                                snapshots,
-                                controls,
-                            )
-                            .await);
-                        }
-                        Err(error) => {
-                            return Err(fail_transaction(
-                                actor, attempt_id, error, &emitter, snapshots, controls,
-                            )
-                            .await);
-                        }
-                    };
+                    let result = GreetdTransport::connect(cancellation).await;
+                    let transport = handle_transport_result(
+                        actor, attempt_id, result, &emitter, snapshots, controls,
+                    )
+                    .await?;
                     actor
                         .attempt
                         .as_mut()
                         .expect("active authentication owns attempt resources")
                         .transport = Some(transport);
-                    response = match actor
+                    let result = actor
                         .get_transport()
                         .create_session(&username, cancellation)
-                        .await
-                    {
-                        Ok(response) => response,
-                        Err(GreetdError::Cancelled) => {
-                            return Err(finish_cancellation(
-                                actor,
-                                attempt_id,
-                                Some(&emitter),
-                                snapshots,
-                                controls,
-                            )
-                            .await);
-                        }
-                        Err(error) => {
-                            return Err(fail_transaction(
-                                actor, attempt_id, error, &emitter, snapshots, controls,
-                            )
-                            .await);
-                        }
-                    };
+                        .await;
+                    response = handle_transport_result(
+                        actor, attempt_id, result, &emitter, snapshots, controls,
+                    )
+                    .await?;
                     continue;
                 }
 
@@ -1126,7 +1080,11 @@ async fn consume_response(
                     })
                     .expect("authentication event matches the actor phase");
                 publish_state(&actor.auth, attempt_id, snapshots);
-                emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
+                emit_state_best_effort(
+                    Some(&emitter),
+                    &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+                )
+                .await;
                 detach_resources(actor, controls);
                 return Err(fdo::Error::Failed(detail));
             }
@@ -1139,7 +1097,11 @@ async fn consume_response(
                     .transition(StateEvent::AuthMessage)
                     .expect("authentication event matches the actor phase");
                 publish_state(&actor.auth, attempt_id, snapshots);
-                emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id)).await;
+                emit_state_best_effort(
+                    Some(&emitter),
+                    &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+                )
+                .await;
                 if cancellation.is_cancelled() {
                     return Err(finish_cancellation(
                         actor,
@@ -1175,8 +1137,11 @@ async fn consume_response(
                             .transition(StateEvent::PromptNeedsInput)
                             .expect("authentication event matches the actor phase");
                         publish_state(&actor.auth, attempt_id, snapshots);
-                        emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id))
-                            .await;
+                        emit_state_best_effort(
+                            Some(&emitter),
+                            &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+                        )
+                        .await;
                         if cancellation.is_cancelled() {
                             return Err(finish_cancellation(
                                 actor,
@@ -1195,31 +1160,19 @@ async fn consume_response(
                             .transition(StateEvent::PromptAutoResponse)
                             .expect("authentication event matches the actor phase");
                         publish_state(&actor.auth, attempt_id, snapshots);
-                        emit_state_best_effort(Some(&emitter), &snapshot(&actor.auth, attempt_id))
-                            .await;
-                        response = match actor
+                        emit_state_best_effort(
+                            Some(&emitter),
+                            &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+                        )
+                        .await;
+                        let result = actor
                             .get_transport()
                             .post_auth_message_response(None, cancellation)
-                            .await
-                        {
-                            Ok(response) => response,
-                            Err(GreetdError::Cancelled) => {
-                                return Err(finish_cancellation(
-                                    actor,
-                                    attempt_id,
-                                    Some(&emitter),
-                                    snapshots,
-                                    controls,
-                                )
-                                .await);
-                            }
-                            Err(error) => {
-                                return Err(fail_transaction(
-                                    actor, attempt_id, error, &emitter, snapshots, controls,
-                                )
-                                .await);
-                            }
-                        };
+                            .await;
+                        response = handle_transport_result(
+                            actor, attempt_id, result, &emitter, snapshots, controls,
+                        )
+                        .await?;
                     }
                     _ => {
                         return Err(fail_transaction(
@@ -1281,7 +1234,11 @@ async fn cancel_current(
         .expect("authentication event matches the actor phase");
     publish_state(&actor.auth, &attempt_id, snapshots);
     if let Some(emitter) = emitter.as_ref() {
-        emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, &attempt_id)).await;
+        emit_state_best_effort(
+            Some(emitter),
+            &AuthSnapshot::from_auth(&actor.auth, &attempt_id),
+        )
+        .await;
     }
     let mut resources = actor
         .attempt
@@ -1310,7 +1267,11 @@ async fn cancel_current(
         .transition(StateEvent::CancellationFinished)
         .expect("cancellation completes from Cancelling");
     publish_state(&actor.auth, &attempt_id, snapshots);
-    emit_state_best_effort(emitter.as_ref(), &snapshot(&actor.auth, &attempt_id)).await;
+    emit_state_best_effort(
+        emitter.as_ref(),
+        &AuthSnapshot::from_auth(&actor.auth, &attempt_id),
+    )
+    .await;
 
     match cancel_result {
         Ok(GreetdResponse::Success) => {
@@ -1362,14 +1323,14 @@ async fn finish_cancellation(
         .transition(StateEvent::CancelRequested)
         .expect("transport cancellation occurs during active authentication");
     publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(emitter, &snapshot(&actor.auth, attempt_id)).await;
+    emit_state_best_effort(emitter, &AuthSnapshot::from_auth(&actor.auth, attempt_id)).await;
     detach_resources(actor, controls);
     actor
         .auth
         .transition(StateEvent::CancellationFinished)
         .expect("cancellation completes from Cancelling");
     publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(emitter, &snapshot(&actor.auth, attempt_id)).await;
+    emit_state_best_effort(emitter, &AuthSnapshot::from_auth(&actor.auth, attempt_id)).await;
 
     tracing::info!(%attempt_id, "authentication cancelled; transport closed");
     cancelled_error()
@@ -1396,7 +1357,11 @@ async fn fail_transaction(
         })
         .expect("protocol failure occurs during active authentication");
     publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(Some(emitter), &snapshot(&actor.auth, attempt_id)).await;
+    emit_state_best_effort(
+        Some(emitter),
+        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
+    )
+    .await;
     detach_resources(actor, controls);
     fdo::Error::Failed(detail)
 }
@@ -1412,11 +1377,7 @@ fn publish_state(
     snapshots: &watch::Sender<AuthSnapshot>,
 ) {
     tracing::info!(%attempt_id, state = auth.state().as_str(), "authentication state changed");
-    let _ = snapshots.send(snapshot(auth, attempt_id));
-}
-
-fn snapshot(auth: &AuthStateMachine, attempt_id: &str) -> AuthSnapshot {
-    AuthSnapshot::from_auth(auth, attempt_id)
+    let _ = snapshots.send(AuthSnapshot::from_auth(auth, attempt_id));
 }
 
 fn spawn_caller_watcher(
@@ -1624,7 +1585,7 @@ mod tests {
 
     use super::{
         ActorState, AuthActorHandle, AuthSnapshot, cancel_current, display_detail,
-        session_environment, snapshot, validate_attempt, validate_cancel_target,
+        session_environment, validate_attempt, validate_cancel_target,
     };
     use crate::{
         session_catalog::{SessionEntry, SessionType},
@@ -1673,7 +1634,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            snapshot(&auth, &attempt_id),
+            AuthSnapshot::from_auth(&auth, &attempt_id),
             AuthSnapshot {
                 attempt_id,
                 state: "Failed".to_owned(),
