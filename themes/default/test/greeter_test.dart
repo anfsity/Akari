@@ -482,15 +482,15 @@ void main() {
           matching: find.byWidgetPredicate(
             (widget) =>
                 widget is DecoratedBox &&
-                widget.decoration is BoxDecoration &&
-                (widget.decoration as BoxDecoration).border != null,
+                widget.decoration is ShapeDecoration &&
+                (widget.decoration as ShapeDecoration).shape is InputBorder,
           ),
         )
         .first;
     final decoration =
-        tester.widget<DecoratedBox>(fieldSurface).decoration as BoxDecoration;
+        tester.widget<DecoratedBox>(fieldSurface).decoration as ShapeDecoration;
     expect(
-      (decoration.border as Border).top.color,
+      (decoration.shape as InputBorder).borderSide.color,
       buildDefaultTheme().materialTheme.colorScheme.primary,
     );
   });

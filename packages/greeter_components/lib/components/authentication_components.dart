@@ -53,16 +53,10 @@ class CredentialField extends StatelessWidget {
             : focusNode.hasFocus
             ? inputTheme.focusedBorder ?? inputTheme.enabledBorder
             : inputTheme.enabledBorder;
-        final borderRadius = border is OutlineInputBorder
-            ? border.borderRadius
-            : BorderRadius.zero;
         return DecoratedBox(
-          decoration: BoxDecoration(
+          decoration: ShapeDecoration(
             color: inputTheme.fillColor,
-            borderRadius: borderRadius,
-            border: Border.fromBorderSide(
-              border?.borderSide ?? BorderSide.none,
-            ),
+            shape: border ?? InputBorder.none,
           ),
           child: child,
         );
