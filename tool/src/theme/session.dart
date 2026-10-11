@@ -1,0 +1,292 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import '../sdk_commands.dart';
+import 'model.dart';
+
+// A restart includes generation; regeneration includes a reload. Coalescing
+// retains the strongest pending request while one serialized batch is active.
+enum _ReloadRequest { reload, regenerate, restart }
+
+/// Owns one Flutter machine session and its watchers, protocol requests and
+/// generator. A failed generation leaves the current application running;
+/// source edits arriving during a batch belong to the next batch.
+class ThemeSession {
+  ThemeSession({
+    required this.repoRoot,
+    required this.theme,
+    required this.host,
+    required this.mode,
+    required this.backend,
+  });
+
+  final Directory repoRoot;
+  final Directory theme;
+  final Directory host;
+  final BuildMode mode;
+  final String backend;
+
+  late final Process _process;
+  final _subscriptions = <StreamSubscription<dynamic>>[];
+  final _watched = <String>{};
+  final _requests = <int, Completer<Map<String, dynamic>>>{};
+  var _requestId = 0;
+  String? _appId;
+  var _ready = false;
+  var _stopping = false;
+  var _reloading = false;
+  _ReloadRequest? _pendingReload;
+  Timer? _debounce;
+  Process? _generator;
+
+  Future<int> start() async {
+    final flutter = getFlutterCommand(repoRoot);
+    _process = await Process.start(flutter.first, [
+      ...flutter.skip(1),
+      'run',
+      '-d',
+      'linux',
+      '--${mode.name}',
+      '--no-pub',
+      '--machine',
+      '--dart-define=AKARI_BACKEND=$backend',
+    ], workingDirectory: host.path);
+    final outputDone = Completer<void>();
+    _subscriptions.add(
+      _process.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(_handleFlutterOutput, onDone: outputDone.complete),
+    );
+    final stderrDone = _process.stderr.listen(stderr.add).asFuture<void>();
+    _subscriptions.add(stdin.listen(_handleInput));
+    for (final signal in [ProcessSignal.sigint, ProcessSignal.sigterm]) {
+      _subscriptions.add(
+        signal.watch().listen((_) {
+          unawaited(_stop());
+        }),
+      );
+    }
+    if (mode == BuildMode.debug) {
+      _watchDirectory(Directory('${theme.path}/lib'));
+      _watchDirectory(Directory('${theme.path}/assets'));
+      _watchDirectory(Directory('${repoRoot.path}/lib'));
+      for (final package in Directory(
+        '${repoRoot.path}/packages',
+      ).listSync().whereType<Directory>()) {
+        _watchDirectory(Directory('${package.path}/lib'));
+      }
+    }
+    try {
+      final status = await _process.exitCode;
+      await Future.wait([outputDone.future, stderrDone]);
+      return status;
+    } finally {
+      await _close();
+    }
+  }
+
+  void _handleInput(List<int> bytes) {
+    for (final byte in bytes) {
+      switch (byte) {
+        case 114:
+          _queueReload(_ReloadRequest.regenerate);
+        case 82:
+          _queueReload(_ReloadRequest.restart);
+        case 113:
+        case 3:
+          unawaited(_stop());
+      }
+    }
+  }
+
+  void _queueReload(_ReloadRequest request) {
+    if (mode != BuildMode.debug || _stopping) return;
+    _pendingReload = switch ((_pendingReload, request)) {
+      (_ReloadRequest.restart, _) ||
+      (_, _ReloadRequest.restart) => _ReloadRequest.restart,
+      (_ReloadRequest.regenerate, _) ||
+      (_, _ReloadRequest.regenerate) => _ReloadRequest.regenerate,
+      _ => _ReloadRequest.reload,
+    };
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), () {
+      unawaited(_reload());
+    });
+  }
+
+  Future<void> _reload() async {
+    if (!_ready || _stopping || _reloading) return;
+    _reloading = true;
+    try {
+      while (_pendingReload != null && !_stopping) {
+        final request = _pendingReload!;
+        _pendingReload = null;
+        if (request != _ReloadRequest.reload && !await _generateScenes()) {
+          continue;
+        }
+        if (_stopping) break;
+        final restart = request == _ReloadRequest.restart;
+        final response = await _sendRequest('app.restart', {
+          'appId': _appId,
+          'fullRestart': restart,
+          'pause': false,
+          'reason': 'Akari theme changed',
+        });
+        if (response.containsKey('error')) {
+          stderr.writeln('Flutter reload failed: ${response['error']}');
+        } else {
+          final result = response['result'] as Map<String, dynamic>;
+          stdout.writeln(
+            result['message'] ??
+                (restart ? 'Hot restart complete.' : 'Hot reload complete.'),
+          );
+        }
+      }
+    } finally {
+      _reloading = false;
+    }
+  }
+
+  Future<bool> _generateScenes() async {
+    final dart = getDartCommand(repoRoot);
+    final generator = await Process.start(dart.first, [
+      ...dart.skip(1),
+      'run',
+      'build_runner',
+      'build',
+    ], workingDirectory: theme.path);
+    _generator = generator;
+    try {
+      final output = Future.wait([
+        generator.stdout.listen(stdout.add).asFuture<void>(),
+        generator.stderr.listen(stderr.add).asFuture<void>(),
+      ]);
+      final status = await generator.exitCode;
+      await output;
+      if (status != 0) {
+        stderr.writeln('Scene generation failed; keeping the running theme.');
+        return false;
+      }
+      return true;
+    } finally {
+      _generator = null;
+    }
+  }
+
+  Future<Map<String, dynamic>> _sendRequest(
+    String method,
+    Map<String, Object?> params,
+  ) {
+    final id = ++_requestId;
+    final response = Completer<Map<String, dynamic>>();
+    _requests[id] = response;
+    _process.stdin.writeln(
+      jsonEncode([
+        {'id': id, 'method': method, 'params': params},
+      ]),
+    );
+    return response.future;
+  }
+
+  Future<void> _stop() async {
+    if (_stopping) return;
+    _stopping = true;
+    _generator?.kill();
+    if (_appId == null) {
+      _process.kill();
+    } else {
+      await _sendRequest('app.stop', {'appId': _appId});
+    }
+  }
+
+  void _watchDirectory(Directory directory) {
+    if (!directory.existsSync() || !_watched.add(directory.path)) return;
+    _subscriptions.add(
+      directory.watch().listen(
+        (event) {
+          if (event.isDirectory) {
+            if (event.type == FileSystemEvent.create ||
+                event.type == FileSystemEvent.move) {
+              _watchDirectory(Directory(event.path));
+            }
+            return;
+          }
+          // build_runner writes these itself; watching its output as a source
+          // edit would schedule a second reload for every scene regeneration.
+          if (event.path.endsWith('.scene.g.dart')) return;
+          final dart = event.path.endsWith('.dart');
+          final scene = event.path.endsWith('.scene.json');
+          final asset = event.path.contains('/assets/');
+          if (dart || scene || asset) {
+            _queueReload(
+              scene || event.path.contains('/scene_codegen/lib/')
+                  ? _ReloadRequest.regenerate
+                  : _ReloadRequest.reload,
+            );
+          }
+        },
+        onError: (Object error) {
+          stderr.writeln('Theme source watcher failed: $error');
+          unawaited(_stop());
+        },
+      ),
+    );
+    for (final child
+        in directory.listSync(followLinks: false).whereType<Directory>()) {
+      _watchDirectory(child);
+    }
+  }
+
+  void _handleFlutterOutput(String line) {
+    if (!line.startsWith('[{') || !line.endsWith('}]')) {
+      stdout.writeln(line);
+      return;
+    }
+    final messages = jsonDecode(line) as List;
+    for (final value in messages) {
+      final message = value as Map<String, dynamic>;
+      final id = message['id'];
+      if (id is int) {
+        _requests.remove(id)?.complete(message);
+        continue;
+      }
+      final params = message['params'] as Map<String, dynamic>?;
+      switch (message['event']) {
+        case 'app.start':
+          _appId = params!['appId'] as String;
+        case 'app.started':
+          _ready = true;
+          stdout.writeln(
+            mode == BuildMode.debug
+                ? 'Greeter ready. Sources reload on save; r reloads, R restarts, q quits.'
+                : 'Greeter ready. Press q to quit.',
+          );
+          unawaited(_reload());
+        case 'app.log':
+          stdout.writeln(params!['log']);
+        case 'app.progress':
+          if (params!['message'] != null) {
+            stdout.writeln(params['message']);
+          }
+        case 'daemon.logMessage':
+          stdout.writeln(params!['message']);
+      }
+    }
+  }
+
+  Future<void> _close() async {
+    _stopping = true;
+    _debounce?.cancel();
+    _generator?.kill();
+    // Settle requests before cancelling protocol delivery. An in-flight reload
+    // or stop must not await a reply from a process that has already exited.
+    for (final request in _requests.values) {
+      request.complete({'error': 'Flutter session closed.'});
+    }
+    for (final subscription in _subscriptions) {
+      await subscription.cancel();
+    }
+  }
+}
