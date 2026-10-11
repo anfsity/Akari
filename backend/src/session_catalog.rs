@@ -125,9 +125,7 @@ impl SessionCatalog {
                     continue;
                 }
 
-                if let Some(session) = parse_session_file(&path, *session_type)
-                    && session_available(&session)
-                {
+                if let Some(session) = parse_session_file(&path, *session_type) {
                     sessions.push(session);
                 }
             }
@@ -190,7 +188,7 @@ fn parse_session_file(path: &Path, session_type: SessionType) -> Option<SessionE
             value
                 .split(';')
                 .map(str::trim)
-                .filter(|name| !name.is_empty() && is_safe_env_value(name))
+                .filter(|name| is_safe_env_value(name))
                 .map(str::to_owned)
                 .collect()
         })
@@ -315,14 +313,6 @@ fn tokenize_exec(value: &str) -> Result<Vec<String>, ()> {
     }
 
     Ok(tokens)
-}
-
-/// Checks that the executable at the head of a parsed session command exists.
-fn session_available(session: &SessionEntry) -> bool {
-    session
-        .exec
-        .first()
-        .is_some_and(|command| is_executable(Path::new(command)))
 }
 
 /// Resolves a command name through a backend-owned path, or checks an explicit

@@ -60,10 +60,9 @@ SceneDocument decodeSceneDocumentMap(Map<String, dynamic> json) {
     throw FormatException('Unsupported scene version: $version');
   }
 
-  final nodesJson = _list(json, 'nodes');
   final nodeIds = <String>{};
   final nodes = <SceneNode>[
-    for (final rawNode in nodesJson)
+    for (final rawNode in _list(json, 'nodes'))
       _decodeNode(_asMap(rawNode, 'nodes[]'), nodeIds, version),
   ];
   if (nodes.isEmpty) {
@@ -72,9 +71,18 @@ SceneDocument decodeSceneDocumentMap(Map<String, dynamic> json) {
     );
   }
 
-  final canvasJson = _map(json, 'canvas');
-  final referenceWidth = _int(canvasJson, 'referenceWidth', fallback: 1920);
-  final referenceHeight = _int(canvasJson, 'referenceHeight', fallback: 1080);
+  return SceneDocument(
+    id: _string(json, 'id'),
+    version: currentSceneVersion,
+    canvas: _decodeCanvas(_map(json, 'canvas')),
+    background: _decodeBackground(_map(json, 'background')),
+    nodes: nodes,
+  );
+}
+
+SceneCanvas _decodeCanvas(Map<String, dynamic> json) {
+  final referenceWidth = _int(json, 'referenceWidth', fallback: 1920);
+  final referenceHeight = _int(json, 'referenceHeight', fallback: 1080);
   if (referenceWidth < 1 ||
       referenceWidth > 16384 ||
       referenceHeight < 1 ||
@@ -83,27 +91,18 @@ SceneDocument decodeSceneDocumentMap(Map<String, dynamic> json) {
       'Canvas reference dimensions must be between 1 and 16384 pixels.',
     );
   }
-  return SceneDocument(
-    id: _string(json, 'id'),
-    version: currentSceneVersion,
-    canvas: SceneCanvas(
-      fit: _enumValue(
-        SceneCanvasFit.values,
-        _string(canvasJson, 'fit'),
-        'canvas.fit',
-      ),
-      useSafeArea: _bool(canvasJson, 'useSafeArea', fallback: true),
-      referenceWidth: referenceWidth,
-      referenceHeight: referenceHeight,
-    ),
-    background: _decodeBackground(_map(json, 'background')),
-    nodes: nodes,
+  return SceneCanvas(
+    fit: _enumValue(SceneCanvasFit.values, _string(json, 'fit'), 'canvas.fit'),
+    useSafeArea: _bool(json, 'useSafeArea', fallback: true),
+    referenceWidth: referenceWidth,
+    referenceHeight: referenceHeight,
   );
 }
 
 /// Encodes a scene document into its JSON authoring form.
 String encodeSceneDocument(SceneDocument document) {
-  return const JsonEncoder.withIndent('  ').convert(sceneDocumentToMap(document));
+  return const JsonEncoder.withIndent('  ')
+      .convert(sceneDocumentToMap(document));
 }
 
 /// Encodes a scene document into a JSON-ready map.
@@ -175,49 +174,14 @@ SceneNode _decodeNode(
     throw FormatException('Duplicate scene node id: $id');
   }
 
-  final rectJson = _map(json, 'rect');
-  final rect = SceneRect(
-    x: _double(rectJson, 'x'),
-    y: _double(rectJson, 'y'),
-    width: _double(rectJson, 'width'),
-    height: _double(rectJson, 'height'),
-  );
-  if (!rect.isNormalized) {
-    throw FormatException('Node $id has a non-normalized rect.');
-  }
-
+  final rect = _decodeRect(_map(json, 'rect'), id);
   final transformJson = _map(json, 'transform', fallback: const {});
-  // Normalize the old closed kind/action vocabulary into v2 components and
-  // interactivity here. Runtime and codegen consume only the current model.
-  final versionOne = version == 1;
-  final componentId = _string(json, versionOne ? 'kind' : 'component');
-  if (componentId.trim().isEmpty) {
-    throw FormatException('Node $id has an empty component id.');
-  }
-  if (versionOne && !_legacyComponentIds.contains(componentId)) {
-    throw FormatException('Unknown version 1 node kind: $componentId');
-  }
-
-  final legacyAction = versionOne ? _nullableString(json, 'action') : null;
-  if (legacyAction != null && !_legacyActionIds.contains(legacyAction)) {
-    throw FormatException('Unknown version 1 node action: $legacyAction');
-  }
+  final component = _decodeComponent(json, id, version);
   return SceneNode(
     id: id,
-    componentId: componentId,
+    componentId: component.id,
     rect: rect,
-    transform: SceneTransform(
-      translateX: _double(transformJson, 'translateX', fallback: 0),
-      translateY: _double(transformJson, 'translateY', fallback: 0),
-      scaleX: _double(transformJson, 'scaleX', fallback: 1),
-      scaleY: _double(transformJson, 'scaleY', fallback: 1),
-      rotationX: _double(transformJson, 'rotationX', fallback: 0),
-      rotationY: _double(transformJson, 'rotationY', fallback: 0),
-      rotationZ: _double(transformJson, 'rotationZ', fallback: 0),
-      pivotX: _double(transformJson, 'pivotX', fallback: 0.5),
-      pivotY: _double(transformJson, 'pivotY', fallback: 0.5),
-      perspective: _double(transformJson, 'perspective', fallback: 0),
-    ),
+    transform: _decodeTransform(transformJson),
     z: _int(json, 'z', fallback: 0),
     renderOrder: _int(json, 'renderOrder', fallback: 0),
     focusOrder: _int(json, 'focusOrder', fallback: 0),
@@ -227,14 +191,68 @@ SceneNode _decodeNode(
       'node.motion',
     ),
     visibleWhen: _decodeCondition(json['visibleWhen'], 'node.visibleWhen'),
-    interactive: versionOne
-        ? legacyAction != null ||
-              _legacyInteractiveComponentIds.contains(componentId)
-        : _bool(json, 'interactive', fallback: false),
+    interactive: component.interactive,
     properties: <String, String>{
       for (final entry in _map(json, 'properties', fallback: const {}).entries)
         entry.key: _asString(entry.value, 'node.properties.${entry.key}'),
     },
+  );
+}
+
+SceneRect _decodeRect(Map<String, dynamic> json, String id) {
+  final rect = SceneRect(
+    x: _double(json, 'x'),
+    y: _double(json, 'y'),
+    width: _double(json, 'width'),
+    height: _double(json, 'height'),
+  );
+  if (!rect.isNormalized) {
+    throw FormatException('Node $id has a non-normalized rect.');
+  }
+
+  return rect;
+}
+
+SceneTransform _decodeTransform(Map<String, dynamic> json) {
+  return SceneTransform(
+    translateX: _double(json, 'translateX', fallback: 0),
+    translateY: _double(json, 'translateY', fallback: 0),
+    scaleX: _double(json, 'scaleX', fallback: 1),
+    scaleY: _double(json, 'scaleY', fallback: 1),
+    rotationX: _double(json, 'rotationX', fallback: 0),
+    rotationY: _double(json, 'rotationY', fallback: 0),
+    rotationZ: _double(json, 'rotationZ', fallback: 0),
+    pivotX: _double(json, 'pivotX', fallback: 0.5),
+    pivotY: _double(json, 'pivotY', fallback: 0.5),
+    perspective: _double(json, 'perspective', fallback: 0),
+  );
+}
+
+// Convert the legacy kind/action vocabulary at the authoring boundary. The
+// rest of node decoding consumes one component identity and interactivity flag.
+({String id, bool interactive}) _decodeComponent(
+  Map<String, dynamic> json,
+  String nodeId,
+  int version,
+) {
+  final field = version == 1 ? 'kind' : 'component';
+  final id = _string(json, field);
+  if (id.trim().isEmpty) {
+    throw FormatException('Node $nodeId has an empty component id.');
+  }
+  if (version != 1) {
+    return (id: id, interactive: _bool(json, 'interactive', fallback: false));
+  }
+  if (!_legacyComponentIds.contains(id)) {
+    throw FormatException('Unknown version 1 node kind: $id');
+  }
+  final action = _nullableString(json, 'action');
+  if (action != null && !_legacyActionIds.contains(action)) {
+    throw FormatException('Unknown version 1 node action: $action');
+  }
+  return (
+    id: id,
+    interactive: action != null || _legacyInteractiveComponentIds.contains(id),
   );
 }
 
@@ -304,9 +322,7 @@ List<SceneCondition> _decodeConditionList(Object? value, String field) {
   if (value is! List || value.isEmpty) {
     throw FormatException('$field must be a non-empty list.');
   }
-  return [
-    for (final item in value) _decodeCondition(item, field)!,
-  ];
+  return [for (final item in value) _decodeCondition(item, field)!];
 }
 
 Object _encodeCondition(SceneCondition condition) {

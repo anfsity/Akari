@@ -44,10 +44,6 @@ impl GreeterService {
             task,
         )
     }
-
-    fn owned_emitter(emitter: SignalEmitter<'_>) -> SignalEmitter<'static> {
-        emitter.into_owned()
-    }
 }
 
 #[interface(name = "io.akari.Greeter1")]
@@ -98,7 +94,7 @@ impl GreeterService {
         }
         let caller = get_caller(&header)?;
         self.auth
-            .begin(caller, username, Self::owned_emitter(emitter))
+            .begin(caller, username, emitter.into_owned())
             .await
     }
 
@@ -115,7 +111,7 @@ impl GreeterService {
                 caller,
                 attempt_id,
                 zeroize::Zeroizing::new(response),
-                Self::owned_emitter(emitter),
+                emitter.into_owned(),
             )
             .await
     }
@@ -128,7 +124,7 @@ impl GreeterService {
     ) -> fdo::Result<()> {
         let caller = get_caller(&header)?;
         self.auth
-            .cancel(caller, attempt_id, Self::owned_emitter(emitter))
+            .cancel(caller, attempt_id, emitter.into_owned())
             .await
     }
 
@@ -140,16 +136,29 @@ impl GreeterService {
         session_id: String,
     ) -> fdo::Result<ResponseDispatchNotifier<()>> {
         let caller = get_caller(&header)?;
-        let emitter = Self::owned_emitter(emitter);
+        let emitter = emitter.into_owned();
         self.auth
             .resolve_session(caller.clone(), attempt_id.clone(), emitter.clone())
             .await?;
 
         let sessions = self.sessions.clone();
         let lookup_id = session_id.clone();
-        let session_result = tokio::task::spawn_blocking(move || sessions.find(&lookup_id)).await;
-        let session_result = match session_result {
-            Ok(result) => result,
+        let session = match tokio::task::spawn_blocking(move || sessions.find(&lookup_id)).await {
+            Ok(Ok(Some(session))) => session,
+            Ok(Ok(None)) => {
+                let detail = format!("session {session_id} is unavailable");
+                self.auth
+                    .session_unavailable(caller, attempt_id, detail.clone(), emitter)
+                    .await?;
+                return Err(fdo::Error::InvalidArgs(detail));
+            }
+            Ok(Err(error)) => {
+                tracing::error!(%attempt_id, %caller, operation = "ResolveSession", error = ?error, "session catalog lookup failed");
+                self.auth
+                    .session_resolution_failed(caller, attempt_id, error.to_string(), emitter)
+                    .await?;
+                return Err(map_session_error(error));
+            }
             Err(error) => {
                 tracing::error!(%attempt_id, %caller, operation = "ResolveSession", error = ?error, "session catalog task failed");
                 let detail = format!("session catalog task failed: {error}");
@@ -157,24 +166,6 @@ impl GreeterService {
                     .session_resolution_failed(caller, attempt_id, detail.clone(), emitter)
                     .await?;
                 return Err(fdo::Error::Failed(detail));
-            }
-        };
-        let session = match session_result {
-            Ok(Some(session)) => session,
-            Ok(None) => {
-                let detail = format!("session {session_id} is unavailable");
-                self.auth
-                    .session_unavailable(caller, attempt_id, detail.clone(), emitter)
-                    .await?;
-                return Err(fdo::Error::InvalidArgs(detail));
-            }
-            Err(error) => {
-                tracing::error!(%attempt_id, %caller, operation = "ResolveSession", error = ?error, "session catalog lookup failed");
-                let detail = error.to_string();
-                self.auth
-                    .session_resolution_failed(caller, attempt_id, detail.clone(), emitter)
-                    .await?;
-                return Err(map_session_error(error));
             }
         };
 

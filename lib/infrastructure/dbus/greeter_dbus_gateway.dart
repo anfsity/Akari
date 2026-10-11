@@ -20,12 +20,27 @@ class DBusGreeterGateway implements GreeterGateway {
       name: _busName,
       path: DBusObjectPath(_objectPath),
     );
-    _listenToSignals();
+    // One stream keeps Prompt and StateChanged in the order the backend emitted
+    // them. Per-signal streams can interleave, letting a stale PromptPending
+    // arrive after the Prompt and reset the credential field to a waiting state.
+    _signalSubscription =
+        DBusSignalStream(
+          _client,
+          sender: _busName,
+          path: DBusObjectPath(_objectPath),
+          interface: _interfaceName,
+          signature: DBusSignature('sss'),
+        ).listen(
+          _onSignal,
+          onError: (Object error, StackTrace stackTrace) =>
+              _handleDisconnection(),
+          onDone: _handleDisconnection,
+        );
   }
 
   final DBusClient _client;
   final StreamController<GreeterEvent> _events;
-  final List<StreamSubscription<DBusSignal>> _signalSubscriptions = [];
+  late final StreamSubscription<DBusSignal> _signalSubscription;
   late final DBusRemoteObject _object;
   bool _closed = false;
 
@@ -143,46 +158,28 @@ class DBusGreeterGateway implements GreeterGateway {
     }
   }
 
-  void _listenToSignals() {
-    // One stream keeps Prompt and StateChanged in the order the backend emitted
-    // them. Per-signal streams can interleave, letting a stale PromptPending
-    // arrive after the Prompt and reset the credential field to a waiting state.
-    final signalStream = DBusSignalStream(
-      _client,
-      sender: _busName,
-      path: DBusObjectPath(_objectPath),
-      interface: _interfaceName,
-      signature: DBusSignature('sss'),
-    );
-
-    _signalSubscriptions.add(
-      signalStream.listen(
-        _onSignal,
-        onError: _onTransportError,
-        onDone: _onTransportDone,
-      ),
-    );
-  }
-
   void _onSignal(DBusSignal signal) {
-    switch (signal.name) {
-      case 'Prompt':
-        _onPrompt(signal);
-      case 'StateChanged':
-        _onStateChanged(signal);
-    }
-  }
-
-  void _onPrompt(DBusSignal signal) {
     try {
-      final values = signal.values;
-      _events.add(
-        BackendPromptReceived(
-          attemptId: values[0].asString(),
-          kind: _getPromptKind(values[1].asString()),
-          text: values[2].asString(),
-        ),
-      );
+      switch (signal.name) {
+        case 'Prompt':
+          final [attemptId, kind, text] = signal.values;
+          _events.add(
+            BackendPromptReceived(
+              attemptId: attemptId.asString(),
+              kind: _getPromptKind(kind.asString()),
+              text: text.asString(),
+            ),
+          );
+        case 'StateChanged':
+          final [attemptId, state, detail] = signal.values;
+          _events.add(
+            BackendStateChanged(
+              attemptId: attemptId.asString(),
+              state: _getBackendAuthState(state.asString()),
+              detail: detail.asString(),
+            ),
+          );
+      }
     } on Object {
       // Malformed protocol input leaves the conversation unusable. Report
       // loss of service rather than guessing how to answer a prompt.
@@ -190,31 +187,8 @@ class DBusGreeterGateway implements GreeterGateway {
     }
   }
 
-  void _onStateChanged(DBusSignal signal) {
-    try {
-      final values = signal.values;
-      _events.add(
-        BackendStateChanged(
-          attemptId: values[0].asString(),
-          state: _getBackendAuthState(values[1].asString()),
-          detail: values[2].asString(),
-        ),
-      );
-    } on Object {
-      _events.add(const BackendDisconnected());
-    }
-  }
-
-  void _onTransportError(Object error, StackTrace stackTrace) {
-    if (!_closed) {
-      _events.add(const BackendDisconnected());
-    }
-  }
-
-  void _onTransportDone() {
-    if (!_closed) {
-      _events.add(const BackendDisconnected());
-    }
+  void _handleDisconnection() {
+    if (!_closed) _events.add(const BackendDisconnected());
   }
 
   PromptKind _getPromptKind(String value) {
@@ -268,10 +242,7 @@ class DBusGreeterGateway implements GreeterGateway {
       return;
     }
     _closed = true;
-    for (final subscription in _signalSubscriptions) {
-      await subscription.cancel();
-    }
-    _signalSubscriptions.clear();
+    await _signalSubscription.cancel();
     await _client.close();
     await _events.close();
   }
