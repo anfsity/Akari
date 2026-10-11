@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import '../cli/arguments.dart';
+import '../cli/definition.dart';
 import '../execution/model.dart';
 import '../execution/paths.dart';
 import '../execution/report.dart';
@@ -18,7 +19,7 @@ Future<int> runDevelopmentCommand(
   Directory repoRoot,
 ) async {
   final command = options.command;
-  final themes = options.themePath != null || command.requiresSelectedTheme
+  final themes = options.themePath != null || command.isThemeSelectionRequired
       ? [
           getThemePackage(
             Directory(options.themePath ?? '${repoRoot.path}/themes/default'),
@@ -76,7 +77,7 @@ Future<int> runDevelopmentCommand(
       dryRun: options.dryRun,
     ),
     DevelopmentCommand.generateScenes => RunPlan(
-      command: command.commandName,
+      command: 'generate-scenes',
       themes: themes,
       steps: createSceneGenerationSteps(repoRoot, themes),
     ),

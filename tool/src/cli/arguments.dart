@@ -73,7 +73,7 @@ class DevCommandOptions {
       values,
       arguments.theme,
       jobs,
-      DevelopmentCommand.fromName(command.name),
+      command.development!,
     );
     if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(options.buildTarget)) {
       throw FormatException(
@@ -97,38 +97,4 @@ class DevCommandOptions {
   final String? resolution;
   final String? scale;
   final SwayBackend swayBackend;
-}
-
-enum DevelopmentCommand {
-  build('build'),
-  run('run', runTarget: ThemeRunTarget.greeter),
-  sway('run sway', runTarget: ThemeRunTarget.sway),
-  preview('preview', runTarget: ThemeRunTarget.preview),
-  studio('run studio', runTarget: ThemeRunTarget.studio),
-  verify('verify'),
-  verifyPerf('verify-perf'),
-  tracePerf('trace-perf'),
-  generateScenes('generate-scenes');
-
-  const DevelopmentCommand(this.commandName, {this.runTarget});
-  final String commandName;
-  final ThemeRunTarget? runTarget;
-
-  static DevelopmentCommand fromName(String name) => switch (name) {
-    'build' => build,
-    'run' => run,
-    'run sway' => sway,
-    'preview' => preview,
-    'run studio' => studio,
-    'verify' => verify,
-    'verify-perf' => verifyPerf,
-    'trace-perf' => tracePerf,
-    'generate-scenes' => generateScenes,
-    _ => throw StateError('Not a development command: $name'),
-  };
-
-  bool get requiresSelectedTheme => switch (this) {
-    verify || generateScenes => false,
-    _ => true,
-  };
 }

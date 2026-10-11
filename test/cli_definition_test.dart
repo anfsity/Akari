@@ -21,9 +21,11 @@ void main() {
       ]),
     );
     expect(getCliCommand('perf').name, 'verify-perf');
+    expect(getCliCommand('perf').development, DevelopmentCommand.verifyPerf);
     expect(getCliCommand('trace').name, 'trace-perf');
     expect(getCliCommand('perf').forwardsArguments, isTrue);
     expect(getCliCommand('run studio').name, 'run studio');
+    expect(getCliCommand('run studio').development, DevelopmentCommand.studio);
     expect(getCliSubcommands('run').map((command) => command.name), [
       'run sway',
       'run studio',
