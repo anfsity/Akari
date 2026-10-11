@@ -1,9 +1,11 @@
+import '../../../tool/src/theme/model.dart';
+
 import 'dart:convert';
 import 'dart:io';
 
 import '../../../tool/src/sdk_commands.dart';
-import '../../../tool/src/theme_host.dart';
-import '../../../tool/src/theme_project.dart';
+import '../../../tool/src/theme/host.dart';
+import '../../../tool/src/theme/project.dart';
 
 Future<void> main(List<String> arguments) async {
   try {
@@ -22,7 +24,7 @@ Future<void> main(List<String> arguments) async {
     final repoRoot = themeDirectory.parent.parent;
     final theme = getThemePackage(themeDirectory);
     final host = Directory(
-      '${repoRoot.path}/${getThemeHostDirectory(theme, preview: true)}-perf',
+      '${repoRoot.path}/${getThemeHostDirectory(theme, ThemeHostKind.preview)}-perf',
     );
     // This theme's integration fixture runs the shared greeter application.
     // Its test dependencies and entrypoints belong to this perf host only.
@@ -30,7 +32,7 @@ Future<void> main(List<String> arguments) async {
       repoRoot: repoRoot,
       theme: theme,
       output: host,
-      preview: true,
+      kind: ThemeHostKind.preview,
       devDependencies: {
         'flutter_test': {'sdk': 'flutter'},
         'integration_test': {'sdk': 'flutter'},

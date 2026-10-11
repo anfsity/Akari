@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../tool/src/cli_definition.dart';
+import '../tool/src/cli/definition.dart';
 
 void main() {
   test('short and long options normalize to the same values', () {

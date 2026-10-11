@@ -62,9 +62,7 @@ exit 17
   test(
     'scene generation precedes reload and failures preserve the running app',
     () async {
-      final temporary = await Directory.systemTemp.createTemp(
-        'akari-session-',
-      );
+      final temporary = await Directory.systemTemp.createTemp('akari-session-');
       addTearDown(() => temporary.delete(recursive: true));
       final theme = Directory('${temporary.path}/theme');
       await Directory('${theme.path}/lib').create(recursive: true);

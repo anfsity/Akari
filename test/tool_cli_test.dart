@@ -1,14 +1,18 @@
+import '../tool/src/theme/model.dart';
+
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../tool/src/command_plans.dart';
+import '../tool/src/commands/theme.dart';
+import '../tool/src/commands/verification.dart';
 import '../tool/src/execution/model.dart';
 import '../tool/src/commands/development.dart';
+import '../tool/src/commands/plan.dart';
 import '../tool/src/sdk_commands.dart';
-import '../tool/src/theme_project.dart';
-import '../tool/src/theme_host.dart';
+import '../tool/src/theme/project.dart';
+import '../tool/src/theme/host.dart';
 
 void main() {
   late Directory tempRoot;
@@ -29,14 +33,20 @@ void main() {
 import 'dart:io';
 import '${Directory.current.uri}tool/src/execution/model.dart';
 import '${Directory.current.uri}tool/src/commands/development.dart';
+import '${Directory.current.uri}tool/src/commands/plan.dart';
 Future<void> main() async {
-  exitCode = await runDevCommand(
-    command: 'interactive', format: RunOutputFormat.text, reportPath: null,
-    repoRoot: Directory.current, runDirectory: 'run', artifactPaths: {},
-    steps: [RunStep(id: 'session', workingDirectory: '.', environment: {},
+  exitCode = await runPlan(RunPlan(
+command: 'interactive',
+artifactPaths: {},
+steps: [RunStep(id: 'session', workingDirectory: '.', environment: {},
       interactive: true,
       command: ['bash', '-c', 'echo INTERACTIVE_READY; dd bs=1 count=1 >/dev/null 2>&1'])],
-  );
+),
+format: RunOutputFormat.text,
+reportPath: null,
+repoRoot: Directory.current,
+runDirectory: 'run',
+);
 }
 ''');
     final result = await Process.run('python3', [
@@ -129,8 +139,7 @@ Future<void> main() async {
       repoRoot: Directory.current,
       theme: theme,
       output: host,
-      preview: true,
-      studio: true,
+      kind: ThemeHostKind.studio,
     );
     final manifest = jsonDecode(
       File('${host.path}/pubspec.yaml').readAsStringSync(),
@@ -147,8 +156,8 @@ Future<void> main() async {
     expect(entrypoint, isNot(contains('MyApp')));
     expect(Directory('${host.path}/lib').listSync(), hasLength(1));
     expect(
-      getThemeHostDirectory(theme, preview: true, studio: true),
-      isNot(getThemeHostDirectory(theme, preview: true)),
+      getThemeHostDirectory(theme, ThemeHostKind.studio),
+      isNot(getThemeHostDirectory(theme, ThemeHostKind.preview)),
     );
   });
 
@@ -233,7 +242,7 @@ Future<void> main() async {
         repoRoot: repository,
         theme: theme,
         output: host,
-        preview: true,
+        kind: ThemeHostKind.preview,
       );
       final manifest = File('${host.path}/pubspec.yaml');
       final originalModified = DateTime.utc(2020);
@@ -249,7 +258,7 @@ Future<void> main() async {
         repoRoot: repository,
         theme: theme,
         output: host,
-        preview: true,
+        kind: ThemeHostKind.preview,
       );
       expect((await manifest.lastModified()).toUtc(), originalModified);
       expect(
@@ -263,16 +272,19 @@ Future<void> main() async {
         'cached',
       );
       expect(
-        getThemeHostDirectory(theme, preview: true),
-        getThemeHostDirectory(getThemePackage(project), preview: true),
+        getThemeHostDirectory(theme, ThemeHostKind.preview),
+        getThemeHostDirectory(getThemePackage(project), ThemeHostKind.preview),
       );
       final otherProject = await _createThemeProject(
         Directory('${tempRoot.path}/other'),
       );
       expect(
-        getThemeHostDirectory(theme, preview: true),
+        getThemeHostDirectory(theme, ThemeHostKind.preview),
         isNot(
-          getThemeHostDirectory(getThemePackage(otherProject), preview: true),
+          getThemeHostDirectory(
+            getThemePackage(otherProject),
+            ThemeHostKind.preview,
+          ),
         ),
       );
     },
@@ -282,13 +294,12 @@ Future<void> main() async {
     'build plans compile production backend and configure native jobs',
     () async {
       final project = await _createThemeProject(tempRoot);
-      final plan = buildStepsFor(
-        'build',
+      final plan = createBuildPlan(
         Directory.current,
-        'runs/build',
-        selectedTheme: getThemePackage(project),
+        getThemePackage(project),
+        mode: BuildMode.release,
         jobs: 4,
-      );
+      ).steps;
       final backend = plan.singleWhere((step) => step.id == 'backend.build');
       expect(backend.command, containsAll(['--release', '--jobs', '4']));
       expect(backend.command, isNot(contains('mock')));
@@ -311,41 +322,43 @@ Future<void> main() async {
 
   test('internal actions wait for prerequisites and report failures without spawning', () async {
     final prepared = File('${tempRoot.path}/prepared');
-    final status = await runDevCommand(
-      command: 'build',
+    final status = await runPlan(
+      RunPlan(
+        command: 'build',
+        steps: [
+          RunStep(
+            id: 'prepare',
+            command: ['unused-standalone-command'],
+            workingDirectory: '.',
+            environment: const {},
+            action: () async {
+              await prepared.writeAsString('ready');
+            },
+          ),
+          RunStep(
+            id: 'publish',
+            command: ['unused-standalone-command'],
+            workingDirectory: '.',
+            environment: const {},
+            action: () {
+              expect(prepared.readAsStringSync(), 'ready');
+              throw StateError('publication failed');
+            },
+          ),
+          RunStep(
+            id: 'must.not.run',
+            command: ['unused-standalone-command'],
+            workingDirectory: '.',
+            environment: const {},
+            action: () => fail('Dependent action ran after failure'),
+          ),
+        ],
+        artifactPaths: const {},
+      ),
       format: RunOutputFormat.json,
       reportPath: null,
       repoRoot: tempRoot,
       runDirectory: 'runs/internal',
-      steps: [
-        RunStep(
-          id: 'prepare',
-          command: ['unused-standalone-command'],
-          workingDirectory: '.',
-          environment: const {},
-          action: () async {
-            await prepared.writeAsString('ready');
-          },
-        ),
-        RunStep(
-          id: 'publish',
-          command: ['unused-standalone-command'],
-          workingDirectory: '.',
-          environment: const {},
-          action: () {
-            expect(prepared.readAsStringSync(), 'ready');
-            throw StateError('publication failed');
-          },
-        ),
-        RunStep(
-          id: 'must.not.run',
-          command: ['unused-standalone-command'],
-          workingDirectory: '.',
-          environment: const {},
-          action: () => fail('Dependent action ran after failure'),
-        ),
-      ],
-      artifactPaths: const {},
     );
     expect(status, 1);
     final report = jsonDecode(
@@ -375,40 +388,42 @@ for _ in range(500):
     time.sleep(0.01)
 sys.exit(1)
 """);
-      final status = await runDevCommand(
-        command: 'build',
+      final status = await runPlan(
+        RunPlan(
+          command: 'build',
+          steps: [
+            RunStep(
+              id: 'left',
+              command: ['python3', gate.path, 'left.ready', 'right.ready'],
+              workingDirectory: '.',
+              environment: const {},
+              dependencies: const [],
+            ),
+            RunStep(
+              id: 'right',
+              command: ['python3', gate.path, 'right.ready', 'left.ready'],
+              workingDirectory: '.',
+              environment: const {},
+              dependencies: const [],
+            ),
+            RunStep(
+              id: 'join',
+              command: [
+                'bash',
+                '-c',
+                'test -f left.ready && test -f right.ready',
+              ],
+              workingDirectory: '.',
+              environment: const {},
+              dependencies: const ['left', 'right'],
+            ),
+          ],
+          artifactPaths: const {},
+        ),
         format: RunOutputFormat.json,
         reportPath: null,
         repoRoot: tempRoot,
         runDirectory: 'runs/concurrent',
-        steps: [
-          RunStep(
-            id: 'left',
-            command: ['python3', gate.path, 'left.ready', 'right.ready'],
-            workingDirectory: '.',
-            environment: const {},
-            dependencies: const [],
-          ),
-          RunStep(
-            id: 'right',
-            command: ['python3', gate.path, 'right.ready', 'left.ready'],
-            workingDirectory: '.',
-            environment: const {},
-            dependencies: const [],
-          ),
-          RunStep(
-            id: 'join',
-            command: [
-              'bash',
-              '-c',
-              'test -f left.ready && test -f right.ready',
-            ],
-            workingDirectory: '.',
-            environment: const {},
-            dependencies: const ['left', 'right'],
-          ),
-        ],
-        artifactPaths: const {},
       );
       expect(status, 0);
     },
@@ -502,7 +517,12 @@ sys.exit(1)
   test('verification plans discover independent theme projects', () async {
     await _createThemeProject(Directory('${tempRoot.path}/themes'));
 
-    final steps = buildStepsFor('verify', tempRoot, 'runs/verify');
+    final steps = createVerificationPlan(
+      tempRoot,
+      'runs/verify',
+      findThemePackages(tempRoot),
+      selectedThemeOnly: false,
+    ).steps;
 
     expect(
       steps
@@ -959,15 +979,10 @@ perf:
     }
   });
 
-  test(
-    'failed step stops the plan and still writes report, events, and logs',
-    () async {
-      final status = await runDevCommand(
+  test('failed step stops the plan and still writes report, events, and logs', () async {
+    final status = await runPlan(
+      RunPlan(
         command: 'verify',
-        format: RunOutputFormat.json,
-        reportPath: null,
-        repoRoot: tempRoot,
-        runDirectory: 'runs/failure-case',
         steps: [
           RunStep(
             id: 'first.failure',
@@ -987,46 +1002,48 @@ perf:
           ),
         ],
         artifactPaths: const {},
-      );
+      ),
+      format: RunOutputFormat.json,
+      reportPath: null,
+      repoRoot: tempRoot,
+      runDirectory: 'runs/failure-case',
+    );
 
-      expect(status, 1);
-      expect(File('${tempRoot.path}/should-not-exist').existsSync(), isFalse);
-      final reportFile = File('${tempRoot.path}/runs/failure-case/report.json');
-      final reportText = await reportFile.readAsString();
-      final report = jsonDecode(reportText) as Map<String, dynamic>;
-      expect(report['status'], 'failed');
-      final steps = (report['steps'] as List).cast<Map<String, dynamic>>();
-      expect(steps, hasLength(1));
-      expect(steps.single['exit_code'], 23);
-      for (final pathKey in ['stdout_log', 'stderr_log']) {
-        final path = steps.single[pathKey] as String;
-        expect(File('${tempRoot.path}/$path').existsSync(), isTrue);
-      }
+    expect(status, 1);
+    expect(File('${tempRoot.path}/should-not-exist').existsSync(), isFalse);
+    final reportFile = File('${tempRoot.path}/runs/failure-case/report.json');
+    final reportText = await reportFile.readAsString();
+    final report = jsonDecode(reportText) as Map<String, dynamic>;
+    expect(report['status'], 'failed');
+    final steps = (report['steps'] as List).cast<Map<String, dynamic>>();
+    expect(steps, hasLength(1));
+    expect(steps.single['exit_code'], 23);
+    for (final pathKey in ['stdout_log', 'stderr_log']) {
+      final path = steps.single[pathKey] as String;
+      expect(File('${tempRoot.path}/$path').existsSync(), isTrue);
+    }
 
-      final stdoutLog = File('${tempRoot.path}/${steps.single['stdout_log']}');
-      final stderrLog = File('${tempRoot.path}/${steps.single['stderr_log']}');
-      expect(await stdoutLog.readAsString(), 'first stdout\n');
-      expect(await stderrLog.readAsString(), 'first stderr\n');
+    final stdoutLog = File('${tempRoot.path}/${steps.single['stdout_log']}');
+    final stderrLog = File('${tempRoot.path}/${steps.single['stderr_log']}');
+    expect(await stdoutLog.readAsString(), 'first stdout\n');
+    expect(await stderrLog.readAsString(), 'first stderr\n');
 
-      final eventsFile = File(
-        '${tempRoot.path}/runs/failure-case/events.jsonl',
-      );
-      final events = (await eventsFile.readAsLines())
-          .map((line) => jsonDecode(line) as Map<String, dynamic>)
-          .toList();
-      expect(events.first['event'], 'run_started');
-      expect(events.last['event'], 'run_finished');
-      expect(events.last['status'], 'failed');
-      expect(
-        events.where((event) => event['event'] == 'step_started'),
-        hasLength(1),
-      );
-      expect(
-        events.where((event) => event['event'] == 'step_finished'),
-        hasLength(1),
-      );
-    },
-  );
+    final eventsFile = File('${tempRoot.path}/runs/failure-case/events.jsonl');
+    final events = (await eventsFile.readAsLines())
+        .map((line) => jsonDecode(line) as Map<String, dynamic>)
+        .toList();
+    expect(events.first['event'], 'run_started');
+    expect(events.last['event'], 'run_finished');
+    expect(events.last['status'], 'failed');
+    expect(
+      events.where((event) => event['event'] == 'step_started'),
+      hasLength(1),
+    );
+    expect(
+      events.where((event) => event['event'] == 'step_finished'),
+      hasLength(1),
+    );
+  });
 
   test(
     'reports and logs redact command, environment, token, and PAM secrets',
@@ -1036,33 +1053,35 @@ perf:
       const password = 'password-value-176';
       const apiKey = 'api-key-value-417';
       const commandToken = 'command-token-value-269';
-      final status = await runDevCommand(
-        command: 'verify',
+      final status = await runPlan(
+        RunPlan(
+          command: 'verify',
+          steps: [
+            RunStep(
+              id: 'secret.output',
+              command: [
+                'bash',
+                '-c',
+                'printf "PAM secret: %s token=%s password=%s api_key=%s\\n" "\$AKARI_PAM_SECRET" "\$AKARI_TOKEN" "\$PASSWORD" "\$API_KEY"; printf "Bearer %s\\n" "\$AKARI_AUTHORIZATION"',
+                '--token',
+                commandToken,
+              ],
+              workingDirectory: '.',
+              environment: const {
+                'AKARI_PAM_SECRET': pamSecret,
+                'AKARI_TOKEN': token,
+                'PASSWORD': password,
+                'API_KEY': apiKey,
+                'AKARI_AUTHORIZATION': 'Bearer authorization-value-551',
+              },
+            ),
+          ],
+          artifactPaths: const {},
+        ),
         format: RunOutputFormat.json,
         reportPath: null,
         repoRoot: tempRoot,
         runDirectory: 'runs/redaction-case',
-        steps: [
-          RunStep(
-            id: 'secret.output',
-            command: [
-              'bash',
-              '-c',
-              'printf "PAM secret: %s token=%s password=%s api_key=%s\\n" "\$AKARI_PAM_SECRET" "\$AKARI_TOKEN" "\$PASSWORD" "\$API_KEY"; printf "Bearer %s\\n" "\$AKARI_AUTHORIZATION"',
-              '--token',
-              commandToken,
-            ],
-            workingDirectory: '.',
-            environment: const {
-              'AKARI_PAM_SECRET': pamSecret,
-              'AKARI_TOKEN': token,
-              'PASSWORD': password,
-              'API_KEY': apiKey,
-              'AKARI_AUTHORIZATION': 'Bearer authorization-value-551',
-            },
-          ),
-        ],
-        artifactPaths: const {},
       );
 
       expect(status, 0);

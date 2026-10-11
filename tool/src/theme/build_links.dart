@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'theme_project.dart';
+import 'project.dart';
+import 'model.dart';
 
 Map<String, String> getBuildLinkPaths(ThemePackage theme) => {
   'bundle_link': 'build/out/${theme.packageName.substring('theme_'.length)}',
@@ -13,12 +14,11 @@ Map<String, String> getBuildLinkPaths(ThemePackage theme) => {
 Future<void> updateBuildLinks(
   Directory repoRoot,
   ThemePackage theme,
-  String buildMode,
+  BuildMode buildMode,
 ) async {
-  final host = getThemeHostDirectory(theme, preview: false);
+  final host = getThemeHostDirectory(theme, ThemeHostKind.greeter);
   final frontend = getLinuxExecutablePath(host, buildMode);
-  final backend =
-      'backend/target/akari-real/${buildMode == 'debug' ? 'debug' : 'release'}/backend';
+  final backend = getBackendExecutablePath(BackendMode.real, buildMode);
   final targets = {
     'bundle_link': File(frontend).parent.path,
     'backend_link': backend,
