@@ -1,9 +1,11 @@
+import '../../../tool/src/theme/model.dart';
+
 import 'dart:convert';
 import 'dart:io';
 
 import '../../../tool/src/sdk_commands.dart';
-import '../../../tool/src/theme_host.dart';
-import '../../../tool/src/theme_project.dart';
+import '../../../tool/src/theme/host.dart';
+import '../../../tool/src/theme/project.dart';
 
 /// Run the performance journey in the same nested Sway environment as preview.
 /// The compositor report is retained alongside frame metrics so a result cannot
@@ -14,13 +16,13 @@ Future<void> main() async {
   final root = directory.parent.parent;
   final theme = getThemePackage(directory);
   final host = Directory(
-    '${root.path}/${getThemeHostDirectory(theme, preview: true)}-perf',
+    '${root.path}/${getThemeHostDirectory(theme, ThemeHostKind.preview)}-perf',
   );
   createThemeHost(
     repoRoot: root,
     theme: theme,
     output: host,
-    preview: true,
+    kind: ThemeHostKind.preview,
     devDependencies: {
       'flutter_test': {'sdk': 'flutter'},
       'integration_test': {'sdk': 'flutter'},

@@ -3,7 +3,12 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
-import 'theme_project.dart';
+import '../theme/project.dart';
+import '../theme/scene_generation.dart';
+import '../execution/model.dart';
+import '../execution/paths.dart';
+import '../sdk_commands.dart';
+import 'plan.dart';
 
 /// Only the transport is shared. Themes own their commands, test journeys,
 /// metrics, baselines, and the contents of every reported artifact.
@@ -75,4 +80,80 @@ Future<Map<String, String>> getThemePerfArtifacts(File manifest) async {
     paths[name] = resolvedPath;
   }
   return paths;
+}
+
+Future<RunPlan> preparePerformanceRun(
+  String operation,
+  Directory repoRoot,
+  String runDirectory,
+  ThemePackage theme,
+  List<String> themeArguments, {
+  required bool dryRun,
+}) async {
+  final entrypoint = getThemePerfCommand(theme, operation);
+  final executable = switch (entrypoint.first) {
+    'dart' => getDartCommand(repoRoot),
+    'flutter' => getFlutterCommand(repoRoot),
+    final executable => [executable],
+  };
+  final output = '$runDirectory/perf';
+  if (!dryRun) {
+    await Directory(getAbsolutePath(repoRoot, output)).create(recursive: true);
+  }
+  return RunPlan(
+    command: operation == 'verify' ? 'verify-perf' : 'trace-perf',
+    themes: [theme],
+    artifactPaths: {
+      'performance_output': output,
+      'performance_result': '$output/result.json',
+    },
+    collectResult: (result) => collectPerformanceResult(
+      repoRoot,
+      File(getAbsolutePath(repoRoot, '$output/result.json')),
+      result,
+    ),
+    steps: [
+      RunStep(
+        id: 'theme.pub_get',
+        command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+        workingDirectory: theme.directory.path,
+      ),
+      ...createSceneGenerationSteps(repoRoot, [theme]),
+      RunStep(
+        id: 'theme.perf.$operation',
+        command: [...executable, ...entrypoint.skip(1), ...themeArguments],
+        workingDirectory: theme.directory.path,
+        environment: {
+          'AKARI_PERF_OUTPUT_DIR': getAbsolutePath(repoRoot, output),
+        },
+      ),
+    ],
+  );
+}
+
+Future<RunCompletion> collectPerformanceResult(
+  Directory repoRoot,
+  File manifest,
+  RunResult result,
+) async {
+  final failureExitCode = result.getFirstFailureExitCode();
+  // A failed journey may publish diagnostics; a successful journey must
+  // publish a valid manifest before the overall command can pass.
+  if (!result.isPassed && !await manifest.exists()) {
+    return RunCompletion(failureExitCode: failureExitCode);
+  }
+  try {
+    final artifacts = await getThemePerfArtifacts(manifest);
+    return RunCompletion(
+      failureExitCode: failureExitCode,
+      fields: {
+        'theme_artifacts': {
+          for (final entry in artifacts.entries)
+            entry.key: getRelativePath(repoRoot, entry.value),
+        },
+      },
+    );
+  } catch (error) {
+    return RunCompletion(error: '$error', failureExitCode: failureExitCode);
+  }
 }

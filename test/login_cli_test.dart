@@ -52,8 +52,8 @@ elif command == 'python3':
     runner = File('${temporary.path}/runner.dart');
     await runner.writeAsString('''
 import 'dart:io';
-import '${Directory.current.uri}tool/src/login.dart';
-import '${Directory.current.uri}tool/src/cli_definition.dart';
+import '${Directory.current.uri}tool/src/commands/login.dart';
+import '${Directory.current.uri}tool/src/cli/definition.dart';
 Future<void> main(List<String> arguments) async {
   try {
     final name = ['install', 'uninstall'].contains(arguments.first)

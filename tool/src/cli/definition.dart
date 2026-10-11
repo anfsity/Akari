@@ -1,3 +1,5 @@
+import '../theme/model.dart';
+
 /// Shared command grammar for parsing, help, and shell completion. Keep aliases,
 /// accepted options, and enumerated values here so those consumers cannot drift.
 class CliOption {
@@ -27,7 +29,7 @@ class CliCommand {
     this.aliases = const [],
     this.options = const [],
     this.forwardsArguments = false,
-    this.reportsRun = true,
+    this.development,
   });
 
   final String name;
@@ -35,7 +37,9 @@ class CliCommand {
   final List<String> aliases;
   final List<String> options;
   final bool forwardsArguments;
-  final bool reportsRun;
+  final DevelopmentCommand? development;
+
+  bool get hasRunReport => development != null;
 
   List<String> get spellings => [name, ...aliases];
 }
@@ -180,16 +184,19 @@ const cliCommands = [
     'build',
     'Build the selected frontend and production Rust backend.',
     options: ['--theme', '--jobs', '--mode', '--platform'],
+    development: DevelopmentCommand.build,
   ),
   CliCommand(
     'run',
     'Run the greeter on a private D-Bus session (default), or a selected target.',
     options: ['--theme', '--jobs', '--mode', '--backend'],
+    development: DevelopmentCommand.run,
   ),
   CliCommand(
     'preview',
     'Run the selected theme with demo login state.',
     options: ['--theme', '--jobs', '--mode'],
+    development: DevelopmentCommand.preview,
   ),
   CliCommand(
     'run sway',
@@ -204,16 +211,19 @@ const cliCommands = [
       '--scale',
       '--sway-backend',
     ],
+    development: DevelopmentCommand.sway,
   ),
   CliCommand(
     'run studio',
     'Edit theme scenes with a compiled preview and shadcn controls (debug, no backend).',
     options: ['--theme', '--jobs'],
+    development: DevelopmentCommand.studio,
   ),
   CliCommand(
     'verify',
     'Verify shared code, backend, and theme projects.',
     options: ['--theme'],
+    development: DevelopmentCommand.verify,
   ),
   CliCommand(
     'verify-perf',
@@ -221,11 +231,13 @@ const cliCommands = [
     aliases: ['perf'],
     options: ['--theme'],
     forwardsArguments: true,
+    development: DevelopmentCommand.verifyPerf,
   ),
   CliCommand(
     'generate-scenes',
     'Generate theme scene code.',
     options: ['--theme'],
+    development: DevelopmentCommand.generateScenes,
   ),
   CliCommand(
     'trace-perf',
@@ -233,100 +245,79 @@ const cliCommands = [
     aliases: ['trace'],
     options: ['--theme'],
     forwardsArguments: true,
+    development: DevelopmentCommand.tracePerf,
   ),
   CliCommand(
     'install',
     'Build and install the production login environment without switching services.',
     options: ['--theme', '--jobs', '--keyring', '--dry-run'],
-    reportsRun: false,
   ),
   CliCommand(
     'install cli',
     'Install the akari launcher and shell completion.',
     options: ['--shell', '--prefix', '--rc'],
-    reportsRun: false,
   ),
   CliCommand(
     'uninstall',
     'Remove an inactive production installation; retain preferences and logs.',
     options: ['--dry-run'],
-    reportsRun: false,
   ),
-  CliCommand(
-    'login',
-    'Manage the production login service.',
-    reportsRun: false,
-  ),
+  CliCommand('login', 'Manage the production login service.'),
   CliCommand(
     'login enable',
     'Select Akari for the next boot and save the previous login service.',
     options: ['--dry-run'],
-    reportsRun: false,
   ),
   CliCommand(
     'login disable',
     'Restore the previous login service for the next boot.',
     options: ['--dry-run'],
-    reportsRun: false,
   ),
   CliCommand(
     'login rollback',
     'Select the previous installed release for the next greeter launch.',
     options: ['--dry-run'],
-    reportsRun: false,
   ),
   CliCommand(
     'login status',
     'Show the installed release, boot login service and runtime state.',
     options: ['--format'],
-    reportsRun: false,
   ),
   CliCommand(
     'login logs',
     'Read the production service journal or newest greeter logs.',
     options: ['--component', '--lines', '--follow'],
-    reportsRun: false,
   ),
   CliCommand(
     'completion',
     'Print a shell completion script.',
     options: ['--shell'],
-    reportsRun: false,
   ),
-  CliCommand(
-    'greetd-test',
-    'Manage standalone greetd testing.',
-    reportsRun: false,
-  ),
+  CliCommand('greetd-test', 'Manage standalone greetd testing.'),
   CliCommand(
     'greetd-test install',
     'Build, back up and install the test environment; save desktop display order.',
     options: ['--theme', '--dry-run'],
-    reportsRun: false,
   ),
   CliCommand(
     'greetd-test start',
     'Check service configuration, arm recovery and start the test service.',
     options: ['--scale', '--log-dir', '--dry-run'],
-    reportsRun: false,
   ),
   CliCommand(
     'greetd-test restore',
     'Restore SDDM using the independently installed recovery script.',
     options: ['--dry-run'],
-    reportsRun: false,
   ),
   CliCommand(
     'greetd-test status',
     'Show installation, service, recovery timer and saved log paths.',
     options: ['--format'],
-    reportsRun: false,
   ),
   CliCommand(
     'greetd-test logs',
     'Read startup, greeter or recovery logs without sudo.',
     options: ['--run', '--file', '--lines', '--follow'],
-    reportsRun: false,
   ),
 ];
 
@@ -344,7 +335,7 @@ List<CliCommand> getCliSubcommands(String parent) => [
 
 List<CliOption> getCliOptions(CliCommand command) => [
   for (final name in command.options) cliOptions[name]!,
-  if (command.reportsRun) ...[
+  if (command.hasRunReport) ...[
     cliOptions['--format']!,
     cliOptions['--report']!,
     cliOptions['--dry-run']!,
@@ -400,4 +391,26 @@ Map<String, String> getCliOptionValues(
     values[option.name] = value;
   }
   return values;
+}
+
+// The command table binds external spellings to these internal identities once.
+// Development workflows consume the identity without parsing command strings.
+enum DevelopmentCommand {
+  build,
+  run(runTarget: ThemeRunTarget.greeter),
+  sway(runTarget: ThemeRunTarget.sway),
+  preview(runTarget: ThemeRunTarget.preview),
+  studio(runTarget: ThemeRunTarget.studio),
+  verify,
+  verifyPerf,
+  tracePerf,
+  generateScenes;
+
+  const DevelopmentCommand({this.runTarget});
+  final ThemeRunTarget? runTarget;
+
+  bool get isThemeSelectionRequired => switch (this) {
+    verify || generateScenes => false,
+    _ => true,
+  };
 }

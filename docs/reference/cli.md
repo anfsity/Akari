@@ -195,7 +195,7 @@ remain available at the installed path; reinstall after moving the repository.
 
 Completion covers commands and aliases, command-specific long and short options,
 enum values, and paths. It stops after `--`, where arguments belong to the theme.
-The parser, help, and generated scripts share `tool/src/cli_definition.dart`.
+The parser, help, and generated scripts share `tool/src/cli/definition.dart`.
 Reinstall after changing that definition to refresh installed completion scripts.
 For manual registration, `akari completion --shell zsh` or `--shell bash` prints
 the corresponding script.

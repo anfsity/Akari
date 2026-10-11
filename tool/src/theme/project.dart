@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
+import 'model.dart';
+
 const _themePackagePrefix = 'theme_';
 
 class ThemePackage {
@@ -115,22 +117,20 @@ String getThemeCacheKey(ThemePackage theme) {
   ].join('/');
 }
 
-String getThemeHostDirectory(
-  ThemePackage theme, {
-  required bool preview,
-  bool studio = false,
-}) =>
-    'build/tool/hosts/${getThemeCacheKey(theme)}/${studio
-        ? 'studio'
-        : preview
-        ? 'demo'
-        : 'real'}';
+String getThemeHostDirectory(ThemePackage theme, ThemeHostKind kind) =>
+    'build/tool/hosts/${getThemeCacheKey(theme)}/${kind.cacheName}';
 
-String getLinuxExecutablePath(String hostDirectory, String buildMode) {
+String getBackendTargetDirectory(BackendMode backend) =>
+    'target/akari-${backend.name}';
+
+String getBackendExecutablePath(BackendMode backend, BuildMode mode) =>
+    'backend/${getBackendTargetDirectory(backend)}/${mode.rustProfile}/backend';
+
+String getLinuxExecutablePath(String hostDirectory, BuildMode buildMode) {
   final architecture = switch (Abi.current()) {
     Abi.linuxX64 => 'x64',
     Abi.linuxArm64 => 'arm64',
     _ => throw UnsupportedError('Linux builds require an x64 or arm64 host.'),
   };
-  return '$hostDirectory/build/linux/$architecture/$buildMode/bundle/greeter';
+  return '$hostDirectory/build/linux/$architecture/${buildMode.name}/bundle/greeter';
 }
