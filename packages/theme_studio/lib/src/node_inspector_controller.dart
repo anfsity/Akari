@@ -63,11 +63,15 @@ class NodeInspectorController extends ChangeNotifier {
     _updatingFields = false;
   }
 
+  Map<String, double> _getLayoutValues(SceneRect rect) => {
+    'X': rect.x * _getLayoutFactor('X'),
+    'Y': rect.y * _getLayoutFactor('Y'),
+    'Width': rect.width * _getLayoutFactor('Width'),
+    'Height': rect.height * _getLayoutFactor('Height'),
+  };
+
   Map<String, double> _getPreviewValues(SceneNode node) => {
-    'X': node.rect.x * _getLayoutFactor('X'),
-    'Y': node.rect.y * _getLayoutFactor('Y'),
-    'Width': node.rect.width * _getLayoutFactor('Width'),
-    'Height': node.rect.height * _getLayoutFactor('Height'),
+    ..._getLayoutValues(node.rect),
     'Scale X': node.transform.scaleX,
     'Scale Y': node.transform.scaleY,
     'Rotate X': node.transform.rotationX,
@@ -75,12 +79,13 @@ class NodeInspectorController extends ChangeNotifier {
     'Rotate Z': node.transform.rotationZ,
   };
 
-  double _getLayoutFactor(String label) =>
-      _layoutUnit == StudioLayoutUnit.percent
-      ? 100
-      : (label == 'X' || label == 'Width')
-      ? _canvas.referenceWidth.toDouble()
-      : _canvas.referenceHeight.toDouble();
+  double _getLayoutFactor(String label) {
+    if (_layoutUnit == StudioLayoutUnit.percent) return 100;
+    return switch (label) {
+      'X' || 'Width' => _canvas.referenceWidth.toDouble(),
+      _ => _canvas.referenceHeight.toDouble(),
+    };
+  }
 
   String _getFieldText(String label, Object value) =>
       _layoutFields.contains(label)
@@ -90,15 +95,11 @@ class NodeInspectorController extends ChangeNotifier {
   void updateLayoutUnit(StudioLayoutUnit unit) {
     if (unit == _layoutUnit) return;
     try {
-      final rect = _getRect();
+      final rect = _getDraftRect();
       _layoutUnit = unit;
       _updatingFields = true;
-      for (final entry in _getPreviewValues(
-        _node.copyWith(rect: rect),
-      ).entries) {
-        if (_layoutFields.contains(entry.key)) {
-          getField(entry.key).text = _getFieldText(entry.key, entry.value);
-        }
+      for (final entry in _getLayoutValues(rect).entries) {
+        getField(entry.key).text = _getFieldText(entry.key, entry.value);
       }
       _updatingFields = false;
       notifyListeners();
@@ -143,13 +144,13 @@ class NodeInspectorController extends ChangeNotifier {
   int _getInteger(String label) => getIntegerInput(label, getField(label).text);
 
   SceneNode getUpdatedNode() => _node.copyWith(
-    rect: _getRect(),
+    rect: _getDraftRect(),
     z: _getInteger('Depth'),
     renderOrder: _getInteger('Paint order'),
     focusOrder: _getInteger('Focus order'),
     motion: _motion,
-    transform: _getTransform(),
-    properties: _getProperties(),
+    transform: _getDraftTransform(),
+    properties: _getValidatedProperties(),
   );
 
   double _getLayoutNumber(String label, double source) {
@@ -162,14 +163,14 @@ class NodeInspectorController extends ChangeNotifier {
     return _getNumber(label) / factor;
   }
 
-  SceneRect _getRect() => SceneRect(
+  SceneRect _getDraftRect() => SceneRect(
     x: _getLayoutNumber('X', _node.rect.x),
     y: _getLayoutNumber('Y', _node.rect.y),
     width: _getLayoutNumber('Width', _node.rect.width),
     height: _getLayoutNumber('Height', _node.rect.height),
   );
 
-  SceneTransform _getTransform() => SceneTransform(
+  SceneTransform _getDraftTransform() => SceneTransform(
     translateX: _getNumber('Translate X'),
     translateY: _getNumber('Translate Y'),
     scaleX: _getNumber('Scale X'),
@@ -201,7 +202,7 @@ class NodeInspectorController extends ChangeNotifier {
     return properties.cast<String, String>();
   }
 
-  Map<String, String> _getProperties() {
+  Map<String, String> _getValidatedProperties() {
     final properties = getPropertiesDraft();
     if (properties.values.any((value) => value.isEmpty)) {
       throw const FormatException(

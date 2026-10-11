@@ -107,13 +107,16 @@ SceneNode calculateResizedNode({
   if (lockAspectRatio) {
     final widthRatio = width / rect.width;
     final heightRatio = height / rect.height;
-    final ratio = alignment.x == 0
-        ? heightRatio
-        : alignment.y == 0
-        ? widthRatio
-        : (widthRatio - 1).abs() >= (heightRatio - 1).abs()
-        ? widthRatio
-        : heightRatio;
+    final double ratio;
+    if (alignment.x == 0) {
+      ratio = heightRatio;
+    } else if (alignment.y == 0) {
+      ratio = widthRatio;
+    } else {
+      ratio = (widthRatio - 1).abs() >= (heightRatio - 1).abs()
+          ? widthRatio
+          : heightRatio;
+    }
     final bounded = math.max(
       ratio,
       math.max(minimum / rect.width, minimum / rect.height),
