@@ -1,7 +1,9 @@
+import 'src/theme/model.dart';
+
 import 'dart:io';
 
-import 'src/theme_project.dart';
-import 'src/theme_host.dart';
+import 'src/theme/project.dart';
+import 'src/theme/host.dart';
 
 void main(List<String> arguments) {
   if (arguments.length < 2 ||
@@ -18,7 +20,10 @@ void main(List<String> arguments) {
     repoRoot: File.fromUri(Platform.script).parent.parent,
     theme: getThemePackage(Directory(arguments[0])),
     output: Directory(arguments[1]),
-    preview: arguments.length == 3,
-    studio: arguments.last == '--studio',
+    kind: switch (arguments.last) {
+      '--studio' => ThemeHostKind.studio,
+      '--preview' => ThemeHostKind.preview,
+      _ => ThemeHostKind.greeter,
+    },
   );
 }

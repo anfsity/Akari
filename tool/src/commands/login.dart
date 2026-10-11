@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'cli_definition.dart';
-import 'sdk_commands.dart';
+import '../cli/definition.dart';
+import '../sdk_commands.dart';
 
 const loginInstallationPath = '/opt/akari';
 

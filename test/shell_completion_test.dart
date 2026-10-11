@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../tool/src/cli_install.dart';
-import '../tool/src/shell_completion.dart';
+import '../tool/src/cli/installation.dart';
+import '../tool/src/cli/completion.dart';
 
 void main() {
   late Directory temp;

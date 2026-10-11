@@ -25,7 +25,7 @@ description: 了解 Akari 各部分代码的位置和职责。
 
 ## 主题是怎么构建的
 
-从 `tool/akari.dart` 开始。`tool/src/cli_definition.dart` 定义通用命令语法。`theme_project.dart` 解析项目及 builder；`command_plans.dart` 描述执行步骤；`theme_host.dart` 创建所选宿主。场景构建器使用 `scene_schema` 校验文档，再生成主题需要导入的 Dart 代码。
+从 `tool/akari.dart` 开始。`tool/src/cli/definition.dart` 定义通用命令语法。`tool/src/commands/` 拥有开发流程，并生成包含步骤、产物和主题所有权的 `RunPlan`。`tool/src/execution/` 执行依赖图并记录日志与报告，业务结果由各流程自己检查。`tool/src/theme/project.dart` 解析项目及 builder，`tool/src/theme/host.dart` 创建所选宿主。场景构建器使用 `scene_schema` 校验文档，再生成主题需要导入的 Dart 代码。
 
 ## 界面是怎么更新的
 

@@ -1,5 +1,6 @@
-import 'cli_definition.dart';
-import 'run_report.dart';
+import 'definition.dart';
+import '../execution/model.dart';
+import '../theme/model.dart';
 
 /// Separates CLI input from the theme's arguments before interpreting options.
 /// Help applies only to CLI input, even when the theme receives its own --help.
@@ -34,19 +35,25 @@ class DevCommandOptions {
     Map<String, String> values,
     this.themeArguments,
     this.jobs,
+    this.command,
   ) : format = values['--format'] == 'json'
           ? RunOutputFormat.json
           : RunOutputFormat.text,
       buildTarget = values['--platform'] ?? 'linux',
-      buildMode = values['--mode'],
+      buildMode = BuildMode.values.byName(
+        values['--mode'] ??
+            (command == DevelopmentCommand.build ? 'release' : 'debug'),
+      ),
       reportPath = values['--report'],
       dryRun = values.containsKey('--dry-run'),
       themePath = values['--theme'],
-      backendMode = values['--backend'] ?? 'mock',
+      backendMode = BackendMode.values.byName(values['--backend'] ?? 'mock'),
       displayProfile = values['--display-profile'] ?? 'auto',
       resolution = values['--resolution'],
       scale = values['--scale'],
-      swayBackend = values['--sway-backend'] ?? 'wayland';
+      swayBackend = SwayBackend.values.byName(
+        values['--sway-backend'] ?? 'wayland',
+      );
 
   factory DevCommandOptions.parse(CliCommand command, CliArguments arguments) {
     if (arguments.forwardsArguments && !command.forwardsArguments) {
@@ -62,7 +69,12 @@ class DevCommandOptions {
         throw const FormatException('--jobs must be a positive integer.');
       }
     }
-    final options = DevCommandOptions._(values, arguments.theme, jobs);
+    final options = DevCommandOptions._(
+      values,
+      arguments.theme,
+      jobs,
+      command.development!,
+    );
     if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(options.buildTarget)) {
       throw FormatException(
         'Invalid Flutter build target: ${options.buildTarget}',
@@ -74,14 +86,15 @@ class DevCommandOptions {
   final RunOutputFormat format;
   final List<String> themeArguments;
   final String buildTarget;
-  final String? buildMode;
+  final DevelopmentCommand command;
+  final BuildMode buildMode;
   final String? reportPath;
   final bool dryRun;
   final String? themePath;
   final int? jobs;
-  final String backendMode;
+  final BackendMode backendMode;
   final String displayProfile;
   final String? resolution;
   final String? scale;
-  final String swayBackend;
+  final SwayBackend swayBackend;
 }

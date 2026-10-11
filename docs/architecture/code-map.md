@@ -25,10 +25,12 @@ description: Where to read and change each part of Akari.
 
 ## Follow a theme build
 
-Start at `tool/akari.dart`. `tool/src/cli_definition.dart` owns the shared
-command grammar. `theme_project.dart` resolves the package and builder;
-`command_plans.dart` describes execution; `theme_host.dart` creates the selected
-host. The scene builder delegates validation to `scene_schema` and emits Dart
+Start at `tool/akari.dart`. `tool/src/cli/definition.dart` owns the shared
+command grammar. `tool/src/commands/` owns development workflows and creates a
+`RunPlan` containing steps, artifacts and theme ownership. `tool/src/execution/`
+runs the dependency graph and records logs and reports; each workflow validates
+its own results. `tool/src/theme/project.dart` resolves the package and builder,
+and `tool/src/theme/host.dart` creates the selected host. The scene builder delegates validation to `scene_schema` and emits Dart
 that the theme imports.
 
 ## Follow a UI update

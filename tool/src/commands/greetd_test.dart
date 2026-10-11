@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'cli_definition.dart';
+import '../cli/definition.dart';
 
 const greetdTestInstallationPath = '/opt/akari-test';
 

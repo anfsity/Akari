@@ -62,9 +62,7 @@ exit 17
   test(
     'scene generation precedes reload and failures preserve the running app',
     () async {
-      final temporary = await Directory.systemTemp.createTemp(
-        'akari-session-',
-      );
+      final temporary = await Directory.systemTemp.createTemp('akari-session-');
       addTearDown(() => temporary.delete(recursive: true));
       final theme = Directory('${temporary.path}/theme');
       await Directory('${theme.path}/lib').create(recursive: true);
@@ -151,6 +149,126 @@ pathlib.Path(${jsonEncode(generated.path)}).write_text(content)
       expect(await process.exitCode.timeout(const Duration(seconds: 15)), 0);
       await Future.wait([stdoutDone, stderrDone]);
       expect(await generated.readAsString(), 'updated');
+    },
+  );
+  test(
+    'saves during generation are serialized and retain a pending restart',
+    () async {
+      final temporary = await Directory.systemTemp.createTemp(
+        'akari-session-batch-',
+      );
+      addTearDown(() => temporary.delete(recursive: true));
+      final theme = Directory('${temporary.path}/theme');
+      await Directory('${theme.path}/lib').create(recursive: true);
+      final scene = File('${theme.path}/lib/test.scene.json');
+      await scene.writeAsString('initial');
+      final trace = File('${temporary.path}/trace');
+      final release = File('${temporary.path}/release');
+      final flutter = File('${temporary.path}/flutter');
+      await flutter.writeAsString('''#!/usr/bin/env python3
+import json, pathlib, sys
+trace = pathlib.Path(${jsonEncode(trace.path)})
+print(json.dumps([{'event': 'app.start', 'params': {'appId': 'test'}}]), flush=True)
+print(json.dumps([{'event': 'app.started', 'params': {}}]), flush=True)
+for line in sys.stdin:
+    request = json.loads(line)[0]
+    operation = request['method']
+    if operation == 'app.restart':
+        operation = 'restart' if request['params']['fullRestart'] else 'reload'
+        result = {'message': operation + '_done'}
+    else:
+        result = True
+    with trace.open('a') as output:
+        output.write(operation + '\\n')
+    print(json.dumps([{'id': request['id'], 'result': result}]), flush=True)
+    if operation == 'app.stop':
+        sys.exit(0)
+''');
+      final dart = File('${temporary.path}/dart');
+      await dart.writeAsString('''#!/usr/bin/env python3
+import pathlib, time
+root = pathlib.Path(${jsonEncode(temporary.path)})
+active = root / 'active'
+active.open('x').close()
+try:
+    counter = root / 'counter'
+    count = int(counter.read_text()) + 1 if counter.exists() else 1
+    counter.write_text(str(count))
+    with (root / 'trace').open('a') as output:
+        output.write('generate_' + str(count) + '_start\\n')
+    if count == 1:
+        print('GENERATION_STARTED', flush=True)
+        for _ in range(1000):
+            if (root / 'release').exists():
+                break
+            time.sleep(0.01)
+        assert (root / 'release').exists()
+    pathlib.Path(${jsonEncode('${theme.path}/lib/test.scene.g.dart')}).write_text(str(count))
+    with (root / 'trace').open('a') as output:
+        output.write('generate_' + str(count) + '_finish\\n')
+finally:
+    active.unlink()
+''');
+      expect(
+        (await Process.run('chmod', ['+x', flutter.path, dart.path])).exitCode,
+        0,
+      );
+      final sdk = getDartCommand(Directory.current);
+      final process = await Process.start(
+        sdk.first,
+        [
+          ...sdk.skip(1),
+          'tool/theme_session.dart',
+          theme.path,
+          temporary.path,
+          'debug',
+          'demo',
+        ],
+        environment: {
+          'AKARI_FLUTTER_BIN': flutter.path,
+          'AKARI_DART_BIN': dart.path,
+        },
+      );
+      addTearDown(() {
+        process.kill();
+      });
+      final ready = Completer<void>();
+      final generating = Completer<void>();
+      final restarted = Completer<void>();
+      final stdoutDone = process.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen((line) {
+            if (line.startsWith('Greeter ready')) ready.complete();
+            if (line == 'GENERATION_STARTED') generating.complete();
+            if (line == 'restart_done') restarted.complete();
+          })
+          .asFuture<void>();
+      final errors = process.stderr.transform(utf8.decoder).join();
+      await ready.future.timeout(const Duration(seconds: 15));
+      await scene.writeAsString('first');
+      await generating.future.timeout(const Duration(seconds: 15));
+      await scene.writeAsString('second');
+      process.stdin.write('R');
+      // Let both input and source events arrive while the first generator is
+      // blocked; a later Dart-only save must not downgrade the restart request.
+      await File('${theme.path}/lib/change.dart').writeAsString('// changed');
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await release.writeAsString('continue');
+      await restarted.future.timeout(const Duration(seconds: 15));
+      process.stdin.write('q');
+      expect(await process.exitCode.timeout(const Duration(seconds: 15)), 0);
+      await stdoutDone;
+      expect(await errors, isEmpty);
+      expect(await trace.readAsLines(), [
+        'generate_1_start',
+        'generate_1_finish',
+        'reload',
+        'generate_2_start',
+        'generate_2_finish',
+        'restart',
+        'app.stop',
+      ]);
     },
   );
 }
