@@ -49,34 +49,42 @@ class TerraceAccountPicker extends StatelessWidget {
             ),
           ),
       ],
-      builder: (open) => Center(
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: AnimatedContainer(
-            duration: MediaQuery.disableAnimationsOf(context)
-                ? Duration.zero
-                : const Duration(milliseconds: 180),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Theme.of(context).inputDecorationTheme.fillColor,
-              border: Border.all(
-                color: accent.withValues(alpha: open ? 1 : 0.5),
-                width: open ? 2 : 1,
+      builder: (open) => Align(
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox.square(
+              dimension: 48,
+              child: ClipOval(
+                child: account.selected == null
+                    ? Icon(Icons.person_outline, color: accent, size: 24)
+                    : Center(
+                        child: AccountPortrait(
+                          user: account.selected!,
+                          accent: accent,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
               ),
             ),
-            child: ClipOval(
-              child: account.selected == null
-                  ? Icon(Icons.person_outline, color: accent, size: 24)
-                  : Center(
-                      child: AccountPortrait(
-                        user: account.selected!,
-                        accent: accent,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+            const SizedBox(width: 16),
+            Flexible(
+              child: TerraceChoiceLabel(
+                id: account.selected?.id,
+                label: account.selected?.displayName ?? 'Choose account',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
             ),
-          ),
+            if (account.canSelect) ...[
+              const SizedBox(width: 8),
+              _TerraceChoiceArrow(open: open),
+            ],
+          ],
         ),
       ),
     );
@@ -111,75 +119,68 @@ class TerraceSessionPicker extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Text('No desktop sessions available.'),
     ),
-    CatalogMode.ready || CatalogMode.empty => LayoutBuilder(
-      builder: (context, constraints) {
-        final inputTheme = InputDecorationTheme.of(context);
-        final border = inputTheme.enabledBorder! as OutlineInputBorder;
-        return _TerraceMenu<SessionSummary>(
-          tooltip: 'Choose a session',
-          minWidth: constraints.maxWidth,
-          entries: [
-            for (final item in session.sessions)
-              PopupMenuItem<SessionSummary>(
-                value: item,
-                onTap: () => onSelect(item),
-                padding: EdgeInsets.zero,
-                child: _ChoiceRow(
-                  label: item.name,
-                  selected: session.selected?.id == item.id,
-                  leading: const Icon(Icons.desktop_windows_outlined, size: 18),
-                ),
-              ),
-          ],
-          builder: (open) => AnimatedContainer(
-            duration: MediaQuery.disableAnimationsOf(context)
-                ? Duration.zero
-                : const Duration(milliseconds: 180),
-            decoration: BoxDecoration(
-              color: inputTheme.fillColor,
-              borderRadius: border.borderRadius,
-              border: Border.fromBorderSide(
-                open
-                    ? BorderSide(
-                        color: Theme.of(context).colorScheme.primary,
-                        width: 1.5,
-                      )
-                    : border.borderSide,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.desktop_windows_outlined,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TerraceChoiceLabel(
-                      id: session.selected?.id,
-                      label: session.selected?.name ?? 'Choose session',
-                    ),
-                  ),
-                  if (session.sessions.length > 1)
-                    AnimatedRotation(
-                      turns: open ? 0.5 : 0,
-                      duration: MediaQuery.disableAnimationsOf(context)
-                          ? Duration.zero
-                          : const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      child: const Icon(Icons.expand_more, size: 18),
-                    ),
-                ],
-              ),
+    CatalogMode.ready || CatalogMode.empty => _TerraceMenu<SessionSummary>(
+      tooltip: 'Choose a session',
+      entries: [
+        for (final item in session.sessions)
+          PopupMenuItem<SessionSummary>(
+            value: item,
+            onTap: () => onSelect(item),
+            padding: EdgeInsets.zero,
+            child: _ChoiceRow(
+              label: item.name,
+              selected: session.selected?.id == item.id,
+              leading: const Icon(Icons.desktop_windows_outlined, size: 18),
             ),
           ),
-        );
-      },
+      ],
+      builder: (open) => Align(
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.desktop_windows_outlined,
+              size: 18,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: TerraceChoiceLabel(
+                id: session.selected?.id,
+                label: session.selected?.name ?? 'Choose session',
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+            if (session.sessions.length > 1) ...[
+              const SizedBox(width: 8),
+              _TerraceChoiceArrow(open: open),
+            ],
+          ],
+        ),
+      ),
     ),
   };
+}
+
+class _TerraceChoiceArrow extends StatelessWidget {
+  const _TerraceChoiceArrow({required this.open});
+
+  final bool open;
+
+  @override
+  Widget build(BuildContext context) => AnimatedRotation(
+    turns: open ? 0.5 : 0,
+    duration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 220),
+    curve: Curves.easeOutCubic,
+    child: Icon(
+      Icons.expand_more,
+      size: 18,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
+  );
 }
 
 class _TerraceMenu<T> extends StatefulWidget {
@@ -188,14 +189,12 @@ class _TerraceMenu<T> extends StatefulWidget {
     required this.entries,
     required this.builder,
     this.enabled = true,
-    this.minWidth = 240,
   });
 
   final String tooltip;
   final List<PopupMenuEntry<T>> entries;
   final Widget Function(bool open) builder;
   final bool enabled;
-  final double minWidth;
 
   @override
   State<_TerraceMenu<T>> createState() => _TerraceMenuState<T>();
@@ -217,7 +216,7 @@ class _TerraceMenuState<T> extends State<_TerraceMenu<T>> {
     await navigator.push(
       _TerraceChoiceRoute<T>(
         anchor: anchor,
-        width: widget.minWidth * scale,
+        width: 240 * scale,
         scale: scale,
         entries: widget.entries,
         label: widget.tooltip,
