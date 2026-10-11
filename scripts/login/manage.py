@@ -436,7 +436,7 @@ def show_logs(component, lines, follow):
     return subprocess.call(command)
 
 
-def main():
+def parse_arguments():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     install = commands.add_parser('install')
@@ -455,7 +455,11 @@ def main():
     logs.add_argument('--component', choices=['service', 'backend', 'flutter', 'sway'], default='service')
     logs.add_argument('--lines', type=int, default=100)
     logs.add_argument('--follow', action='store_true')
-    arguments = parser.parse_args()
+    return parser.parse_args()
+
+
+def main():
+    arguments = parse_arguments()
     if arguments.command == 'status':
         result = get_status()
         if arguments.format == 'json':
@@ -475,20 +479,21 @@ def main():
         raise ValueError('This operation requires root; invoke it through akari or sudo python3.')
     with LOCK.open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        if arguments.command == 'install':
-            create_installation(arguments.source, arguments.bundle, arguments.backend, arguments.layout, arguments.keyring)
-        elif arguments.command == 'configure-keyring':
-            providers = select_keyrings(arguments.keyring)
-            update_pam(get_keyring_pam_configuration(PAM.read_text(), providers))
-            print(f'Configured greetd keyring PAM: {", ".join(providers) or "none"}')
-        elif arguments.command == 'enable':
-            enable_login()
-        elif arguments.command == 'disable':
-            disable_login()
-        elif arguments.command == 'rollback':
-            rollback_installation()
-        else:
-            remove_installation()
+        match arguments.command:
+            case 'install':
+                create_installation(arguments.source, arguments.bundle, arguments.backend, arguments.layout, arguments.keyring)
+            case 'configure-keyring':
+                providers = select_keyrings(arguments.keyring)
+                update_pam(get_keyring_pam_configuration(PAM.read_text(), providers))
+                print(f'Configured greetd keyring PAM: {", ".join(providers) or "none"}')
+            case 'enable':
+                enable_login()
+            case 'disable':
+                disable_login()
+            case 'rollback':
+                rollback_installation()
+            case 'uninstall':
+                remove_installation()
     return 0
 
 
