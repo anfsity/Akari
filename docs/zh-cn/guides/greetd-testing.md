@@ -9,9 +9,56 @@ description: 构建和安装真实登录测试工具、捕获显示器信息、�
 
 登录界面唤醒且账号、会话已选定时，Akari 会自动开始系统认证。识别期间会持续显示 PAM 提供的提示；认证成功后直接启动所选桌面，无需提交密码。若识别超时或摄像头不可用后 PAM 继续请求密码，输入框会在同一次认证中恢复，并自动获得键盘焦点。
 
-在主机安装并配置 [Howdy](https://github.com/boltgolt/howdy)，使用 `sudo howdy -U USERNAME add` 为实际登录账号录入人脸，然后按照发行版的 Howdy 说明把模块接入 `/etc/pam.d/greetd`。将人脸认证放在现有密码规则之前，使用允许成功完成认证、失败继续密码规则的 PAM 控制方式，并保留原有 account 和 session 规则。
+初步使用 [Gaze](https://github.com/GunduLabs/gaze) 作为人脸认证提供方。其默认顺序 PAM 模式会先识别人脸，失败后继续现有密码规则。Akari 直接展示 PAM 提示，不根据文案猜测认证提供方，因此翻译后的消息也能正常显示。摄像头设置、人脸录入、超时和回退策略由提供方与 PAM 管理；Akari 不采集摄像头画面、不存储人脸模型。预览和模拟模式不会执行真实人脸识别。
 
-在 Howdy 的 `[core]` 配置中启用 `detection_notice = true`，让模块报告识别开始。Akari 直接展示这些提示，不根据文案猜测认证提供方，因此翻译后的消息也能正常显示。摄像头设置、人脸录入、超时和回退策略由提供方与 PAM 管理；Akari 不采集摄像头画面、不存储人脸模型。预览和模拟模式不会执行真实人脸识别。
+### 安装并验证 Gaze
+
+按照 Gaze 的[安装指南](https://gaze.gundulabs.com/guide/installation.html)操作。Arch 上的人脸认证包名是 `gaze-bin`；AUR 中名为 `gaze` 的另一个包是文件监视工具。基础包已经包含守护进程、CLI 和 PAM 模块，Akari 无需桌面扩展。
+
+Arch 包的安装钩子还会配置 sudo 和 polkit。若第一轮只接入 greetd，应在安装前创建 `/etc/gaze/pam-sudo.optout`，备份现有 polkit 规则并记录 `/etc/pam.d/polkit-1` 是否存在，安装完成后恢复 polkit 规则；升级时也要重新检查这些钩子。参见 Gaze 的 [PAM 指南](https://gaze.gundulabs.com/guide/pam.html)。
+
+```sh
+sudo install -d -m 0755 /etc/gaze
+sudo touch /etc/gaze/pam-sudo.optout
+yay -S --needed gaze-bin
+sudo systemctl enable --now gazed
+gaze config
+```
+
+先使用 CPU 推理、`security.level = "medium"` 并保持活体检测开启。先选 RGB 摄像头，确认红外采集及补光正常后再添加 IR。多摄像头时优先使用 `usb:VVVV:PPPP` 标识，避免 `/dev/video*` 编号变化选错设备。Gaze 直接采集硬件，登录界面的识别不依赖用户的 PipeWire 会话。参见[配置指南](https://gaze.gundulabs.com/guide/configuration.html)。
+
+在桌面中以实际登录账号执行录入和验证：
+
+```sh
+gaze add-face default
+gaze auth --verbose
+gaze doctor
+```
+
+需要管理员权限的命令会请求认证。`gaze auth` 验证摄像头和识别，不测试 greetd 的 PAM 规则；先确认这里能够成功识别，再接入 PAM。修改 PAM 前备份原规则，并保留已认证的管理员终端。
+
+### 在 Arch 上接入 greetd
+
+对于 `/etc/pam.d/greetd` 引用 `system-local-login` 的标准 Arch 规则，将开头的 `auth` 规则替换为：
+
+```text
+auth       required                     pam_securetty.so
+auth       requisite                    pam_nologin.so
+auth       required                     pam_shells.so
+auth       requisite                    pam_faillock.so preauth
+auth       [success=1 default=ignore]     pam_gaze.so
+auth       include                      system-local-login
+auth       required                     pam_env.so
+auth       required                     pam_faillock.so authsucc
+```
+
+保留已有 `account`、`session` 和密钥环规则。Shell 与失败锁定检查放在 Gaze 前，因为人脸成功会跳过通常执行这些检查的密码栈。成功时只跳过紧邻的 `system-local-login` 认证引用，再加载环境并清除此前的认证失败记录；Gaze 失败或模块不可用时继续原密码栈。后续密钥环认证规则仍会执行，而在这一层使用 `sufficient` 会跳过它们。跳转依赖紧邻的引用规则，后续修改 PAM 时需要检查。若主机的 PAM 布局不同，应按发行版规则和 Gaze 的 [greetd 指南](https://gaze.gundulabs.com/guide/greetd.html)调整，不要直接复制上述配置。
+
+初步配置保持 TPM 密码存储关闭。人脸登录不会自动解锁有密码的密钥环；进入桌面后按提示解锁即可。Gaze 的可选密钥环集成属于独立配置，额外存储和 PAM 要求见其 greetd 指南。
+
+### 验证真实登录
+
+安装当前 Akari 构建后，使用下文的独立测试工具。验证人脸成功且无需提交密码、识别失败后密码登录、摄像头不可用时密码回退，以及识别中切换账号后旧尝试无法启动会话。已锁定的账号即使人脸匹配也必须保持拒绝。失败时查看后端日志及 `journalctl -u gazed -b`。恢复备份的 greetd 规则即可移除本次试用接入。
 
 ## 安装和运行测试工具
 
