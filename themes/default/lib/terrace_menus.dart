@@ -49,42 +49,23 @@ class TerraceAccountPicker extends StatelessWidget {
             ),
           ),
       ],
-      builder: (open) => Align(
-        alignment: Alignment.centerLeft,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox.square(
-              dimension: 48,
-              child: ClipOval(
-                child: account.selected == null
-                    ? Icon(Icons.person_outline, color: accent, size: 24)
-                    : Center(
-                        child: AccountPortrait(
-                          user: account.selected!,
-                          accent: accent,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Flexible(
-              child: TerraceChoiceLabel(
-                id: account.selected?.id,
-                label: account.selected?.displayName ?? 'Choose account',
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w400,
+      builder: (open) => _TerraceChoiceHeader(
+        id: account.selected?.id,
+        label: account.selected?.displayName ?? 'Choose account',
+        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w400),
+        open: open,
+        showArrow: account.canSelect,
+        leading: ClipOval(
+          child: account.selected == null
+              ? Icon(Icons.person_outline, color: accent, size: 24)
+              : Center(
+                  child: AccountPortrait(
+                    user: account.selected!,
+                    accent: accent,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-            ),
-            if (account.canSelect) ...[
-              const SizedBox(width: 8),
-              _TerraceChoiceArrow(open: open),
-            ],
-          ],
         ),
       ),
     );
@@ -134,33 +115,54 @@ class TerraceSessionPicker extends StatelessWidget {
             ),
           ),
       ],
-      builder: (open) => Align(
-        alignment: Alignment.centerLeft,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.desktop_windows_outlined,
-              size: 18,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(width: 12),
-            Flexible(
-              child: TerraceChoiceLabel(
-                id: session.selected?.id,
-                label: session.selected?.name ?? 'Choose session',
-                style: const TextStyle(fontSize: 16),
-              ),
-            ),
-            if (session.sessions.length > 1) ...[
-              const SizedBox(width: 8),
-              _TerraceChoiceArrow(open: open),
-            ],
-          ],
+      builder: (open) => _TerraceChoiceHeader(
+        id: session.selected?.id,
+        label: session.selected?.name ?? 'Choose session',
+        style: const TextStyle(fontSize: 16),
+        open: open,
+        showArrow: session.sessions.length > 1,
+        leading: Icon(
+          Icons.desktop_windows_outlined,
+          size: 24,
+          color: Theme.of(context).colorScheme.primary,
         ),
       ),
     ),
   };
+}
+
+class _TerraceChoiceHeader extends StatelessWidget {
+  const _TerraceChoiceHeader({
+    required this.id,
+    required this.label,
+    required this.style,
+    required this.leading,
+    required this.open,
+    required this.showArrow,
+  });
+
+  final String? id;
+  final String label;
+  final TextStyle style;
+  final Widget leading;
+  final bool open;
+  final bool showArrow;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      SizedBox.square(dimension: 48, child: leading),
+      const SizedBox(width: 16),
+      Flexible(
+        child: TerraceChoiceLabel(id: id, label: label, style: style),
+      ),
+      if (showArrow) ...[
+        const SizedBox(width: 8),
+        _TerraceChoiceArrow(open: open),
+      ],
+    ],
+  );
 }
 
 class _TerraceChoiceArrow extends StatelessWidget {
@@ -203,10 +205,10 @@ class _TerraceMenu<T> extends StatefulWidget {
 class _TerraceMenuState<T> extends State<_TerraceMenu<T>> {
   bool _open = false;
 
-  Future<void> _openMenu() async {
+  Future<void> _openMenu(BuildContext anchorContext) async {
     final navigator = Navigator.of(context);
     final overlay = navigator.overlay!.context.findRenderObject()! as RenderBox;
-    final button = context.findRenderObject()! as RenderBox;
+    final button = anchorContext.findRenderObject()! as RenderBox;
     final anchor = MatrixUtils.transformRect(
       button.getTransformTo(overlay),
       Offset.zero & button.size,
@@ -216,7 +218,7 @@ class _TerraceMenuState<T> extends State<_TerraceMenu<T>> {
     await navigator.push(
       _TerraceChoiceRoute<T>(
         anchor: anchor,
-        width: 240 * scale,
+        width: 280 * scale,
         scale: scale,
         entries: widget.entries,
         label: widget.tooltip,
@@ -232,12 +234,19 @@ class _TerraceMenuState<T> extends State<_TerraceMenu<T>> {
   }
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: widget.tooltip,
-    child: InkWell(
-      onTap: widget.enabled && !_open ? _openMenu : null,
-      borderRadius: BorderRadius.circular(12),
-      child: widget.builder(_open),
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerLeft,
+    child: Builder(
+      builder: (anchorContext) => Tooltip(
+        message: widget.tooltip,
+        child: InkWell(
+          onTap: widget.enabled && !_open
+              ? () => _openMenu(anchorContext)
+              : null,
+          borderRadius: BorderRadius.circular(12),
+          child: widget.builder(_open),
+        ),
+      ),
     ),
   );
 }
@@ -454,16 +463,24 @@ class _ChoiceRow extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: [
             IconTheme.merge(
               data: IconThemeData(color: accent),
-              child: SizedBox.square(dimension: 28, child: leading),
+              child: SizedBox.square(dimension: 32, child: leading),
             ),
-            const SizedBox(width: 12),
-            Expanded(child: Text(label, overflow: TextOverflow.ellipsis)),
-            if (selected) Icon(Icons.check, size: 16, color: accent),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 8),
+            SizedBox.square(
+              dimension: 16,
+              child: selected
+                  ? Icon(Icons.check, size: 16, color: accent)
+                  : null,
+            ),
           ],
         ),
       ),
