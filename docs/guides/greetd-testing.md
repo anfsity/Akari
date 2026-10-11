@@ -17,19 +17,97 @@ successful PAM authentication starts the selected desktop without a password
 submission. If the PAM stack proceeds to a password prompt after a timeout or
 missing camera, the field returns with keyboard focus in the same attempt.
 
-Install and configure [Howdy](https://github.com/boltgolt/howdy) on the host, enroll
-the actual login account with `sudo howdy -U USERNAME add`, and integrate its
-module into `/etc/pam.d/greetd` following the distribution's Howdy instructions.
-Place facial authentication before the existing password rules with a PAM
-control that allows success to complete authentication and failure to continue
-to the password rules. Preserve the existing account and session rules.
-
-Enable `detection_notice = true` in Howdy's `[core]` configuration so the provider
-announces when recognition begins. Akari displays these instructions without
-guessing the provider from their wording; translated messages work the same way.
+Use [Gaze](https://github.com/GunduLabs/gaze) as the initial face provider. Its
+default sequential PAM mode tries face authentication before falling back to
+the existing password rules. Akari displays PAM instructions without guessing
+the provider from their wording; translated messages work the same way.
 Camera configuration, enrollment, recognition timeouts and fallback policy belong
 to the provider and PAM. Akari does not capture camera frames or store face models.
 Preview and mock mode do not perform facial recognition.
+
+### Install and verify Gaze
+
+Follow Gaze's [installation guide](https://gaze.gundulabs.com/guide/installation.html).
+On Arch, the facial authentication package is `gaze-bin`; the unrelated AUR
+package named `gaze` is a file watcher. The base package provides the daemon,
+CLI and PAM module; a desktop extension is not needed for Akari.
+
+The Arch package's installation hooks also configure sudo and polkit. For a
+greetd-only trial, create `/etc/gaze/pam-sudo.optout` before installing, back up
+the existing polkit policy (including whether `/etc/pam.d/polkit-1` exists),
+and restore that policy after installation. Review those hooks again on upgrades.
+See Gaze's [PAM guide](https://gaze.gundulabs.com/guide/pam.html).
+
+```sh
+sudo install -d -m 0755 /etc/gaze
+sudo touch /etc/gaze/pam-sudo.optout
+yay -S --needed gaze-bin
+sudo systemctl enable --now gazed
+gaze config
+```
+
+Start with CPU inference, `security.level = "medium"` and liveness enabled.
+Choose the RGB camera first; add IR after verifying its capture and emitter.
+For multiple cameras, prefer a `usb:VVVV:PPPP` identifier over a numbered
+`/dev/video*` path. Gaze captures the hardware directly, so recognition at the
+login screen does not depend on a user's PipeWire session. See the
+[configuration guide](https://gaze.gundulabs.com/guide/configuration.html).
+
+Run enrollment from the desktop as the actual login account:
+
+```sh
+gaze add-face default
+gaze auth --verbose
+gaze doctor
+```
+
+These commands request administrator authentication where needed. `gaze auth`
+tests the camera and recognition, but does not exercise greetd's PAM policy.
+Before connecting PAM, verify successful recognition here. Keep an authenticated
+administrator terminal available while editing PAM and back up the original
+policy.
+
+### Connect greetd on Arch
+
+For the stock Arch stack where `/etc/pam.d/greetd` includes
+`system-local-login`, replace its initial `auth` rules with:
+
+```text
+auth       required                     pam_securetty.so
+auth       requisite                    pam_nologin.so
+auth       required                     pam_shells.so
+auth       requisite                    pam_faillock.so preauth
+auth       [success=1 default=ignore]     pam_gaze.so
+auth       include                      system-local-login
+auth       required                     pam_env.so
+auth       required                     pam_faillock.so authsucc
+```
+
+Keep the existing `account`, `session` and keyring rules. The shell and lockout
+checks precede Gaze because a face match skips the password stack that normally
+performs them. Success skips exactly the `system-local-login` auth include,
+then loads the environment and clears prior authentication failures. A failed
+or unavailable Gaze module continues through the existing password stack.
+The existing keyring auth rules still run; `sufficient` at this level would
+skip them. This jump depends on the adjacent include: review it when changing
+the policy. For a different PAM layout, follow the distribution's policy and
+Gaze's [greetd guide](https://gaze.gundulabs.com/guide/greetd.html) instead of
+copying these rules.
+
+The initial setup leaves TPM-backed password storage disabled. A face login
+does not unlock a password-protected keyring automatically; unlock it in the
+desktop when requested. Gaze's optional keyring integration is a separate setup
+with additional storage and PAM requirements described in its greetd guide.
+
+### Verify real login
+
+Use the standalone harness below after installing the current Akari build.
+Verify face success without password submission, an unsuccessful scan followed
+by password login, and password fallback with the camera unavailable. Also
+change the selected account during a scan and confirm the previous attempt
+cannot start a session. A locked-out account must remain denied even when its
+face matches. Inspect backend logs and `journalctl -u gazed -b` for failures.
+Restore the backed-up greetd policy to remove the trial integration.
 
 ## Install and run the harness
 
