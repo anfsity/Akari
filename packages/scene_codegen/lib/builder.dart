@@ -21,10 +21,7 @@ class SceneBuilder implements Builder {
 }
 
 String generateScene(String input) {
-  return _generate(decodeSceneDocument(input));
-}
-
-String _generate(SceneDocument document) {
+  final document = decodeSceneDocument(input);
   final buffer = StringBuffer()
     ..writeln('// GENERATED CODE - DO NOT MODIFY BY HAND')
     ..writeln('// Generated from ${document.id}.scene.json.')
@@ -33,9 +30,9 @@ String _generate(SceneDocument document) {
     ..writeln(
       // A getter creates a fresh document after hot reload. A cached top-level
       // final would keep the old scene even after regenerated code is loaded.
-      'SceneDocument get ${_variableName(document.id)} => SceneDocument(',
+      'SceneDocument get ${_getVariableName(document.id)} => SceneDocument(',
     )
-    ..writeln('  id: ${_dartString(document.id)},')
+    ..writeln('  id: ${_encodeDartString(document.id)},')
     ..writeln('  version: ${document.version},')
     ..writeln('  canvas: const SceneCanvas(')
     ..writeln('    fit: SceneCanvasFit.${document.canvas.fit.name},')
@@ -45,56 +42,20 @@ String _generate(SceneDocument document) {
     ..writeln('  ),')
     ..writeln('  background: SceneBackground(')
     ..writeln('    kind: SceneBackgroundKind.${document.background.kind.name},')
-    ..writeln('    asset: ${_dartNullableString(document.background.asset)},')
-    ..writeln('    color: ${_colorLiteral(document.background.color)},')
+    ..writeln(
+      '    asset: ${_encodeDartNullableString(document.background.asset)},',
+    )
+    ..writeln('    color: ${_encodeColorLiteral(document.background.color)},')
     ..writeln('    scrimOpacity: ${document.background.scrimOpacity},')
     ..writeln('    blurSigma: ${document.background.blurSigma},')
     ..writeln(
-      '    rendererId: ${_dartNullableString(document.background.rendererId)},',
+      '    rendererId: ${_encodeDartNullableString(document.background.rendererId)},',
     )
     ..writeln('  ),')
     ..writeln('  nodes: <SceneNode>[');
 
   for (final node in document.nodes) {
-    buffer
-      ..writeln('    SceneNode(')
-      ..writeln('      id: ${_dartString(node.id)},')
-      ..writeln('      componentId: ${_dartString(node.componentId)},')
-      ..writeln('      rect: const SceneRect(')
-      ..writeln('        x: ${node.rect.x},')
-      ..writeln('        y: ${node.rect.y},')
-      ..writeln('        width: ${node.rect.width},')
-      ..writeln('        height: ${node.rect.height},')
-      ..writeln('      ),')
-      ..writeln('      transform: const SceneTransform(')
-      ..writeln('        translateX: ${node.transform.translateX},')
-      ..writeln('        translateY: ${node.transform.translateY},')
-      ..writeln('        scaleX: ${node.transform.scaleX},')
-      ..writeln('        scaleY: ${node.transform.scaleY},')
-      ..writeln('        rotationX: ${node.transform.rotationX},')
-      ..writeln('        rotationY: ${node.transform.rotationY},')
-      ..writeln('        rotationZ: ${node.transform.rotationZ},')
-      ..writeln('        pivotX: ${node.transform.pivotX},')
-      ..writeln('        pivotY: ${node.transform.pivotY},')
-      ..writeln('        perspective: ${node.transform.perspective},')
-      ..writeln('      ),')
-      ..writeln('      z: ${node.z},')
-      ..writeln('      renderOrder: ${node.renderOrder},')
-      ..writeln('      focusOrder: ${node.focusOrder},')
-      ..writeln('      motion: SceneMotionPreset.${node.motion.name},')
-      ..writeln(
-        '      visibleWhen: ${node.visibleWhen == null ? 'null' : 'const ${_conditionLiteral(node.visibleWhen!)}'},',
-      )
-      ..writeln('      interactive: ${node.interactive},')
-      ..writeln('      properties: <String, String>{');
-    for (final entry in node.properties.entries) {
-      buffer.writeln(
-        '        ${_dartString(entry.key)}: ${_dartString(entry.value)},',
-      );
-    }
-    buffer
-      ..writeln('      },')
-      ..writeln('    ),');
+    _writeNode(buffer, node);
   }
 
   buffer
@@ -104,19 +65,62 @@ String _generate(SceneDocument document) {
   return buffer.toString();
 }
 
-String _conditionLiteral(SceneCondition condition) {
+void _writeNode(StringBuffer buffer, SceneNode node) {
+  buffer
+    ..writeln('    SceneNode(')
+    ..writeln('      id: ${_encodeDartString(node.id)},')
+    ..writeln('      componentId: ${_encodeDartString(node.componentId)},')
+    ..writeln('      rect: const SceneRect(')
+    ..writeln('        x: ${node.rect.x},')
+    ..writeln('        y: ${node.rect.y},')
+    ..writeln('        width: ${node.rect.width},')
+    ..writeln('        height: ${node.rect.height},')
+    ..writeln('      ),')
+    ..writeln('      transform: const SceneTransform(')
+    ..writeln('        translateX: ${node.transform.translateX},')
+    ..writeln('        translateY: ${node.transform.translateY},')
+    ..writeln('        scaleX: ${node.transform.scaleX},')
+    ..writeln('        scaleY: ${node.transform.scaleY},')
+    ..writeln('        rotationX: ${node.transform.rotationX},')
+    ..writeln('        rotationY: ${node.transform.rotationY},')
+    ..writeln('        rotationZ: ${node.transform.rotationZ},')
+    ..writeln('        pivotX: ${node.transform.pivotX},')
+    ..writeln('        pivotY: ${node.transform.pivotY},')
+    ..writeln('        perspective: ${node.transform.perspective},')
+    ..writeln('      ),')
+    ..writeln('      z: ${node.z},')
+    ..writeln('      renderOrder: ${node.renderOrder},')
+    ..writeln('      focusOrder: ${node.focusOrder},')
+    ..writeln('      motion: SceneMotionPreset.${node.motion.name},')
+    ..writeln(
+      '      visibleWhen: ${node.visibleWhen == null ? 'null' : 'const ${_encodeConditionLiteral(node.visibleWhen!)}'},',
+    )
+    ..writeln('      interactive: ${node.interactive},')
+    ..writeln('      properties: <String, String>{');
+  for (final entry in node.properties.entries) {
+    buffer.writeln(
+      '        ${_encodeDartString(entry.key)}: ${_encodeDartString(entry.value)},',
+    );
+  }
+  buffer
+    ..writeln('      },')
+    ..writeln('    ),');
+}
+
+String _encodeConditionLiteral(SceneCondition condition) {
   return switch (condition) {
     ScenePredicateCondition(:final predicate) =>
       'ScenePredicateCondition(ScenePredicate.${predicate.name})',
     SceneAll(:final conditions) =>
-      'SceneAll(<SceneCondition>[${conditions.map(_conditionLiteral).join(', ')}])',
+      'SceneAll(<SceneCondition>[${conditions.map(_encodeConditionLiteral).join(', ')}])',
     SceneAny(:final conditions) =>
-      'SceneAny(<SceneCondition>[${conditions.map(_conditionLiteral).join(', ')}])',
-    SceneNot(:final condition) => 'SceneNot(${_conditionLiteral(condition)})',
+      'SceneAny(<SceneCondition>[${conditions.map(_encodeConditionLiteral).join(', ')}])',
+    SceneNot(:final condition) =>
+      'SceneNot(${_encodeConditionLiteral(condition)})',
   };
 }
 
-String _variableName(String id) {
+String _getVariableName(String id) {
   final parts = id.split(RegExp(r'[^A-Za-z0-9]+'))
     ..removeWhere((part) => part.isEmpty);
   if (parts.isEmpty) {
@@ -129,7 +133,7 @@ String _variableName(String id) {
   return '${first[0].toLowerCase()}${first.substring(1)}${rest.join()}SceneDocument';
 }
 
-String _dartString(String value) {
+String _encodeDartString(String value) {
   final escaped = value
       .replaceAll(r'\', r'\\')
       .replaceAll("'", r"\'")
@@ -138,10 +142,10 @@ String _dartString(String value) {
   return "'$escaped'";
 }
 
-String _dartNullableString(String? value) {
-  return value == null ? 'null' : _dartString(value);
+String _encodeDartNullableString(String? value) {
+  return value == null ? 'null' : _encodeDartString(value);
 }
 
-String _colorLiteral(int value) {
+String _encodeColorLiteral(int value) {
   return '0x${value.toRadixString(16).padLeft(8, '0')}';
 }
