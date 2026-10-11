@@ -51,7 +51,7 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
           color: colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
           fontSize: 16,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+        contentPadding: EdgeInsets.zero,
         border: _getFieldBorder(Colors.white.withValues(alpha: 0.3), 1),
         enabledBorder: _getFieldBorder(Colors.white.withValues(alpha: 0.3), 1),
         focusedBorder: _getFieldBorder(colorScheme.primary, 1.5),

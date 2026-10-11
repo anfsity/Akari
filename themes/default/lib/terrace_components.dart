@@ -13,7 +13,8 @@ const _contentScale = 1.3;
 /// Scene-specific presentation, borrowing the standard authentication controls
 /// so prompt, recovery and session semantics retain one authoritative path.
 class TerraceComponents implements GreeterThemeComponents {
-  TerraceComponents(this.theme) : _controls = StandardGreeterComponents(theme);
+  TerraceComponents(this.theme)
+    : _controls = StandardGreeterComponents(theme, textAlign: TextAlign.start);
 
   final GreeterThemeContext theme;
   final StandardGreeterComponents _controls;
@@ -49,6 +50,7 @@ class TerraceComponents implements GreeterThemeComponents {
             auth: auth,
             controller: theme.host.credentialController,
             focusNode: theme.host.credentialFocusNode,
+            textAlign: _controls.textAlign,
           ),
         ),
       ),
