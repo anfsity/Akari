@@ -53,7 +53,6 @@ Future<Color> extractSeedFromBytes(Uint8List bytes) async {
 Color calculateAccentFromRgba(Uint8List rgba) {
   final histogram = List<double>.filled(_bucketCount, 0);
   final samples = List<HSVColor?>.filled(_bucketCount, null);
-  var vibrantFound = false;
   var brightnessTotal = 0.0;
   for (var i = 0; i + 3 < rgba.length; i += 4) {
     final red = rgba[i];
@@ -76,15 +75,6 @@ Color calculateAccentFromRgba(Uint8List rgba) {
     if (sample == null || weight > sample.saturation * sample.value) {
       samples[bucket] = hsv;
     }
-    vibrantFound = true;
-  }
-
-  if (!vibrantFound) {
-    final pixelCount = rgba.length ~/ 4;
-    final averageBrightness = pixelCount == 0
-        ? 0.0
-        : brightnessTotal / pixelCount;
-    return averageBrightness < 0.5 ? _lightNeutralAccent : _darkNeutralAccent;
   }
 
   // Red straddles the 0/360-degree boundary. Merge those bins so one red region
@@ -98,19 +88,21 @@ Color calculateAccentFromRgba(Uint8List rgba) {
   }
   histogram[0] += histogram[_bucketCount - 1];
 
-  var winner = -1;
-  var maxWeight = -1.0;
-  for (var bucket = 0; bucket < _bucketCount - 1; bucket++) {
-    if (histogram[bucket] > maxWeight) {
-      maxWeight = histogram[bucket];
-      winner = bucket;
-    }
+  var winner = 0;
+  for (var bucket = 1; bucket < _bucketCount - 1; bucket++) {
+    if (histogram[bucket] > histogram[winner]) winner = bucket;
   }
 
-  final sample = winner == -1 ? null : samples[winner];
-  if (sample == null) {
-    return _lightNeutralAccent;
+  if (histogram[winner] == 0) {
+    final pixelCount = rgba.length ~/ 4;
+    final averageBrightness = pixelCount == 0
+        ? 0.0
+        : brightnessTotal / pixelCount;
+    return averageBrightness < 0.5 ? _lightNeutralAccent : _darkNeutralAccent;
   }
+
+  // A positive bin always owns a sample, including the merged red bin.
+  final sample = samples[winner]!;
   final saturation = (sample.saturation * _accentSaturationScale).clamp(
     _minAccentSaturation,
     _maxAccentSaturation,
