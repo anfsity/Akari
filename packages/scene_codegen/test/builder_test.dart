@@ -1,7 +1,61 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:scene_codegen/builder.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('generated Dart preserves literal strings when executed', () async {
+    final properties = {
+      r'$key': r'$user and ${expression}',
+      'escaping': "quote' and \\ slash\nnew line\rcarriage return",
+      'backslash before dollar': r'\$user',
+    };
+    final generated = generateScene(
+      jsonEncode({
+        'id': 'test',
+        'version': 2,
+        'canvas': {'fit': 'contain'},
+        'background': {
+          'kind': 'custom',
+          'asset': r'assets/$wallpaper.png',
+          'rendererId': r'${renderer}',
+        },
+        'nodes': [
+          {
+            'id': r'$node',
+            'component': r'${component}',
+            'rect': {'x': 0, 'y': 0, 'width': 1, 'height': 1},
+            'properties': properties,
+          },
+        ],
+      }),
+    );
+    final temp = await Directory.systemTemp.createTemp('scene-codegen-test-');
+    addTearDown(() => temp.delete(recursive: true));
+    final script = File('${temp.path}/scene.dart');
+    // scene re-exports these models; use their Flutter-free source to execute
+    // the generated constructors without requiring a Flutter runtime.
+    await script.writeAsString('''
+import 'dart:convert';
+${generated.replaceAll('package:scene/scene.dart', 'package:scene_schema/scene_schema.dart')}
+void main() {
+  print(jsonEncode(sceneDocumentToMap(testSceneDocument)));
+}
+''');
+    final result = await Process.run(Platform.resolvedExecutable, [
+      '--packages=${File('.dart_tool/package_config.json').absolute.path}',
+      script.path,
+    ]);
+    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    final document = jsonDecode(result.stdout as String);
+    expect(document['background']['asset'], r'assets/$wallpaper.png');
+    expect(document['background']['rendererId'], r'${renderer}');
+    expect(document['nodes'][0]['id'], r'$node');
+    expect(document['nodes'][0]['component'], r'${component}');
+    expect(document['nodes'][0]['properties'], properties);
+  });
+
   test('generates a typed document from a valid scene', () {
     final generated = generateScene('''
 {
