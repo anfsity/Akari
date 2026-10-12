@@ -22,89 +22,72 @@ class SceneBuilder implements Builder {
 
 String generateScene(String input) {
   final document = decodeSceneDocument(input);
-  final buffer = StringBuffer()
-    ..writeln('// GENERATED CODE - DO NOT MODIFY BY HAND')
-    ..writeln('// Generated from ${document.id}.scene.json.')
-    ..writeln("import 'package:scene/scene.dart';")
-    ..writeln()
-    ..writeln(
-      // A getter creates a fresh document after hot reload. A cached top-level
-      // final would keep the old scene even after regenerated code is loaded.
-      'SceneDocument get ${_getVariableName(document.id)} => SceneDocument(',
-    )
-    ..writeln('  id: ${_encodeDartString(document.id)},')
-    ..writeln('  version: ${document.version},')
-    ..writeln('  canvas: const SceneCanvas(')
-    ..writeln('    fit: SceneCanvasFit.${document.canvas.fit.name},')
-    ..writeln('    useSafeArea: ${document.canvas.useSafeArea},')
-    ..writeln('    referenceWidth: ${document.canvas.referenceWidth},')
-    ..writeln('    referenceHeight: ${document.canvas.referenceHeight},')
-    ..writeln('  ),')
-    ..writeln('  background: SceneBackground(')
-    ..writeln('    kind: SceneBackgroundKind.${document.background.kind.name},')
-    ..writeln(
-      '    asset: ${_encodeDartNullableString(document.background.asset)},',
-    )
-    ..writeln('    color: ${_encodeColorLiteral(document.background.color)},')
-    ..writeln('    scrimOpacity: ${document.background.scrimOpacity},')
-    ..writeln('    blurSigma: ${document.background.blurSigma},')
-    ..writeln(
-      '    rendererId: ${_encodeDartNullableString(document.background.rendererId)},',
-    )
-    ..writeln('  ),')
-    ..writeln('  nodes: <SceneNode>[');
+  // A getter creates a fresh document after hot reload. A cached top-level
+  // final would keep the old scene even after regenerated code is loaded.
+  return '''// GENERATED CODE - DO NOT MODIFY BY HAND
+// Generated from ${document.id}.scene.json.
+import 'package:scene/scene.dart';
 
-  for (final node in document.nodes) {
-    _writeNode(buffer, node);
-  }
+SceneDocument get ${_getVariableName(document.id)} => SceneDocument(
+  id: ${_encodeDartString(document.id)},
+  version: ${document.version},
+  canvas: const SceneCanvas(
+    fit: SceneCanvasFit.${document.canvas.fit.name},
+    useSafeArea: ${document.canvas.useSafeArea},
+    referenceWidth: ${document.canvas.referenceWidth},
+    referenceHeight: ${document.canvas.referenceHeight},
+  ),
+  background: SceneBackground(
+    kind: SceneBackgroundKind.${document.background.kind.name},
+    asset: ${_encodeDartNullableString(document.background.asset)},
+    color: ${_encodeColorLiteral(document.background.color)},
+    scrimOpacity: ${document.background.scrimOpacity},
+    blurSigma: ${document.background.blurSigma},
+    rendererId: ${_encodeDartNullableString(document.background.rendererId)},
+  ),
+  nodes: <SceneNode>[
+${document.nodes.map(_encodeNode).join()}  ],
+);
 
-  buffer
-    ..writeln('  ],')
-    ..writeln(');')
-    ..writeln();
-  return buffer.toString();
+''';
 }
 
-void _writeNode(StringBuffer buffer, SceneNode node) {
-  buffer
-    ..writeln('    SceneNode(')
-    ..writeln('      id: ${_encodeDartString(node.id)},')
-    ..writeln('      componentId: ${_encodeDartString(node.componentId)},')
-    ..writeln('      rect: const SceneRect(')
-    ..writeln('        x: ${node.rect.x},')
-    ..writeln('        y: ${node.rect.y},')
-    ..writeln('        width: ${node.rect.width},')
-    ..writeln('        height: ${node.rect.height},')
-    ..writeln('      ),')
-    ..writeln('      transform: const SceneTransform(')
-    ..writeln('        translateX: ${node.transform.translateX},')
-    ..writeln('        translateY: ${node.transform.translateY},')
-    ..writeln('        scaleX: ${node.transform.scaleX},')
-    ..writeln('        scaleY: ${node.transform.scaleY},')
-    ..writeln('        rotationX: ${node.transform.rotationX},')
-    ..writeln('        rotationY: ${node.transform.rotationY},')
-    ..writeln('        rotationZ: ${node.transform.rotationZ},')
-    ..writeln('        pivotX: ${node.transform.pivotX},')
-    ..writeln('        pivotY: ${node.transform.pivotY},')
-    ..writeln('        perspective: ${node.transform.perspective},')
-    ..writeln('      ),')
-    ..writeln('      z: ${node.z},')
-    ..writeln('      renderOrder: ${node.renderOrder},')
-    ..writeln('      focusOrder: ${node.focusOrder},')
-    ..writeln('      motion: SceneMotionPreset.${node.motion.name},')
-    ..writeln(
-      '      visibleWhen: ${node.visibleWhen == null ? 'null' : 'const ${_encodeConditionLiteral(node.visibleWhen!)}'},',
-    )
-    ..writeln('      interactive: ${node.interactive},')
-    ..writeln('      properties: <String, String>{');
-  for (final entry in node.properties.entries) {
-    buffer.writeln(
-      '        ${_encodeDartString(entry.key)}: ${_encodeDartString(entry.value)},',
-    );
-  }
-  buffer
-    ..writeln('      },')
-    ..writeln('    ),');
+String _encodeNode(SceneNode node) {
+  final properties = [
+    for (final entry in node.properties.entries)
+      '        ${_encodeDartString(entry.key)}: ${_encodeDartString(entry.value)},\n',
+  ].join();
+  return '''    SceneNode(
+      id: ${_encodeDartString(node.id)},
+      componentId: ${_encodeDartString(node.componentId)},
+      rect: const SceneRect(
+        x: ${node.rect.x},
+        y: ${node.rect.y},
+        width: ${node.rect.width},
+        height: ${node.rect.height},
+      ),
+      transform: const SceneTransform(
+        translateX: ${node.transform.translateX},
+        translateY: ${node.transform.translateY},
+        scaleX: ${node.transform.scaleX},
+        scaleY: ${node.transform.scaleY},
+        rotationX: ${node.transform.rotationX},
+        rotationY: ${node.transform.rotationY},
+        rotationZ: ${node.transform.rotationZ},
+        pivotX: ${node.transform.pivotX},
+        pivotY: ${node.transform.pivotY},
+        perspective: ${node.transform.perspective},
+      ),
+      z: ${node.z},
+      renderOrder: ${node.renderOrder},
+      focusOrder: ${node.focusOrder},
+      motion: SceneMotionPreset.${node.motion.name},
+      visibleWhen: ${node.visibleWhen == null ? 'null' : 'const ${_encodeConditionLiteral(node.visibleWhen!)}'},
+      interactive: ${node.interactive},
+      properties: <String, String>{
+${properties}      },
+    ),
+''';
 }
 
 String _encodeConditionLiteral(SceneCondition condition) {
