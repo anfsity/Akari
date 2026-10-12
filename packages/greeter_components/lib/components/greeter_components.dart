@@ -12,9 +12,13 @@ import 'system_components.dart';
 /// semantic callbacks without owning authentication or rebuilding the full scene.
 /// A theme using different component IDs supplies its own factory.
 class StandardGreeterComponents implements GreeterThemeComponents {
-  const StandardGreeterComponents(this.theme);
+  const StandardGreeterComponents(
+    this.theme, {
+    this.textAlign = TextAlign.center,
+  });
 
   final GreeterThemeContext theme;
+  final TextAlign textAlign;
 
   @override
   Widget build(BuildContext context, SceneNode node) {
@@ -56,6 +60,7 @@ class StandardGreeterComponents implements GreeterThemeComponents {
           auth: auth,
           controller: host.credentialController,
           focusNode: host.credentialFocusNode,
+          textAlign: textAlign,
         ),
       ),
       'primaryAction' => ListenableBuilder(
@@ -78,6 +83,7 @@ class StandardGreeterComponents implements GreeterThemeComponents {
           service: host.serviceSlots.value,
           auth: host.authPromptSlots.value,
           session: host.sessionPickerSlots.value,
+          textAlign: textAlign,
         ),
       ),
       'background' ||

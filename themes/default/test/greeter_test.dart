@@ -186,6 +186,7 @@ void main() {
     await tester.tap(find.byTooltip('Choose account'));
     await tester.pumpAndSettle();
     final menuLabelHeight = tester.getRect(find.text('Alice')).height;
+    final menuWidth = tester.getRect(find.byType(SingleChildScrollView)).width;
     final menuRowHeight = tester
         .getRect(
           find.byWidgetPredicate((widget) => widget is PopupMenuItem).first,
@@ -219,6 +220,7 @@ void main() {
       final menu = tester.getRect(find.byType(SingleChildScrollView));
       expect(menu.left, closeTo(anchor.left, .01));
       expect(menu.top, closeTo(anchor.bottom + 8, .01));
+      expect(menu.width, closeTo(menuWidth * scale, .01));
       expect(
         tester
             .getRect(
@@ -232,8 +234,6 @@ void main() {
           tester.getRect(find.text('Alice').last).height,
           closeTo(menuLabelHeight * scale, .01),
         );
-      } else {
-        expect(menu.width, closeTo(anchor.width, .01));
       }
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
@@ -482,15 +482,15 @@ void main() {
           matching: find.byWidgetPredicate(
             (widget) =>
                 widget is DecoratedBox &&
-                widget.decoration is BoxDecoration &&
-                (widget.decoration as BoxDecoration).border != null,
+                widget.decoration is ShapeDecoration &&
+                (widget.decoration as ShapeDecoration).shape is InputBorder,
           ),
         )
         .first;
     final decoration =
-        tester.widget<DecoratedBox>(fieldSurface).decoration as BoxDecoration;
+        tester.widget<DecoratedBox>(fieldSurface).decoration as ShapeDecoration;
     expect(
-      (decoration.border as Border).top.color,
+      (decoration.shape as InputBorder).borderSide.color,
       buildDefaultTheme().materialTheme.colorScheme.primary,
     );
   });

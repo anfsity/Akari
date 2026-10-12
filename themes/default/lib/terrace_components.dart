@@ -13,7 +13,8 @@ const _contentScale = 1.3;
 /// Scene-specific presentation, borrowing the standard authentication controls
 /// so prompt, recovery and session semantics retain one authoritative path.
 class TerraceComponents implements GreeterThemeComponents {
-  TerraceComponents(this.theme) : _controls = StandardGreeterComponents(theme);
+  TerraceComponents(this.theme)
+    : _controls = StandardGreeterComponents(theme, textAlign: TextAlign.start);
 
   final GreeterThemeContext theme;
   final StandardGreeterComponents _controls;
@@ -22,7 +23,6 @@ class TerraceComponents implements GreeterThemeComponents {
   Widget build(BuildContext context, SceneNode node) {
     final component = switch (node.componentId) {
       'terraceClock' => const _TerraceClock(),
-      'terracePanel' => TerracePanel(radius: theme.tokens.panelRadius),
       'terraceLabel' => _TerraceLabel(
         text: node.properties['text']!,
         large: node.properties['variant'] == 'large',
@@ -50,19 +50,18 @@ class TerraceComponents implements GreeterThemeComponents {
             auth: auth,
             controller: theme.host.credentialController,
             focusNode: theme.host.credentialFocusNode,
+            textAlign: _controls.textAlign,
           ),
         ),
       ),
-      'accountName' => SceneRegion<AccountPickerSlots>(
-        valueListenable: theme.host.accountPickerSlots,
-        builder: (context, account) => Align(
-          alignment: Alignment.centerLeft,
-          child: TerraceChoiceLabel(
-            id: account.selected?.id,
-            label: account.selected?.displayName ?? 'Choose account',
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w400),
+      'primaryAction' => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+            primary: Colors.transparent,
+            onPrimary: Theme.of(context).colorScheme.primary,
           ),
         ),
+        child: _controls.build(context, node),
       ),
       _ => _controls.build(context, node),
     };

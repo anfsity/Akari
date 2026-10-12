@@ -113,8 +113,8 @@ class _TerraceBackdropState extends State<_TerraceBackdrop> {
   }
 }
 
-/// Panels settle first, followed by the text, then the controls. All
-/// layers share reversible runtime progress so interrupted wakes stay smooth.
+/// Headings appear before the fading controls. Reversible runtime progress
+/// keeps interrupted wakes smooth, and stable glyph scale retains text caches.
 class TerraceEntranceMotion extends SceneMotionBuilder {
   const TerraceEntranceMotion();
 
@@ -125,36 +125,15 @@ class TerraceEntranceMotion extends SceneMotionBuilder {
     Animation<double> progress,
     Widget child,
   ) {
-    final surface = spec.preset == SceneMotionPreset.fadeScale;
-    final entrance = progress.drive(
-      CurveTween(curve: Interval(surface ? 0 : 0.12, surface ? 0.82 : 1)),
-    );
-    // Keep glyph scale stable so the raster cache can reuse text while it
-    // moves. Only the panel surface needs expansion; headings spring in place.
-    final content = RepaintBoundary(child: child);
+    final entrance = progress.drive(CurveTween(curve: const Interval(0.12, 1)));
     return FadeTransition(
       opacity: entrance.drive(CurveTween(curve: Curves.easeOutCubic)),
       child: SlideTransition(
-        position:
-            Tween<Offset>(
-              begin: Offset(surface ? -0.02 : 0, surface ? 0 : 0.16),
-              end: Offset.zero,
-            ).animate(
-              entrance.drive(
-                CurveTween(
-                  curve: surface ? Curves.easeOutCubic : Curves.easeOutBack,
-                ),
-              ),
-            ),
-        child: surface
-            ? ScaleTransition(
-                alignment: Alignment.centerLeft,
-                scale: Tween<double>(begin: 0.96, end: 1).animate(
-                  entrance.drive(CurveTween(curve: Curves.easeOutBack)),
-                ),
-                child: content,
-              )
-            : content,
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.16),
+          end: Offset.zero,
+        ).animate(entrance.drive(CurveTween(curve: Curves.easeOutBack))),
+        child: RepaintBoundary(child: child),
       ),
     );
   }
@@ -272,13 +251,12 @@ class _TerraceCredentialFeedbackState extends State<TerraceCredentialFeedback>
         child: DecoratedBox(
           position: DecorationPosition.foreground,
           decoration: BoxDecoration(
-            borderRadius:
-                (InputDecorationTheme.of(context).enabledBorder!
-                        as OutlineInputBorder)
-                    .borderRadius,
-            border: Border.all(
-              color: Theme.of(context).colorScheme.error
-                  .withValues(alpha: math.sin(progress * math.pi) * 0.85),
+            border: Border(
+              bottom: BorderSide(
+                width: 1.5,
+                color: Theme.of(context).colorScheme.error
+                    .withValues(alpha: math.sin(progress * math.pi) * 0.85),
+              ),
             ),
           ),
           child: child,
@@ -326,25 +304,6 @@ class TerraceChoiceLabel extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: style,
-    ),
-  );
-}
-
-class TerracePanel extends StatelessWidget {
-  const TerracePanel({required this.radius, super.key});
-
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(radius),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0x704b819b), Color(0x40345674)],
-      ),
     ),
   );
 }
