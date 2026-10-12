@@ -311,7 +311,8 @@ if name == 'dart':
                     self.assertEqual((self.installation / relative).read_text(), version)
                 self.assertIn(str(self.installation / "launch.sh"),
                               (self.installation / "greetd.toml").read_text())
-        backups = sorted((self.installation / "backups").iterdir())
+        backups = sorted((self.installation / "backups").iterdir(),
+                         key=lambda path: path.stat().st_mtime_ns)
         self.assertEqual(len(backups), 2)
         self.assertEqual((backups[0] / "frontend/greeter").read_text(), "old")
         self.assertEqual((backups[1] / "frontend/greeter").read_text(), "new")
