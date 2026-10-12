@@ -5,6 +5,16 @@ description: 构建和安装真实登录测试工具、捕获显示器信息、�
 
 测试工具位于 `scripts/greetd-test/`，安装到 `/opt/akari-test`。它使用正式版后端，通过 greetd 验证登录，并调用 logind 处理电源操作。这里的挂起、重启和关机都会实际执行。系统启动时仍由 SDDM 管理登录；桌面开发用的 `akari run` 默认模拟登录和电源操作。
 
+## 用户会话环境
+
+正式版和测试工具的 greetd 配置均启用 profile 加载。greetd 先读取 `/etc/profile` 和 `~/.profile`，随后 Akari 将认证用户的命令转发给 `$SHELL`，以非交互 login 模式启动。默认 shell 自行读取原生配置，Akari 不选择配置文件，也不按 shell 名称分支。原生 shell 集成测试覆盖 bash、sh、zsh 和 fish。
+
+桌面需要的环境变量应导出到登录配置，例如 zsh 的 `.zprofile`，或 fish 配置中 `status is-interactive` 条件之外的部分；`.zshrc` 不会加载。原生 shell 的启动文件可能再次读取 POSIX profile，因此 profile 中的操作应支持重复执行。安装时会保留已有配置；升级旧安装时，请移除 `/etc/akari/greetd.toml` 中的 `source_profile = false`，或改为 `true`。重新安装测试工具会同时更新配置和后端。
+
+用户侧执行器完整保留命令参数，仅在 LANG 缺失或为空时补入 `LANG=C.UTF-8`；它记录 locale 检查结果，保留用户明确设置的覆盖值。桌面的 stdout/stderr 和启动信息写入 `${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/` 下的私有日志。执行器运行前的 shell 初始化失败仍通过 greetd 的会话输出报告。
+
+桌面与 systemd 服务的就绪时序由所选桌面或会话管理器负责。选择 UWSM 管理的会话时，环境同步和退出清理由 UWSM 处理。直接启动 compositor 时保留现有集成；新增 custom 回调无法约束上游已经启动的应用。验证时应分别检查 compositor 子进程、新启动的用户服务和新激活的 D-Bus 服务。greetd 交接成功不代表桌面已经就绪。
+
 ## 人脸认证
 
 登录界面唤醒且账号、会话已选定时，Akari 会自动开始系统认证。识别期间会持续显示 PAM 提供的提示；认证成功后直接启动所选桌面，无需提交密码。若识别超时或摄像头不可用后 PAM 继续请求密码，输入框会在同一次认证中恢复，并自动获得键盘焦点。
