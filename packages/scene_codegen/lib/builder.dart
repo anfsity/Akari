@@ -85,7 +85,7 @@ String _encodeNode(SceneNode node) {
       visibleWhen: ${node.visibleWhen == null ? 'null' : 'const ${_encodeConditionLiteral(node.visibleWhen!)}'},
       interactive: ${node.interactive},
       properties: <String, String>{
-${properties}      },
+$properties      },
     ),
 ''';
 }
