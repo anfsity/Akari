@@ -5,49 +5,44 @@ import 'package:theme_default/theme.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 void main() {
-  for (final preset in [
-    SceneMotionPreset.fadeSlide,
-    SceneMotionPreset.fadeScale,
-  ]) {
-    testWidgets('$preset reuses static painting while moving', (tester) async {
-      final controller = AnimationController(
-        vsync: tester,
-        duration: const Duration(milliseconds: 420),
-      );
-      addTearDown(controller.dispose);
-      final painter = _PaintCounter();
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Center(
-            child: SizedBox(
-              width: 300,
-              height: 80,
-              child: Builder(
-                builder: (context) => const TerraceEntranceMotion().build(
-                  context,
-                  (
-                    preset: preset,
-                    duration: controller.duration!,
-                    curve: Curves.linear,
-                    reducedMotion: false,
-                  ),
-                  controller,
-                  CustomPaint(painter: painter),
+  testWidgets('entrance reuses static painting while moving', (tester) async {
+    final controller = AnimationController(
+      vsync: tester,
+      duration: const Duration(milliseconds: 420),
+    );
+    addTearDown(controller.dispose);
+    final painter = _PaintCounter();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: SizedBox(
+            width: 300,
+            height: 80,
+            child: Builder(
+              builder: (context) => const TerraceEntranceMotion().build(
+                context,
+                (
+                  preset: SceneMotionPreset.fadeSlide,
+                  duration: controller.duration!,
+                  curve: Curves.linear,
+                  reducedMotion: false,
                 ),
+                controller,
+                CustomPaint(painter: painter),
               ),
             ),
           ),
         ),
-      );
-      controller.forward();
-      for (var frame = 0; frame < 20; frame++) {
-        await tester.pump(const Duration(milliseconds: 16));
-      }
-      expect(painter.paints, greaterThan(0));
-      expect(painter.paints, lessThanOrEqualTo(2));
-      await tester.pumpAndSettle();
-    });
-  }
+      ),
+    );
+    controller.forward();
+    for (var frame = 0; frame < 20; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(painter.paints, greaterThan(0));
+    expect(painter.paints, lessThanOrEqualTo(2));
+    await tester.pumpAndSettle();
+  });
 
   testWidgets('a shake reuses the credential surface painting', (tester) async {
     final painter = _PaintCounter();

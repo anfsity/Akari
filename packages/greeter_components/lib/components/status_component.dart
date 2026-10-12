@@ -6,12 +6,14 @@ class GreeterStatusLine extends StatelessWidget {
     required this.service,
     required this.auth,
     required this.session,
+    this.textAlign = TextAlign.center,
     super.key,
   });
 
   final ServiceSlots service;
   final AuthPromptSlots auth;
   final SessionPickerSlots session;
+  final TextAlign textAlign;
 
   @override
   Widget build(BuildContext context) {
@@ -43,20 +45,23 @@ class GreeterStatusLine extends StatelessWidget {
     return Semantics(
       liveRegion: true,
       child: Center(
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color:
-                service.mode == ServiceMode.unavailable ||
-                    auth.mode == AuthMode.error ||
-                    auth.promptError != null ||
-                    session.error != null
-                ? scheme.error
-                : scheme.primary,
-            fontSize: 14,
+        child: SizedBox(
+          width: double.infinity,
+          child: Text(
+            message,
+            textAlign: textAlign,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color:
+                  service.mode == ServiceMode.unavailable ||
+                      auth.mode == AuthMode.error ||
+                      auth.promptError != null ||
+                      session.error != null
+                  ? scheme.error
+                  : scheme.primary,
+              fontSize: 14,
+            ),
           ),
         ),
       ),

@@ -6,12 +6,14 @@ class CredentialField extends StatelessWidget {
     required this.auth,
     required this.controller,
     required this.focusNode,
+    this.textAlign = TextAlign.center,
     super.key,
   });
 
   final AuthPromptSlots auth;
   final TextEditingController controller;
   final FocusNode focusNode;
+  final TextAlign textAlign;
 
   @override
   Widget build(BuildContext context) {
@@ -53,16 +55,10 @@ class CredentialField extends StatelessWidget {
             : focusNode.hasFocus
             ? inputTheme.focusedBorder ?? inputTheme.enabledBorder
             : inputTheme.enabledBorder;
-        final borderRadius = border is OutlineInputBorder
-            ? border.borderRadius
-            : BorderRadius.zero;
         return DecoratedBox(
-          decoration: BoxDecoration(
+          decoration: ShapeDecoration(
             color: inputTheme.fillColor,
-            borderRadius: borderRadius,
-            border: Border.fromBorderSide(
-              border?.borderSide ?? BorderSide.none,
-            ),
+            shape: border ?? InputBorder.none,
           ),
           child: child,
         );
@@ -75,7 +71,7 @@ class CredentialField extends StatelessWidget {
           enabled: enabled,
           obscureText: auth.prompt?.kind == PromptKind.secret || !enabled,
           textInputAction: TextInputAction.done,
-          textAlign: TextAlign.center,
+          textAlign: textAlign,
           textAlignVertical: TextAlignVertical.center,
           style: TextStyle(
             color: scheme.onSurface,

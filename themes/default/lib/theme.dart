@@ -45,17 +45,17 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
         displayColor: text,
       ),
       inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: surface.withValues(alpha: 0.55),
+        filled: false,
+        fillColor: Colors.transparent,
         hintStyle: TextStyle(
           color: colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
           fontSize: 16,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18),
-        border: _fieldBorder(Colors.transparent, 0),
-        enabledBorder: _fieldBorder(Colors.white.withValues(alpha: 0.16), 1),
-        focusedBorder: _fieldBorder(colorScheme.primary, 1.5),
-        disabledBorder: _fieldBorder(
+        contentPadding: EdgeInsets.zero,
+        border: _getFieldBorder(Colors.white.withValues(alpha: 0.3), 1),
+        enabledBorder: _getFieldBorder(Colors.white.withValues(alpha: 0.3), 1),
+        focusedBorder: _getFieldBorder(colorScheme.primary, 1.5),
+        disabledBorder: _getFieldBorder(
           colorScheme.outline.withValues(alpha: 0.3),
           1,
         ),
@@ -95,7 +95,6 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
       motions: const {
         SceneMotionPreset.fade: TerraceFadeMotion(),
         SceneMotionPreset.fadeSlide: TerraceEntranceMotion(),
-        SceneMotionPreset.fadeScale: TerraceEntranceMotion(),
         SceneMotionPreset.hoverLift: TerraceActionMotion(),
         SceneMotionPreset.focusGlow: FocusGlowMotionBuilder(),
       },
@@ -104,9 +103,9 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
   );
 }
 
-OutlineInputBorder _fieldBorder(Color color, double width) {
-  return OutlineInputBorder(
-    borderRadius: BorderRadius.circular(12),
+UnderlineInputBorder _getFieldBorder(Color color, double width) {
+  return UnderlineInputBorder(
+    borderRadius: BorderRadius.zero,
     borderSide: BorderSide(color: color, width: width),
   );
 }
