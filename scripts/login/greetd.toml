@@ -2,9 +2,6 @@
 vt = 1
 switch = true
 
-[general]
-source_profile = false
-
 [default_session]
 command = "/opt/akari/current/launch.sh"
 user = "akari-greeter"

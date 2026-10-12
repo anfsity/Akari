@@ -2,9 +2,6 @@
 vt = 1
 switch = true
 
-[general]
-source_profile = false
-
 [default_session]
 command = "@TEST_ROOT@/launch.sh"
 user = "greeter"
