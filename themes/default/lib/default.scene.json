@@ -109,21 +109,6 @@
       }
     },
     {
-      "id": "login_panel",
-      "component": "terracePanel",
-      "rect": {
-        "x": 0.06,
-        "y": 0.26,
-        "width": 0.45,
-        "height": 0.48
-      },
-      "renderOrder": 30,
-      "motion": "fadeScale",
-      "visibleWhen": {
-        "not": "isDormant"
-      }
-    },
-    {
       "id": "entrance_heading",
       "component": "terraceLabel",
       "rect": {
@@ -161,12 +146,12 @@
       }
     },
     {
-      "id": "avatar",
+      "id": "account_picker",
       "component": "terraceAccount",
       "rect": {
         "x": 0.085,
         "y": 0.425,
-        "width": 0.05,
+        "width": 0.4,
         "height": 0.078
       },
       "renderOrder": 40,
@@ -176,21 +161,6 @@
         "not": "isDormant"
       },
       "interactive": true
-    },
-    {
-      "id": "account_name",
-      "component": "accountName",
-      "rect": {
-        "x": 0.154,
-        "y": 0.425,
-        "width": 0.331,
-        "height": 0.078
-      },
-      "renderOrder": 40,
-      "motion": "fade",
-      "visibleWhen": {
-        "not": "isDormant"
-      }
     },
     {
       "id": "session_picker",
@@ -207,10 +177,7 @@
       "visibleWhen": {
         "not": "isDormant"
       },
-      "interactive": true,
-      "properties": {
-        "variant": "pill"
-      }
+      "interactive": true
     },
     {
       "id": "credential_field",
@@ -227,10 +194,7 @@
       "visibleWhen": {
         "not": "isDormant"
       },
-      "interactive": true,
-      "properties": {
-        "variant": "outline"
-      }
+      "interactive": true
     },
     {
       "id": "primary_action",
@@ -259,10 +223,7 @@
           }
         ]
       },
-      "interactive": true,
-      "properties": {
-        "variant": "round-arrow"
-      }
+      "interactive": true
     },
     {
       "id": "status",

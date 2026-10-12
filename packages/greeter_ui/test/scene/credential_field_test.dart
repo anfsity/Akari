@@ -5,7 +5,7 @@ import 'package:scene/scene.dart';
 import 'package:theme_default/theme.dart';
 
 void main() {
-  testWidgets('credential text fills its node so the prompt centers', (
+  testWidgets('credential fills its node with the default theme alignment', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1920, 1080);
@@ -51,7 +51,7 @@ void main() {
     final inputRect = tester.getRect(textField);
     final surfaceRect = tester.getRect(fieldSurface);
 
-    expect(field.textAlign, TextAlign.center);
+    expect(field.textAlign, TextAlign.start);
     expect(field.textAlignVertical, TextAlignVertical.center);
     expect(surfaceRect.height, closeTo(64.8, 1));
     expect(inputRect.center.dx, closeTo(surfaceRect.center.dx, 0.5));
