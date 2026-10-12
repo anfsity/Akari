@@ -183,7 +183,7 @@ struct AuthMessageResponseRequest<'a> {
 struct StartSessionRequest<'a> {
     #[serde(rename = "type")]
     kind: &'static str,
-    cmd: &'a [String],
+    cmd: [String; 1],
     env: &'a [String],
 }
 
@@ -284,7 +284,7 @@ impl GreetdClient {
         .await
     }
 
-    /// Sends `start_session` with the command and environment chosen by the backend.
+    /// Encodes argv for greetd's sh command line before sending `start_session`.
     pub async fn start_session(
         &mut self,
         cmd: &[String],
@@ -294,7 +294,7 @@ impl GreetdClient {
         self.request(
             &StartSessionRequest {
                 kind: "start_session",
-                cmd,
+                cmd: [encode_command(cmd)],
                 env,
             },
             cancellation,
@@ -371,6 +371,16 @@ impl GreetdClient {
 
         serde_json::from_slice(payload.as_slice()).map_err(GreetdError::Decode)
     }
+}
+
+/// greetd joins `cmd` with spaces and runs it through sh. Quote each argument
+/// at this protocol boundary so empty arguments and shell syntax remain data.
+fn encode_command(arguments: &[String]) -> String {
+    arguments
+        .iter()
+        .map(|argument| format!("'{}'", argument.replace('\'', "'\\''")))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 impl GreetdClientApi for GreetdClient {
@@ -525,6 +535,7 @@ async fn read_exact_with_timeout(
 mod tests {
     use std::{
         path::PathBuf,
+        process::Command,
         time::{Duration, SystemTime, UNIX_EPOCH},
     };
 
@@ -536,13 +547,48 @@ mod tests {
 
     use super::{
         AuthMessageResponseRequest, GreetdClient, GreetdError, GreetdResponse, MAX_FRAME_SIZE,
-        encode_frame,
+        encode_command, encode_frame,
     };
 
     use tokio_util::sync::CancellationToken;
 
     #[cfg(feature = "mock")]
     use super::GreetdTransport;
+
+    #[test]
+    fn shell_handoff_preserves_literal_and_empty_arguments() {
+        let arguments = [
+            "/usr/bin/printf",
+            "<%s>\\n",
+            "",
+            "中文 路径",
+            "it's quoted",
+            "$HOME `false` $(false); exit 99",
+            "line\nbreak",
+        ]
+        .map(str::to_owned);
+        let output = Command::new("/bin/sh")
+            .args(["-c", &format!("exec {}", encode_command(&arguments))])
+            .output()
+            .unwrap();
+
+        assert!(output.status.success());
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            "<>\n<中文 路径>\n<it's quoted>\n<$HOME `false` $(false); exit 99>\n<line\nbreak>\n"
+        );
+    }
+
+    #[test]
+    fn shell_handoff_preserves_sh_command_and_exit_status() {
+        let arguments = ["/bin/sh", "-c", "exit 23"].map(str::to_owned);
+        let status = Command::new("/bin/sh")
+            .args(["-c", &format!("exec {}", encode_command(&arguments))])
+            .status()
+            .unwrap();
+
+        assert_eq!(status.code(), Some(23));
+    }
 
     #[test]
     fn encodes_frame() {
@@ -848,7 +894,7 @@ mod tests {
 
             let start = read_request(&mut stream).await;
             assert_eq!(start["type"], "start_session");
-            assert_eq!(start["cmd"], serde_json::json!(["/bin/test-session"]));
+            assert_eq!(start["cmd"], serde_json::json!(["'/bin/test-session'"]));
             assert_eq!(start["env"], serde_json::json!(["TEST_MODE=1"]));
             write_response(&mut stream, serde_json::json!({"type": "success"})).await;
         });
