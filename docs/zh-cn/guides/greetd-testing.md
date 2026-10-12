@@ -13,6 +13,8 @@ description: 构建和安装真实登录测试工具、捕获显示器信息、�
 
 用户侧执行器完整保留命令参数，仅在 LANG 缺失或为空时补入 `LANG=C.UTF-8`；它记录 locale 检查结果，保留用户明确设置的覆盖值。桌面的 stdout/stderr 和启动信息写入 `${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/` 下的私有日志。执行器运行前的 shell 初始化失败仍通过 greetd 的会话输出报告。
 
+ASCII 交接实验会在 Sway 退出前准备 AKARI 字标，在用户会话启动、VT 仍处于文字模式时播放扫光动画。图形模式接管、会话退出或超过 15 秒后停止；普通伪终端或没有控制终端时跳过。可用 `python3 scripts/ascii-transition.py preview` 在普通终端预览。生命周期与实机验证项目见[交接实验](../../proposals/login-handoff.md)；仍需在真实 VT 上检查画面能否跨越 Sway/greetd 交接，并验证桌面启动失败、退出登录和 VT 切换。
+
 桌面与 systemd 服务的就绪时序由所选桌面或会话管理器负责。选择 UWSM 管理的会话时，环境同步和退出清理由 UWSM 处理。直接启动 compositor 时保留现有集成；新增 custom 回调无法约束上游已经启动的应用。验证时应分别检查 compositor 子进程、新启动的用户服务和新激活的 D-Bus 服务。greetd 交接成功不代表桌面已经就绪。
 
 ## 人脸认证
