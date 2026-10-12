@@ -1,7 +1,8 @@
 # User session environment contract
 
-Status: proposed startup contract. Runtime integration and real-login validation
-are pending. This document does not change greetd, desktop files, or user rice.
+Status: login-shell forwarding, argv preservation, locale diagnostics, and user
+session logging are implemented. PAM/VT login and desktop service readiness
+still require real-login validation. Desktop files and user rice are unchanged.
 
 ## Problem and existing behavior
 
@@ -10,10 +11,11 @@ Services activated by the user service manager must also receive the relevant
 desktop environment before they start. Updating an activation environment does
 not update processes that are already running.
 
-Today the backend resolves a session desktop file and sends its command and
-selected environment assignments to greetd. greetd supplies the PAM environment;
-its `source_profile` option only controls sourcing `/etc/profile` and
-`~/.profile`. It does not initialize the user's native login shell.
+The backend resolves a session desktop file and asks greetd to forward execution
+to the authenticated account's `$SHELL` in non-interactive login mode. greetd
+supplies the PAM environment and POSIX profiles. Native shell configuration is
+evaluated by the user's shell, then the backend's user-side executor launches
+the selected desktop with intact arguments.
 
 The installed end-4 rice registers its startup callback before `custom/execs.lua`.
 Its callback launches applications and environment import commands asynchronously,
@@ -32,7 +34,9 @@ verification.
 | Responsibility | Owner | Completion condition |
 | --- | --- | --- |
 | Authentication and login resources | greetd and PAM | Authenticated user session can start |
-| User login environment and command handoff | Akari user-session launcher | Native login initialization completed; selected command receives intact arguments |
+| POSIX login baseline | greetd profile loading | `/etc/profile` and `~/.profile` evaluated as the authenticated user |
+| Native login configuration | User's shell, forwarded by Akari's greetd request | Shell login initialization completed |
+| Desktop command handoff and diagnostics | Akari user-side executor | Selected command receives intact arguments and initialized environment |
 | Desktop configuration and display endpoints | Selected desktop or compositor | Configuration applied and endpoints available |
 | Activation environment, dependent services, and cleanup | Desktop's existing session manager, or explicitly configured compositor integration | Required environment published before dependent services start; teardown belongs to the same owner |
 
@@ -42,7 +46,9 @@ environment to the user's service manager.
 
 ```text
 greetd / PAM
-  -> Akari launcher initializes the user's login environment
+  -> greetd loads POSIX profiles
+  -> user's login shell initializes its native configuration
+  -> Akari user-side executor preserves argv, checks locale, and opens user logs
   -> selected desktop entry starts its desktop/session manager
   -> desktop endpoints and configuration are ready
   -> session owner publishes activation environment and confirms readiness
@@ -60,13 +66,17 @@ the shell find its own startup files, including zsh's `ZDOTDIR` and fish's XDG
 configuration paths. zsh interactive `.zshrc` configuration and fish commands
 guarded by `status is-interactive` are outside this initialization contract.
 
-System baseline initialization must be explicit for each supported shell.
-For example, this host's zsh login profile loads `/etc/profile`; fish requires
-a POSIX-compatible baseline stage before its native configuration is evaluated.
-Do not ask fish to source POSIX shell code or ask sh to source fish configuration.
-Assign profile loading to one owner; if the launcher takes over that work,
-disable greetd's profile loading only together with the complete replacement.
-The greeter launch path must retain its own required baseline initialization.
+Keep greetd's `source_profile` enabled as the POSIX baseline, including for fish
+and the greeter. Akari does not select startup files or branch on shell names.
+Its forwarding expression uses `-l -c` and `exec "$VARIABLE"`; bash, sh, zsh,
+and fish are exercised by native-shell tests. Other shells need to support that
+invocation contract. Do not interpret native configuration with sh.
+
+The native login shell can load a POSIX profile again through distribution or
+user startup configuration. Those profiles must tolerate repeated evaluation;
+this compatibility behavior is explicit rather than hidden by shell-specific
+Akari exceptions. Existing installed greetd configurations are preserved by the
+installer: remove an old `source_profile = false` setting when upgrading.
 
 Preserve explicit user locale choices and their precedence. When no effective
 locale is configured, use the distribution's locale, with an available UTF-8
@@ -74,11 +84,12 @@ fallback. Diagnose invalid configured locales rather than silently replacing
 them. Preserve the initialized user's PATH after resolving the trusted desktop
 entry executable.
 
-Keep arguments intact across both boundaries: greetd's command is evaluated by
-sh, and the native shell uses its own command syntax. A parsed argv vector must
-be encoded for the actual interpreter; joining tokens with spaces loses quoted
-and empty arguments. The final desktop invocation must preserve signal and exit
-status behavior, using `exec` when ownership permits it.
+The greetd transport quotes argv for its sh execution boundary. The native shell
+receives a fixed expression that expands a quoted executor path. Desktop argv
+and selection metadata travel as JSON in the greetd environment, so fish and
+POSIX shells never reinterpret desktop arguments. The executor removes Akari's
+internal variables before using `exec` for the selected command, preserving
+process identity, signals, and exit status.
 
 ## Variables and publication
 
