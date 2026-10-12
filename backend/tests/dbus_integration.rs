@@ -987,6 +987,24 @@ async fn fake_start(listener: UnixListener, fail_start: bool) {
     write_response(&mut stream, serde_json::json!({ "type": "success" })).await;
     let start = read_request(&mut stream).await;
     assert_eq!(start["type"], "start_session");
+    let environment: Vec<_> = start["env"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| value.as_str().unwrap().split_once('=').unwrap())
+        .collect();
+    let invocation: Value = serde_json::from_str(
+        environment
+            .iter()
+            .find(|(name, _)| *name == "AKARI_SESSION_INVOCATION")
+            .unwrap()
+            .1,
+    )
+    .unwrap();
+    assert_eq!(invocation["command"], serde_json::json!(["/usr/bin/true"]));
+    assert_eq!(invocation["session_id"], "wayland:test");
+    assert!(environment.contains(&("XDG_SESSION_TYPE", "wayland")));
+    assert!(environment.contains(&("XDG_CURRENT_DESKTOP", "test")));
     if fail_start {
         write_response(
             &mut stream,
@@ -999,6 +1017,26 @@ async fn fake_start(listener: UnixListener, fail_start: bool) {
         .await;
     } else {
         write_response(&mut stream, serde_json::json!({ "type": "success" })).await;
+        // Execute the actual received wire command with greetd's profile/sh
+        // semantics, using a temporary user home and a harmless desktop entry.
+        let home = temp_dir("session-handoff");
+        let command = start["cmd"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let output = Command::new("/bin/sh").args(["-c", &format!(
+            "[ -f /etc/profile ] && . /etc/profile; [ -f \"$HOME/.profile\" ] && . \"$HOME/.profile\"; exec {command}"
+        )]).env_clear().envs(environment).env("HOME", &*home).env("SHELL", "/bin/sh")
+            .output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(home.join(".local/state/akari/sessions").is_dir());
     }
 }
 

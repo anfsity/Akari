@@ -21,6 +21,7 @@ use zbus::{fdo, object_server::SignalEmitter};
 use crate::{
     greetd::{GreetdError, GreetdResponse, GreetdTransport},
     session_catalog::SessionEntry,
+    session_launch::get_session_launch,
     state::{AuthState, AuthStateMachine, BeginAuthenticationError, StateEvent},
 };
 
@@ -859,6 +860,23 @@ async fn handle_start_session(
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<()> {
     require_state(&actor.auth, AuthState::ResolvingSession)?;
+    let (command, environment) = match get_session_launch(&session) {
+        Ok(launch) => launch,
+        Err(error) => {
+            let detail = format!("could not prepare user session launcher: {error}");
+            tracing::error!(%attempt_id, error = ?error, "user session launcher preparation failed");
+            session_resolution_failed(
+                actor,
+                attempt_id,
+                detail.clone(),
+                &emitter,
+                snapshots,
+                controls,
+            )
+            .await?;
+            return Err(fdo::Error::Failed(detail));
+        }
+    };
     let cancellation = actor.get_attempt().cancellation.clone();
 
     actor
@@ -873,10 +891,9 @@ async fn handle_start_session(
     .await;
 
     tracing::info!(%attempt_id, session_id = %session.session_id, source = %session.source.display(), state = actor.auth.state().as_str(), "starting desktop session");
-    let environment = session_environment(&session);
     let response = actor
         .get_transport()
-        .start_session(&session.exec, &environment, &cancellation)
+        .start_session(&command, &environment, &cancellation)
         .await;
     let response =
         handle_transport_result(actor, attempt_id, response, &emitter, snapshots, controls).await?;
@@ -1539,23 +1556,6 @@ fn require_state(auth: &AuthStateMachine, expected: AuthState) -> fdo::Result<()
     }
 }
 
-fn session_environment(session: &SessionEntry) -> Vec<String> {
-    // The backend owns the launch environment and does not inherit a caller's
-    // PATH when executing a desktop entry selected through D-Bus.
-    let mut environment = vec![
-        "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
-        format!("XDG_SESSION_TYPE={}", session.session_type.as_str()),
-    ];
-    if let Some(desktop_name) = session.desktop_names.first() {
-        environment.push(format!("XDG_SESSION_DESKTOP={desktop_name}"));
-        environment.push(format!(
-            "XDG_CURRENT_DESKTOP={}",
-            session.desktop_names.join(":")
-        ));
-    }
-    environment
-}
-
 fn display_detail(detail: &str) -> String {
     // Error text crosses the D-Bus boundary, so remove control characters and
     // cap its size before retaining or displaying it.
@@ -1585,12 +1585,9 @@ mod tests {
 
     use super::{
         ActorState, AuthActorHandle, AuthSnapshot, cancel_current, display_detail,
-        session_environment, validate_attempt, validate_cancel_target,
+        validate_attempt, validate_cancel_target,
     };
-    use crate::{
-        session_catalog::{SessionEntry, SessionType},
-        state::{AuthState, AuthStateMachine, StateEvent},
-    };
+    use crate::state::{AuthState, AuthStateMachine, StateEvent};
 
     fn cancelled_attempt() -> (AuthStateMachine, String) {
         let mut auth = AuthStateMachine::default();
@@ -1652,45 +1649,6 @@ mod tests {
         assert!(!sanitized.contains('\0'));
         assert!(sanitized.contains("before\nafter"));
         assert_eq!(sanitized.chars().count(), 512);
-    }
-
-    #[test]
-    fn builds_session_environment() {
-        let session = SessionEntry {
-            session_id: "wayland:sway".to_owned(),
-            session_type: SessionType::Wayland,
-            name: "Sway".to_owned(),
-            exec: vec!["/usr/bin/sway".to_owned()],
-            desktop_names: vec!["sway".to_owned(), "wlroots".to_owned()],
-            source: "/tmp/sway.desktop".into(),
-        };
-
-        assert_eq!(
-            session_environment(&session),
-            [
-                "PATH=/usr/local/bin:/usr/bin:/bin",
-                "XDG_SESSION_TYPE=wayland",
-                "XDG_SESSION_DESKTOP=sway",
-                "XDG_CURRENT_DESKTOP=sway:wlroots",
-            ]
-        );
-    }
-
-    #[test]
-    fn env_without_desktop_names() {
-        let session = SessionEntry {
-            session_id: "x11:test".to_owned(),
-            session_type: SessionType::X11,
-            name: "Test".to_owned(),
-            exec: vec!["/usr/bin/test-session".to_owned()],
-            desktop_names: Vec::new(),
-            source: "/tmp/test.desktop".into(),
-        };
-
-        assert_eq!(
-            session_environment(&session),
-            ["PATH=/usr/local/bin:/usr/bin:/bin", "XDG_SESSION_TYPE=x11",]
-        );
     }
 
     #[tokio::test]

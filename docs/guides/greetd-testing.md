@@ -9,6 +9,35 @@ and power actions call logind, performing actual suspend, reboot and shutdown.
 Boot configuration stays on SDDM. Desktop development with `akari run` still
 uses mock authentication and mock power by default.
 
+## User session environment
+
+Production and harness greetd configurations enable profile loading. greetd
+loads `/etc/profile` and `~/.profile`, then Akari forwards the authenticated
+user's command to `$SHELL` in non-interactive login mode. The shell loads its
+native configuration; Akari does not choose files or branch on shell names.
+bash, sh, zsh, and fish are covered by native-shell integration tests.
+
+Put exported desktop variables in login configuration, such as zsh's `.zprofile`
+or fish configuration outside `status is-interactive`. `.zshrc` is not loaded.
+POSIX profiles may be read again by the native shell's startup files, so keep
+them safe to evaluate repeatedly. Install preserves existing configuration;
+remove `source_profile = false` from `/etc/akari/greetd.toml` when upgrading an
+older installation, or set it to `true`. Reinstall the harness to update its
+configuration and backend together.
+
+The user-side executor preserves arguments, supplies `LANG=C.UTF-8` only when
+LANG is absent or empty, and logs locale diagnostics without replacing explicit
+locale overrides. Desktop stdout/stderr and startup details go into private
+files under `${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/`. Shell startup
+failures before the executor runs still appear on greetd's session output.
+
+Desktop and systemd service readiness belongs to the selected desktop/session
+manager. UWSM-managed selections retain UWSM's environment and cleanup behavior.
+Direct compositor sessions keep their existing integration; an additional
+custom rice callback cannot order applications already launched by upstream.
+Validate a compositor child, a newly started user service, and a newly activated
+D-Bus service separately. A successful greetd handoff is not desktop readiness.
+
 ## Facial authentication
 
 Akari starts authentication when the greeter wakes with an account and session

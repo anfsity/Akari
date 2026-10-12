@@ -5,6 +5,7 @@
 mod greetd;
 mod service;
 mod session_catalog;
+mod session_launch;
 mod state;
 mod users;
 
@@ -20,8 +21,19 @@ use zbus::connection::Builder;
 
 type AppResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
+fn main() -> AppResult<()> {
+    let arguments: Vec<_> = std::env::args_os().skip(1).collect();
+    match arguments.first().and_then(|argument| argument.to_str()) {
+        None if arguments.is_empty() => run_backend(),
+        Some(session_launch::EXEC_DESKTOP) if arguments.len() == 1 => {
+            session_launch::exec_desktop().map_err(Into::into)
+        }
+        _ => Err("expected no arguments or --exec-desktop".into()),
+    }
+}
+
 #[tokio::main]
-async fn main() -> AppResult<()> {
+async fn run_backend() -> AppResult<()> {
     if let Err(error) = init_tracing() {
         eprintln!("event=startup_failed operation=InitTracing error={error:?}");
         return Err(error);
