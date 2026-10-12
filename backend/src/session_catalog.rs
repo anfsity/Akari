@@ -34,7 +34,7 @@ pub struct SessionEntry {
     pub session_type: SessionType,
     /// User-facing `Name=` value from the desktop entry.
     pub name: String,
-    /// Tokenized, backend-owned `Exec=` command passed to greetd.
+    /// Tokenized, backend-owned `Exec=` arguments encoded by the greetd transport.
     pub exec: Vec<String>,
     /// Sanitized `DesktopNames=` values used to construct session metadata.
     pub desktop_names: Vec<String>,
@@ -164,7 +164,7 @@ fn parse_session_file(path: &Path, session_type: SessionType) -> Option<SessionE
 
     let name = fields.get("Name")?.to_owned();
     let mut exec = tokenize_exec(fields.get("Exec")?).ok()?;
-    if exec.is_empty() || exec.iter().any(|token| token.contains('%')) {
+    if exec.is_empty() || exec.iter().any(|token| token.contains(['%', '\0'])) {
         return None;
     }
     exec[0] = resolve_command(&exec[0])?;
@@ -269,9 +269,9 @@ fn unescape_desktop_value(value: &str) -> String {
 /// This implements the small command-line grammar needed for these desktop
 /// entries; field-code substitutions are rejected by the caller. Unclosed
 /// quotes and trailing escapes return `Err(())`.
-/// The result goes directly to greetd as argv, without a shell. Quotes group
-/// arguments; shell expansion, pipelines, and redirections are not interpreted
-/// by this tokenizer.
+/// Quotes group arguments; shell expansion, pipelines, and redirections are
+/// not interpreted here. The greetd transport quotes the resulting argv for
+/// greetd's sh execution boundary.
 fn tokenize_exec(value: &str) -> Result<Vec<String>, ()> {
     let mut tokens = Vec::new();
     let mut token = String::new();
@@ -434,6 +434,20 @@ mod tests {
             ["wrapper", "argument with spaces"]
         );
         assert!(tokenize_exec("wrapper 'unfinished").is_err());
+    }
+
+    #[test]
+    fn rejects_nul_in_session_arguments() {
+        let root = test_root();
+        fs::write(
+            root.join("invalid.desktop"),
+            "[Desktop Entry]\nType=Application\nName=Invalid\nExec=/bin/sh 'invalid\0argument'\n",
+        )
+        .unwrap();
+
+        let catalog = SessionCatalog::from_roots(root.clone(), PathBuf::from("/does/not/exist"));
+        assert!(catalog.list().unwrap().is_empty());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
