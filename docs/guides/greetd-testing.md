@@ -31,6 +31,15 @@ locale overrides. Desktop stdout/stderr and startup details go into private
 files under `${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/`. Shell startup
 failures before the executor runs still appear on greetd's session output.
 
+The ASCII handoff experiment prepares an AKARI wordmark before Sway exits and
+animates a light sweep while the user session starts on a text-mode Linux VT.
+It stops when graphics mode takes over, the session exits, or 15 seconds elapse.
+PTYs and missing controlling terminals skip this behavior. Preview it with
+`python3 scripts/ascii-transition.py preview`; see the
+[handoff experiment](../proposals/login-handoff.md) for lifecycle and hardware
+checks. Real VT testing must establish whether Sway/greetd preserves the prepared
+buffer, including desktop startup failure, logout and VT switching.
+
 Desktop and systemd service readiness belongs to the selected desktop/session
 manager. UWSM-managed selections retain UWSM's environment and cleanup behavior.
 Direct compositor sessions keep their existing integration; an additional

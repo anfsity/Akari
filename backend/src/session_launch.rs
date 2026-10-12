@@ -20,6 +20,7 @@ use std::{
 };
 
 use crate::session_catalog::SessionEntry;
+use crate::terminal_transition::start_transition_animation;
 use serde::{Deserialize, Serialize};
 
 pub const EXEC_DESKTOP: &str = "--exec-desktop";
@@ -118,6 +119,11 @@ pub fn exec_desktop() -> io::Result<()> {
     command
         .stdout(Stdio::from(log.try_clone()?))
         .stderr(Stdio::from(log.try_clone()?));
+    // Display preparation is optional; a missing console or failed renderer
+    // must not prevent an otherwise valid desktop session from starting.
+    if let Err(error) = start_transition_animation(&log) {
+        writeln!(log, "event=transition_animation_failed error={error:?}")?;
+    }
     let error = command.exec();
     writeln!(
         log,
@@ -145,11 +151,9 @@ fn create_session_log() -> io::Result<File> {
         .map_err(io::Error::other)?
         .as_nanos();
     let path = directory.join(format!("session-{timestamp}-{}.log", std::process::id()));
-    let log = OpenOptions::new()
+    OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(0o600)
-        .open(&path)?;
-    eprintln!("Akari user session log: {}", path.display());
-    Ok(log)
+        .open(&path)
 }
