@@ -88,6 +88,18 @@ runDirectory: 'run',
       expect(steps.last['id'], 'theme.studio');
       expect(steps.last['command'].last, 'demo');
       expect(steps.last['environment']['AKARI_DISPLAY_MODE'], 'single');
+      final projects = jsonDecode(
+        steps.last['environment']['AKARI_THEME_DIRECTORIES_JSON'] as String,
+      ) as List;
+      expect(projects, contains(Directory('themes/preset1').absolute.path));
+      expect(
+        steps.map((step) => step['id']),
+        containsAll([
+          'scenes.generate_theme_default',
+          'scenes.generate_theme_fallback',
+          'scenes.generate_theme_preset1',
+        ]),
+      );
       expect(steps.last['environment']['AKARI_BUILD_JOBS'], '2');
       expect(plan['artifacts']['host_project'], endsWith('/studio'));
       expect(plan['artifacts'], isNot(contains('backend_executable')));
@@ -129,37 +141,43 @@ runDirectory: 'run',
     },
   );
 
-  test('studio host imports only its editor and selected theme with literal scene paths', () async {
-    final project = await _createThemeProject(
-      Directory('${tempRoot.path}/theme with \$dollar'),
-    );
-    final theme = getThemePackage(project);
-    final host = Directory('${tempRoot.path}/studio');
-    createThemeHost(
-      repoRoot: Directory.current,
-      theme: theme,
-      output: host,
-      kind: ThemeHostKind.studio,
-    );
-    final manifest = jsonDecode(
-      File('${host.path}/pubspec.yaml').readAsStringSync(),
-    );
-    expect(manifest['dependencies']['theme_studio'], isNotNull);
-    expect(manifest['dependencies']['dbus'], isNull);
-    expect(manifest['dependencies']['greeter_ui'], isNull);
-    final entrypoint = File('${host.path}/lib/main.dart').readAsStringSync();
-    expect(entrypoint, contains('ThemeStudioApp('));
-    expect(entrypoint, contains('themeDirectory:'));
-    expect(entrypoint, contains('themePackageName:'));
-    expect(entrypoint, contains(r'\$dollar'));
-    expect(entrypoint, contains('buildOceanTheme'));
-    expect(entrypoint, isNot(contains('MyApp')));
-    expect(Directory('${host.path}/lib').listSync(), hasLength(1));
-    expect(
-      getThemeHostDirectory(theme, ThemeHostKind.studio),
-      isNot(getThemeHostDirectory(theme, ThemeHostKind.preview)),
-    );
-  });
+  test(
+    'studio host compiles presets and keeps external theme paths literal',
+    () async {
+      final project = await _createThemeProject(
+        Directory('${tempRoot.path}/theme with \$dollar'),
+      );
+      final theme = getThemePackage(project);
+      final host = Directory('${tempRoot.path}/studio');
+      createThemeHost(
+        repoRoot: Directory.current,
+        theme: theme,
+        output: host,
+        kind: ThemeHostKind.studio,
+      );
+      final manifest = jsonDecode(
+        File('${host.path}/pubspec.yaml').readAsStringSync(),
+      );
+      expect(manifest['dependencies']['theme_studio'], isNotNull);
+      expect(manifest['dependencies']['dbus'], isNull);
+      expect(manifest['dependencies']['greeter_ui'], isNull);
+      final entrypoint = File('${host.path}/lib/main.dart').readAsStringSync();
+      expect(entrypoint, contains('ThemeStudioApp('));
+      expect(entrypoint, contains('StudioThemeProject('));
+      expect(entrypoint, contains('initialThemePackageName:'));
+      expect(entrypoint, contains('theme_preset1/theme.dart'));
+      expect(manifest['dependencies']['theme_preset1'], isNotNull);
+      expect(manifest['dependencies']['theme_default'], isNotNull);
+      expect(entrypoint, contains(r'\$dollar'));
+      expect(entrypoint, contains('buildOceanTheme'));
+      expect(entrypoint, isNot(contains('MyApp')));
+      expect(Directory('${host.path}/lib').listSync(), hasLength(1));
+      expect(
+        getThemeHostDirectory(theme, ThemeHostKind.studio),
+        isNot(getThemeHostDirectory(theme, ThemeHostKind.preview)),
+      );
+    },
+  );
 
   test(
     'short options reach native build steps and command help is scoped',

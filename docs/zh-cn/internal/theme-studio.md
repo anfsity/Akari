@@ -12,7 +12,7 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 
 `studio` 是 `run` 的一个目标。`akari run --help` 会列出目标，`akari run studio --help` 会显示其选项。如果当前 Shell 仍不支持补全，可使用 `akari install cli --shell zsh` 刷新安装脚本，然后在该 Shell 运行 `. ~/.local/share/akari/env.zsh`。bash 用户请使用 `--shell bash`，并加载 `~/.local/share/akari/env.bash`。
 
-CLI 会解析主题、生成场景 Dart 代码，并在 `build/tool/hosts/<encoded-canonical-theme-path>/studio/` 中创建可复用宿主。编辑器使用模拟显示数据，不依赖后端或 D-Bus。正式应用不包含编辑器，也不依赖编辑器的 UI 库。`--dry-run` 会打印执行计划；`--format json` 和 `--report PATH` 使用通用工具报告约定。Studio 使用 debug 模式。保存 Dart 代码或资源后，修改会通过热重载生效；保存场景 JSON 后，工具会重新生成场景代码。热重载会保留编辑器当前文档和撤销历史。使用 **Reload from disk** 可加载其他编辑器所做的更改。
+CLI 会解析选定主题和仓库预设、生成各自的场景 Dart 代码，并在 `build/tool/hosts/<encoded-canonical-theme-path>/studio/` 中创建可复用宿主。编辑器使用模拟显示数据，不依赖后端或 D-Bus。正式应用不包含编辑器，也不依赖编辑器的 UI 库。`--dry-run` 会打印执行计划；`--format json` 和 `--report PATH` 使用通用工具报告约定。Studio 使用 debug 模式。保存 Dart 代码或资源后，修改会通过热重载生效；保存场景 JSON 后，工具会重新生成场景代码。热重载会保留编辑器当前文档和撤销历史。使用 **Reload from disk** 可加载其他编辑器所做的更改。
 
 Studio 接受 `--theme`、`--jobs` 及通用报告/dry-run 选项，不接受 `--mode` 或 `--backend`。命令和报告详情见 [CLI 参考](../reference/cli.md#commands-and-targets)。
 
@@ -20,7 +20,7 @@ Studio 接受 `--theme`、`--jobs` 及通用报告/dry-run 选项，不接受 `-
 
 拖动左侧边栏或右侧检查器旁的边界可调整宽度。拖动 **Scenes**、**Layers**、**Assets** 之间的水平边界，或检查器的标题、字段和操作区之间的边界，可重新分配面板空间。列表可以独立滚动，面板有最小尺寸限制，避免控件被挤得无法操作。切换场景或修改设置后，面板尺寸会保留；窗口较小时，工作区可以滚动。
 
-1. 从左侧面板选择场景。切换前须保存或放弃更改。**Load JSON** 会通过系统文件选择器打开任意场景 JSON，并在本会话的场景列表中加入该场景；它会使用当前编译主题的组件。文件无效时会保留之前的场景；继续操作前必须保存或放弃未保存修改。后续保存会写入打开的文件。导入和编译预览使用哪个包，见[导入资源](#importing-assets)。
+1. 从 **THEME** 选择主题，再从 **SCENES** 选择场景。存在未保存修改时，可选择 **Save and switch**、**Discard and switch** 或 **Cancel**。**Load JSON** 会通过系统文件选择器打开任意场景 JSON，并在本会话的场景列表中加入该场景；已注册主题的场景会自动切换到对应的组件实现；其他文件使用当前编译主题的组件。文件无效时会保留之前的场景；继续操作前必须保存或放弃未保存修改。后续保存会写入打开的文件。导入和编译预览使用哪个包，见[导入资源](#importing-assets)。
 2. 在画布或图层列表中选择节点。列表也包含当前预览状态下不可见的节点，并按从前到后的顺序排列。
 3. 在检查器中编辑参考像素（默认）或百分比形式的位置/尺寸、深度、绘制/焦点顺序、变换、动效，以及组件提供的属性字段。**Advanced layout** 用于图层、缩放、平移、轴心和 3D 变换；**Advanced properties** 用于编辑完整的字符串属性 JSON。
 4. 按 Enter 或离开字段即可应用到预览。动效选项会立即应用；也可按 **Apply to preview** 一次应用所有待处理字段。字段无效时会显示错误，预览继续使用上一次有效的文档。选择其他节点前，会先应用有效的待处理字段。切换布局单位只改变显示数值；它会保留待处理编辑，不会创建撤销记录。场景 JSON 仍保存归一化坐标；像素值依据 **Settings** 中的参考分辨率计算。
@@ -75,6 +75,14 @@ Studio 接受 `--theme`、`--jobs` 及通用报告/dry-run 选项，不接受 `-
 
 当前可通过复制节点创建新节点；尚不支持添加任意组件、编辑可见性规则、增加预览状态或关闭应用后恢复未保存内容。关闭窗口前，请先保存修改。自定义属性的名称和值由编译后的组件负责。
 
+## 预设与项目
+
+Studio 会一起编译 `themes/` 下的主题包和 `--theme` 指定的项目。**THEME** 选择器将场景列表、组件工厂、样式参数、背景渲染器和资源作为一个项目切换。选择 `theme_preset1` 后，它的程序绘图和自定义文字会使用自己的组件实现。通过 **Load JSON** 打开已注册项目的场景，也会自动切换对应主题。**SCENES** 会高亮当前场景。
+
+**Save scene** 写回当前主题包的场景 JSON；导入资源写入该包的 `assets/` 和 manifest。任何已编译项目的 Dart 或资源修改都支持热重载；保存场景时只重新生成发生变化的包。热重载保留当前编辑文档。切换项目会读取已保存文件并创建新的撤销历史；未保存的修改需要明确选择保存、放弃或取消。
+
+外部项目与内置主题包同名时，以外部项目为准。新加入或尚未注册的主题需要通过 `--theme` 重启 Studio 才能编译其 Dart 组件。Inspect code 展示可编辑的场景组合；预设的绘图、shader 和自定义组件实现在源文件中修改，再通过热重载进入 Studio。
+
 ## 检查代码
 
 右侧面板提供 **Design** 和 **Inspect code** 两个标签。进入检查模式前会应用有效的待处理字段；字段无效时继续显示 Design 和错误。点击画布或 Layers 中的节点，可查看参考像素尺寸，复制 **JSON** 或生成的 **Dart**。**Selection** 显示单个节点，**Scene** 显示完整场景。代码来自当前有效文档，包含尚未保存的修改，Dart 复用 build_runner 的生成器。这里展示场景组合；自定义 Flutter 控件、绘图和 shader 实现仍在主题包源文件中。
@@ -95,7 +103,7 @@ Studio 接受 `--theme`、`--jobs` 及通用报告/dry-run 选项，不接受 `-
 
 **Use image** 会检查资源能否解码，并将其设为场景背景。该场景编辑支持撤销/重做，但需通过 **Save scene** 才会写入磁盘。Studio 会直接从磁盘读取当前场景的图像背景，因此新图像会立即出现。其他组件资源引用仍遵循编译时实现；若新 bundle 资源尚不可用，请重启 Studio。
 
-打开 JSON 时，Studio 会向上查找最近的包目录。如果包名以 `theme_` 开头，就把它作为场景所属主题，使用它的资源清单，并把导入的图片保存到这个包中。如果找到的不是主题包，或文件不属于任何包，就使用启动 Studio 时选定主题的资源。打开其他主题的 JSON 后，导入资源会保存到那个主题中，但预览仍使用启动 Studio 时编译的组件工厂。例如，`theme_other` 场景导入资源时会写入该包的 `assets/`，并保存以 `packages/theme_other/assets/` 开头的引用。使用 `--theme /path/to/theme_other` 重启 Studio，才能同时预览该包的组件。
+打开 JSON 时，Studio 会向上查找最近的包目录。如果包名以 `theme_` 开头，就把它作为场景所属主题，使用它的资源清单，并把导入的图片保存到这个包中。如果找到的不是主题包，或文件不属于任何包，就使用当前选定主题的资源。打开已注册主题的 JSON 会切换组件工厂和资源；未注册主题的 JSON 只切换资源归属，预览仍使用当前主题的组件。例如，`theme_other` 场景导入资源时会写入该包的 `assets/`，并保存以 `packages/theme_other/assets/` 开头的引用。未注册主题需要使用 `--theme /path/to/theme_other` 重启 Studio，才能编译该包的组件。
 
 ## 编辑问题排查
 

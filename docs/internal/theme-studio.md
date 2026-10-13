@@ -1,6 +1,6 @@
 # Theme Studio
 
-Theme Studio is the Linux scene editor for a compiled Akari theme. Its editor
+Theme Studio is the Linux scene editor for compiled Akari themes. Its editor
 controls use `shadcn_flutter`; the preview renders the selected theme's own
 components, tokens and assets through `SceneRuntime`.
 
@@ -18,7 +18,8 @@ complete it, refresh the installed scripts with `akari install cli --shell zsh`,
 `. ~/.local/share/akari/env.zsh` in that shell. For bash, use `--shell bash`
 and source `~/.local/share/akari/env.bash` instead.
 
-The CLI resolves the theme, generates its scene Dart, and creates a reusable
+The CLI resolves the selected theme and repository presets, generates their scene
+Dart, and creates a reusable
 host in `build/tool/hosts/<encoded-canonical-theme-path>/studio/`. The editor
 uses simulated display data and has no backend or D-Bus dependency. Production
 hosts do not depend on the editor or its UI library. `--dry-run` prints the plan;
@@ -41,10 +42,11 @@ panel space. Each list scrolls independently;
 minimum sizes keep controls usable. Panel sizes survive settings changes and
 scene switches within the current session. Small windows scroll the workspace.
 
-1. Select a scene from the left panel. Save or discard changes before switching.
+1. Select a theme from **THEME**, then a scene from **SCENES**. Switching with
+   unsaved edits offers **Save and switch**, **Discard and switch**, or **Cancel**.
    **Load JSON** opens any scene JSON through the system file picker and adds
-   it to the scene list for this session. It uses the current compiled theme's
-   components. Invalid files retain the previous scene; unsaved edits must be
+   it to the scene list for this session. Registered theme packages automatically
+   select their compiled components; other files use the current theme's components. Invalid files retain the previous scene; unsaved edits must be
    saved or discarded first. Subsequent saves write to the opened file.
    See [Importing assets](#importing-assets) for the package used by imports
    and the compiled preview.
@@ -171,6 +173,28 @@ the application are not implemented. Save explicitly before closing the window.
 Custom property names and values remain the responsibility of the compiled
 component.
 
+## Presets and projects
+
+Studio compiles the packages under `themes/` together with the `--theme` project.
+The **THEME** selector switches the scene list, component factory, tokens,
+background renderers and assets as one project. This includes `theme_preset1`:
+its procedural artwork and custom lettering render through its own components.
+Loading JSON belonging to another registered project switches to that project
+as well. The active scene is highlighted in **SCENES**.
+
+**Save scene** writes the active package's scene JSON. Importing assets writes
+that package's `assets/` and manifest. Dart and asset edits in any compiled
+project hot reload; scene saves regenerate only the changed package before
+reload. The selected project's editor document remains authoritative during
+hot reload. Switching projects opens saved authoring files with fresh history;
+unsaved changes require the explicit save/discard/cancel choice.
+
+An external project takes precedence over a built-in project with the same
+package name. Newly added or unregistered packages require restarting Studio
+with `--theme` so their Dart components can be compiled. Inspect code exposes
+editable scene composition; preset painters, shaders and custom component
+implementations are edited in their Dart/source files and hot reload into Studio.
+
 ## Inspect code
 
 The right panel has **Design** and **Inspect code** tabs. Switching to inspection
@@ -223,11 +247,12 @@ available.
 **Load JSON** resolves the opened file to its nearest package boundary. A package
 whose name begins with `theme_` owns that scene's asset list, imports, and image
 backgrounds. A non-theme package boundary or a file with no package uses the
-compiled theme's assets instead. Loading another theme's JSON changes this asset
-ownership, but does not compile its component factory into the running editor.
+compiled theme's assets instead. Loading a registered theme's JSON switches its component factory as well.
+Unregistered theme JSON changes asset ownership while retaining the current
+compiled components.
 For example, a `theme_other` scene imports into that package's `assets/` and
-saves references beginning with `packages/theme_other/assets/`. Restart Studio
-with `--theme /path/to/theme_other` to preview that package's components too.
+saves references beginning with `packages/theme_other/assets/`. For an unregistered package, restart Studio
+with `--theme /path/to/theme_other` to compile its components.
 
 ## Diagnose an edit
 
@@ -236,7 +261,7 @@ with `--theme /path/to/theme_other` to preview that package's components too.
 | Text looks stretched | Use **Advanced layout → Reset scale**, then resize the layout with handles |
 | A small interactive node stops shrinking | Check the compiled theme's minimum hit target; zoom changes handle presentation, not that limit |
 | A field or canvas drag will not apply | Correct the reported inspector error; document commands apply and validate pending fields first |
-| Another theme's JSON shows the current theme's components | Launch Studio with the other package selected through `--theme` |
+| An unregistered theme's JSON shows the current theme's components | Launch Studio with that package selected through `--theme`; registered presets switch automatically |
 | A newly imported background works but a component image does not | Restart Studio to include the new asset in the compiled bundle |
 | Save reports that the source changed externally | Preserve any needed unsaved edits, then use the explicit discard/reload flow before continuing |
 

@@ -51,6 +51,7 @@ class StudioSidebar extends StatelessWidget {
                     Expanded(
                       child: _SceneList(
                         paths: scenePaths,
+                        selectedPath: editor?.file.path,
                         loadingFile: loadingFile,
                         onLoadJson: onLoadJson,
                         onSwitchScene: onSwitchScene,
@@ -125,12 +126,14 @@ class _SidebarHeading extends StatelessWidget {
 class _SceneList extends StatelessWidget {
   const _SceneList({
     required this.paths,
+    required this.selectedPath,
     required this.loadingFile,
     required this.onLoadJson,
     required this.onSwitchScene,
   });
 
   final List<String> paths;
+  final String? selectedPath;
   final bool loadingFile;
   final VoidCallback onLoadJson;
   final ValueChanged<String> onSwitchScene;
@@ -154,7 +157,11 @@ class _SceneList extends StatelessWidget {
             final path = paths[index];
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: GhostButton(
+              child: Button(
+                key: ValueKey('scene-$path'),
+                style: selectedPath == path
+                    ? const ButtonStyle.secondary()
+                    : const ButtonStyle.ghost(),
                 onPressed: () => onSwitchScene(path),
                 child: Text(
                   File(path).uri.pathSegments.last,
