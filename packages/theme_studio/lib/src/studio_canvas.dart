@@ -17,9 +17,11 @@ class StudioCanvas extends StatefulWidget {
     required this.dormant,
     required this.onToggleDormant,
     required this.onSave,
+    this.readOnly = false,
     super.key,
   });
 
+  final bool readOnly;
   final SceneEditor? editor;
   final ThemeDefinition theme;
   final StudioPreferences preferences;
@@ -78,6 +80,11 @@ class _StudioCanvasState extends State<StudioCanvas> {
     final session = widget.editor;
     if (session == null) return KeyEventResult.ignored;
     final keyboard = HardwareKeyboard.instance;
+    if (widget.readOnly &&
+        key != LogicalKeyboardKey.keyH &&
+        !(key == LogicalKeyboardKey.digit1 && keyboard.isShiftPressed)) {
+      return KeyEventResult.ignored;
+    }
     if (keyboard.isControlPressed) {
       if (key == LogicalKeyboardKey.keyZ) {
         keyboard.isShiftPressed ? session.redo() : session.undo();
@@ -166,28 +173,30 @@ class _StudioCanvasState extends State<StudioCanvas> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final tool in StudioCanvasTool.values)
-                      Tooltip(
-                        tooltip: (_) =>
-                            Text('${tool.label} (${tool.shortcut})'),
-                        child: Button(
-                          key: ValueKey('tool-${tool.name}'),
-                          style: !_handTool && tool == _tool
-                              ? const ButtonStyle.primary()
-                              : const ButtonStyle.outline(),
-                          onPressed: () => _selectTool(tool),
-                          child: Semantics(
-                            label: tool.label,
-                            child: Icon(switch (tool) {
-                              StudioCanvasTool.move =>
-                                LucideIcons.mousePointer2,
-                              StudioCanvasTool.scale => LucideIcons.scaling,
-                              StudioCanvasTool.rotate => LucideIcons.rotateCw,
-                              StudioCanvasTool.rotate3d => LucideIcons.rotate3d,
-                            }, size: 16),
+                    if (!widget.readOnly)
+                      for (final tool in StudioCanvasTool.values)
+                        Tooltip(
+                          tooltip: (_) =>
+                              Text('${tool.label} (${tool.shortcut})'),
+                          child: Button(
+                            key: ValueKey('tool-${tool.name}'),
+                            style: !_handTool && tool == _tool
+                                ? const ButtonStyle.primary()
+                                : const ButtonStyle.outline(),
+                            onPressed: () => _selectTool(tool),
+                            child: Semantics(
+                              label: tool.label,
+                              child: Icon(switch (tool) {
+                                StudioCanvasTool.move =>
+                                  LucideIcons.mousePointer2,
+                                StudioCanvasTool.scale => LucideIcons.scaling,
+                                StudioCanvasTool.rotate => LucideIcons.rotateCw,
+                                StudioCanvasTool.rotate3d =>
+                                  LucideIcons.rotate3d,
+                              }, size: 16),
+                            ),
                           ),
                         ),
-                      ),
                     Tooltip(
                       tooltip: (_) =>
                           const Text('Hand (H) · Hold Space to pan'),
@@ -203,30 +212,31 @@ class _StudioCanvasState extends State<StudioCanvas> {
                         ),
                       ),
                     ),
-                    Tooltip(
-                      tooltip: (_) => const Text(
-                        'Lock aspect ratio · Shift while resizing',
-                      ),
-                      child: Button(
-                        key: const ValueKey('lock-aspect-ratio'),
-                        style: _lockAspectRatio
-                            ? const ButtonStyle.primary()
-                            : const ButtonStyle.outline(),
-                        onPressed: () => setState(
-                          () => _lockAspectRatio = !_lockAspectRatio,
+                    if (!widget.readOnly)
+                      Tooltip(
+                        tooltip: (_) => const Text(
+                          'Lock aspect ratio · Shift while resizing',
                         ),
-                        child: Semantics(
-                          label: 'Lock aspect ratio',
-                          toggled: _lockAspectRatio,
-                          child: Icon(
-                            _lockAspectRatio
-                                ? LucideIcons.lock
-                                : LucideIcons.lockOpen,
-                            size: 16,
+                        child: Button(
+                          key: const ValueKey('lock-aspect-ratio'),
+                          style: _lockAspectRatio
+                              ? const ButtonStyle.primary()
+                              : const ButtonStyle.outline(),
+                          onPressed: () => setState(
+                            () => _lockAspectRatio = !_lockAspectRatio,
+                          ),
+                          child: Semantics(
+                            label: 'Lock aspect ratio',
+                            toggled: _lockAspectRatio,
+                            child: Icon(
+                              _lockAspectRatio
+                                  ? LucideIcons.lock
+                                  : LucideIcons.lockOpen,
+                              size: 16,
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -292,6 +302,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                           child: StudioPreview(
                             key: ObjectKey(session),
                             theme: widget.theme,
+                            readOnly: widget.readOnly,
                             document: session.document,
                             selectedId: session.selectedId,
                             dormant: widget.dormant,
@@ -321,7 +332,9 @@ class _StudioCanvasState extends State<StudioCanvas> {
                     child: Text(
                       session == null
                           ? 'Choose a valid scene document.'
-                          : '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}  ·  ${_handTool || _spacePan
+                          : '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}  ·  ${widget.readOnly
+                                ? 'Select a layer to inspect code'
+                                : _handTool || _spacePan
                                 ? 'Drag to pan'
                                 : _tool == StudioCanvasTool.move
                                 ? 'Drag to move · Handles resize · Shift locks ratio'

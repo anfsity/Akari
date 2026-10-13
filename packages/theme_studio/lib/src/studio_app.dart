@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
+import 'code_inspector.dart';
 import 'node_inspector.dart';
 import 'scene_editor.dart';
 import 'studio_canvas.dart';
@@ -50,6 +51,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   StudioPreferences _preferences = const StudioPreferences();
   bool _preferencesReady = false;
   bool _dormant = false;
+  bool _inspect = false;
   bool _confirmReload = false;
 
   @override
@@ -289,6 +291,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     return StudioWorkspace(
       toolbar: StudioToolbar(
         themeId: _theme.id,
+        readOnly: _inspect,
         editor: editor,
         preferencesReady: _preferencesReady,
         onOpenSettings: () => _openSettings(context),
@@ -299,6 +302,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         assetPaths: _assetPaths,
         editor: editor,
         loadingFile: _loadingFile,
+        readOnly: _inspect,
         onLoadJson: _loadJson,
         onSwitchScene: _switchScene,
         onImportAsset: _importAsset,
@@ -309,14 +313,49 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         theme: _theme,
         preferences: _preferences,
         dormant: _dormant,
+        readOnly: _inspect,
         onToggleDormant: () => setState(() => _dormant = !_dormant),
         onSave: _save,
       ),
       inspector: editor == null
           ? const SizedBox()
-          : NodeInspector(
-              controller: editor.inspector,
-              onApply: editor.applyDraft,
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Row(
+                    children: [
+                      for (final inspect in [false, true])
+                        Expanded(
+                          child: Button(
+                            style: _inspect == inspect
+                                ? const ButtonStyle.secondary()
+                                : const ButtonStyle.ghost(),
+                            onPressed: () {
+                              if (!editor.applyDraft()) return;
+                              setState(() => _inspect = inspect);
+                            },
+                            child: Text(inspect ? 'Inspect code' : 'Design'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Expanded(
+                  child: IndexedStack(
+                    index: _inspect ? 1 : 0,
+                    children: [
+                      NodeInspector(
+                        controller: editor.inspector,
+                        onApply: editor.applyDraft,
+                      ),
+                      CodeInspector(key: ObjectKey(editor), editor: editor),
+                    ],
+                  ),
+                ),
+              ],
             ),
       statusBar: StudioStatusBar(
         path: _path,

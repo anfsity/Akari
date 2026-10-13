@@ -171,6 +171,22 @@ the application are not implemented. Save explicitly before closing the window.
 Custom property names and values remain the responsibility of the compiled
 component.
 
+## Inspect code
+
+The right panel has **Design** and **Inspect code** tabs. Switching to inspection
+applies valid pending fields; invalid fields keep Design open with their error.
+Select a node on the canvas or in Layers to inspect its reference-pixel size and
+copy its **JSON** or generated **Dart**. Choose **Selection** for one node or
+**Scene** for the complete document. Inspection uses the editor's current
+validated document, including unsaved changes, and the same Dart generator as
+build_runner. It describes scene composition; custom Flutter widget, painter and
+shader implementations remain in the theme package's source files.
+
+Inspection allows selection, pan and zoom while disabling layout gestures,
+resize handles, document-edit shortcuts and mutation controls. **Save scene**
+can still persist edits made in Design. Returning to Design preserves selection,
+viewport and panel sizes. Copying code never changes the scene or its history.
+
 ## Settings
 
 **Settings** edits the canvas reference width/height, fit and safe-area policy,

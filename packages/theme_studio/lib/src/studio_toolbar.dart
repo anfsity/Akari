@@ -9,9 +9,11 @@ class StudioToolbar extends StatelessWidget {
     required this.preferencesReady,
     required this.onOpenSettings,
     required this.onSave,
+    this.readOnly = false,
     super.key,
   });
 
+  final bool readOnly;
   final String themeId;
   final SceneEditor? editor;
   final bool preferencesReady;
@@ -35,7 +37,7 @@ class StudioToolbar extends StatelessWidget {
             Text(themeId).muted(),
             const Spacer(),
             OutlineButton(
-              onPressed: session != null && preferencesReady
+              onPressed: !readOnly && session != null && preferencesReady
                   ? onOpenSettings
                   : null,
               child: const Text('Settings'),
@@ -48,14 +50,16 @@ class StudioToolbar extends StatelessWidget {
             ).small().muted(),
             const Gap(16),
             OutlineButton(
-              onPressed: hasDraft || session?.canUndo == true
+              onPressed: !readOnly && (hasDraft || session?.canUndo == true)
                   ? session?.undo
                   : null,
               child: const Text('Undo'),
             ),
             const Gap(8),
             OutlineButton(
-              onPressed: session?.canRedo == true ? session?.redo : null,
+              onPressed: !readOnly && session?.canRedo == true
+                  ? session?.redo
+                  : null,
               child: const Text('Redo'),
             ),
             const Gap(16),

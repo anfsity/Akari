@@ -15,9 +15,11 @@ class StudioSidebar extends StatelessWidget {
     required this.onSwitchScene,
     required this.onImportAsset,
     required this.onApplyBackground,
+    this.readOnly = false,
     super.key,
   });
 
+  final bool readOnly;
   final List<String> scenePaths;
   final List<String> assetPaths;
   final SceneEditor? editor;
@@ -81,14 +83,16 @@ class StudioSidebar extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.all(8),
                       child: OutlineButton(
-                        onPressed: loadingFile ? null : onImportAsset,
+                        onPressed: loadingFile || readOnly
+                            ? null
+                            : onImportAsset,
                         child: const Text('Import asset'),
                       ),
                     ),
                     Expanded(
                       child: _AssetList(
                         paths: assetPaths,
-                        onApplyBackground: session == null
+                        onApplyBackground: session == null || readOnly
                             ? null
                             : onApplyBackground,
                       ),
@@ -100,7 +104,7 @@ class StudioSidebar extends StatelessWidget {
           ),
         ),
         const Divider(),
-        if (session != null) _NodeActions(editor: session),
+        if (session != null) _NodeActions(editor: session, readOnly: readOnly),
       ],
     );
   }
@@ -242,9 +246,10 @@ class _LayerList extends StatelessWidget {
 }
 
 class _NodeActions extends StatelessWidget {
-  const _NodeActions({required this.editor});
+  const _NodeActions({required this.editor, required this.readOnly});
 
   final SceneEditor editor;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -255,12 +260,14 @@ class _NodeActions extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           OutlineButton(
-            onPressed: editor.duplicateSelectedNode,
+            onPressed: readOnly ? null : editor.duplicateSelectedNode,
             child: const Text('Duplicate node'),
           ),
           const Gap(8),
           OutlineButton(
-            onPressed: editor.canDeleteNode ? editor.deleteSelectedNode : null,
+            onPressed: !readOnly && editor.canDeleteNode
+                ? editor.deleteSelectedNode
+                : null,
             child: const Text('Delete node'),
           ),
           if (!editor.canDeleteNode) ...[
