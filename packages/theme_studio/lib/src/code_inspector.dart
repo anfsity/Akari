@@ -100,7 +100,7 @@ class _CodeInspectorState extends State<CodeInspector> {
               child: SelectableText(
                 source,
                 key: const ValueKey('inspect-code-source'),
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                style: Theme.of(context).typography.mono.copyWith(fontSize: 12),
               ),
             ),
           ),
