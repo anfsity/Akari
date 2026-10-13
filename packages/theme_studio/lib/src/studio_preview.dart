@@ -40,6 +40,7 @@ class StudioPreview extends StatefulWidget {
     required this.onDragNodeChanged,
     required this.preferences,
     required this.tool,
+    this.readOnly = false,
     this.lockAspectRatio = false,
     this.zoom,
     this.panEnabled = false,
@@ -48,6 +49,7 @@ class StudioPreview extends StatefulWidget {
     super.key,
   });
 
+  final bool readOnly;
   final ThemeDefinition theme;
   final SceneDocument document;
   final String selectedId;
@@ -199,7 +201,8 @@ class _StudioPreviewState extends State<StudioPreview> {
                 canvasSize: referenceSize,
                 viewportScale: viewportScale,
                 minHitTarget: widget.theme.bundle.tokens.minHitTarget,
-                showHandles: widget.tool == StudioCanvasTool.move,
+                showHandles:
+                    !widget.readOnly && widget.tool == StudioCanvasTool.move,
                 onStart: (handle, details) =>
                     _startDrag(selected.id, details, handle: handle),
                 onUpdate: _updateDrag,
@@ -216,7 +219,9 @@ class _StudioPreviewState extends State<StudioPreview> {
       _PreviewNode(
         nodeId: node.id,
         onSelect: () => widget.onSelect(node.id),
-        onStartDrag: (details) => _startDrag(node.id, details),
+        onStartDrag: widget.readOnly
+            ? null
+            : (details) => _startDrag(node.id, details),
         onUpdateDrag: _updateDrag,
         onStopDrag: (_) => _stopDrag(commit: true),
         onCancelDrag: () => _stopDrag(commit: false),
@@ -368,7 +373,7 @@ class _PreviewNode extends StatelessWidget {
 
   final String nodeId;
   final VoidCallback onSelect;
-  final GestureDragStartCallback onStartDrag;
+  final GestureDragStartCallback? onStartDrag;
   final GestureDragUpdateCallback onUpdateDrag;
   final GestureDragEndCallback onStopDrag;
   final GestureDragCancelCallback onCancelDrag;
