@@ -8,6 +8,8 @@ if [[ "$EUID" -ne 0 ]]; then
   echo 'Run this installer with sudo to build and install the test artifacts.' >&2
   exit 1
 fi
+exec 9>/run/lock/akari-test.lock
+flock -n 9 || { echo 'Another test setup is running.' >&2; exit 1; }
 for unit in akari-test.service akari-restore.timer; do
   if systemctl is-active --quiet "$unit"; then
     echo "$unit is active. Restore before installing." >&2
