@@ -6,7 +6,7 @@ import 'package:yaml/yaml.dart';
 import 'project.dart';
 import 'model.dart';
 
-/// Assembles a reusable executable host with a direct import of one theme.
+/// Assembles a reusable executable host with direct imports of compiled themes.
 /// Shared Dart sources are linked for live edits; native sources and generated
 /// entrypoints are updated only when content changes to retain build caches.
 /// Dependency selection belongs to this host, not the platform's manifest.
@@ -15,10 +15,14 @@ void createThemeHost({
   required ThemePackage theme,
   required Directory output,
   required ThemeHostKind kind,
+  List<ThemePackage>? studioThemes,
   Map<String, Object?> devDependencies = const {},
 }) {
   final studio = kind == ThemeHostKind.studio;
   final preview = kind == ThemeHostKind.preview;
+  final themes = studio
+      ? studioThemes ?? findStudioThemePackages(repoRoot, theme)
+      : [theme];
   output.createSync(recursive: true);
   final lib = Directory('${output.path}/lib')..createSync(recursive: true);
   final sources = studio
@@ -58,7 +62,8 @@ void createThemeHost({
       if (studio)
         'theme_studio': {'path': '${repoRoot.path}/packages/theme_studio'},
       'theme_sdk': {'path': '${repoRoot.path}/packages/theme_sdk'},
-      theme.packageName: {'path': theme.directory.path},
+      for (final project in themes)
+        project.packageName: {'path': project.directory.path},
     },
     'flutter': {'uses-material-design': true},
     if (devDependencies.isNotEmpty) 'dev_dependencies': devDependencies,
@@ -69,18 +74,30 @@ void createThemeHost({
   );
 
   if (studio) {
-    final scenes = findThemeSceneFiles(theme.directory);
+    final imports = [
+      for (var index = 0; index < themes.length; index++)
+        "import 'package:${themes[index].packageName}/theme.dart' as theme$index;",
+    ].join('\n');
+    final projects = [
+      for (var index = 0; index < themes.length; index++)
+        '''    StudioThemeProject(
+      themeBuilder: theme$index.${themes[index].builderName},
+      directory: ${jsonEncode(themes[index].directory.path).replaceAll(r'$', r'\$')},
+      packageName: ${jsonEncode(themes[index].packageName)},
+      scenePaths: [${findThemeSceneFiles(themes[index].directory).map((file) => jsonEncode(file.path).replaceAll(r'$', r'\$')).join(', ')}],
+    ),''',
+    ].join('\n');
     _writeIfChanged(File('${output.path}/lib/main.dart'), '''
 import 'package:flutter/widgets.dart';
 import 'package:theme_studio/theme_studio.dart';
-import 'package:${theme.packageName}/theme.dart' show ${theme.builderName};
+$imports
 
 void main() {
   runApp(ThemeStudioApp(
-    themeBuilder: ${theme.builderName},
-    themeDirectory: ${jsonEncode(theme.directory.path).replaceAll(r'$', r'\$')},
-    themePackageName: ${jsonEncode(theme.packageName)},
-    scenePaths: [${scenes.map((file) => jsonEncode(file.path).replaceAll(r'$', r'\$')).join(', ')}],
+    initialThemePackageName: ${jsonEncode(theme.packageName)},
+    projects: [
+$projects
+    ],
   ));
 }
 ''');

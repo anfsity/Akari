@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -34,6 +36,12 @@ const _document = SceneDocument(
     ),
   ],
 );
+
+class _PresetComponents implements GreeterThemeComponents {
+  @override
+  Widget build(BuildContext context, SceneNode node) =>
+      Center(child: Text('preset component ${node.id}'));
+}
 
 class _Components implements GreeterThemeComponents {
   @override
@@ -120,6 +128,7 @@ void main() {
   Future<void> openStudio(
     WidgetTester tester, {
     ThemeBuilder themeBuilder = _buildTheme,
+    List<StudioThemeProject> additionalProjects = const [],
   }) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
@@ -127,14 +136,252 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       ThemeStudioApp(
-        themeBuilder: themeBuilder,
-        scenePaths: [file.path],
-        themeDirectory: directory.path,
-        themePackageName: 'test',
+        initialThemePackageName: 'test',
+        projects: [
+          StudioThemeProject(
+            themeBuilder: themeBuilder,
+            scenePaths: [file.path],
+            directory: directory.path,
+            packageName: 'test',
+          ),
+          ...additionalProjects,
+        ],
       ),
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'theme switching guards drafts and switches compiled components and asset ownership',
+    (tester) async {
+      final presetDirectory = Directory('${directory.path}/preset')
+        ..createSync();
+      File('${presetDirectory.path}/pubspec.yaml')
+          .writeAsStringSync('name: theme_preset\n');
+      final presetFile = File('${presetDirectory.path}/preset.scene.json')
+        ..writeAsStringSync(
+          encodeSceneDocument(_document.copyWith(id: 'preset')),
+        );
+      Directory('${presetDirectory.path}/assets').createSync();
+      File('${presetDirectory.path}/assets/preset.txt')
+          .writeAsStringSync('preset asset');
+      final preset = StudioThemeProject(
+        packageName: 'theme_preset',
+        directory: presetDirectory.path,
+        scenePaths: [presetFile.path],
+        themeBuilder: ({Color? seed}) => ThemeDefinition(
+          id: 'preset',
+          document: _document,
+          bundle: _buildTheme().bundle,
+          components: (_) => _PresetComponents(),
+        ),
+      );
+      await openStudio(tester, additionalProjects: [preset]);
+      Future<void> choosePreset() async {
+        await tester.tap(find.byKey(const ValueKey('studio-theme-select')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('theme_preset').last);
+        await tester.pumpAndSettle();
+      }
+
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '2560');
+      await choosePreset();
+      expect(find.textContaining('non-normalized rect'), findsOneWidget);
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).theme.id,
+        'test',
+      );
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '512');
+      await choosePreset();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).theme.id,
+        'test',
+      );
+      await choosePreset();
+      await tester.tap(find.text('Save and switch'));
+      await tester.pumpAndSettle();
+      expect(
+        decodeSceneDocument(file.readAsStringSync()).nodes.first.rect.width,
+        0.4,
+      );
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).theme.id,
+        'preset',
+      );
+      expect(find.text('preset component panel'), findsOneWidget);
+      expect(find.text('preset.txt'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      expect(
+        decodeSceneDocument(presetFile.readAsStringSync()).nodes.first.rect.x,
+        0.2,
+      );
+      expect(
+        decodeSceneDocument(file.readAsStringSync()).nodes.first.rect.x,
+        0.1,
+      );
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '384');
+      await tester.tap(find.byKey(const ValueKey('studio-theme-select')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('test').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Discard and switch'));
+      await tester.pumpAndSettle();
+      expect(
+        decodeSceneDocument(presetFile.readAsStringSync()).nodes.first.rect.x,
+        0.2,
+      );
+      expect(find.text('preset.txt'), findsNothing);
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).theme.id,
+        'test',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'loading a registered preset scene switches its component factory; broken presets retain the active scene',
+    (tester) async {
+      final presetDirectory = Directory('${directory.path}/preset')
+        ..createSync();
+      File('${presetDirectory.path}/pubspec.yaml')
+          .writeAsStringSync('name: theme_preset\n');
+      final presetFile = File('${presetDirectory.path}/preset.scene.json')
+        ..writeAsStringSync(
+          encodeSceneDocument(_document.copyWith(id: 'preset')),
+        );
+      final preset = StudioThemeProject(
+        packageName: 'theme_preset',
+        directory: presetDirectory.path,
+        scenePaths: [presetFile.path],
+        themeBuilder: ({Color? seed}) => _buildTheme().copyWith(id: 'preset'),
+      );
+      await openStudio(tester, additionalProjects: [preset]);
+      presetFile.writeAsStringSync('invalid');
+      await tester.tap(find.byKey(const ValueKey('studio-theme-select')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('theme_preset').last);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).theme.id,
+        'test',
+      );
+      expect(find.textContaining('Cannot open theme'), findsOneWidget);
+      presetFile.writeAsStringSync(
+        encodeSceneDocument(_document.copyWith(id: 'preset')),
+      );
+      picker.selected = _PickedFile(presetFile);
+      await tester.tap(find.text('Load JSON'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).theme.id,
+        'preset',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'inspect follows selection, copies code and prevents canvas edits',
+    (tester) async {
+      await openStudio(tester);
+      final original = file.readAsStringSync();
+      await tester.tap(find.text('Inspect code'));
+      await tester.pumpAndSettle();
+      String source() => tester
+          .widget<SelectableText>(
+            find.byKey(const ValueKey('inspect-code-source')),
+          )
+          .data!;
+      expect(jsonDecode(source())['id'], 'panel');
+      expect(find.byKey(const ValueKey('resize-right')), findsNothing);
+      await tester.drag(
+        find.byKey(const ValueKey('preview-panel')),
+        const Offset(60, 30),
+      );
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(
+        encodeSceneDocument(
+          tester.widget<StudioPreview>(find.byType(StudioPreview)).document,
+        ),
+        original,
+      );
+      await tester.tap(find.byKey(const ValueKey('layer-label')));
+      await tester.pumpAndSettle();
+      expect(jsonDecode(source())['id'], 'label');
+      await tester.tap(find.text('Dart'));
+      await tester.pumpAndSettle();
+      expect(source(), contains("id: 'label'"));
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = call.arguments['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await tester.tap(find.text('Copy code'));
+      await tester.pumpAndSettle();
+      expect(copied, source());
+      await tester.tap(find.text('Scene'));
+      await tester.pumpAndSettle();
+      expect(source(), contains('SceneDocument get testSceneDocument'));
+      await tester.tap(find.text('JSON'));
+      await tester.pumpAndSettle();
+      expect(source(), original);
+      await tester.tap(find.text('Design'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('field-X')), findsOneWidget);
+      expect(find.byKey(const ValueKey('resize-right')), findsOneWidget);
+      expect(file.readAsStringSync(), original);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'invalid drafts block inspection and valid drafts reach copied code',
+    (tester) async {
+      await openStudio(tester);
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '2560');
+      await tester.tap(find.text('Inspect code'));
+      await tester.pumpAndSettle();
+      expect(find.text('Copy code'), findsNothing);
+      expect(find.textContaining('non-normalized rect'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '512');
+      await tester.tap(find.text('Inspect code'));
+      await tester.pumpAndSettle();
+      final source = tester
+          .widget<SelectableText>(
+            find.byKey(const ValueKey('inspect-code-source')),
+          )
+          .data!;
+      expect(jsonDecode(source)['rect']['width'], 0.4);
+      expect(find.text('Unsaved changes'), findsOneWidget);
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      expect(
+        decodeSceneDocument(file.readAsStringSync()).nodes.first.rect.width,
+        0.4,
+      );
+    },
+  );
 
   testWidgets(
     'preview header preserves original alignment and surface styling',
@@ -839,6 +1086,8 @@ void main() {
         File('${directory.path}/assets/wallpaper-2.png').existsSync(),
         isFalse,
       );
+      await tester.ensureVisible(find.text('Use image').last);
+      await tester.pumpAndSettle();
       await tester.runAsync(() async {
         await tester.tap(find.text('Use image').last);
         await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -905,7 +1154,9 @@ void main() {
       await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
       await tester.tap(find.text('Load JSON'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Save or reload'), findsOneWidget);
+      expect(find.text('Unsaved scene changes'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Load JSON'));

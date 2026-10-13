@@ -82,13 +82,16 @@ RunPlan createThemeRunPlan(
   SwayBackend swayBackend = SwayBackend.wayland,
 }) {
   final kind = target.hostKind;
+  final themes = kind == ThemeHostKind.studio
+      ? findStudioThemePackages(repoRoot, theme)
+      : [theme];
   final host = getThemeHostDirectory(theme, kind);
   final hasBackend = kind == ThemeHostKind.greeter;
   final sway = target == ThemeRunTarget.sway;
   final displayReport = '$runDirectory/sway/display-report.json';
   return RunPlan(
     command: target.commandName,
-    themes: [theme],
+    themes: themes,
     displayProfile: displayProfile,
     collectResult: sway
         ? (result) => collectDisplayResult(
@@ -112,7 +115,13 @@ RunPlan createThemeRunPlan(
     },
     steps: [
       if (hasBackend) _createBackendBuildStep(backend, mode, jobs),
-      ..._createHostPreparationSteps(repoRoot, theme, kind, host),
+      ..._createHostPreparationSteps(
+        repoRoot,
+        theme,
+        kind,
+        host,
+        themes: themes,
+      ),
       RunStep(
         id: 'theme.${target.stepName}',
         command: [
@@ -140,6 +149,10 @@ RunPlan createThemeRunPlan(
         dependencies: [if (hasBackend) 'backend.build', 'theme.host.pub_get'],
         interactive: true,
         environment: {
+          if (kind == ThemeHostKind.studio)
+            'AKARI_THEME_DIRECTORIES_JSON': jsonEncode(
+              themes.map((project) => project.directory.path).toList(),
+            ),
           'AKARI_DISPLAY_MODE': kind == ThemeHostKind.studio
               ? 'single'
               : 'mirror',
@@ -186,37 +199,45 @@ List<RunStep> _createHostPreparationSteps(
   Directory repoRoot,
   ThemePackage theme,
   ThemeHostKind kind,
-  String host,
-) => [
-  RunStep(
-    id: 'theme.pub_get',
-    command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
-    workingDirectory: theme.directory.path,
-    dependencies: const [],
-  ),
-  ...createSceneGenerationSteps(repoRoot, [theme]),
-  RunStep(
-    id: 'theme.host.generate',
-    command: [
-      ...getDartCommand(repoRoot),
-      'tool/theme_host.dart',
-      theme.directory.path,
-      getAbsolutePath(repoRoot, host),
-      if (kind == ThemeHostKind.studio)
-        '--studio'
-      else if (kind == ThemeHostKind.preview)
-        '--preview',
-    ],
-    action: () => createThemeHost(
-      repoRoot: repoRoot,
-      theme: theme,
-      output: Directory(getAbsolutePath(repoRoot, host)),
-      kind: kind,
+  String host, {
+  List<ThemePackage>? themes,
+}) {
+  final projects = themes ?? [theme];
+  return [
+    for (final project in projects)
+      RunStep(
+        id: project.packageName == theme.packageName
+            ? 'theme.pub_get'
+            : '${project.packageName}.pub_get',
+        command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+        workingDirectory: project.directory.path,
+        dependencies: const [],
+      ),
+    ...createSceneGenerationSteps(repoRoot, projects),
+    RunStep(
+      id: 'theme.host.generate',
+      command: [
+        ...getDartCommand(repoRoot),
+        'tool/theme_host.dart',
+        theme.directory.path,
+        getAbsolutePath(repoRoot, host),
+        if (kind == ThemeHostKind.studio)
+          '--studio'
+        else if (kind == ThemeHostKind.preview)
+          '--preview',
+      ],
+      action: () => createThemeHost(
+        repoRoot: repoRoot,
+        theme: theme,
+        output: Directory(getAbsolutePath(repoRoot, host)),
+        kind: kind,
+        studioThemes: projects,
+      ),
     ),
-  ),
-  RunStep(
-    id: 'theme.host.pub_get',
-    command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
-    workingDirectory: host,
-  ),
-];
+    RunStep(
+      id: 'theme.host.pub_get',
+      command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+      workingDirectory: host,
+    ),
+  ];
+}
