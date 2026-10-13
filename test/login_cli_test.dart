@@ -93,15 +93,17 @@ Future<void> main(List<String> arguments) async {
     );
   }
 
-  test(
-    'production workflow tests isolate systemd and runtime boundaries',
-    () async {
+  for (final workflow in [
+    'login_workflow_test.py',
+    'ascii_transition_test.py',
+  ]) {
+    test('$workflow isolates systemd and runtime boundaries', () async {
       final result = await Process.run('python3', [
-        '${Directory.current.path}/test/support/login_workflow_test.py',
+        '${Directory.current.path}/test/support/$workflow',
       ]);
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    },
-  );
+    });
+  }
 
   test(
     'install builds release before sudo and preserves literal paths',

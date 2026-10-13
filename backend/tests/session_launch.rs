@@ -151,7 +151,7 @@ fn native_login_shells_preserve_environment_arguments_and_process_identity() {
             "literal \\ backslash",
             "line\nbreak",
         ];
-        let mut child = fixture
+        let child = fixture
             .get_command(shell, true, &arguments)
             .env("ZDOTDIR", &zdotdir)
             .stdout(Stdio::null())
@@ -159,8 +159,17 @@ fn native_login_shells_preserve_environment_arguments_and_process_identity() {
             .spawn()
             .unwrap();
         let pid = child.id();
-        let status = child.wait().unwrap();
-        assert!(status.success(), "shell={shell} status={status}");
+        let output = child.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "shell={shell} status={:?}",
+            output.status
+        );
+        assert!(
+            output.stderr.is_empty(),
+            "shell={shell} stderr={:?}",
+            output.stderr
+        );
         let report = fixture.get_report();
         assert_eq!(report["pid"], pid, "shell={shell}");
         assert_eq!(
