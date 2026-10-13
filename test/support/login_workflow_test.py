@@ -442,17 +442,23 @@ elif command == 'busctl':
             time.sleep(0.01)
         sys.exit(1)
 elif command == 'swaymsg':
+    if not (root / 'transition-prepared').exists():
+        sys.exit('Transition must be prepared before Sway exits')
     (root / 'sway-exited').touch()
+elif command == 'backend':
+    assert sys.argv[1:] == ['--prepare-transition']
+    (root / 'transition-prepared').touch()
 ''')
         boundary.chmod(0o755)
         # An absolute interpreter keeps the python3 fixture from recursively
         # invoking itself through /usr/bin/env.
         boundary.write_text(boundary.read_text().replace(
             '#!/usr/bin/env python3', f'#!{sys.executable}'))
-        for name in ['python3', 'busctl', 'swaymsg']:
+        for name in ['python3', 'busctl', 'swaymsg', 'backend']:
             (binary / name).symlink_to(boundary)
         self.environment = {**os.environ, 'PATH': f'{binary}:{os.environ["PATH"]}',
                             'AKARI_RELEASE': str(self.root), 'AKARI_APP': 'fixture',
+                            'AKARI_BACKEND_BIN': str(binary / 'backend'),
                             'AKARI_LOG_DIR': str(self.root), 'FIXTURE': str(self.root)}
 
     def run_greeter(self, **environment):
@@ -464,6 +470,7 @@ elif command == 'swaymsg':
         result = self.run_greeter()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.root / 'sway-exited').exists())
+        self.assertTrue((self.root / 'transition-prepared').exists())
         self.assertIn('Frontend exited: 0', (self.root / 'lifecycle.log').read_text())
 
     def test_launch_pins_release_and_publishes_readable_real_login_logs(self):
@@ -473,6 +480,8 @@ elif command == 'swaymsg':
         source = (REPOSITORY / 'scripts/login/launch.sh').read_text()
         (release / 'launch.sh').write_text(source.replace(
             '/var/log/akari/greeter', str(self.root / 'logs')))
+        (release / 'backend').write_text('#!/bin/sh\nprintf "prepared\\n"\n')
+        (release / 'backend').chmod(0o755)
         boundary = release / 'scripts/debug-dbus.sh'
         boundary.write_text(f'''#!{sys.executable}
 import json, os, pathlib
@@ -489,8 +498,11 @@ print(json.dumps({{'release': os.environ['AKARI_RELEASE'],
                                 env={**os.environ, 'WLR_BACKENDS': 'headless'},
                                 capture_output=True, text=True, timeout=5)
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, '')
+        self.assertEqual(result.stderr, '')
         sessions = list((self.root / 'logs').glob('session-*'))
         self.assertEqual(len(sessions), 1)
+        self.assertIn('prepared', (sessions[0] / 'lifecycle.log').read_text())
         self.assertEqual(json.loads((sessions[0] / 'sway.log').read_text()), {
             'release': str(release), 'mode': 'real', 'nested_backend': None,
             'log_permissions': 0o755})
