@@ -95,12 +95,23 @@ class _CodeInspectorState extends State<CodeInspector> {
           ),
           const Divider(),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: SelectableText(
-                source,
-                key: const ValueKey('inspect-code-source'),
-                style: Theme.of(context).typography.mono.copyWith(fontSize: 12),
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: constraints.maxWidth - 32,
+                    ),
+                    child: SelectableText(
+                      source,
+                      key: const ValueKey('inspect-code-source'),
+                      style: Theme.of(context).typography.mono
+                          .copyWith(fontSize: 12),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
