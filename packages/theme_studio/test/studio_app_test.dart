@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -135,6 +137,104 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'inspect follows selection, copies code and prevents canvas edits',
+    (tester) async {
+      await openStudio(tester);
+      final original = file.readAsStringSync();
+      await tester.tap(find.text('Inspect code'));
+      await tester.pumpAndSettle();
+      String source() => tester
+          .widget<SelectableText>(
+            find.byKey(const ValueKey('inspect-code-source')),
+          )
+          .data!;
+      expect(jsonDecode(source())['id'], 'panel');
+      expect(find.byKey(const ValueKey('resize-right')), findsNothing);
+      await tester.drag(
+        find.byKey(const ValueKey('preview-panel')),
+        const Offset(60, 30),
+      );
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(
+        encodeSceneDocument(
+          tester.widget<StudioPreview>(find.byType(StudioPreview)).document,
+        ),
+        original,
+      );
+      await tester.tap(find.byKey(const ValueKey('layer-label')));
+      await tester.pumpAndSettle();
+      expect(jsonDecode(source())['id'], 'label');
+      await tester.tap(find.text('Dart'));
+      await tester.pumpAndSettle();
+      expect(source(), contains("id: 'label'"));
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = call.arguments['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await tester.tap(find.text('Copy code'));
+      await tester.pumpAndSettle();
+      expect(copied, source());
+      await tester.tap(find.text('Scene'));
+      await tester.pumpAndSettle();
+      expect(source(), contains('SceneDocument get testSceneDocument'));
+      await tester.tap(find.text('JSON'));
+      await tester.pumpAndSettle();
+      expect(source(), original);
+      await tester.tap(find.text('Design'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('field-X')), findsOneWidget);
+      expect(find.byKey(const ValueKey('resize-right')), findsOneWidget);
+      expect(file.readAsStringSync(), original);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'invalid drafts block inspection and valid drafts reach copied code',
+    (tester) async {
+      await openStudio(tester);
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '2560');
+      await tester.tap(find.text('Inspect code'));
+      await tester.pumpAndSettle();
+      expect(find.text('Copy code'), findsNothing);
+      expect(find.textContaining('non-normalized rect'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '512');
+      await tester.tap(find.text('Inspect code'));
+      await tester.pumpAndSettle();
+      final source = tester
+          .widget<SelectableText>(
+            find.byKey(const ValueKey('inspect-code-source')),
+          )
+          .data!;
+      expect(jsonDecode(source)['rect']['width'], 0.4);
+      expect(find.text('Unsaved changes'), findsOneWidget);
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      expect(
+        decodeSceneDocument(file.readAsStringSync()).nodes.first.rect.width,
+        0.4,
+      );
+    },
+  );
 
   testWidgets(
     'preview header preserves original alignment and surface styling',
