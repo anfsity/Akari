@@ -37,10 +37,20 @@ class ThemeSession {
   var _stopping = false;
   var _reloading = false;
   _ReloadRequest? _pendingReload;
+  final _pendingGenerationThemes = <String>{};
+  bool _generateAllThemes = false;
   Timer? _debounce;
   Process? _generator;
+  late final List<Directory> _themes;
 
   Future<int> start() async {
+    final directories = Platform.environment['AKARI_THEME_DIRECTORIES_JSON'];
+    _themes = directories == null
+        ? [theme]
+        : (jsonDecode(directories) as List)
+              .cast<String>()
+              .map(Directory.new)
+              .toList();
     final flutter = getFlutterCommand(repoRoot);
     _process = await Process.start(flutter.first, [
       ...flutter.skip(1),
@@ -69,8 +79,10 @@ class ThemeSession {
       );
     }
     if (mode == BuildMode.debug) {
-      _watchDirectory(Directory('${theme.path}/lib'));
-      _watchDirectory(Directory('${theme.path}/assets'));
+      for (final project in _themes) {
+        _watchDirectory(Directory('${project.path}/lib'), sceneTheme: project);
+        _watchDirectory(Directory('${project.path}/assets'));
+      }
       _watchDirectory(Directory('${repoRoot.path}/lib'));
       for (final package in Directory(
         '${repoRoot.path}/packages',
@@ -101,8 +113,15 @@ class ThemeSession {
     }
   }
 
-  void _queueReload(_ReloadRequest request) {
+  void _queueReload(_ReloadRequest request, {Directory? sceneTheme}) {
     if (mode != BuildMode.debug || _stopping) return;
+    if (request != _ReloadRequest.reload) {
+      if (sceneTheme == null) {
+        _generateAllThemes = true;
+      } else {
+        _pendingGenerationThemes.add(sceneTheme.path);
+      }
+    }
     _pendingReload = switch ((_pendingReload, request)) {
       (_ReloadRequest.restart, _) ||
       (_, _ReloadRequest.restart) => _ReloadRequest.restart,
@@ -123,7 +142,18 @@ class ThemeSession {
       while (_pendingReload != null && !_stopping) {
         final request = _pendingReload!;
         _pendingReload = null;
-        if (request != _ReloadRequest.reload && !await _generateScenes()) {
+        final generationThemes = _generateAllThemes
+            ? _themes
+            : _themes
+                  .where(
+                    (project) =>
+                        _pendingGenerationThemes.contains(project.path),
+                  )
+                  .toList();
+        _generateAllThemes = false;
+        _pendingGenerationThemes.clear();
+        if (request != _ReloadRequest.reload &&
+            !await _generateScenes(generationThemes)) {
           continue;
         }
         if (_stopping) break;
@@ -149,30 +179,33 @@ class ThemeSession {
     }
   }
 
-  Future<bool> _generateScenes() async {
+  Future<bool> _generateScenes(List<Directory> themes) async {
     final dart = getDartCommand(repoRoot);
-    final generator = await Process.start(dart.first, [
-      ...dart.skip(1),
-      'run',
-      'build_runner',
-      'build',
-    ], workingDirectory: theme.path);
-    _generator = generator;
-    try {
-      final output = Future.wait([
-        generator.stdout.listen(stdout.add).asFuture<void>(),
-        generator.stderr.listen(stderr.add).asFuture<void>(),
-      ]);
-      final status = await generator.exitCode;
-      await output;
-      if (status != 0) {
-        stderr.writeln('Scene generation failed; keeping the running theme.');
-        return false;
+    for (final project in themes) {
+      if (_stopping) return false;
+      final generator = await Process.start(dart.first, [
+        ...dart.skip(1),
+        'run',
+        'build_runner',
+        'build',
+      ], workingDirectory: project.path);
+      _generator = generator;
+      try {
+        final output = Future.wait([
+          generator.stdout.listen(stdout.add).asFuture<void>(),
+          generator.stderr.listen(stderr.add).asFuture<void>(),
+        ]);
+        final status = await generator.exitCode;
+        await output;
+        if (status != 0) {
+          stderr.writeln('Scene generation failed; keeping the running theme.');
+          return false;
+        }
+      } finally {
+        _generator = null;
       }
-      return true;
-    } finally {
-      _generator = null;
     }
+    return true;
   }
 
   Future<Map<String, dynamic>> _sendRequest(
@@ -201,7 +234,7 @@ class ThemeSession {
     }
   }
 
-  void _watchDirectory(Directory directory) {
+  void _watchDirectory(Directory directory, {Directory? sceneTheme}) {
     if (!directory.existsSync() || !_watched.add(directory.path)) return;
     _subscriptions.add(
       directory.watch().listen(
@@ -209,7 +242,7 @@ class ThemeSession {
           if (event.isDirectory) {
             if (event.type == FileSystemEvent.create ||
                 event.type == FileSystemEvent.move) {
-              _watchDirectory(Directory(event.path));
+              _watchDirectory(Directory(event.path), sceneTheme: sceneTheme);
             }
             return;
           }
@@ -224,6 +257,7 @@ class ThemeSession {
               scene || event.path.contains('/scene_codegen/lib/')
                   ? _ReloadRequest.regenerate
                   : _ReloadRequest.reload,
+              sceneTheme: scene ? sceneTheme : null,
             );
           }
         },
@@ -235,7 +269,7 @@ class ThemeSession {
     );
     for (final child
         in directory.listSync(followLinks: false).whereType<Directory>()) {
-      _watchDirectory(child);
+      _watchDirectory(child, sceneTheme: sceneTheme);
     }
   }
 

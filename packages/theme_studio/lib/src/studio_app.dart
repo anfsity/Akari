@@ -19,20 +19,18 @@ import 'studio_workspace.dart';
 import 'studio_assets.dart';
 import 'studio_preferences.dart';
 import 'studio_settings.dart';
+import 'studio_theme_project.dart';
+import 'studio_theme_selector.dart';
 
 class ThemeStudioApp extends StatefulWidget {
   const ThemeStudioApp({
-    required this.themeBuilder,
-    required this.scenePaths,
-    required this.themeDirectory,
-    required this.themePackageName,
+    required this.projects,
+    required this.initialThemePackageName,
     super.key,
   });
 
-  final ThemeBuilder themeBuilder;
-  final List<String> scenePaths;
-  final String themeDirectory;
-  final String themePackageName;
+  final List<StudioThemeProject> projects;
+  final String initialThemePackageName;
 
   @override
   State<ThemeStudioApp> createState() => _ThemeStudioAppState();
@@ -42,9 +40,10 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   SceneEditor? _editor;
   late ThemeDefinition _theme;
   late String _path;
-  late final List<String> _scenePaths;
+  late List<String> _scenePaths;
+  late StudioThemeProject _project;
   bool _loadingFile = false;
-  late final StudioAssets _compiledAssets;
+  late StudioAssets _compiledAssets;
   late StudioAssets _assets;
   List<String> _assetPaths = [];
   String? _error;
@@ -57,14 +56,17 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   @override
   void initState() {
     super.initState();
+    _project = widget.projects.firstWhere(
+      (project) => project.packageName == widget.initialThemePackageName,
+    );
     _compiledAssets = StudioAssets(
-      directory: Directory(widget.themeDirectory),
-      packageName: widget.themePackageName,
+      directory: Directory(_project.directory),
+      packageName: _project.packageName,
     );
     _assets = _compiledAssets;
-    _updateTheme(widget.themeBuilder());
+    _updateTheme(_project.themeBuilder());
     _assetPaths = _assets.getAssets();
-    _scenePaths = [...widget.scenePaths];
+    _scenePaths = [..._project.scenePaths];
     _path = _scenePaths.first;
     _openScene(_path);
     unawaited(_loadSeed());
@@ -130,13 +132,13 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     final theme = _theme;
     final seed = await theme.findBackgroundSeed();
     if (!mounted || !identical(theme, _theme) || seed == null) return;
-    setState(() => _updateTheme(widget.themeBuilder(seed: seed)));
+    setState(() => _updateTheme(_project.themeBuilder(seed: seed)));
   }
 
   @override
   void reassemble() {
     super.reassemble();
-    _updateTheme(widget.themeBuilder());
+    _updateTheme(_project.themeBuilder());
     unawaited(_loadSeed());
   }
 
@@ -158,18 +160,106 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     }
   }
 
-  void _switchScene(String path) {
-    if (_editor?.applyDraft() == false) return;
-    if (_editor?.isDirty == true) {
-      setState(
-        () => _error = 'Save or reload your changes before switching scenes.',
+  Future<void> _switchTheme(
+    StudioThemeProject project,
+    BuildContext context, {
+    String? scenePath,
+  }) async {
+    if (!await _confirmSwitch(context)) return;
+    if (!mounted) return;
+    try {
+      // Prepare the entire target before releasing the current session. A bad
+      // preset file must leave the working document and its renderer intact.
+      final editor = SceneEditor(File(scenePath ?? project.scenePaths.first));
+      final assets = StudioAssets(
+        directory: Directory(project.directory),
+        packageName: project.packageName,
       );
-      return;
+      final List<String> assetPaths;
+      final ThemeDefinition theme;
+      try {
+        assetPaths = assets.getAssets();
+        theme = project.themeBuilder();
+      } on Object {
+        editor.dispose();
+        rethrow;
+      }
+      setState(() {
+        _editor?.dispose();
+        _editor = editor;
+        _project = project;
+        _compiledAssets = assets;
+        _assets = assets;
+        _assetPaths = assetPaths;
+        _scenePaths = [...project.scenePaths];
+        _path = editor.file.path;
+        if (!_scenePaths.contains(_path)) _scenePaths.add(_path);
+        _updateTheme(theme);
+        _error = null;
+        _confirmReload = false;
+      });
+      unawaited(_loadSeed());
+    } on Object catch (error) {
+      setState(() => _error = 'Cannot open theme: $error');
     }
-    setState(() => _openScene(path));
   }
 
-  Future<void> _loadJson() async {
+  Future<bool> _confirmSwitch(BuildContext context) async {
+    final editor = _editor;
+    if (editor == null) return true;
+    if (!editor.applyDraft()) return false;
+    if (!editor.isDirty) return true;
+    final save = await showOverlay<bool>(
+      context,
+      const DialogConfiguration(),
+      builder: (context) => AlertDialog(
+        title: const Text('Unsaved scene changes'),
+        content: const Text(
+          'Save this scene before opening another project or scene?',
+        ),
+        actions: [
+          OutlineButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          OutlineButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Discard and switch'),
+          ),
+          PrimaryButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Save and switch'),
+          ),
+        ],
+      ),
+    ).future;
+    if (!mounted || save == null) return false;
+    if (!save) return true;
+    _save();
+    return !editor.isDirty;
+  }
+
+  Future<void> _switchScene(String path, BuildContext context) async {
+    if (path == _path) return;
+    final StudioAssets? assets;
+    try {
+      assets = StudioAssets.findForScene(File(path));
+    } on Object catch (error) {
+      setState(() => _error = '$error');
+      return;
+    }
+    for (final project in widget.projects) {
+      if (!identical(project, _project) &&
+          project.directory == assets?.directory.path) {
+        await _switchTheme(project, context, scenePath: path);
+        return;
+      }
+    }
+    if (!context.mounted || !await _confirmSwitch(context)) return;
+    if (mounted) setState(() => _openScene(path));
+  }
+
+  Future<void> _loadJson(BuildContext context) async {
     setState(() => _loadingFile = true);
     try {
       final file = await FilePicker.pickFile(
@@ -178,8 +268,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         type: FileType.custom,
         allowedExtensions: ['json'],
       );
-      if (!mounted || file == null) return;
-      _switchScene(File.fromUri(file.uri).path);
+      if (!context.mounted || file == null) return;
+      await _switchScene(File.fromUri(file.uri).path, context);
     } on Object catch (error) {
       if (mounted) setState(() => _error = '$error');
     } finally {
@@ -297,16 +387,29 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         onOpenSettings: () => _openSettings(context),
         onSave: _save,
       ),
-      sidebar: StudioSidebar(
-        scenePaths: _scenePaths,
-        assetPaths: _assetPaths,
-        editor: editor,
-        loadingFile: _loadingFile,
-        readOnly: _inspect,
-        onLoadJson: _loadJson,
-        onSwitchScene: _switchScene,
-        onImportAsset: _importAsset,
-        onApplyBackground: _applyBackground,
+      sidebar: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          StudioThemeSelector(
+            projects: widget.projects,
+            selected: _project,
+            onChanged: (project) => unawaited(_switchTheme(project, context)),
+          ),
+          const Divider(),
+          Expanded(
+            child: StudioSidebar(
+              scenePaths: _scenePaths,
+              assetPaths: _assetPaths,
+              editor: editor,
+              loadingFile: _loadingFile,
+              readOnly: _inspect,
+              onLoadJson: () => _loadJson(context),
+              onSwitchScene: (path) => _switchScene(path, context),
+              onImportAsset: _importAsset,
+              onApplyBackground: _applyBackground,
+            ),
+          ),
+        ],
       ),
       canvas: StudioCanvas(
         editor: editor,

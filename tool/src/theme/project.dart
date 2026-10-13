@@ -90,6 +90,18 @@ List<ThemePackage> findThemePackages(Directory repoRoot) {
   return themes;
 }
 
+/// Studio compiles the repository's presets alongside the selected project.
+/// An external project owns its package name, including when it overrides a
+/// built-in theme; pub cannot resolve two paths for the same package identity.
+List<ThemePackage> findStudioThemePackages(
+  Directory repoRoot,
+  ThemePackage selected,
+) => [
+  selected,
+  ...findThemePackages(repoRoot)
+      .where((theme) => theme.packageName != selected.packageName),
+]..sort((left, right) => left.packageName.compareTo(right.packageName));
+
 String _getBuilderName(String themeName) {
   final words = themeName.split('_');
   final pascalName = words
