@@ -25,7 +25,10 @@ Future<int> runLoginCommand(
     throw const FormatException('--jobs must be a positive integer.');
   }
   final controller = File('${root.path}/manage.py');
-  final script = operation == 'install' || (query && !controller.existsSync())
+  final script =
+      operation == 'install' ||
+          operation == 'clean' ||
+          (query && !controller.existsSync())
       ? File('${repoRoot.path}/scripts/login/manage.py')
       : controller;
   final privilege = <String>[];

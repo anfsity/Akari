@@ -262,6 +262,11 @@ const cliCommands = [
     'Remove an inactive production installation; retain preferences and logs.',
     options: ['--dry-run'],
   ),
+  CliCommand(
+    'clean',
+    'Clean inactive production and test installations, including leftover registrations; retain preferences and logs.',
+    options: ['--dry-run'],
+  ),
   CliCommand('login', 'Manage the production login service.'),
   CliCommand(
     'login enable',

@@ -22,6 +22,7 @@ From the repository root, use `fvm dart run tool/akari.dart COMMAND`. After
 | `install` | Build and deploy the production login environment | `--theme`, `--jobs`, `--dry-run` |
 | `install cli` | Install the repository-bound launcher and completion | `--shell`, `--prefix`, `--rc` |
 | `uninstall` | Remove an inactive production installation | `--dry-run` |
+| `clean` | Clean inactive production and test installations, including leftovers | `--dry-run` |
 | `login enable` / `login disable` | Select Akari or restore the previous boot login service | `--dry-run` |
 | `login rollback` | Select the previous installed release | `--dry-run` |
 | `login status` | Inspect deployment and service state | `--format` |
@@ -161,7 +162,25 @@ logs remain on disk. `uninstall` requires an inactive service, restores any reco
 boot login service, and removes the deployment and `/etc/akari` configuration;
 it retains the greeter account, preferences, and logs.
 
-`install`, `uninstall`, `login enable`, `login disable`, and `login rollback`
+Use `clean` to also remove test artifacts or leftovers from an incomplete
+installation. It removes `/opt/akari`, `/opt/akari-test`, `/etc/akari`, and
+`/etc/systemd/system/akari.service`, restores the recorded boot login service,
+and removes only Akari's keyring block from `/etc/pam.d/greetd`. It works without
+an installed controller or installation manifest and can be repeated when these
+files are already absent. Accounts, preferences, PAM backups, production/test
+logs outside the installation directories, and the CLI launcher are retained.
+The production service, test service, recovery service, and recovery timer must
+all be inactive or failed. For a running production session, use `login disable`
+and reboot first; for an armed test, use `greetd-test restore`. Cleanup refuses to
+remove recovery files if restoring the recorded login service fails or its
+snapshot is missing while Akari is selected for boot.
+
+```sh
+akari clean --dry-run
+akari clean
+```
+
+`install`, `uninstall`, `clean`, `login enable`, `login disable`, and `login rollback`
 accept `--dry-run`, which prints a JSON plan without building, requesting sudo,
 or changing files. Status and logs are read-only. The CLI launcher still needs
 this repository and its SDK; the installed login service does not. Recovery

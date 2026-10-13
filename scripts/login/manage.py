@@ -20,12 +20,14 @@ import tempfile
 
 
 INSTALLATION = Path('/opt/akari')
+TEST_INSTALLATION = Path('/opt/akari-test')
 CONFIGURATION = Path('/etc/akari')
 STATE = Path('/var/lib/akari')
 LOGS = Path('/var/log/akari/greeter')
 UNIT = Path('/etc/systemd/system/akari.service')
 DISPLAY_MANAGER = UNIT.with_name('display-manager.service')
 LOCK = Path('/run/lock/akari-login.lock')
+TEST_LOCK = Path('/run/lock/akari-test.lock')
 PAM = Path('/etc/pam.d/greetd')
 GREETER = 'akari-greeter'
 SNAPSHOT = STATE / 'display-manager.json'
@@ -318,13 +320,17 @@ def create_installation(source, bundle, backend, layout, keyring='auto'):
 
 
 def restore_display_manager(snapshot):
-    run_systemctl('disable', UNIT.name)
+    if UNIT.exists():
+        run_systemctl('disable', UNIT.name)
+    elif is_akari_target(get_display_manager_target()):
+        # Partial removal can leave a dangling alias. systemctl cannot disable
+        # a missing unit, but recovery must still restore the saved selection.
+        DISPLAY_MANAGER.unlink()
     target = snapshot['target']
-    if target is None:
-        return
-    if snapshot['enabled']:
-        run_systemctl('enable', '--force', Path(target).name)
-    update_link(DISPLAY_MANAGER, target)
+    if target is not None:
+        if snapshot['enabled']:
+            run_systemctl('enable', '--force', Path(target).name)
+        update_link(DISPLAY_MANAGER, target)
     run_systemctl('daemon-reload')
 
 
@@ -361,6 +367,10 @@ def enable_login():
 
 def disable_login():
     validate_installation()
+    restore_login_selection()
+
+
+def restore_login_selection():
     target = get_display_manager_target()
     if not SNAPSHOT.exists():
         if is_akari_target(target):
@@ -389,16 +399,51 @@ def rollback_installation():
 
 def remove_installation():
     validate_installation()
-    active = run_systemctl('show', '--property=ActiveState', '--value', UNIT.name)
-    if active not in ['inactive', 'failed']:
-        raise ValueError('Akari is running. Disable it and reboot before uninstalling.')
-    disable_login()
-    update_pam(get_pam_without_keyring(PAM.read_text()))
-    UNIT.unlink()
-    run_systemctl('daemon-reload')
-    shutil.rmtree(CONFIGURATION)
-    shutil.rmtree(INSTALLATION)
+    validate_inactive_units([UNIT.name])
+    remove_login_files()
     print('Akari uninstalled. Greeter account, preferences and logs were retained.')
+
+
+def validate_inactive_units(units):
+    for unit in units:
+        result = subprocess.run(['systemctl', 'show', '--property=ActiveState', '--value', unit],
+                                text=True, capture_output=True)
+        # Missing units report inactive with a nonzero exit code. A failed bus
+        # connection supplies no state and must not be treated as safe to clean.
+        active = result.stdout.strip()
+        if result.returncode != 0 and not active:
+            raise subprocess.CalledProcessError(result.returncode, result.args, stderr=result.stderr)
+        if active not in ['inactive', 'failed']:
+            recovery = ('Run akari login disable and reboot first.' if unit == UNIT.name
+                        else 'Run akari greetd-test restore first.')
+            raise ValueError(f'{unit} is running ({active}). {recovery}')
+
+
+def remove_registered_paths(paths):
+    for path in paths:
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+        elif path.exists():
+            shutil.rmtree(path)
+
+
+def remove_login_files():
+    configuration = get_pam_without_keyring(PAM.read_text()) if PAM.exists() else None
+    restore_login_selection()
+    if configuration is not None:
+        update_pam(configuration)
+    UNIT.unlink(missing_ok=True)
+    run_systemctl('daemon-reload')
+    remove_registered_paths([CONFIGURATION, INSTALLATION])
+
+
+def clean_installations():
+    # Check every lifecycle before deleting anything: the test timer and
+    # ExecStopPost still depend on restore.sh even after the greeter exits.
+    validate_inactive_units([UNIT.name, 'akari-test.service', 'akari-restore.service', 'akari-restore.timer'])
+    remove_login_files()
+    remove_registered_paths([TEST_INSTALLATION])
+    print('Akari production and test files cleaned. Greeter accounts, preferences, logs and CLI launcher were retained.')
 
 
 def get_status():
@@ -447,7 +492,7 @@ def parse_arguments():
     install.add_argument('--keyring', choices=keyring_options, default='auto')
     keyring = commands.add_parser('configure-keyring', help='Configure greetd keyring PAM without rebuilding Akari.')
     keyring.add_argument('--keyring', choices=keyring_options, default='auto')
-    for name in ['enable', 'disable', 'rollback', 'uninstall']:
+    for name in ['enable', 'disable', 'rollback', 'uninstall', 'clean']:
         commands.add_parser(name)
     status = commands.add_parser('status')
     status.add_argument('--format', choices=['text', 'json'], default='text')
@@ -494,6 +539,13 @@ def main():
                 rollback_installation()
             case 'uninstall':
                 remove_installation()
+            case 'clean':
+                with TEST_LOCK.open('a') as test_lock:
+                    try:
+                        fcntl.flock(test_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    except BlockingIOError:
+                        raise ValueError('Another test setup is running; retry cleanup after it finishes.') from None
+                    clean_installations()
     return 0
 
 

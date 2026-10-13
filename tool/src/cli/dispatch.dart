@@ -22,6 +22,7 @@ Future<int> runCliCommand(CliCommand command, CliArguments input) async {
       return 0;
     case 'install':
     case 'uninstall':
+    case 'clean':
     case 'login enable':
     case 'login disable':
     case 'login rollback':

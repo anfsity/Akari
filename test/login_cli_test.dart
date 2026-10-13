@@ -56,7 +56,7 @@ import '${Directory.current.uri}tool/src/commands/login.dart';
 import '${Directory.current.uri}tool/src/cli/definition.dart';
 Future<void> main(List<String> arguments) async {
   try {
-    final name = ['install', 'uninstall'].contains(arguments.first)
+    final name = ['install', 'uninstall', 'clean'].contains(arguments.first)
         ? arguments.first : 'login ' + arguments.first;
     exitCode = await runLoginCommand(getCliCommand(name), arguments.skip(1).toList(),
       repoRoot: Directory(Platform.environment['REPOSITORY']!),
@@ -186,6 +186,7 @@ Future<void> main(List<String> arguments) async {
       'disable',
       'rollback',
       'uninstall',
+      'clean',
     ]) {
       final result = await runFixture([target, '--dry-run']);
       expect(result.exitCode, 0, reason: '${result.stderr}');
@@ -203,6 +204,27 @@ Future<void> main(List<String> arguments) async {
     expect(File('${temporary.path}/sudo.json').existsSync(), isFalse);
     expect(Directory('${temporary.path}/build').existsSync(), isFalse);
   });
+
+  test(
+    'clean uses repository controller even with an old or missing installation',
+    () async {
+      for (final installed in [true, false]) {
+        if (!installed) await File('${installation.path}/manage.py').delete();
+        final result = await runFixture(['clean']);
+        expect(result.exitCode, 17, reason: '${result.stderr}');
+        expect(
+          jsonDecode(await File('${temporary.path}/sudo.json').readAsString()),
+          [
+            '--',
+            'python3',
+            '${Directory.current.path}/scripts/login/manage.py',
+            'clean',
+          ],
+        );
+      }
+      expect(File('${temporary.path}/build.json').existsSync(), isFalse);
+    },
+  );
 
   test(
     'lifecycle uses installed controller and root does not request sudo',
@@ -279,6 +301,7 @@ Future<void> main(List<String> arguments) async {
       ['install', '--keyring', 'other'],
       ['enable', '--keyring', 'gnome'],
       ['enable', '--theme', 'themes/default'],
+      ['clean', '--theme', 'themes/default'],
       ['logs', '--lines', '0'],
       ['logs', '--component', 'unknown'],
     ]) {
@@ -298,6 +321,7 @@ Future<void> main(List<String> arguments) async {
         ['install'],
         ['install', 'cli'],
         ['uninstall'],
+        ['clean'],
         ['login'],
         ['login', 'enable'],
         ['login', 'disable'],
@@ -318,6 +342,7 @@ Future<void> main(List<String> arguments) async {
       for (final words in [
         ['install'],
         ['uninstall'],
+        ['clean'],
         ['login', 'enable'],
       ]) {
         final result = await Process.run(dart.first, [

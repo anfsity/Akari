@@ -23,6 +23,7 @@ description: 查命令、选项、显示配置和运行报告。
 | `install` | 构建并部署正式登录环境 | `--theme`、`--jobs`、`--dry-run` |
 | `install cli` | 安装绑定到当前仓库的启动器和补全脚本 | `--shell`、`--prefix`、`--rc` |
 | `uninstall` | 卸载已停止运行的正式环境 | `--dry-run` |
+| `clean` | 清理已停止运行的正式、测试环境及安装残留 | `--dry-run` |
 | `login enable` / `login disable` | 选择 Akari 或恢复原来的开机登录服务 | `--dry-run` |
 | `login rollback` | 选择上一个已安装版本 | `--dry-run` |
 | `login status` | 查看安装和服务状态 | `--format` |
@@ -95,7 +96,14 @@ akari uninstall
 
 重新安装会保留旧版本，在部署成功后切换 `current`。`login rollback` 交换 `current` 和 `previous`，下一次启动登录界面时使用所选版本；已经运行的登录界面继续使用原版本。回退不修改系统配置和偏好。旧版本与会话日志会保留在磁盘上。`uninstall` 要求服务已停止运行，恢复已记录的开机登录服务，并删除部署产物和 `/etc/akari` 配置；账户、偏好和日志保留。
 
-`install`、`uninstall`、`login enable`、`login disable` 和 `login rollback` 接受 `--dry-run`，只输出 JSON 计划，不构建、不请求 sudo，也不修改文件。状态和日志操作只读。CLI 启动器仍依赖仓库和 SDK，已安装的登录服务独立运行。在 TTY 中恢复时，也可以直接调用已安装的控制器：
+使用 `clean` 可同时清理测试环境和未完成安装的残留。它删除 `/opt/akari`、`/opt/akari-test`、`/etc/akari` 和 `/etc/systemd/system/akari.service`，恢复已记录的开机登录服务，并只移除 `/etc/pam.d/greetd` 中 Akari 添加的密钥环配置块。已安装的控制器或安装清单缺失时仍可使用；文件已经不存在时可重复执行。账户、偏好、PAM 备份、安装目录之外的正式及测试日志，以及 CLI 启动器保留。正式服务、测试服务、恢复服务及恢复定时器必须处于 inactive 或 failed 状态。正式会话仍在运行时，先执行 `login disable` 并重启；测试已启动时，先执行 `greetd-test restore`。恢复原登录服务失败，或 Akari 仍被选为开机登录服务但恢复快照缺失时，会拒绝删除恢复所需的文件。
+
+```sh
+akari clean --dry-run
+akari clean
+```
+
+`install`、`uninstall`、`clean`、`login enable`、`login disable` 和 `login rollback` 接受 `--dry-run`，只输出 JSON 计划，不构建、不请求 sudo，也不修改文件。状态和日志操作只读。CLI 启动器仍依赖仓库和 SDK，已安装的登录服务独立运行。在 TTY 中恢复时，也可以直接调用已安装的控制器：
 
 ```sh
 sudo python3 /opt/akari/manage.py disable
