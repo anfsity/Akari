@@ -17,6 +17,6 @@ export XDG_CURRENT_DESKTOP=Sway
 export XDG_SESSION_DESKTOP=sway
 export XDG_SESSION_TYPE=wayland
 unset DISPLAY WAYLAND_DISPLAY WAYLAND_SOCKET SWAYSOCK WLR_BACKENDS WLR_WAYLAND_DISPLAY
-printf 'Akari greeter logs: %s\n' "$AKARI_LOG_DIR"
+"$AKARI_BACKEND_BIN" --prepare-transition >> "$AKARI_LOG_DIR/lifecycle.log" 2>&1 || true
 exec "$AKARI_RELEASE/scripts/debug-dbus.sh" \
   /usr/bin/sway --config /etc/akari/sway.conf > "$AKARI_LOG_DIR/sway.log" 2>&1
