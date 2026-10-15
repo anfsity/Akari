@@ -75,6 +75,10 @@ Camera configuration, enrollment, recognition timeouts and fallback policy belon
 to the provider and PAM. Akari does not capture camera frames or store face models.
 Preview and mock mode do not perform facial recognition.
 
+Authentication can wait longer than ten seconds for PAM to produce a response,
+and remains cancellable while waiting. Connection, writes, incomplete response
+frames, session startup and cancellation replies retain bounded I/O timeouts.
+
 ### Install and verify Gaze
 
 Follow Gaze's [installation guide](https://gaze.gundulabs.com/guide/installation.html).

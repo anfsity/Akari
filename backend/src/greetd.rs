@@ -12,13 +12,18 @@ use thiserror::Error;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
-    time::{error::Elapsed, timeout},
+    time::timeout,
 };
 use tokio_util::sync::CancellationToken;
 use zeroize::Zeroizing;
 
 const MAX_FRAME_SIZE: usize = 1024 * 1024;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+
+enum ResponseWait {
+    Pam,
+    Immediate,
+}
 
 /// Errors produced while connecting to greetd or exchanging one framed request.
 #[derive(Debug, Error)]
@@ -264,6 +269,7 @@ impl GreetdClient {
                 username,
             },
             cancellation,
+            ResponseWait::Pam,
         )
         .await
     }
@@ -280,6 +286,7 @@ impl GreetdClient {
                 response,
             },
             cancellation,
+            ResponseWait::Pam,
         )
         .await
     }
@@ -298,6 +305,7 @@ impl GreetdClient {
                 env,
             },
             cancellation,
+            ResponseWait::Immediate,
         )
         .await
     }
@@ -312,6 +320,7 @@ impl GreetdClient {
                 kind: "cancel_session",
             },
             cancellation,
+            ResponseWait::Immediate,
         )
         .await
     }
@@ -328,6 +337,7 @@ impl GreetdClient {
         &mut self,
         request: &T,
         cancellation: &CancellationToken,
+        response_wait: ResponseWait,
     ) -> Result<GreetdResponse, GreetdError>
     where
         T: Serialize,
@@ -347,19 +357,26 @@ impl GreetdClient {
             }
         }
 
-        self.read_response(cancellation).await
+        match response_wait {
+            ResponseWait::Pam => self.read_response(cancellation).await,
+            ResponseWait::Immediate => timeout(REQUEST_TIMEOUT, self.read_response(cancellation))
+                .await
+                .map_err(|_| GreetdError::Timeout)?,
+        }
     }
 
     /// Reads and decodes one length-prefixed response frame.
     ///
-    /// The frame length is checked before allocation, and each exact read is
-    /// bounded by [`REQUEST_TIMEOUT`].
+    /// PAM may wait for a camera or another external factor before producing a
+    /// response. Wait cancellably for its first byte, then bound the remaining
+    /// frame reads so an incomplete response cannot stall the conversation.
     async fn read_response(
         &mut self,
         cancellation: &CancellationToken,
     ) -> Result<GreetdResponse, GreetdError> {
         let mut length_bytes = [0_u8; 4];
-        read_exact_with_timeout(&mut self.stream, &mut length_bytes, cancellation).await?;
+        read_exact(&mut self.stream, &mut length_bytes[..1], cancellation).await?;
+        read_exact_with_timeout(&mut self.stream, &mut length_bytes[1..], cancellation).await?;
 
         let length = u32::from_ne_bytes(length_bytes) as usize;
         if length > MAX_FRAME_SIZE {
@@ -518,15 +535,24 @@ async fn read_exact_with_timeout(
     buffer: &mut [u8],
     cancellation: &CancellationToken,
 ) -> Result<(), GreetdError> {
+    timeout(REQUEST_TIMEOUT, read_exact(stream, buffer, cancellation))
+        .await
+        .map_err(|_| GreetdError::Timeout)?
+}
+
+async fn read_exact(
+    stream: &mut UnixStream,
+    buffer: &mut [u8],
+    cancellation: &CancellationToken,
+) -> Result<(), GreetdError> {
     tokio::select! {
         _ = cancellation.cancelled() => Err(GreetdError::Cancelled),
-        result = timeout(REQUEST_TIMEOUT, stream.read_exact(buffer)) => match result {
-            Ok(Ok(_)) => Ok(()),
-            Ok(Err(error)) if error.kind() == io::ErrorKind::UnexpectedEof => {
+        result = stream.read_exact(buffer) => match result {
+            Ok(_) => Ok(()),
+            Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => {
                 Err(GreetdError::ResponseTruncated)
             }
-            Ok(Err(error)) => Err(GreetdError::Io(error)),
-            Err(Elapsed { .. }) => Err(GreetdError::Timeout),
+            Err(error) => Err(GreetdError::Io(error)),
         }
     }
 }
@@ -542,7 +568,7 @@ mod tests {
     use serde_json::Value;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
-        net::UnixListener,
+        net::{UnixListener, UnixStream},
     };
 
     use super::{
@@ -737,6 +763,118 @@ mod tests {
         assert!(matches!(error, GreetdError::Cancelled));
         server.await.unwrap();
         let _ = std::fs::remove_file(socket);
+    }
+
+    #[tokio::test]
+    async fn slow_pam_responses_preserve_password_fallback() {
+        let (stream, mut server) = UnixStream::pair().unwrap();
+        let request = tokio::spawn(async move {
+            let mut client = GreetdClient { stream };
+            let cancellation = CancellationToken::new();
+            assert!(matches!(
+                client.create_session("alice", &cancellation).await,
+                Ok(GreetdResponse::AuthMessage { auth_message_type, .. })
+                    if auth_message_type == "info"
+            ));
+            assert!(matches!(
+                client.post_auth_message_response(None, &cancellation).await,
+                Ok(GreetdResponse::AuthMessage { auth_message_type, .. })
+                    if auth_message_type == "secret"
+            ));
+            assert!(matches!(
+                client
+                    .post_auth_message_response(Some("password"), &cancellation)
+                    .await,
+                Ok(GreetdResponse::Success)
+            ));
+        });
+        for response in [
+            serde_json::json!({
+                "type": "auth_message", "auth_message_type": "info",
+                "auth_message": "Attempting facial authentication"
+            }),
+            serde_json::json!({
+                "type": "auth_message", "auth_message_type": "secret",
+                "auth_message": "Password: "
+            }),
+            serde_json::json!({"type": "success"}),
+        ] {
+            let _ = read_request(&mut server).await;
+            tokio::task::yield_now().await;
+            tokio::time::pause();
+            tokio::time::advance(Duration::from_secs(12)).await;
+            tokio::task::yield_now().await;
+            assert!(
+                !request.is_finished(),
+                "PAM must own its authentication deadline"
+            );
+            tokio::time::resume();
+            write_response(&mut server, response).await;
+        }
+        request.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn slow_pam_wait_remains_cancellable() {
+        let (stream, mut server) = UnixStream::pair().unwrap();
+        let cancellation = CancellationToken::new();
+        let cancel = cancellation.clone();
+        let request = tokio::spawn(async move {
+            GreetdClient { stream }
+                .create_session("alice", &cancel)
+                .await
+        });
+        let _ = read_request(&mut server).await;
+        tokio::task::yield_now().await;
+        tokio::time::pause();
+        tokio::time::advance(Duration::from_secs(12)).await;
+        cancellation.cancel();
+        assert!(matches!(
+            request.await.unwrap(),
+            Err(GreetdError::Cancelled)
+        ));
+    }
+
+    #[tokio::test]
+    async fn partial_response_frames_still_timeout() {
+        for partial in [
+            4_u32.to_ne_bytes()[..1].to_vec(),
+            [4_u32.to_ne_bytes().as_slice(), b"{"].concat(),
+        ] {
+            let (stream, mut server) = UnixStream::pair().unwrap();
+            let request = tokio::spawn(async move {
+                GreetdClient { stream }
+                    .create_session("alice", &CancellationToken::new())
+                    .await
+            });
+            let _ = read_request(&mut server).await;
+            server.write_all(&partial).await.unwrap();
+            tokio::time::pause();
+            assert!(matches!(request.await.unwrap(), Err(GreetdError::Timeout)));
+            tokio::time::resume();
+        }
+    }
+
+    #[tokio::test]
+    async fn session_start_and_cancel_replies_still_timeout() {
+        for start_session in [false, true] {
+            let (stream, mut server) = UnixStream::pair().unwrap();
+            let request = tokio::spawn(async move {
+                let mut client = GreetdClient { stream };
+                let cancellation = CancellationToken::new();
+                if start_session {
+                    client
+                        .start_session(&["/bin/session".into()], &[], &cancellation)
+                        .await
+                } else {
+                    client.cancel_session(&cancellation).await
+                }
+            });
+            let _ = read_request(&mut server).await;
+            tokio::time::pause();
+            assert!(matches!(request.await.unwrap(), Err(GreetdError::Timeout)));
+            tokio::time::resume();
+        }
     }
 
     #[tokio::test]
