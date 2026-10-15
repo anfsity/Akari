@@ -5,6 +5,7 @@ set -euo pipefail
 export AKARI_RELEASE="$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")"
 umask 022
 export AKARI_LOG_DIR="$(mktemp -d /var/log/akari/greeter/session-XXXXXXXX)"
+exec >> "$AKARI_LOG_DIR/lifecycle.log" 2>&1
 chmod 0755 "$AKARI_LOG_DIR"
 export AKARI_BACKEND_MODE=real
 export AKARI_BACKEND_BIN="$AKARI_RELEASE/backend"
@@ -17,6 +18,6 @@ export XDG_CURRENT_DESKTOP=Sway
 export XDG_SESSION_DESKTOP=sway
 export XDG_SESSION_TYPE=wayland
 unset DISPLAY WAYLAND_DISPLAY WAYLAND_SOCKET SWAYSOCK WLR_BACKENDS WLR_WAYLAND_DISPLAY
-"$AKARI_BACKEND_BIN" --prepare-transition >> "$AKARI_LOG_DIR/lifecycle.log" 2>&1 || true
+"$AKARI_BACKEND_BIN" --prepare-transition || true
 exec "$AKARI_RELEASE/scripts/debug-dbus.sh" \
   /usr/bin/sway --config /etc/akari/sway.conf > "$AKARI_LOG_DIR/sway.log" 2>&1

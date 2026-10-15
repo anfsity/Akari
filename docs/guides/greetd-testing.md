@@ -28,12 +28,20 @@ configuration and backend together.
 The user-side executor preserves arguments, supplies `LANG=C.UTF-8` only when
 LANG is absent or empty, and logs locale diagnostics without replacing explicit
 locale overrides. Desktop stdout/stderr and startup details go into private
-files under `${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/`. Shell startup
-failures before the executor runs still appear on greetd's session output.
+`session-*.log` files under
+`${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/`. Before entering the native
+login shell, Akari captures its stdout/stderr in a private `startup-*.log` in
+the same directory, resolved from the environment before native shell startup.
+If the shell changes `XDG_STATE_HOME`, the desktop log uses the updated location
+while the startup log stays in the original location. greetd's own profile
+loading and PAM output precede this launcher and are outside its redirection.
+Greeter launch and shutdown diagnostics go to each greeter's `lifecycle.log`.
 
 The ASCII handoff experiment prepares an AKARI wordmark before Sway exits and
 animates a light sweep while the user session starts on a text-mode Linux VT.
-It stops when graphics mode takes over, the session exits, or 15 seconds elapse.
+It stops when graphics mode takes over, the session exits, or 15 seconds elapse,
+then clears the VT buffer and scrollback so the last frame does not reappear
+when the desktop exits.
 PTYs and missing controlling terminals skip this behavior. Preview it with
 `python3 scripts/ascii-transition.py preview`; see the
 [handoff experiment](../proposals/login-handoff.md) for lifecycle and hardware

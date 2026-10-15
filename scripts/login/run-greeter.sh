@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -uo pipefail
+exec >> "$AKARI_LOG_DIR/lifecycle.log" 2>&1
 frontend_pid=''
 watcher_pid=''
 cleanup() {
@@ -9,7 +10,7 @@ cleanup() {
       wait "$child" >/dev/null 2>&1 || true
     fi
   done
-  "$AKARI_BACKEND_BIN" --prepare-transition >> "$AKARI_LOG_DIR/lifecycle.log" 2>&1 || true
+  "$AKARI_BACKEND_BIN" --prepare-transition || true
   swaymsg exit >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -33,5 +34,5 @@ frontend_pid=$!
 watcher_pid=$!
 wait "$frontend_pid"
 status=$?
-printf 'Frontend exited: %s\n' "$status" >> "$AKARI_LOG_DIR/lifecycle.log"
+printf 'Frontend exited: %s\n' "$status"
 exit "$status"

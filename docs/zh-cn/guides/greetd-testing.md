@@ -11,9 +11,9 @@ description: 构建和安装真实登录测试工具、捕获显示器信息、�
 
 桌面需要的环境变量应导出到登录配置，例如 zsh 的 `.zprofile`，或 fish 配置中 `status is-interactive` 条件之外的部分；`.zshrc` 不会加载。原生 shell 的启动文件可能再次读取 POSIX profile，因此 profile 中的操作应支持重复执行。安装时会保留已有配置；升级旧安装时，请移除 `/etc/akari/greetd.toml` 中的 `source_profile = false`，或改为 `true`。重新安装测试工具会同时更新配置和后端。
 
-用户侧执行器完整保留命令参数，仅在 LANG 缺失或为空时补入 `LANG=C.UTF-8`；它记录 locale 检查结果，保留用户明确设置的覆盖值。桌面的 stdout/stderr 和启动信息写入 `${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/` 下的私有日志。执行器运行前的 shell 初始化失败仍通过 greetd 的会话输出报告。
+用户侧执行器完整保留命令参数，仅在 LANG 缺失或为空时补入 `LANG=C.UTF-8`；它记录 locale 检查结果，保留用户明确设置的覆盖值。桌面的 stdout/stderr 和启动信息写入 `${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/` 下的私有 `session-*.log`。进入原生 login shell 前，Akari 会将 shell 的 stdout/stderr 写入同一目录下的私有 `startup-*.log`，目录按原生 shell 启动前的环境解析。如果 shell 修改了 `XDG_STATE_HOME`，桌面日志使用新目录，启动日志仍留在原目录。greetd 自己加载 profile 和执行 PAM 的输出早于这个启动器，不受此重定向控制。登录界面启动和退出时的诊断写入各自的 `lifecycle.log`。
 
-ASCII 交接实验会在 Sway 退出前准备 AKARI 字标，在用户会话启动、VT 仍处于文字模式时播放扫光动画。图形模式接管、会话退出或超过 15 秒后停止；普通伪终端或没有控制终端时跳过。可用 `python3 scripts/ascii-transition.py preview` 在普通终端预览。生命周期与实机验证项目见[交接实验](../../proposals/login-handoff.md)；仍需在真实 VT 上检查画面能否跨越 Sway/greetd 交接，并验证桌面启动失败、退出登录和 VT 切换。
+ASCII 交接实验会在 Sway 退出前准备 AKARI 字标，在用户会话启动、VT 仍处于文字模式时播放扫光动画。图形模式接管、会话退出或超过 15 秒后停止，并清理 VT 画面和回滚缓冲，避免桌面退出后重新显示最后一帧；普通伪终端或没有控制终端时跳过。可用 `python3 scripts/ascii-transition.py preview` 在普通终端预览。生命周期与实机验证项目见[交接实验](../../proposals/login-handoff.md)；仍需在真实 VT 上检查画面能否跨越 Sway/greetd 交接，并验证桌面启动失败、退出登录和 VT 切换。
 
 桌面与 systemd 服务的就绪时序由所选桌面或会话管理器负责。选择 UWSM 管理的会话时，环境同步和退出清理由 UWSM 处理。直接启动 compositor 时保留现有集成；新增 custom 回调无法约束上游已经启动的应用。验证时应分别检查 compositor 子进程、新启动的用户服务和新激活的 D-Bus 服务。greetd 交接成功不代表桌面已经就绪。
 

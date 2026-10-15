@@ -1,8 +1,8 @@
 //! User-side session handoff, separate from the greeter's bus and runtime.
 //!
-//! greetd forwards execution to the account's login shell. The fixed shell
-//! expression only expands one executable path; the desktop argv travels as
-//! JSON in the environment, avoiding interpreter-specific argument escaping.
+//! The user launcher redirects output before entering the account's login shell.
+//! The fixed shell expression only expands one executable path; desktop argv
+//! travels as JSON in the environment, avoiding interpreter-specific escaping.
 //! Existing desktop managers own readiness and activation-environment cleanup.
 
 use std::{
@@ -23,6 +23,7 @@ use crate::session_catalog::SessionEntry;
 use crate::terminal_transition::start_transition_animation;
 use serde::{Deserialize, Serialize};
 
+pub const START_SESSION: &str = "--start-session";
 pub const EXEC_DESKTOP: &str = "--exec-desktop";
 
 #[derive(Deserialize, Serialize)]
@@ -43,9 +44,7 @@ pub fn get_session_launch(session: &SessionEntry) -> io::Result<(Vec<String>, Ve
         command: session.exec.clone(),
     })
     .map_err(io::Error::other)?;
-    let command = ["/bin/sh", "-c",
-        ": \"${SHELL:?PAM did not supply SHELL}\"; exec \"$SHELL\" -l -c 'exec \"$AKARI_SESSION_EXECUTABLE\" --exec-desktop'"]
-        .map(str::to_owned).to_vec();
+    let command = vec![executable.clone(), START_SESSION.to_owned()];
     let mut environment = vec![
         "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
         format!("XDG_SESSION_TYPE={}", session.session_type.as_str()),
@@ -62,6 +61,31 @@ pub fn get_session_launch(session: &SessionEntry) -> io::Result<(Vec<String>, Ve
     Ok((command, environment))
 }
 
+pub fn start_session() -> io::Result<()> {
+    // Shell initialization can print diagnostics before the desktop executor
+    // exists. Capture them here so a compositor exit cannot reveal them on VT.
+    // Keep a separate startup log: native shell configuration may change the
+    // state directory before the executor creates the desktop session log.
+    let mut log = create_session_log("startup")?;
+    let shell = env::var_os("SHELL")
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "PAM did not supply SHELL"))?;
+    writeln!(log, "event=native_shell_start shell={shell:?}")?;
+    let error = Command::new(&shell)
+        .args([
+            "-l",
+            "-c",
+            "exec \"$AKARI_SESSION_EXECUTABLE\" --exec-desktop",
+        ])
+        .stdout(Stdio::from(log.try_clone()?))
+        .stderr(Stdio::from(log.try_clone()?))
+        .exec();
+    writeln!(
+        log,
+        "event=native_shell_exec_failed shell={shell:?} error={error:?}"
+    )?;
+    Err(error)
+}
+
 pub fn exec_desktop() -> io::Result<()> {
     let invocation = env::var("AKARI_SESSION_INVOCATION").map_err(io::Error::other)?;
     let invocation: SessionInvocation =
@@ -72,7 +96,7 @@ pub fn exec_desktop() -> io::Result<()> {
             "desktop command is empty",
         ));
     }
-    let mut log = create_session_log()?;
+    let mut log = create_session_log("session")?;
     let mut command = Command::new(&invocation.command[0]);
     command.args(&invocation.command[1..]);
 
@@ -133,7 +157,7 @@ pub fn exec_desktop() -> io::Result<()> {
     Err(error)
 }
 
-fn create_session_log() -> io::Result<File> {
+fn create_session_log(stage: &str) -> io::Result<File> {
     let state = match env::var_os("XDG_STATE_HOME").filter(|value| Path::new(value).is_absolute()) {
         Some(path) => PathBuf::from(path),
         None => PathBuf::from(env::var_os("HOME").ok_or_else(|| {
@@ -150,7 +174,7 @@ fn create_session_log() -> io::Result<File> {
         .duration_since(UNIX_EPOCH)
         .map_err(io::Error::other)?
         .as_nanos();
-    let path = directory.join(format!("session-{timestamp}-{}.log", std::process::id()));
+    let path = directory.join(format!("{stage}-{timestamp}-{}.log", std::process::id()));
     OpenOptions::new()
         .write(true)
         .create_new(true)

@@ -67,9 +67,13 @@ elif name == 'runuser':
     sys.exit(1 if os.environ.get('DENY_GREETER_LOG_ACCESS') else 0)
 elif name == 'journalctl': print('test journal')
 elif name == 'sway': print('test compositor output')
+elif name == 'chmod':
+    print('launcher stdout', flush=True)
+    print('launcher stderr', file=sys.stderr, flush=True)
+    os.execv('/usr/bin/chmod', ['/usr/bin/chmod', *args])
 ''')
         handler.chmod(0o755)
-        for name in ["systemctl", "systemd-run", "loginctl", "tty", "readlink", "install", "runuser", "journalctl", "sway"]:
+        for name in ["systemctl", "systemd-run", "loginctl", "tty", "readlink", "install", "runuser", "journalctl", "sway", "chmod"]:
             (self.bin / name).symlink_to(handler)
         for name in ["start.sh", "restore.sh", "launch.sh"]:
             script = (SOURCE / name).read_text()
@@ -189,12 +193,17 @@ elif name == 'sway': print('test compositor output')
         for _ in range(2):
             result = self.run_script('launch.sh')
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, '')
+            self.assertEqual(result.stderr, '')
         sessions = list((self.logs / 'current/greeter').iterdir())
         self.assertEqual(len(sessions), 2)
         for session in sessions:
             self.assertEqual(session.stat().st_mode & 0o7777, 0o755)
             self.assertEqual((session / 'backend.log').read_text(), 'backend')
             self.assertEqual((session / 'sway.log').read_text(), 'test compositor output\n')
+            lifecycle = (session / 'lifecycle.log').read_text()
+            self.assertIn('launcher stdout', lifecycle)
+            self.assertIn('launcher stderr', lifecycle)
             for log in [session / 'backend.log', session / 'sway.log']:
                 self.assertEqual(log.stat().st_mode & 0o777, 0o644)
 
