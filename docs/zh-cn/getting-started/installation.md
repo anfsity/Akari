@@ -13,7 +13,7 @@ Akari 目前只支持在 Linux 上构建和运行。开始前，请先安装这�
 - Clang、CMake、Ninja、pkg-config，以及 Flutter Linux 所需的 GTK 3 开发文件。
 - D-Bus 工具，包括后端会话所需的 `dbus-run-session` 和 `busctl`。
 
-如果要在嵌套或无头合成器中测试，还需要 Sway、`swaymsg`、Python 3 和 grim。测试原生键盘输入时需要 wtype。真实登录测试需要 greetd；具体环境要求见[独立 greetd 测试](../guides/greetd-testing.md)。
+如果要在嵌套或无头合成器中测试，还需要 Sway、`swaymsg`、`swaybg`、Python 3 和 grim。测试原生键盘输入时需要 wtype。真实登录测试需要 greetd；具体环境要求见[独立 greetd 测试](../guides/greetd-testing.md)。
 
 ## 获取项目
 

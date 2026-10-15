@@ -275,7 +275,7 @@ if name == 'dart':
     sys.exit(1 if os.environ.get('FAIL_BUILD') else 0)
 ''')
         handler.chmod(0o755)
-        for name in ["systemctl", "runuser", "dart", "hyprctl"]:
+        for name in ["systemctl", "runuser", "dart", "hyprctl", "swaybg"]:
             (self.bin / name).symlink_to(handler)
         self.environment = {
             **os.environ,

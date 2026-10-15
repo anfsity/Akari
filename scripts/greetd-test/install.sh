@@ -16,6 +16,7 @@ for unit in akari-test.service akari-restore.timer; do
     exit 1
   fi
 done
+command -v swaybg >/dev/null 2>&1 || { echo 'Missing required command: swaybg' >&2; exit 1; }
 build_user="${SUDO_USER:-$(stat -c '%U' "$repo_root")}"
 printf 'Building theme %s and production backend as %s...\n' "$theme_path" "$build_user"
 # Build as the caller so SDK and repository caches retain their user ownership.

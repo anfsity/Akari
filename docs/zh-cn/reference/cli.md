@@ -56,7 +56,7 @@ fvm dart run tool/akari.dart perf -t themes/default -- --cycles 5
 
 ## 安装正式登录环境
 
-`install` 现在用于部署正式登录环境。原来的启动器安装改为 `install cli`；`install --shell` 不再接受。请在使用 systemd 的 Linux 主机上，以普通用户运行安装命令。运行环境需要 `/usr/bin/greetd`、`/usr/bin/sway`、Python 3、`swaymsg`、`dbus-run-session` 和 `busctl`。通过发行版安装 greetd 的 `/etc/pam.d/greetd`；Akari 保留原有认证策略，并添加下述可选的密钥环集成。
+`install` 现在用于部署正式登录环境。原来的启动器安装改为 `install cli`；`install --shell` 不再接受。请在使用 systemd 的 Linux 主机上，以普通用户运行安装命令。运行环境需要 `/usr/bin/greetd`、`/usr/bin/sway`、Python 3、`swaymsg`、`swaybg`、`dbus-run-session` 和 `busctl`。通过发行版安装 greetd 的 `/etc/pam.d/greetd`；Akari 保留原有认证策略，并添加下述可选的密钥环集成。
 
 ```sh
 akari install --theme themes/default --jobs 4

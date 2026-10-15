@@ -19,7 +19,6 @@ export XDG_CURRENT_DESKTOP=Sway
 export XDG_SESSION_DESKTOP=sway
 export XDG_SESSION_TYPE=wayland
 unset DISPLAY WAYLAND_DISPLAY WAYLAND_SOCKET SWAYSOCK WLR_BACKENDS WLR_WAYLAND_DISPLAY
-source "$AKARI_RELEASE/scripts/splash.sh"
-akari_show_splash || true
 exec "$AKARI_RELEASE/scripts/debug-dbus.sh" \
+  /bin/bash "$AKARI_RELEASE/scripts/splash.sh" \
   /usr/bin/sway --config /etc/akari/sway.conf > "$AKARI_LOG_DIR/sway.log" 2>&1

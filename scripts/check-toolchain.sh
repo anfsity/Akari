@@ -112,6 +112,7 @@ check_sdk flutter "${flutter_command[@]}"
 check_sdk dart "${dart_command[@]}"
 
 check_command sway
+check_command swaybg
 check_command greetd
 
 if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
