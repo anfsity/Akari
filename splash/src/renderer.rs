@@ -31,7 +31,7 @@ impl Renderer {
     pub fn create_scene(&self, width: u32, height: u32, dark: bool) -> Result<Scene> {
         let mut background = Pixmap::new(width, height).ok_or("invalid output dimensions")?;
         let (base, foreground, muted) = if dark {
-            ([34, 30, 40], [224, 207, 220], [159, 141, 159])
+            ([21, 25, 31], [224, 207, 220], [159, 141, 159])
         } else {
             ([250, 247, 242], [99, 81, 101], [160, 139, 153])
         };

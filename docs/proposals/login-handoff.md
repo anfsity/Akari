@@ -25,7 +25,8 @@ font. Both its desktop window and KMS outputs use one CPU renderer. Images and
 fonts load once; scaled portraits and glyph layers are cached per output size.
 Only the slight float and status dots change each frame.
 
-The minimum display time defaults to 1.2 seconds, starting at the first successful
+The background defaults to dark (`#15191f`), matching the login compositor.
+The minimum display time defaults to 3 seconds, starting at the first successful
 presentation. Zero removes the artificial hold. `--splash-duration` controls the
 window preview; `AKARI_SPLASH_DURATION` can be set in the VT launcher's environment
 and is forwarded through greetd to the user launcher. This time is not a desktop
