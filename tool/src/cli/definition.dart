@@ -78,7 +78,7 @@ const cliOptions = {
   ),
   '--splash-duration': CliOption(
     '--splash-duration',
-    'Minimum native splash display time in seconds (default: 1.2; 0 skips the hold).',
+    'Minimum native splash display time in seconds (default: 3; 0 skips the hold).',
     valueName: 'SECONDS',
   ),
   '--keyring': CliOption(

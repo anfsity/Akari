@@ -32,9 +32,9 @@ fn run() -> Result {
     let arguments: Vec<_> = env::args().skip(1).collect();
     if arguments.iter().any(|argument| argument == "--help") {
         println!(
-            "Usage: akari-splash window|kms [--duration SECONDS] [--dark] [--snapshot PNG]\n\
+            "Usage: akari-splash window|kms [--duration SECONDS] [--dark|--light] [--snapshot PNG]\n\
                   akari-splash clear\n\
-                  Minimum display time defaults to 1.2 seconds; 0 skips the hold.\n\
+                  Defaults: dark background, 3 seconds minimum; 0 skips the hold.\n\
                   AKARI_SPLASH_DURATION also sets the minimum display time."
         );
         return Ok(());
@@ -84,13 +84,14 @@ impl Options {
                 snapshot: None,
             });
         }
-        let mut duration = environment_duration.unwrap_or_else(|| "1.2".to_owned());
-        let mut dark = false;
+        let mut duration = environment_duration.unwrap_or_else(|| "3".to_owned());
+        let mut dark = true;
         let mut snapshot = None;
         while let Some(argument) = arguments.next() {
             match argument.as_str() {
                 "--duration" => duration = arguments.next().ok_or("missing duration")?,
                 "--dark" => dark = true,
+                "--light" => dark = false,
                 "--snapshot" => snapshot = Some(arguments.next().ok_or("missing PNG path")?.into()),
                 _ => return Err(format!("unknown option: {argument}").into()),
             }
@@ -134,7 +135,7 @@ mod tests {
         }
         assert_eq!(
             Options::parse(vec!["kms".into()], None).unwrap().duration,
-            Duration::from_millis(1200)
+            Duration::from_secs(3)
         );
         assert_eq!(
             Options::parse(vec!["kms".into()], Some("3".into()))
@@ -142,5 +143,17 @@ mod tests {
                 .duration,
             Duration::from_secs(3)
         );
+    }
+
+    #[test]
+    fn defaults_to_dark_with_an_explicit_light_override() {
+        for target in ["window", "kms"] {
+            assert!(Options::parse(vec![target.into()], None).unwrap().dark);
+            assert!(
+                !Options::parse(vec![target.into(), "--light".into()], None)
+                    .unwrap()
+                    .dark
+            );
+        }
     }
 }

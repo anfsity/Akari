@@ -6,11 +6,13 @@ DRM/KMS outputs. No browser, Flutter engine or authentication service runs here.
 
 ```sh
 cargo build --locked --manifest-path splash/Cargo.toml
-splash/target/debug/akari-splash window --duration 3
-splash/target/debug/akari-splash window --dark --snapshot /tmp/akari-splash.png
+splash/target/debug/akari-splash window
+splash/target/debug/akari-splash window --snapshot /tmp/akari-splash.png
 ```
 
-The default minimum display time is 1.2 seconds after the first successful
+The default background is dark, matching the login compositor's `#15191f`.
+Use `--light` to preview the light variant; `--dark` remains accepted.
+The default minimum display time is 3 seconds after the first successful
 presentation. `--duration` overrides `AKARI_SPLASH_DURATION`; zero skips the
 artificial hold while still presenting one frame. Closing the window or pressing
 Escape ends the preview early. SIGINT, SIGTERM, SIGHUP and launcher death stop it.
