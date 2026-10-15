@@ -32,6 +32,8 @@
 # Backend
 !/backend/
 !/backend/**
+!/splash/
+!/splash/**
 **/target/
 
 # Project-owned configuration, documentation, and tools.
