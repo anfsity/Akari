@@ -49,7 +49,9 @@ wordmark on small consoles. It clears once, then updates the wordmark in place.
 The animator detaches, allowing the executor to keep desktop process identity,
 signals, and exit status. A pidfd follows that session across exec without PID
 reuse ambiguity. Animation stops on graphics takeover, session exit, a stop
-signal, or a 15-second limit, and restores the cursor. Renderer errors are logged
+signal, or a 15-second limit. It clears the VT text buffer and scrollback before
+restoring the cursor, including when graphics mode has already taken over, to
+prevent desktop exit from revealing the last animation frame. Renderer errors are logged
 and do not prevent desktop startup. Animation requires Python's Linux pidfd
 support; a failure leaves the prepared static frame and is recorded in the log.
 

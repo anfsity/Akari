@@ -98,38 +98,46 @@ os.execv(sys.executable, [sys.executable, sys.argv[2], 'prepare'])
             transition.run_animation(terminal, owner_fd)
             self.assertEqual(terminal.getvalue(), b'')
 
-    def test_detached_animation_restores_cursor_when_the_session_exits(self):
-        with tempfile.TemporaryDirectory(prefix='akari-ascii-test-') as temporary:
-            output = Path(temporary) / 'console'
-            owner = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])
-            self.addCleanup(owner.wait)
-            self.addCleanup(owner.kill)
-            script = '''import importlib.util, sys
+    def test_detached_animation_erases_its_frame_on_graphics_takeover_or_session_exit(self):
+        for stop in ['graphics', 'session']:
+            with self.subTest(stop=stop), \
+                    tempfile.TemporaryDirectory(prefix='akari-ascii-test-') as temporary:
+                output = Path(temporary) / 'console'
+                graphics = Path(temporary) / 'graphics'
+                owner = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])
+                self.addCleanup(owner.wait)
+                self.addCleanup(owner.kill)
+                script = '''import importlib.util, pathlib, sys
 spec = importlib.util.spec_from_file_location('transition', sys.argv[1])
 transition = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(transition)
 transition.open_console = lambda: open(sys.argv[2], 'w+b', buffering=0)
-transition.get_console_mode = lambda terminal: transition.KD_TEXT
+transition.get_console_mode = lambda terminal: int(pathlib.Path(sys.argv[4]).exists())
 transition.get_terminal_size = lambda terminal: (24, 80)
 transition.animate_transition(int(sys.argv[3]))
 '''
-            # The detached worker keeps its diagnostic stream open until it
-            # stops. Use a file, matching the executor's real redirection.
-            with (Path(temporary) / 'animator.log').open('w+b') as log:
-                result = subprocess.run([sys.executable, '-c', script, str(SOURCE), str(output),
-                                         str(owner.pid)], stdout=log, stderr=log, timeout=5)
-                log.seek(0)
-                self.assertEqual(result.returncode, 0, log.read())
-            deadline = time.monotonic() + 2
-            while not output.read_bytes() and time.monotonic() < deadline:
-                time.sleep(0.01)
-            self.assertIn(b'Loading', output.read_bytes())
-            owner.terminate()
-            owner.wait(timeout=5)
-            while not output.read_bytes().endswith(transition.RESTORE.encode()) \
-                    and time.monotonic() < deadline:
-                time.sleep(0.01)
-            self.assertTrue(output.read_bytes().endswith(transition.RESTORE.encode()))
+                # The detached worker keeps its diagnostic stream open until it
+                # stops. Use a file, matching the executor's real redirection.
+                with (Path(temporary) / 'animator.log').open('w+b') as log:
+                    result = subprocess.run([sys.executable, '-c', script, str(SOURCE), str(output),
+                                             str(owner.pid), str(graphics)], stdout=log, stderr=log, timeout=5)
+                    log.seek(0)
+                    self.assertEqual(result.returncode, 0, log.read())
+                deadline = time.monotonic() + 2
+                while not output.read_bytes() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertIn(b'Loading', output.read_bytes())
+                if stop == 'graphics':
+                    graphics.touch()
+                else:
+                    owner.terminate()
+                    owner.wait(timeout=5)
+                cleared = (transition.CLEAR + transition.RESTORE).encode()
+                while not output.read_bytes().endswith(cleared) \
+                        and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(output.read_bytes().endswith(cleared))
+                self.assertNotIn(b'Loading', output.read_bytes().rsplit(b'\x1b[2J', 1)[1])
 
 
 if __name__ == '__main__':
