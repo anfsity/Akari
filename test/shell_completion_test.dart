@@ -224,7 +224,12 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(result.exitCode, 0, reason: result.stderr);
     final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
     expect(plan['command'], 'build');
-    expect((plan['steps'] as List)[1]['working_directory'], project.path);
+    expect(
+      (plan['steps'] as List).singleWhere(
+        (step) => step['id'] == 'theme.pub_get',
+      )['working_directory'],
+      project.path,
+    );
     final studio = await Process.run(
       '${prefix.path}/bin/akari',
       ['run', 'studio', '-t', 'relative theme', '--dry-run'],
