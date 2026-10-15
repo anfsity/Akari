@@ -39,13 +39,18 @@ Greeter launch and shutdown diagnostics go to each greeter's `lifecycle.log`.
 
 The native splash runs before Sway and before the user desktop, using libseat and
 DRM/KMS on real VTs. Each launcher waits for renderer exit before allowing the
-next compositor to acquire the display. Failure remains optional. The default
-minimum hold is 1.2 seconds from first presentation; `AKARI_SPLASH_DURATION` in
-the greeter launcher environment adjusts both transitions. Console text and
+next compositor to acquire the display. Failure remains optional. The background
+defaults to dark, with a minimum hold of 3 seconds from first presentation;
+`AKARI_SPLASH_DURATION` in the greeter launcher environment adjusts both transitions. Console text and
 scrollback are cleared before release. Preview the shared renderer with
 `akari preview --splash-duration 3`; see the
-[handoff implementation](../proposals/login-handoff.md) for lifetime and hardware
+[handoff implementation](https://github.com/anfsity/Akari/blob/main/docs/proposals/login-handoff.md) for lifetime and hardware
 checks. Actual blank intervals, VT switching, failure and logout need real VT tests.
+
+The supplied Sway configuration uses a splash snapshot as its background while
+Flutter loads and requires `swaybg`. Existing production installations preserve
+their configuration; update the background line in `/etc/akari/sway.conf` to
+`output * bg "$AKARI_LOG_DIR/splash.png" fit #15191f` to enable this hold.
 
 Desktop and systemd service readiness belongs to the selected desktop/session
 manager. UWSM-managed selections retain UWSM's environment and cleanup behavior.
