@@ -26,7 +26,13 @@ Future<int> runLoginCommand(
   }
   final controller = File('${root.path}/manage.py');
   final script =
-      const {'install', 'clean', 'configure-keyring'}.contains(operation) ||
+      const {
+            'install',
+            'clean',
+            'configure-keyring',
+            'enable-gaze',
+            'disable-gaze',
+          }.contains(operation) ||
           (query && !controller.existsSync())
       ? File('${repoRoot.path}/scripts/login/manage.py')
       : controller;

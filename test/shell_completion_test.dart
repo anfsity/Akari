@@ -54,6 +54,8 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       'disable',
       'rollback',
       'configure-keyring',
+      'enable-gaze',
+      'disable-gaze',
       'status',
       'logs',
     ]);
@@ -204,6 +206,8 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       buffers[16].trimRight(),
       'akari login configure-keyring --keyring gnome',
     );
+    expect(buffers[17].trimRight(), 'akari login enable-gaze');
+    expect(buffers[18].trimRight(), 'akari login disable-gaze');
   });
 
   test('installation preserves startup content and works outside the repository', () async {

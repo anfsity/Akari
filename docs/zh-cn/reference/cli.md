@@ -27,6 +27,7 @@ description: 查命令、选项、显示配置和运行报告。
 | `login enable` / `login disable` | 选择 Akari 或恢复原来的开机登录服务 | `--dry-run` |
 | `login rollback` | 选择上一个已安装版本 | `--dry-run` |
 | `login configure-keyring` | 无需重新构建即可配置 greetd 密钥环 PAM | `--keyring`、`--dry-run` |
+| `login enable-gaze` / `login disable-gaze` | 为标准 Arch greetd 启用 Gaze，或恢复密码认证 | `--dry-run` |
 | `login status` | 查看安装和服务状态 | `--format` |
 | `login logs` | 查看服务 journal 或最新登录界面日志 | `--component`、`--lines`、`--follow` |
 | `completion` | 输出命令补全脚本 | `--shell` |
@@ -79,6 +80,8 @@ akari login configure-keyring --keyring gnome
 
 该命令使用仓库中的最新控制器，需要时自动请求 sudo，因此无需重新部署即可更新旧安装。提供方选择与 PAM 备份行为和安装命令相同。
 
+人脸认证通过 `akari login enable-gaze` 单独启用，通过 `akari login disable-gaze` 移除。这两个命令使用仓库中的最新控制器、自动请求 sudo，并保留 account、session 与密钥环钩子。自动接入仅接受标准 Arch auth 规则，遇到自定义认证要求时会拒绝修改。辅助规则、备份、密码回退与恢复方式见 [Gaze 接入](../guides/greetd-testing.md#在-arch-上接入-greetd)。应先部署当前后端，避免识别等待被旧版十秒传输超时截断。
+
 安装会创建独立的 `akari-greeter` 系统账户，将各版本放到 `/opt/akari/releases/`，用 `current` 符号链接选择运行版本。`akari.service` 使用 `/etc/akari/greetd.toml` 启动 greetd，登录界面使用 `/etc/akari/sway.conf` 在 Sway 内运行。原有 `/etc/greetd/config.toml` 和 `/opt/akari-test` 测试资源不变。登录偏好保存在 `/var/lib/akari/greeter/`。
 
 安装不会切换开机登录服务。`login enable` 要求现有默认 target 为 `graphical.target`，先保存原显示管理器的符号链接和启用状态，再启用 `akari.service` 替代它。它不启动、停止或重启任何服务；准备好后重启系统使用 Akari。`login disable` 恢复已记录的开机登录服务，同样不会中断当前桌面。切换失败时会立即尝试恢复；若恢复也失败，保留快照，可再次运行 `login disable`。
@@ -106,7 +109,7 @@ akari clean --dry-run
 akari clean
 ```
 
-`install`、`uninstall`、`clean`、`login enable`、`login disable`、`login rollback` 和 `login configure-keyring` 接受 `--dry-run`，只输出 JSON 计划，不构建、不请求 sudo，也不修改文件。状态和日志操作只读。CLI 启动器仍依赖仓库和 SDK，已安装的登录服务独立运行。在 TTY 中恢复时，也可以直接调用已安装的控制器：
+`install`、`uninstall`、`clean`、`login enable`、`login disable`、`login rollback`、`login configure-keyring`、`login enable-gaze` 和 `login disable-gaze` 接受 `--dry-run`，只输出 JSON 计划，不构建、不请求 sudo，也不修改文件。状态和日志操作只读。CLI 启动器仍依赖仓库和 SDK，已安装的登录服务独立运行。在 TTY 中恢复时，也可以直接调用已安装的控制器：
 
 ```sh
 sudo python3 /opt/akari/manage.py disable

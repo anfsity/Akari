@@ -38,15 +38,48 @@ KEYRINGS = {
 PAM_MODULE_ROOTS = [Path(path) for path in ['/usr/lib', '/usr/lib64', '/lib', '/lib64']]
 KEYRING_START = '\n# BEGIN Akari keyring\n'
 KEYRING_END = '# END Akari keyring\n'
+GAZE_SERVICE = 'akari-gaze'
+GAZE_PAM = '''#%PAM-1.0
+# Managed by Akari: face authentication with the distribution password fallback.
+auth       requisite                    pam_shells.so
+auth       requisite                    pam_faillock.so preauth
+auth       [success=ignore default=3]    pam_gaze.so
+auth       requisite                    pam_env.so
+auth       requisite                    pam_faillock.so authsucc
+auth       sufficient                   pam_permit.so
+auth       include                      system-local-login
+'''
+ARCH_AUTH_RULES = {
+    'system-local-login': ['auth include system-login'],
+    'system-login': [
+        'auth required pam_shells.so',
+        'auth requisite pam_nologin.so',
+        'auth include system-auth',
+    ],
+    'system-auth': [
+        'auth required pam_faillock.so preauth',
+        '-auth [success=2 default=ignore] pam_systemd_home.so',
+        'auth [success=1 default=bad] pam_unix.so try_first_pass nullok',
+        'auth [default=die] pam_faillock.so authfail',
+        'auth optional pam_permit.so',
+        'auth required pam_env.so',
+        'auth required pam_faillock.so authsucc',
+    ],
+}
 
 
-def get_installed_keyrings():
+def find_pam_module(module):
     directories = []
     for root in PAM_MODULE_ROOTS:
         directories.append(root / 'security')
         directories.extend(root.glob('*-linux-gnu/security'))
+    return next((directory / module for directory in directories
+                 if (directory / module).is_file()), None)
+
+
+def get_installed_keyrings():
     return [name for name, (_, module, _, _) in KEYRINGS.items()
-            if any((directory / module).is_file() for directory in directories)]
+            if find_pam_module(module) is not None]
 
 
 def get_keyring_install_command(provider):
@@ -152,26 +185,101 @@ def get_keyring_pam_configuration(configuration, providers):
     return configuration + KEYRING_START + ''.join(lines) + KEYRING_END
 
 
-def update_pam(configuration):
+def update_pam(configuration, backup_name='greetd.pam.before-keyring'):
     if configuration == PAM.read_text():
         return
     STATE.mkdir(parents=True, exist_ok=True)
-    backup = STATE / 'greetd.pam.before-keyring'
+    backup = STATE / backup_name
     if not backup.exists():
         shutil.copy2(PAM, backup)
-    # Resolve a distribution-managed symlink and retain mode, owner and xattrs.
-    target = PAM.resolve(strict=True)
+    write_pam_file(PAM, configuration)
+
+
+def write_pam_file(path, configuration):
+    # Resolve distribution-managed symlinks and retain existing metadata. A new
+    # helper is published before greetd refers to it, with normal PAM permissions.
+    target = path.resolve()
     descriptor, name = tempfile.mkstemp(prefix='.greetd-', dir=target.parent)
     os.close(descriptor)
     temporary = Path(name)
     try:
-        shutil.copy2(target, temporary)
+        if target.exists():
+            shutil.copy2(target, temporary)
+            owner = target.stat()
+            os.chown(temporary, owner.st_uid, owner.st_gid)
+        else:
+            temporary.chmod(0o644)
         temporary.write_text(configuration)
-        owner = target.stat()
-        os.chown(temporary, owner.st_uid, owner.st_gid)
         temporary.replace(target)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def get_auth_rules(configuration):
+    rules = []
+    for line in configuration.splitlines():
+        line = line.split('#', 1)[0].strip()
+        if re.match(r'-?auth\b|@include\b', line, re.IGNORECASE):
+            rules.append(' '.join(line.split()))
+    return rules
+
+
+def validate_gaze_pam(configuration):
+    # A face match bypasses the password include. Accept only the known Arch
+    # auth policy so custom MFA or other requirements cannot be bypassed with it.
+    for service, expected in ARCH_AUTH_RULES.items():
+        path = PAM.with_name(service)
+        if not path.is_file() or get_auth_rules(path.read_text()) != expected:
+            raise ValueError(f'Unsupported auth policy in {path}; configure Gaze manually without bypassing custom authentication rules.')
+    rules = get_auth_rules(configuration)
+    if (rules[:2] != ['auth required pam_securetty.so', 'auth requisite pam_nologin.so']
+            or len(rules) < 3
+            or rules[2] not in ['auth include system-local-login', f'auth substack {GAZE_SERVICE}']
+            or any(not re.fullmatch(r'-?auth optional .+', line) for line in rules[3:])):
+        raise ValueError(f'Unsupported auth policy in {PAM}; expected the stock Arch greetd stack with optional auth hooks after it.')
+    if find_pam_module('pam_gaze.so') is None:
+        raise ValueError('pam_gaze.so is missing; install and verify Gaze before enabling it for greetd.')
+    helper = PAM.with_name(GAZE_SERVICE)
+    if helper.is_symlink() or (helper.exists() and helper.read_text() != GAZE_PAM):
+        raise ValueError(f'{helper} contains a custom policy; refusing to replace it.')
+    if 'pam_gaze.so' in get_pam_modules('\n'.join(rules[3:]), 'auth', {PAM}):
+        raise ValueError('Gaze is already configured in the auth stack; refusing to add another invocation.')
+
+
+def get_gaze_pam_configuration(configuration, *, enabled):
+    source_control, source_service = ('include', 'system-local-login') if enabled else ('substack', GAZE_SERVICE)
+    target_control, target_service = ('substack', GAZE_SERVICE) if enabled else ('include', 'system-local-login')
+    return re.sub(
+        rf'(?m)^([ \t]*auth[ \t]+){source_control}([ \t]+){source_service}(?=[ \t]*(?:#|$))',
+        rf'\g<1>{target_control}\g<2>{target_service}', configuration)
+
+
+def enable_gaze():
+    configuration = PAM.read_text()
+    validate_gaze_pam(configuration)
+    helper = PAM.with_name(GAZE_SERVICE)
+    created = not helper.exists()
+    if created:
+        write_pam_file(helper, GAZE_PAM)
+    try:
+        update_pam(get_gaze_pam_configuration(configuration, enabled=True), 'greetd.pam.before-gaze')
+    except Exception:
+        if created:
+            helper.unlink()
+        raise
+    print('Gaze enabled for greetd with password fallback. Existing login sessions keep running.')
+
+
+def remove_gaze_helper():
+    helper = PAM.with_name(GAZE_SERVICE)
+    if not helper.is_symlink() and helper.exists() and helper.read_text() == GAZE_PAM:
+        helper.unlink()
+
+
+def disable_gaze():
+    update_pam(get_gaze_pam_configuration(PAM.read_text(), enabled=False), 'greetd.pam.before-gaze')
+    remove_gaze_helper()
+    print('Gaze disabled for greetd. Other PAM rules and backups were retained.')
 
 
 def run_systemctl(*arguments):
@@ -429,10 +537,11 @@ def remove_registered_paths(paths):
 
 
 def remove_login_files():
-    configuration = get_pam_without_keyring(PAM.read_text()) if PAM.exists() else None
+    configuration = get_pam_without_keyring(get_gaze_pam_configuration(PAM.read_text(), enabled=False)) if PAM.exists() else None
     restore_login_selection()
     if configuration is not None:
         update_pam(configuration)
+    remove_gaze_helper()
     UNIT.unlink(missing_ok=True)
     run_systemctl('daemon-reload')
     remove_registered_paths([CONFIGURATION, INSTALLATION])
@@ -493,7 +602,7 @@ def parse_arguments():
     install.add_argument('--keyring', choices=keyring_options, default='auto')
     keyring = commands.add_parser('configure-keyring', help='Configure greetd keyring PAM without rebuilding Akari.')
     keyring.add_argument('--keyring', choices=keyring_options, default='auto')
-    for name in ['enable', 'disable', 'rollback', 'uninstall', 'clean']:
+    for name in ['enable', 'disable', 'rollback', 'uninstall', 'clean', 'enable-gaze', 'disable-gaze']:
         commands.add_parser(name)
     status = commands.add_parser('status')
     status.add_argument('--format', choices=['text', 'json'], default='text')
@@ -532,6 +641,10 @@ def main():
                 providers = select_keyrings(arguments.keyring)
                 update_pam(get_keyring_pam_configuration(PAM.read_text(), providers))
                 print(f'Configured greetd keyring PAM: {", ".join(providers) or "none"}')
+            case 'enable-gaze':
+                enable_gaze()
+            case 'disable-gaze':
+                disable_gaze()
             case 'enable':
                 enable_login()
             case 'disable':

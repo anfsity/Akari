@@ -294,6 +294,16 @@ const cliCommands = [
     options: ['--keyring', '--dry-run'],
   ),
   CliCommand(
+    'login enable-gaze',
+    'Enable Gaze for the stock Arch greetd PAM stack with password fallback.',
+    options: ['--dry-run'],
+  ),
+  CliCommand(
+    'login disable-gaze',
+    'Restore greetd password authentication and remove the managed Gaze helper.',
+    options: ['--dry-run'],
+  ),
+  CliCommand(
     'login status',
     'Show the installed release, boot login service and runtime state.',
     options: ['--format'],

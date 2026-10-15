@@ -96,6 +96,7 @@ Future<void> main(List<String> arguments) async {
 
   for (final workflow in [
     'login_workflow_test.py',
+    'gaze_pam_test.py',
     'splash_workflow_test.py',
   ]) {
     test('$workflow isolates systemd and runtime boundaries', () async {
@@ -189,6 +190,8 @@ Future<void> main(List<String> arguments) async {
       'disable',
       'rollback',
       'configure-keyring',
+      'enable-gaze',
+      'disable-gaze',
       'uninstall',
       'clean',
     ]) {
@@ -256,6 +259,24 @@ Future<void> main(List<String> arguments) async {
       expect(File('${temporary.path}/build.json').existsSync(), isFalse);
     },
   );
+
+  test('Gaze commands use the current controller without rebuilding', () async {
+    await File('${installation.path}/manage.py').delete();
+    for (final operation in ['enable-gaze', 'disable-gaze']) {
+      final result = await runFixture([operation]);
+      expect(result.exitCode, 17, reason: '${result.stderr}');
+      expect(
+        jsonDecode(await File('${temporary.path}/sudo.json').readAsString()),
+        [
+          '--',
+          'python3',
+          '${Directory.current.path}/scripts/login/manage.py',
+          operation,
+        ],
+      );
+    }
+    expect(File('${temporary.path}/build.json').existsSync(), isFalse);
+  });
 
   test(
     'lifecycle uses installed controller and root does not request sudo',
@@ -332,6 +353,8 @@ Future<void> main(List<String> arguments) async {
       ['install', '--keyring', 'other'],
       ['configure-keyring', '--keyring', 'other'],
       ['configure-keyring', '--theme', 'themes/default'],
+      ['enable-gaze', '--keyring', 'gnome'],
+      ['disable-gaze', '--theme', 'themes/default'],
       ['enable', '--keyring', 'gnome'],
       ['enable', '--theme', 'themes/default'],
       ['clean', '--theme', 'themes/default'],
@@ -360,6 +383,8 @@ Future<void> main(List<String> arguments) async {
         ['login', 'disable'],
         ['login', 'rollback'],
         ['login', 'configure-keyring'],
+        ['login', 'enable-gaze'],
+        ['login', 'disable-gaze'],
         ['login', 'status'],
         ['login', 'logs'],
       ]) {
@@ -379,6 +404,8 @@ Future<void> main(List<String> arguments) async {
         ['clean'],
         ['login', 'enable'],
         ['login', 'configure-keyring'],
+        ['login', 'enable-gaze'],
+        ['login', 'disable-gaze'],
       ]) {
         final result = await Process.run(dart.first, [
           ...dart.skip(1),

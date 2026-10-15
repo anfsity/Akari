@@ -26,6 +26,7 @@ From the repository root, use `fvm dart run tool/akari.dart COMMAND`. After
 | `login enable` / `login disable` | Select Akari or restore the previous boot login service | `--dry-run` |
 | `login rollback` | Select the previous installed release | `--dry-run` |
 | `login configure-keyring` | Configure greetd keyring PAM without rebuilding | `--keyring`, `--dry-run` |
+| `login enable-gaze` / `login disable-gaze` | Enable Gaze on stock Arch greetd or restore password authentication | `--dry-run` |
 | `login status` | Inspect deployment and service state | `--format` |
 | `login logs` | Read the service journal or latest greeter logs | `--component`, `--lines`, `--follow` |
 | `completion` | Print a completion script | `--shell` |
@@ -124,6 +125,14 @@ This command uses the repository's current controller and requests sudo when
 needed, so it can update an older installation without redeploying it. It shares
 the installation command's provider selection and PAM backup behavior.
 
+Face authentication is enabled separately with `akari login enable-gaze` and
+removed with `akari login disable-gaze`. These commands use the current repository
+controller, request sudo, and preserve account, session and keyring hooks. The
+automatic setup accepts only the stock Arch auth policy and refuses custom
+authentication requirements. See [Gaze setup](../guides/greetd-testing.md#connect-greetd-on-arch)
+for the helper, backup, password fallback and recovery behavior. Deploy the current
+backend first so recognition can outlast the old ten-second transport deadline.
+
 The installation uses a separate `akari-greeter` system account, release directories
 beneath `/opt/akari/releases/`, and a `current` symlink. The service runs greetd
 with `/etc/akari/greetd.toml`; the greeter runs in Sway with
@@ -190,9 +199,9 @@ akari clean
 ```
 
 `install`, `uninstall`, `clean`, `login enable`, `login disable`, `login rollback`,
-and `login configure-keyring` accept `--dry-run`, which prints a JSON plan without
-building, requesting sudo,
-or changing files. Status and logs are read-only. The CLI launcher still needs
+`login configure-keyring`, `login enable-gaze`, and `login disable-gaze` accept
+`--dry-run`, which prints a JSON plan without building, requesting sudo, or
+changing files. Status and logs are read-only. The CLI launcher still needs
 this repository and its SDK; the installed login service does not. Recovery
 from a TTY can use the installed controller directly:
 

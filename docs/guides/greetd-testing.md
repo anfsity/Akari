@@ -123,29 +123,21 @@ policy.
 
 ### Connect greetd on Arch
 
-For the stock Arch stack where `/etc/pam.d/greetd` includes
-`system-local-login`, create `/etc/pam.d/akari-gaze` with:
+After installing the current backend, enable Gaze for the stock Arch greetd stack:
 
-```text
-#%PAM-1.0
-auth       requisite                    pam_shells.so
-auth       requisite                    pam_faillock.so preauth
-auth       [success=ignore default=3]    pam_gaze.so
-auth       requisite                    pam_env.so
-auth       requisite                    pam_faillock.so authsucc
-auth       sufficient                   pam_permit.so
-auth       include                      system-local-login
+```sh
+akari login enable-gaze --dry-run
+akari login enable-gaze
 ```
 
-Then replace the initial `auth` rules in `/etc/pam.d/greetd` with:
+The command requests sudo, checks the shared Arch auth policies and the installed
+Gaze module, and refuses custom policies that might contain additional factors.
+It backs up greetd to `/var/lib/akari/greetd.pam.before-gaze`, publishes
+`/etc/pam.d/akari-gaze`, and replaces the `auth include system-local-login` rule
+with `auth substack akari-gaze`. Account, session and keyring rules stay in place.
+Repeated execution is idempotent, and no running service is restarted.
 
-```text
-auth       required     pam_securetty.so
-auth       requisite    pam_nologin.so
-auth       substack     akari-gaze
-```
-
-Keep the existing `account`, `session` and keyring rules. The helper checks
+The helper checks
 shell eligibility and lockout before Gaze. A face match loads the environment,
 clears prior authentication failures and completes only the substack. Failure
 or an unavailable Gaze module skips those three face-success rules and reaches
@@ -153,18 +145,31 @@ the existing password stack. Password failure ends the substack without
 clearing the failed-attempt records. The parent stack still runs its keyring
 auth rules; an ordinary `sufficient` rule in the parent would skip them.
 
-Use `substack` in the parent: `include` expands its rules into that stack, so a
-successful `sufficient` rule would end the parent's authentication too. The
-numeric jump in the helper covers three ordinary module rules, not an include.
-Review it when changing the helper. For a different PAM layout, follow the
-distribution's policy and Gaze's
-[greetd guide](https://gaze.gundulabs.com/guide/greetd.html) instead of copying
-these rules.
+The substack keeps a successful `sufficient` rule from ending the parent auth
+section before its keyring hooks run. The numeric failure jump covers only the
+three face-success modules, leaving the original password include intact.
+The maintained policy is defined in the
+[login controller](https://github.com/anfsity/Akari/blob/main/scripts/login/manage.py).
+For a different PAM layout, follow the distribution's policy and Gaze's
+[greetd guide](https://gaze.gundulabs.com/guide/greetd.html).
 
 The initial setup leaves TPM-backed password storage disabled. A face login
 does not unlock a password-protected keyring automatically; unlock it in the
 desktop when requested. Gaze's optional keyring integration is a separate setup
 with additional storage and PAM requirements described in its greetd guide.
+When enabling that feature, run
+`akari login configure-keyring --keyring gnome` to ensure the GNOME auth hook
+uses `use_authtok`. Authentication policy and keyring setup are separate commands.
+
+To restore the original password include while preserving later PAM edits:
+
+```sh
+akari login disable-gaze
+```
+
+This also removes an unchanged Akari helper and retains the backup. A modified
+helper is retained for the administrator. Current uninstall and cleanup commands
+remove Akari's Gaze routing and its unchanged helper as well.
 
 ### Verify real login
 
@@ -174,8 +179,7 @@ by password login, and password fallback with the camera unavailable. Also
 change the selected account during a scan and confirm the previous attempt
 cannot start a session. A locked-out account must remain denied even when its
 face matches. Inspect backend logs and `journalctl -u gazed -b` for failures.
-Restore the backed-up greetd policy and remove `/etc/pam.d/akari-gaze` to remove
-the trial integration.
+Run `akari login disable-gaze` to remove the trial integration.
 
 ## Install and run the harness
 
