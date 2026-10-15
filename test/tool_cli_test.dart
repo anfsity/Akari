@@ -596,9 +596,44 @@ sys.exit(1)
       ['verify', '--preview'],
       ['preview', '--platform', 'web'],
       ['build', '--theme', 'themes/default', '--theme', 'themes/fallback'],
+      ['preview', '--splash-duration=-1'],
+      ['preview', '--splash-duration=NaN'],
+      ['preview', '--splash-duration=Infinity'],
+      ['preview', '--splash-duration=invalid'],
+      ['run', '--splash-duration=3'],
     ]) {
       final result = await _runTool(arguments);
       expect(result.exitCode, 2, reason: '$arguments: ${result.stderr}');
+    }
+  });
+
+  test('preview completes both builds before presenting the splash', () async {
+    for (final duration in ['0', '1.2', '3']) {
+      final result = await _runTool([
+        'preview',
+        '--splash-duration',
+        duration,
+        '--dry-run',
+      ]);
+      expect(result.exitCode, 0, reason: result.stderr);
+      final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+      final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
+      final session = steps.last;
+      expect(
+        session['dependencies'],
+        containsAll(['splash.build', 'theme.preview.build']),
+      );
+      expect(session['environment']['AKARI_SPLASH_DURATION'], duration);
+      expect(
+        session['environment']['AKARI_PREVIEW_APPLICATION'],
+        endsWith('/debug/bundle/greeter'),
+      );
+      expect(
+        steps.singleWhere(
+          (step) => step['id'] == 'theme.preview.build',
+        )['command'],
+        containsAllInOrder(['build', 'linux', '--debug']),
+      );
     }
   });
 
@@ -610,10 +645,21 @@ sys.exit(1)
     final flutter = File('${tempRoot.path}/flutter');
     final dart = File('${tempRoot.path}/dart');
     final preview = File('${tempRoot.path}/preview');
+    final compiled = File('${tempRoot.path}/compiled');
+    final shown = File('${tempRoot.path}/shown');
+    final splash = File('${tempRoot.path}/splash');
+    await splash.writeAsString('''#!/bin/sh
+test -f ${_shellQuote(compiled.path)} || exit 24
+test "\$1" = window || exit 25
+printf shown > ${_shellQuote(shown.path)}
+''');
     await preview.writeAsString(
-      '#!/bin/sh\nprintf launched > ${_shellQuote(launchMarker.path)}\n',
+      '#!/bin/sh\ntest -f ${_shellQuote(shown.path)} || exit 26\nprintf launched > ${_shellQuote(launchMarker.path)}\n',
     );
     await flutter.writeAsString('''#!/bin/sh
+if [ "\$1" = build ]; then
+  printf compiled > ${_shellQuote(compiled.path)}
+fi
 if [ "\$1" = run ]; then
   ${_shellQuote(preview.path)}
 fi
@@ -633,6 +679,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
       flutter.path,
       dart.path,
       preview.path,
+      splash.path,
     ]);
     expect(chmod.exitCode, 0, reason: chmod.stderr);
     final result = await _runTool(
@@ -640,6 +687,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
       environment: {
         'AKARI_FLUTTER_BIN': flutter.path,
         'AKARI_DART_BIN': dart.path,
+        'AKARI_SPLASH_BIN': splash.path,
       },
     );
     expect(result.exitCode, 0, reason: result.stderr);

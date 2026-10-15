@@ -138,6 +138,9 @@ String getBackendTargetDirectory(BackendMode backend) =>
 String getBackendExecutablePath(BackendMode backend, BuildMode mode) =>
     'backend/${getBackendTargetDirectory(backend)}/${mode.rustProfile}/backend';
 
+String getSplashExecutablePath(BuildMode mode) =>
+    'build/tool/splash/${mode.rustProfile}/akari-splash';
+
 String getLinuxExecutablePath(String hostDirectory, BuildMode buildMode) {
   final architecture = switch (Abi.current()) {
     Abi.linuxX64 => 'x64',

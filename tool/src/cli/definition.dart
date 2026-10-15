@@ -76,6 +76,11 @@ const cliOptions = {
     valueName: 'MODE',
     values: ['mock', 'real'],
   ),
+  '--splash-duration': CliOption(
+    '--splash-duration',
+    'Minimum native splash display time in seconds (default: 1.2; 0 skips the hold).',
+    valueName: 'SECONDS',
+  ),
   '--keyring': CliOption(
     '--keyring',
     'Configure installed keyring PAM modules (default: auto); offer installation when missing.',
@@ -194,8 +199,8 @@ const cliCommands = [
   ),
   CliCommand(
     'preview',
-    'Run the selected theme with demo login state.',
-    options: ['--theme', '--jobs', '--mode'],
+    'Show the native splash, then run the selected theme with demo login state.',
+    options: ['--theme', '--jobs', '--mode', '--splash-duration'],
     development: DevelopmentCommand.preview,
   ),
   CliCommand(

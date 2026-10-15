@@ -80,6 +80,7 @@ RunPlan createThemeRunPlan(
   int? jobs,
   Map<String, Object?>? displayProfile,
   SwayBackend swayBackend = SwayBackend.wayland,
+  String? splashDuration,
 }) {
   final kind = target.hostKind;
   final themes = kind == ThemeHostKind.studio
@@ -88,6 +89,8 @@ RunPlan createThemeRunPlan(
   final host = getThemeHostDirectory(theme, kind);
   final hasBackend = kind == ThemeHostKind.greeter;
   final sway = target == ThemeRunTarget.sway;
+  final preview = target == ThemeRunTarget.preview;
+  final splash = Platform.environment['AKARI_SPLASH_BIN'];
   final displayReport = '$runDirectory/sway/display-report.json';
   return RunPlan(
     command: target.commandName,
@@ -105,6 +108,7 @@ RunPlan createThemeRunPlan(
       'host_project': host,
       'build_directory': '$host/build/linux',
       'executable': getLinuxExecutablePath(host, mode),
+      if (preview) 'splash_executable': splash ?? getSplashExecutablePath(mode),
       if (sway) ...{
         'display_report': displayReport,
         'display_snapshot': '$runDirectory/sway/outputs.json',
@@ -122,6 +126,23 @@ RunPlan createThemeRunPlan(
         host,
         themes: themes,
       ),
+      if (preview) ...[
+        if (splash == null) _createSplashBuildStep(mode, jobs),
+        RunStep(
+          id: 'theme.preview.build',
+          command: [
+            ...getFlutterCommand(repoRoot),
+            'build',
+            'linux',
+            '--${mode.name}',
+            '--no-pub',
+            '--dart-define=AKARI_BACKEND=demo',
+          ],
+          workingDirectory: host,
+          dependencies: const ['theme.host.pub_get'],
+          environment: {if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs'},
+        ),
+      ],
       RunStep(
         id: 'theme.${target.stepName}',
         command: [
@@ -146,7 +167,14 @@ RunPlan createThemeRunPlan(
           kind.backendDefine,
         ],
         workingDirectory: host,
-        dependencies: [if (hasBackend) 'backend.build', 'theme.host.pub_get'],
+        dependencies: [
+          if (hasBackend) 'backend.build',
+          if (preview) ...[
+            if (splash == null) 'splash.build',
+            'theme.preview.build',
+          ] else
+            'theme.host.pub_get',
+        ],
         interactive: true,
         environment: {
           if (kind == ThemeHostKind.studio)
@@ -160,6 +188,16 @@ RunPlan createThemeRunPlan(
               Platform.environment['AKARI_WINDOW_MODE'] ??
               (hasBackend ? 'fullscreen' : 'windowed'),
           if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs',
+          if (preview) ...{
+            'AKARI_SPLASH_BIN':
+                splash ??
+                getAbsolutePath(repoRoot, getSplashExecutablePath(mode)),
+            'AKARI_PREVIEW_APPLICATION': getAbsolutePath(
+              repoRoot,
+              getLinuxExecutablePath(host, mode),
+            ),
+            'AKARI_SPLASH_DURATION': ?splashDuration,
+          },
           if (sway) 'AKARI_DISPLAY_PROFILE_JSON': jsonEncode(displayProfile!),
           if (hasBackend) ...{
             'AKARI_BACKEND_MODE': backend.name,
@@ -174,6 +212,21 @@ RunPlan createThemeRunPlan(
     ],
   );
 }
+
+RunStep _createSplashBuildStep(BuildMode mode, int? jobs) => RunStep(
+  id: 'splash.build',
+  command: [
+    'cargo',
+    'build',
+    '--locked',
+    '--target-dir',
+    '../build/tool/splash',
+    if (mode != BuildMode.debug) '--release',
+    if (jobs != null) ...['--jobs', '$jobs'],
+  ],
+  workingDirectory: 'splash',
+  dependencies: const [],
+);
 
 RunStep _createBackendBuildStep(
   BackendMode backend,
