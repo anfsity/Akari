@@ -10,7 +10,7 @@ splash/target/debug/akari-splash window
 splash/target/debug/akari-splash window --snapshot /tmp/akari-splash.png
 ```
 
-The default background is dark, matching the login compositor's `#15191f`.
+The default background is pure black (`#000000`), matching the login compositor.
 Use `--light` to preview the light variant; `--dark` remains accepted.
 The default minimum display time is 3 seconds after the first successful
 presentation. `--duration` overrides `AKARI_SPLASH_DURATION`; zero skips the
@@ -34,12 +34,12 @@ text; it is also used before the login compositor exits.
 For login startup, the private bus and backend reach readiness before the splash
 runs. The launcher saves a still of the splash in the greeter's log directory;
 Sway uses it as its background until Flutter covers it with the login screen.
-This requires `swaybg`. If the renderer cannot save a still, Sway uses the dark
+This requires `swaybg`. If the renderer cannot save a still, Sway uses the black
 fallback color. Existing production installations preserve `sway.conf`; update
 its background line to enable this hold:
 
 ```conf
-output * bg "$AKARI_LOG_DIR/splash.png" fit #15191f
+output * bg "$AKARI_LOG_DIR/splash.png" fit #000000
 ```
 
 This covers Flutter startup after Sway acquires the display. It does not cover

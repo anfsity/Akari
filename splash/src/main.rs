@@ -34,7 +34,7 @@ fn run() -> Result {
         println!(
             "Usage: akari-splash window|kms [--duration SECONDS] [--dark|--light] [--snapshot PNG]\n\
                   akari-splash clear\n\
-                  Defaults: dark background, 3 seconds minimum; 0 skips the hold.\n\
+                  Defaults: black background, 3 seconds minimum; 0 skips the hold.\n\
                   AKARI_SPLASH_DURATION also sets the minimum display time."
         );
         return Ok(());

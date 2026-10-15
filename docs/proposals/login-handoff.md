@@ -15,7 +15,7 @@ the child; launcher death also stops the renderer.
 
 The KMS renderer saves a still in the greeter's log directory. The supplied Sway
 configuration displays it through `swaybg` until the Flutter login screen is
-visible, with a dark fallback if no image was saved. Existing production configs
+visible, with a black fallback if no image was saved. Existing production configs
 are preserved; their background line needs the change documented in
 [`splash/README.md`](../../splash/README.md). The image covers Flutter startup,
 not the earlier VT/logind reset or user-desktop initialization.
@@ -33,7 +33,7 @@ font. Both its desktop window and KMS outputs use one CPU renderer. Images and
 fonts load once; scaled portraits and glyph layers are cached per output size.
 Only the slight float and status dots change each frame.
 
-The background defaults to dark (`#15191f`), matching the login compositor.
+The background defaults to pure black (`#000000`), matching the login compositor.
 The minimum display time defaults to 3 seconds, starting at the first successful
 presentation. Zero removes the artificial hold. `--splash-duration` controls the
 window preview; `AKARI_SPLASH_DURATION` can be set in the VT launcher's environment
