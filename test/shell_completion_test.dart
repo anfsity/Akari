@@ -53,12 +53,23 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       'enable',
       'disable',
       'rollback',
+      'configure-keyring',
       'status',
       'logs',
     ]);
     expect(
       await completeBashWords(['akari', 'login', 'logs', '--component', 'b']),
       ['backend'],
+    );
+    expect(
+      await completeBashWords([
+        'akari',
+        'login',
+        'configure-keyring',
+        '--keyring',
+        'g',
+      ]),
+      ['gnome'],
     );
     expect(
       await completeBashWords([
@@ -188,6 +199,11 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       'akari run sway --display-profile reference',
     );
     expect(buffers[14].trimRight(), 'akari run sway --sway-backend=headless');
+    expect(buffers[15].trimRight(), 'akari login configure-keyring');
+    expect(
+      buffers[16].trimRight(),
+      'akari login configure-keyring --keyring gnome',
+    );
   });
 
   test('installation preserves startup content and works outside the repository', () async {

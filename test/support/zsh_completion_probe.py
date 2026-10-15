@@ -75,6 +75,8 @@ try:
         "akari run sw",
         "akari run sway --display-profile re",
         "akari run sway --sway-backend=h",
+        "akari login configure-k",
+        "akari login configure-keyring --keyring g",
     ]
     for index, probe in enumerate(probes):
         os.write(master, (probe + "\t").encode())

@@ -188,6 +188,7 @@ Future<void> main(List<String> arguments) async {
       'enable',
       'disable',
       'rollback',
+      'configure-keyring',
       'uninstall',
       'clean',
     ]) {
@@ -207,6 +208,33 @@ Future<void> main(List<String> arguments) async {
     expect(File('${temporary.path}/sudo.json').existsSync(), isFalse);
     expect(Directory('${temporary.path}/build').existsSync(), isFalse);
   });
+
+  test(
+    'keyring configuration uses the current controller without rebuilding',
+    () async {
+      for (final installed in [true, false]) {
+        if (!installed) await File('${installation.path}/manage.py').delete();
+        final result = await runFixture([
+          'configure-keyring',
+          '--keyring',
+          'gnome',
+        ]);
+        expect(result.exitCode, 17, reason: '${result.stderr}');
+        expect(
+          jsonDecode(await File('${temporary.path}/sudo.json').readAsString()),
+          [
+            '--',
+            'python3',
+            '${Directory.current.path}/scripts/login/manage.py',
+            'configure-keyring',
+            '--keyring',
+            'gnome',
+          ],
+        );
+      }
+      expect(File('${temporary.path}/build.json').existsSync(), isFalse);
+    },
+  );
 
   test(
     'clean uses repository controller even with an old or missing installation',
@@ -302,6 +330,8 @@ Future<void> main(List<String> arguments) async {
       ['install', '-j', '0'],
       ['install', '--mode', 'debug'],
       ['install', '--keyring', 'other'],
+      ['configure-keyring', '--keyring', 'other'],
+      ['configure-keyring', '--theme', 'themes/default'],
       ['enable', '--keyring', 'gnome'],
       ['enable', '--theme', 'themes/default'],
       ['clean', '--theme', 'themes/default'],
@@ -329,6 +359,7 @@ Future<void> main(List<String> arguments) async {
         ['login', 'enable'],
         ['login', 'disable'],
         ['login', 'rollback'],
+        ['login', 'configure-keyring'],
         ['login', 'status'],
         ['login', 'logs'],
       ]) {
@@ -347,6 +378,7 @@ Future<void> main(List<String> arguments) async {
         ['uninstall'],
         ['clean'],
         ['login', 'enable'],
+        ['login', 'configure-keyring'],
       ]) {
         final result = await Process.run(dart.first, [
           ...dart.skip(1),
