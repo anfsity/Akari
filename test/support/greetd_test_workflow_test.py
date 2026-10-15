@@ -219,6 +219,7 @@ class InstallerTest(unittest.TestCase):
         self.installation = self.root / "installed"
         script = (SOURCE / "install.sh").read_text()
         script = script.replace('[[ "$EUID" -ne 0 ]]', 'false')
+        script = script.replace('/run/lock/akari-test.lock', str(self.root / 'lock'))
         (self.source / "install.sh").write_text(script)
         for name in ["start.sh", "restore.sh", "launch.sh", "greetd.toml", "sway.conf", "display-layout.py", "display_profile.py", "screenshot.py"]:
             shutil.copy2(SOURCE / name, self.source / name)
