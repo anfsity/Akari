@@ -7,10 +7,18 @@ The previous ASCII animator has been removed.
 
 ## Launch boundaries
 
-The production and greetd-test launchers run the pinned release's `akari-splash
-kms` before starting Sway. `scripts/splash.sh` owns that child and waits for its
-exit before allowing Sway to acquire the display. Signals terminate and reap the
-child; launcher death also stops the renderer.
+The production and greetd-test launchers start the private bus and wait for the
+backend before running the pinned release's `akari-splash kms`. `scripts/splash.sh`
+owns that child and waits for its exit before execing Sway, so D-Bus startup does
+not extend the blank interval after the animation. Signals terminate and reap
+the child; launcher death also stops the renderer.
+
+The KMS renderer saves a still in the greeter's log directory. The supplied Sway
+configuration displays it through `swaybg` until the Flutter login screen is
+visible, with a dark fallback if no image was saved. Existing production configs
+are preserved; their background line needs the change documented in
+[`splash/README.md`](../../splash/README.md). The image covers Flutter startup,
+not the earlier VT/logind reset or user-desktop initialization.
 
 After successful authentication, greetd starts the user launcher only after the
 greeter has exited. The launcher captures native shell output in `startup-*.log`,

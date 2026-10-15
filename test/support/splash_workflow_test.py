@@ -22,8 +22,9 @@ class SplashWorkflowTest(unittest.TestCase):
         self.renderer.write_text(f'''#!{sys.executable}
 import os, pathlib, signal, sys, time
 root = pathlib.Path(os.environ['FIXTURE'])
-assert sys.argv[1:] == ['kms']
+assert sys.argv[1:] == ['kms', '--snapshot', str(root / 'splash.png')]
 assert int(os.environ['AKARI_SPLASH_PARENT_PID']) == os.getppid()
+(root / 'splash.png').touch()
 (root / 'renderer.pid').write_text(str(os.getpid()))
 signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 try:
@@ -37,9 +38,7 @@ sys.exit(int(os.environ.get('RESULT', '0')))
         self.launcher = self.root / 'launch.sh'
         self.launcher.write_text(f'''#!/bin/bash
 set -euo pipefail
-source '{REPOSITORY}/scripts/splash.sh'
-akari_show_splash || true
-exec '{sys.executable}' -c '
+exec /bin/bash '{REPOSITORY}/scripts/splash.sh' '{sys.executable}' -c '
 import os, pathlib
 root = pathlib.Path(os.environ["FIXTURE"])
 pidfile = root / "renderer.pid"
@@ -52,6 +51,7 @@ if pidfile.exists():
 '
 ''')
         self.environment = {**os.environ, 'FIXTURE': str(self.root),
+                            'AKARI_LOG_DIR': str(self.root),
                             'AKARI_SPLASH_BIN': str(self.renderer)}
 
     def test_compositor_waits_for_release_on_success_and_renderer_failure(self):
@@ -61,8 +61,40 @@ if pidfile.exists():
                                         env={**self.environment, 'RESULT': str(status)},
                                         capture_output=True, text=True, timeout=5)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn(f'event=splash_finished status={status}', result.stdout)
+                self.assertIn(f'event=splash_finished status={status}',
+                              (self.root / 'lifecycle.log').read_text())
                 self.assertTrue((self.root / 'compositor').exists())
+
+    def test_private_bus_and_backend_are_ready_before_the_animation(self):
+        backend = self.root / 'backend'
+        backend.write_text(f'''#!{sys.executable}
+import pathlib, time
+root = pathlib.Path({str(self.root)!r})
+(root / 'backend-started').touch()
+time.sleep(30)
+''')
+        backend.chmod(0o755)
+        busctl = self.root / 'busctl'
+        busctl.write_text(f'''#!{sys.executable}
+import pathlib, sys
+root = pathlib.Path({str(self.root)!r})
+if not (root / 'backend-started').exists():
+    sys.exit(1)
+(root / 'backend-ready').touch()
+''')
+        busctl.chmod(0o755)
+        self.renderer.write_text(self.renderer.read_text().replace(
+            "(root / 'renderer.pid').write_text", "assert (root / 'backend-ready').exists()\n(root / 'renderer.pid').write_text"))
+        result = subprocess.run(
+            ['bash', REPOSITORY / 'scripts/debug-dbus.sh', '--inside-private-bus',
+             '/bin/bash', str(self.launcher)],
+            env={**self.environment, 'AKARI_BACKEND_BIN': str(backend),
+                 'AKARI_PRIVATE_BUS': '1',
+                 'PATH': f'{self.root}:{os.environ["PATH"]}'},
+            capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.root / 'splash.png').exists())
+        self.assertTrue((self.root / 'compositor').exists())
 
     def test_missing_renderer_keeps_the_login_path_available(self):
         self.renderer.unlink()

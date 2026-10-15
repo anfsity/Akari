@@ -567,6 +567,16 @@ class LoginWorkflowTest(unittest.TestCase):
         self.assertEqual(self.enabled, {'sddm.service'})
 
 
+class RuntimeValidationTest(unittest.TestCase):
+    def test_missing_background_renderer_is_rejected_before_installation(self):
+        manager = importlib.util.module_from_spec(SPEC)
+        SPEC.loader.exec_module(manager)
+        with patch.object(manager.shutil, 'which', side_effect=lambda command:
+                          None if command == 'swaybg' else f'/usr/bin/{command}'):
+            with self.assertRaisesRegex(ValueError, 'Missing required command: swaybg'):
+                manager.validate_runtime()
+
+
 class GreeterLifetimeTest(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix='akari-login-runtime-')
@@ -638,7 +648,12 @@ exec /usr/bin/chmod "$@"
 ''')
         chmod.chmod(0o755)
         boundary = release / 'scripts/debug-dbus.sh'
-        boundary.write_text(f'''#!{sys.executable}
+        boundary.write_text('''#!/bin/bash
+exec "$@"
+''')
+        boundary.chmod(0o755)
+        sway = self.root / 'sway'
+        sway.write_text(f'''#!{sys.executable}
 import json, os, pathlib
 logs = pathlib.Path(os.environ['AKARI_LOG_DIR'])
 print(json.dumps({{'release': os.environ['AKARI_RELEASE'],
@@ -646,7 +661,9 @@ print(json.dumps({{'release': os.environ['AKARI_RELEASE'],
                   'nested_backend': os.environ.get('WLR_BACKENDS'),
                   'log_permissions': logs.stat().st_mode & 0o777}}))
 ''')
-        boundary.chmod(0o755)
+        sway.chmod(0o755)
+        (release / 'launch.sh').write_text((release / 'launch.sh').read_text().replace(
+            '/usr/bin/sway', str(sway)))
         current = self.root / 'current'
         current.symlink_to(release)
         result = subprocess.run(['bash', str(current / 'launch.sh')],

@@ -13,7 +13,7 @@ Akari currently builds and runs on Linux. Install:
 - Clang, CMake, Ninja, pkg-config, and GTK 3 development files for Flutter Linux.
 - D-Bus tools, including `dbus-run-session` and `busctl`, for backend sessions.
 
-The optional compositor workflows also need Sway, `swaymsg`, Python 3, and grim.
+The optional compositor workflows also need Sway, `swaymsg`, `swaybg`, Python 3, and grim.
 Native input regression checks use wtype. Standalone login testing needs greetd
 and the existing test environment described in its guide.
 
