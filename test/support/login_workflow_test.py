@@ -130,7 +130,7 @@ class LoginWorkflowTest(unittest.TestCase):
         self.assertFalse(self.manager.SNAPSHOT.exists())
         pam = self.manager.PAM.read_text()
         self.assertTrue(pam.startswith(self.original_pam))
-        self.assertIn('auth       optional     pam_gnome_keyring.so\n', pam)
+        self.assertIn('auth       optional     pam_gnome_keyring.so use_authtok\n', pam)
         self.assertIn('session    optional     pam_gnome_keyring.so auto_start\n', pam)
         self.assertNotIn('kwallet', pam)
         self.assertEqual(self.manager.PAM.stat().st_mode & 0o777, 0o640)
@@ -268,11 +268,21 @@ class LoginWorkflowTest(unittest.TestCase):
         self.assertEqual(self.manager.PAM.read_text(), self.original_pam)
         self.assertEqual((self.manager.INSTALLATION / 'current').resolve(), original)
 
-    def test_configure_keyring_command_only_updates_pam(self):
+    def test_configure_keyring_upgrades_managed_auth_without_deploying(self):
+        legacy = (self.original_pam + self.manager.KEYRING_START
+                  + 'auth       optional     pam_gnome_keyring.so\n'
+                  + 'session    optional     pam_gnome_keyring.so auto_start\n'
+                  + self.manager.KEYRING_END + '\nsession optional pam_env.so\n')
+        self.manager.PAM.write_text(legacy)
         with patch.object(self.manager.sys, 'argv', ['manage.py', 'configure-keyring', '--keyring', 'gnome']), \
                 patch.object(self.manager.os, 'geteuid', return_value=0):
             self.assertEqual(self.manager.main(), 0)
-        self.assertIn('pam_gnome_keyring.so', self.manager.PAM.read_text())
+        pam = self.manager.PAM.read_text()
+        self.assertIn('auth       optional     pam_gnome_keyring.so use_authtok\n', pam)
+        self.assertIn('session    optional     pam_gnome_keyring.so auto_start\n', pam)
+        self.assertEqual(self.manager.get_pam_without_keyring(pam),
+                         self.original_pam + '\nsession optional pam_env.so\n')
+        self.assertEqual((self.manager.STATE / 'greetd.pam.before-keyring').read_text(), legacy)
         self.assertFalse(self.manager.INSTALLATION.exists())
         self.assertEqual(self.calls, [])
 

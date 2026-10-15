@@ -32,8 +32,8 @@ PAM = Path('/etc/pam.d/greetd')
 GREETER = 'akari-greeter'
 SNAPSHOT = STATE / 'display-manager.json'
 KEYRINGS = {
-    'gnome': ('GNOME Keyring', 'pam_gnome_keyring.so', 'auto_start'),
-    'kwallet': ('KWallet', 'pam_kwallet5.so', 'auto_start force_run'),
+    'gnome': ('GNOME Keyring', 'pam_gnome_keyring.so', 'use_authtok', 'auto_start'),
+    'kwallet': ('KWallet', 'pam_kwallet5.so', '', 'auto_start force_run'),
 }
 PAM_MODULE_ROOTS = [Path(path) for path in ['/usr/lib', '/usr/lib64', '/lib', '/lib64']]
 KEYRING_START = '\n# BEGIN Akari keyring\n'
@@ -45,7 +45,7 @@ def get_installed_keyrings():
     for root in PAM_MODULE_ROOTS:
         directories.append(root / 'security')
         directories.extend(root.glob('*-linux-gnu/security'))
-    return [name for name, (_, module, _) in KEYRINGS.items()
+    return [name for name, (_, module, _, _) in KEYRINGS.items()
             if any((directory / module).is_file() for directory in directories)]
 
 
@@ -141,10 +141,10 @@ def get_keyring_pam_configuration(configuration, providers):
     for phase in ['auth', 'session']:
         modules = get_pam_modules(configuration, phase, {PAM})
         for provider in providers:
-            _, module, session_options = KEYRINGS[provider]
+            _, module, auth_options, session_options = KEYRINGS[provider]
             if module not in modules:
-                options = f' {session_options}' if phase == 'session' else ''
-                lines.append(f'{phase:<10} optional     {module}{options}\n')
+                options = auth_options if phase == 'auth' else session_options
+                lines.append(f'{phase:<10} optional     {module} {options}'.rstrip() + '\n')
     if not lines:
         return configuration
     # PAM evaluates each phase separately. Appending keeps the distribution's

@@ -98,18 +98,22 @@ selected provider requires approval at the terminal before installing packages.
 Without a terminal, `auto` skips missing providers and an explicit missing provider
 fails. `--keyring none` removes only Akari's managed keyring block. Existing direct
 rules and rules in included PAM policies are retained without duplication.
-Added rules use `optional` for authentication and session startup; KWallet uses
-`auto_start force_run` for greetd. The first changed PAM policy is backed up at
+Added rules use `optional` for authentication and session startup. GNOME Keyring
+uses `use_authtok` to consume the authentication token and `auto_start` for its
+session hook; KWallet uses `auto_start force_run` for greetd. The first changed
+PAM policy is backed up at
 `/var/lib/akari/greetd.pam.before-keyring`. Deployment failure restores the prior
 PAM content; uninstall removes only Akari's block and preserves other edits.
 Installed keyring packages and the backup are retained.
 
-Automatic unlocking requires the keyring password to match the login password.
-Passwordless or biometric authentication does not supply that password.
+Automatic unlocking requires an authentication token matching the keyring password.
+Biometric login needs a provider that supplies that credential, such as
+[Gaze's optional TPM-backed keyring integration](../guides/greetd-testing.md#facial-authentication).
 See [GNOME's PAM documentation](https://wiki.gnome.org/Projects/GnomeKeyring/Pam).
 KWallet also needs the desktop's `pam_kwallet_init` autostart to complete startup;
 see the [KDE integration sources](https://invent.kde.org/plasma/kwallet-pam).
-To configure PAM without rebuilding, use the repository controller:
+To configure PAM without rebuilding, or update an older Akari-managed block to
+include `use_authtok`, use the repository controller:
 
 ```sh
 sudo python3 scripts/login/manage.py configure-keyring --keyring gnome
