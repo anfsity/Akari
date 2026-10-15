@@ -60,6 +60,7 @@ Future<int> runDevelopmentCommand(
       jobs: options.jobs,
       displayProfile: display,
       swayBackend: options.swayBackend,
+      splashDuration: options.splashDuration,
     ),
     DevelopmentCommand.verify => createVerificationPlan(
       repoRoot,

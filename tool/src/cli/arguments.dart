@@ -51,6 +51,7 @@ class DevCommandOptions {
       displayProfile = values['--display-profile'] ?? 'auto',
       resolution = values['--resolution'],
       scale = values['--scale'],
+      splashDuration = values['--splash-duration'],
       swayBackend = SwayBackend.values.byName(
         values['--sway-backend'] ?? 'wayland',
       );
@@ -75,6 +76,14 @@ class DevCommandOptions {
       jobs,
       command.development!,
     );
+    if (options.splashDuration case final value?) {
+      final duration = double.tryParse(value);
+      if (duration == null || !duration.isFinite || duration < 0) {
+        throw const FormatException(
+          '--splash-duration must be a finite, non-negative number of seconds.',
+        );
+      }
+    }
     if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(options.buildTarget)) {
       throw FormatException(
         'Invalid Flutter build target: ${options.buildTarget}',
@@ -97,4 +106,5 @@ class DevCommandOptions {
   final String? resolution;
   final String? scale;
   final SwayBackend swayBackend;
+  final String? splashDuration;
 }
