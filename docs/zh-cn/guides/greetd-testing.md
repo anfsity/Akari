@@ -55,36 +55,32 @@ gaze doctor
 
 ### 在 Arch 上接入 greetd
 
-对于 `/etc/pam.d/greetd` 引用 `system-local-login` 的标准 Arch 规则，先创建 `/etc/pam.d/akari-gaze`：
+安装当前后端后，可为标准 Arch greetd 规则启用 Gaze：
 
-```text
-#%PAM-1.0
-auth       requisite                    pam_shells.so
-auth       requisite                    pam_faillock.so preauth
-auth       [success=ignore default=3]    pam_gaze.so
-auth       requisite                    pam_env.so
-auth       requisite                    pam_faillock.so authsucc
-auth       sufficient                   pam_permit.so
-auth       include                      system-local-login
+```sh
+akari login enable-gaze --dry-run
+akari login enable-gaze
 ```
 
-再将 `/etc/pam.d/greetd` 开头的 `auth` 规则替换为：
+命令自动请求 sudo，检查共享 Arch auth 规则和已安装的 Gaze 模块；遇到可能包含额外认证因素的自定义规则时会拒绝自动修改。它先将 greetd 备份到 `/var/lib/akari/greetd.pam.before-gaze`，写入 `/etc/pam.d/akari-gaze`，再把 `auth include system-local-login` 改为 `auth substack akari-gaze`。原有 `account`、`session` 和密钥环规则保留；可重复执行，不会重启正在运行的服务。
 
-```text
-auth       required     pam_securetty.so
-auth       requisite    pam_nologin.so
-auth       substack     akari-gaze
+辅助规则先检查 Shell 与失败锁定；人脸成功后加载环境、清除此前的认证失败记录，并只完成子栈。Gaze 失败或模块不可用时跳过这三条人脸成功规则，继续原密码栈。密码失败会结束子栈，不会清除失败记录。父栈随后仍执行密钥环认证规则。
+
+子栈保证其中成功的 `sufficient` 不会提前结束父栈认证、跳过密钥环钩子。失败时的数字跳转只覆盖三条人脸成功规则，保留原密码 include。维护中的策略定义在[登录控制器](https://github.com/anfsity/Akari/blob/main/scripts/login/manage.py)中。其他 PAM 布局应按发行版规则和 Gaze 的 [greetd 指南](https://gaze.gundulabs.com/guide/greetd.html)调整。
+
+初步配置保持 TPM 密码存储关闭。人脸登录不会自动解锁有密码的密钥环；进入桌面后按提示解锁即可。Gaze 的可选密钥环集成属于独立配置，额外存储和 PAM 要求见其 greetd 指南。启用该功能时，再运行 `akari login configure-keyring --keyring gnome`，确保 GNOME auth 钩子带有 `use_authtok`；认证策略与密钥环配置分别管理。
+
+恢复原密码 include、保留后续 PAM 编辑时，运行：
+
+```sh
+akari login disable-gaze
 ```
 
-保留已有 `account`、`session` 和密钥环规则。辅助规则先检查 Shell 与失败锁定；人脸成功后加载环境、清除此前的认证失败记录，并只完成子栈。Gaze 失败或模块不可用时跳过这三条人脸成功规则，继续原密码栈。密码失败会结束子栈，不会清除失败记录。父栈随后仍执行密钥环认证规则；若直接在父栈使用 `sufficient`，这些规则会被跳过。
-
-父栈必须使用 `substack`：`include` 会将规则展开到父栈，其中成功的 `sufficient` 也会结束父栈认证。辅助规则中的数字跳转覆盖三条普通模块规则，不跳过 include；后续修改时需要检查。若主机的 PAM 布局不同，应按发行版规则和 Gaze 的 [greetd 指南](https://gaze.gundulabs.com/guide/greetd.html)调整，不要直接复制上述配置。
-
-初步配置保持 TPM 密码存储关闭。人脸登录不会自动解锁有密码的密钥环；进入桌面后按提示解锁即可。Gaze 的可选密钥环集成属于独立配置，额外存储和 PAM 要求见其 greetd 指南。
+该命令还会删除未修改的 Akari 辅助规则，保留备份；管理员修改过的辅助文件会保留。当前版本的卸载和清理命令也会移除 Akari 的 Gaze 路由及未修改的辅助规则。
 
 ### 验证真实登录
 
-安装当前 Akari 构建后，使用下文的独立测试工具。验证人脸成功且无需提交密码、识别失败后密码登录、摄像头不可用时密码回退，以及识别中切换账号后旧尝试无法启动会话。已锁定的账号即使人脸匹配也必须保持拒绝。失败时查看后端日志及 `journalctl -u gazed -b`。恢复备份的 greetd 规则并删除 `/etc/pam.d/akari-gaze` 即可移除本次试用接入。
+安装当前 Akari 构建后，使用下文的独立测试工具。验证人脸成功且无需提交密码、识别失败后密码登录、摄像头不可用时密码回退，以及识别中切换账号后旧尝试无法启动会话。已锁定的账号即使人脸匹配也必须保持拒绝。失败时查看后端日志及 `journalctl -u gazed -b`。运行 `akari login disable-gaze` 即可移除本次试用接入。
 
 ## 安装和运行测试工具
 
