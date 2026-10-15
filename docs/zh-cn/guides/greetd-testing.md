@@ -13,7 +13,9 @@ description: 构建和安装真实登录测试工具、捕获显示器信息、�
 
 用户侧执行器完整保留命令参数，仅在 LANG 缺失或为空时补入 `LANG=C.UTF-8`；它记录 locale 检查结果，保留用户明确设置的覆盖值。桌面的 stdout/stderr 和启动信息写入 `${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/` 下的私有 `session-*.log`。进入原生 login shell 前，Akari 会将 shell 的 stdout/stderr 写入同一目录下的私有 `startup-*.log`，目录按原生 shell 启动前的环境解析。如果 shell 修改了 `XDG_STATE_HOME`，桌面日志使用新目录，启动日志仍留在原目录。greetd 自己加载 profile 和执行 PAM 的输出早于这个启动器，不受此重定向控制。登录界面启动和退出时的诊断写入各自的 `lifecycle.log`。
 
-原生启动画面在 Sway 启动前和用户桌面启动前运行，通过 libseat 管理真实 VT 上的 DRM/KMS 访问。启动器等待绘制进程退出、释放控制权后才启动后续合成器；图形不可用时继续正常登录。默认从首次呈现起最短展示 1.2 秒，在登录启动器环境中设置 `AKARI_SPLASH_DURATION` 可同时调整两次展示。退出前清理终端文本和回滚缓冲。用 `akari preview --splash-duration 3` 预览同一绘制器。生命周期与实机验收项目见[交接实现](../../proposals/login-handoff.md)；黑屏间隔、VT 切换、桌面启动失败和退出登录仍需真实 VT 验证。
+原生启动画面在 Sway 启动前和用户桌面启动前运行，通过 libseat 管理真实 VT 上的 DRM/KMS 访问。启动器等待绘制进程退出、释放控制权后才启动后续合成器；图形不可用时继续正常登录。默认使用暗色背景，从首次呈现起最短展示 3 秒，在登录启动器环境中设置 `AKARI_SPLASH_DURATION` 可同时调整两次展示。退出前清理终端文本和回滚缓冲。用 `akari preview` 预览同一绘制器。生命周期与实机验收项目见[交接实现](https://github.com/anfsity/Akari/blob/main/docs/proposals/login-handoff.md)；黑屏间隔、VT 切换、桌面启动失败和退出登录仍需真实 VT 验证。
+
+仓库提供的 Sway 配置会在 Flutter 加载期间将启动画面的静态截图用作背景，需要安装 `swaybg`。已有正式安装保留原配置；将 `/etc/akari/sway.conf` 的背景行改为 `output * bg "$AKARI_LOG_DIR/splash.png" fit #15191f` 即可启用这个等待画面。
 
 桌面与 systemd 服务的就绪时序由所选桌面或会话管理器负责。选择 UWSM 管理的会话时，环境同步和退出清理由 UWSM 处理。直接启动 compositor 时保留现有集成；新增 custom 回调无法约束上游已经启动的应用。验证时应分别检查 compositor 子进程、新启动的用户服务和新激活的 D-Bus 服务。greetd 交接成功不代表桌面已经就绪。
 
