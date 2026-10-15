@@ -55,19 +55,12 @@ print('desktop stderr', file=sys.stderr)
     }
 
     fn get_command(&self, shell: &str, login: bool, arguments: &[&str]) -> Command {
-        let mut command = if login {
-            let mut command = Command::new(shell);
-            command.args([
-                "-l",
-                "-c",
-                "exec \"$AKARI_SESSION_EXECUTABLE\" --exec-desktop",
-            ]);
-            command
+        let mut command = Command::new(env!("CARGO_BIN_EXE_backend"));
+        command.arg(if login {
+            "--start-session"
         } else {
-            let mut command = Command::new(env!("CARGO_BIN_EXE_backend"));
-            command.arg("--exec-desktop");
-            command
-        };
+            "--exec-desktop"
+        });
         let mut desktop = vec![self.probe.to_str().unwrap(), self.report.to_str().unwrap()];
         desktop.extend(arguments);
         command
@@ -97,10 +90,17 @@ print('desktop stderr', file=sys.stderr)
         serde_json::from_slice(&fs::read(&self.report).unwrap()).unwrap()
     }
 
-    fn get_logs(&self, state: &str) -> Vec<PathBuf> {
+    fn get_logs(&self, state: &str, stage: &str) -> Vec<PathBuf> {
         fs::read_dir(self.root.join(state).join("akari/sessions"))
             .unwrap()
             .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with(stage)
+            })
             .collect()
     }
 }
@@ -121,7 +121,7 @@ fn native_login_shells_preserve_environment_arguments_and_process_identity() {
         }
         tested.push(shell);
         let fixture = SessionFixture::create();
-        let exports = "export SESSION_LOGIN='native login'\nexport LC_CTYPE=C.UTF-8\nexport PATH=\"$HOME/native-bin:$PATH\"\nexport XDG_STATE_HOME=\"$HOME/native-state\"\n";
+        let exports = "printf 'native stdout\\n'\nprintf 'native stderr\\n' >&2\nexport SESSION_LOGIN='native login'\nexport LC_CTYPE=C.UTF-8\nexport PATH=\"$HOME/native-bin:$PATH\"\nexport XDG_STATE_HOME=\"$HOME/native-state\"\n";
         fs::write(
             fixture.root.join(".profile"),
             format!(
@@ -141,7 +141,7 @@ fn native_login_shells_preserve_environment_arguments_and_process_identity() {
         fs::write(zdotdir.join(".zshrc"), "export SESSION_INTERACTIVE=yes\n").unwrap();
         let fish = fixture.root.join(".config/fish");
         fs::create_dir_all(&fish).unwrap();
-        fs::write(fish.join("config.fish"), "if status is-login\n set -gx SESSION_LOGIN 'native login'\n set -gx LC_CTYPE C.UTF-8\n set -gx PATH $HOME/native-bin $PATH\n set -gx XDG_STATE_HOME $HOME/native-state\nend\nif status is-interactive\n set -gx SESSION_INTERACTIVE yes\nend\n").unwrap();
+        fs::write(fish.join("config.fish"), "printf 'native stdout\\n'\nprintf 'native stderr\\n' >&2\nif status is-login\n set -gx SESSION_LOGIN 'native login'\n set -gx LC_CTYPE C.UTF-8\n set -gx PATH $HOME/native-bin $PATH\n set -gx XDG_STATE_HOME $HOME/native-state\nend\nif status is-interactive\n set -gx SESSION_INTERACTIVE yes\nend\n").unwrap();
 
         let arguments = [
             "",
@@ -154,7 +154,7 @@ fn native_login_shells_preserve_environment_arguments_and_process_identity() {
         let child = fixture
             .get_command(shell, true, &arguments)
             .env("ZDOTDIR", &zdotdir)
-            .stdout(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
             .unwrap();
@@ -164,6 +164,11 @@ fn native_login_shells_preserve_environment_arguments_and_process_identity() {
             output.status.success(),
             "shell={shell} status={:?}",
             output.status
+        );
+        assert!(
+            output.stdout.is_empty(),
+            "shell={shell} stdout={:?}",
+            output.stdout
         );
         assert!(
             output.stderr.is_empty(),
@@ -199,8 +204,22 @@ fn native_login_shells_preserve_environment_arguments_and_process_identity() {
         if shell == "/bin/bash" || shell == "/bin/sh" {
             assert_eq!(environment["SESSION_PROFILE_COUNT"], "1", "shell={shell}");
         }
-        assert!(!fixture.root.join("state").exists());
-        let logs = fixture.get_logs("native-state");
+        let startup_logs = fixture.get_logs("state", "startup-");
+        assert_eq!(startup_logs.len(), 1);
+        assert_eq!(
+            fs::metadata(&startup_logs[0]).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        let startup = fs::read_to_string(&startup_logs[0]).unwrap();
+        assert!(
+            startup.contains("native stdout"),
+            "shell={shell} log={startup}"
+        );
+        assert!(
+            startup.contains("native stderr"),
+            "shell={shell} log={startup}"
+        );
+        let logs = fixture.get_logs("native-state", "session-");
         assert_eq!(logs.len(), 1);
         assert_eq!(
             fs::metadata(&logs[0]).unwrap().permissions().mode() & 0o777,
@@ -243,7 +262,7 @@ fn locale_fallback_preserves_explicit_overrides_and_diagnoses_invalid_locales() 
         assert_eq!(environment["LC_CTYPE"], serde_json::json!(ctype));
         assert_eq!(environment["LC_ALL"], serde_json::json!(all));
         if language == Some("akari_invalid_locale") {
-            let log = fs::read_to_string(&fixture.get_logs("state")[0]).unwrap();
+            let log = fs::read_to_string(&fixture.get_logs("state", "session-")[0]).unwrap();
             assert!(log.contains("Cannot set"), "{log}");
         }
     }
@@ -286,6 +305,49 @@ fn malformed_invocation_and_failed_desktop_exec_have_actionable_diagnostics() {
     fs::remove_file(&fixture.probe).unwrap();
     let output = fixture.get_command("/bin/sh", true, &[]).output().unwrap();
     assert!(!output.status.success());
-    let log = fs::read_to_string(&fixture.get_logs("state")[0]).unwrap();
+    assert!(output.stdout.is_empty());
+    assert!(output.stderr.is_empty());
+    let log = fs::read_to_string(&fixture.get_logs("state", "session-")[0]).unwrap();
     assert!(log.contains("desktop_exec_failed"));
+}
+
+#[test]
+fn native_shell_failures_stay_in_private_startup_logs() {
+    let fixture = SessionFixture::create();
+    let shell = fixture.root.join("failed-shell");
+    fs::write(
+        &shell,
+        "#!/bin/sh\nprintf 'shell startup failed\\n' >&2\nexit 23\n",
+    )
+    .unwrap();
+    fs::set_permissions(&shell, fs::Permissions::from_mode(0o700)).unwrap();
+    let output = fixture
+        .get_command(shell.to_str().unwrap(), true, &[])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(23));
+    assert!(output.stdout.is_empty());
+    assert!(output.stderr.is_empty());
+    let logs = fixture.get_logs("state", "startup-");
+    assert_eq!(logs.len(), 1);
+    assert!(
+        fs::read_to_string(&logs[0])
+            .unwrap()
+            .contains("shell startup failed")
+    );
+    assert!(fixture.get_logs("state", "session-").is_empty());
+
+    fs::remove_file(&shell).unwrap();
+    let output = fixture
+        .get_command(shell.to_str().unwrap(), true, &[])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    assert!(output.stderr.is_empty());
+    assert!(fixture.get_logs("state", "startup-").iter().any(|path| {
+        fs::read_to_string(path)
+            .unwrap()
+            .contains("native_shell_exec_failed")
+    }));
 }

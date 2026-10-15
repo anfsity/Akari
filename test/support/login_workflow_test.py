@@ -624,6 +624,13 @@ elif command == 'backend':
             '/var/log/akari/greeter', str(self.root / 'logs')))
         (release / 'backend').write_text('#!/bin/sh\nprintf "prepared\\n"\n')
         (release / 'backend').chmod(0o755)
+        chmod = self.root / 'bin/chmod'
+        chmod.write_text('''#!/bin/sh
+printf 'launcher stdout\\n'
+printf 'launcher stderr\\n' >&2
+exec /usr/bin/chmod "$@"
+''')
+        chmod.chmod(0o755)
         boundary = release / 'scripts/debug-dbus.sh'
         boundary.write_text(f'''#!{sys.executable}
 import json, os, pathlib
@@ -637,14 +644,17 @@ print(json.dumps({{'release': os.environ['AKARI_RELEASE'],
         current = self.root / 'current'
         current.symlink_to(release)
         result = subprocess.run(['bash', str(current / 'launch.sh')],
-                                env={**os.environ, 'WLR_BACKENDS': 'headless'},
+                                env={**os.environ, 'WLR_BACKENDS': 'headless',
+                                     'PATH': self.environment['PATH']},
                                 capture_output=True, text=True, timeout=5)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, '')
         self.assertEqual(result.stderr, '')
         sessions = list((self.root / 'logs').glob('session-*'))
         self.assertEqual(len(sessions), 1)
-        self.assertIn('prepared', (sessions[0] / 'lifecycle.log').read_text())
+        lifecycle = (sessions[0] / 'lifecycle.log').read_text()
+        for message in ['prepared', 'launcher stdout', 'launcher stderr']:
+            self.assertIn(message, lifecycle)
         self.assertEqual(json.loads((sessions[0] / 'sway.log').read_text()), {
             'release': str(release), 'mode': 'real', 'nested_backend': None,
             'log_permissions': 0o755})
@@ -652,6 +662,8 @@ print(json.dumps({{'release': os.environ['AKARI_RELEASE'],
     def test_backend_exit_terminates_frontend_and_releases_compositor(self):
         result = self.run_greeter(LONG_FRONTEND='1', FAIL_BACKEND='1')
         self.assertEqual(result.returncode, 143, result.stderr)
+        self.assertEqual(result.stdout, '')
+        self.assertEqual(result.stderr, '')
         self.assertTrue((self.root / 'sway-exited').exists())
         pid = int((self.root / 'frontend.pid').read_text())
         with self.assertRaises(ProcessLookupError):

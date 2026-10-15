@@ -26,13 +26,18 @@ fn main() -> AppResult<()> {
     let arguments: Vec<_> = std::env::args_os().skip(1).collect();
     match arguments.first().and_then(|argument| argument.to_str()) {
         None if arguments.is_empty() => run_backend(),
+        Some(session_launch::START_SESSION) if arguments.len() == 1 => {
+            session_launch::start_session().map_err(Into::into)
+        }
         Some(session_launch::EXEC_DESKTOP) if arguments.len() == 1 => {
             session_launch::exec_desktop().map_err(Into::into)
         }
         Some(terminal_transition::PREPARE_TRANSITION) if arguments.len() == 1 => {
             terminal_transition::prepare_transition().map_err(Into::into)
         }
-        _ => Err("expected no arguments, --exec-desktop or --prepare-transition".into()),
+        _ => Err(
+            "expected no arguments, --start-session, --exec-desktop or --prepare-transition".into(),
+        ),
     }
 }
 

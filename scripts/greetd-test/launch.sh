@@ -6,6 +6,7 @@ run_dir="$(readlink -f "$test_root/current-run")"
 # so a later login screen cannot overwrite the first handoff's backend logs.
 umask 022
 export AKARI_LOG_DIR="$(mktemp -d "$run_dir/greeter/session-XXXXXXXX")"
+exec >> "$AKARI_LOG_DIR/lifecycle.log" 2>&1
 chmod 0755 "$AKARI_LOG_DIR"
 export AKARI_BACKEND_MODE=real
 export AKARI_BACKEND_BIN="$test_root/backend"
@@ -24,6 +25,6 @@ export XDG_SESSION_DESKTOP=sway
 export XDG_SESSION_TYPE=wayland
 # This is a standalone DRM test. Do not inherit nested desktop backend settings.
 unset DISPLAY WAYLAND_DISPLAY WAYLAND_SOCKET SWAYSOCK WLR_BACKENDS WLR_WAYLAND_DISPLAY
-"$AKARI_BACKEND_BIN" --prepare-transition >> "$AKARI_LOG_DIR/lifecycle.log" 2>&1 || true
+"$AKARI_BACKEND_BIN" --prepare-transition || true
 exec "$test_root/scripts/debug-dbus.sh" \
   /usr/bin/sway --config "$run_dir/sway.conf" > "$AKARI_LOG_DIR/sway.log" 2>&1

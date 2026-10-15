@@ -24,10 +24,12 @@ The process observes both service lifetime and authentication actor lifetime.
 Shutdown stops accepting calls before cancelling active protocol work. Session
 handoff must release the greeter so greetd can launch the selected desktop.
 
-The handoff forwards to the authenticated user's login shell, then re-enters the
-same installed executable with `--exec-desktop`. That mode runs without the
-greeter's async runtime or D-Bus service. Desktop arguments travel as JSON in
-the greetd environment and are executed directly after native initialization.
+The handoff enters the installed executable with `--start-session`, captures
+startup output in a private log, and execs the authenticated user's login shell.
+The shell then re-enters the same executable with `--exec-desktop`. Both modes
+run without the greeter's async runtime or D-Bus service. Desktop arguments
+travel as JSON in the greetd environment and are executed directly after native
+initialization.
 The [real-login guide](../guides/greetd-testing.md#user-session-environment)
 describes configuration, logs, and service-readiness boundaries.
 
