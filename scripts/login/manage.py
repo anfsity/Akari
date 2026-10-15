@@ -266,7 +266,7 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
         (release / 'scripts').mkdir()
         # Reuse the tested D-Bus and output-layout implementations. The test
         # lifecycle remains entirely separate from this deployment.
-        for name in ['debug-dbus.sh', 'lib.sh']:
+        for name in ['debug-dbus.sh', 'lib.sh', 'splash.sh']:
             shutil.copy2(source / 'scripts' / name, release / 'scripts' / name)
         for name in ['display-layout.py', 'display_profile.py']:
             shutil.copy2(source / 'scripts/greetd-test' / name, release / name)

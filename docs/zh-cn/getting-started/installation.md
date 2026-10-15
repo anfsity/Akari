@@ -8,7 +8,8 @@ description: 安装运行 Akari 所需的工具，准备好开发环境。
 Akari 目前只支持在 Linux 上构建和运行。开始前，请先安装这些工具：
 
 - Git 和 [FVM](https://fvm.app/)，用于使用仓库指定的 Flutter SDK。
-- Rust 和 Cargo，用于构建后端。
+- Rust 和 Cargo，用于构建后端和原生启动画面；libseat 开发文件
+  （Debian/Ubuntu 安装 `libseat-dev`，Arch 由 `seatd` 提供）。
 - Clang、CMake、Ninja、pkg-config，以及 Flutter Linux 所需的 GTK 3 开发文件。
 - D-Bus 工具，包括后端会话所需的 `dbus-run-session` 和 `busctl`。
 

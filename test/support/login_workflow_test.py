@@ -592,8 +592,8 @@ elif command == 'swaymsg':
     if not (root / 'transition-prepared').exists():
         sys.exit('Transition must be prepared before Sway exits')
     (root / 'sway-exited').touch()
-elif command == 'backend':
-    assert sys.argv[1:] == ['--prepare-transition']
+elif command == 'akari-splash':
+    assert sys.argv[1:] == ['clear']
     (root / 'transition-prepared').touch()
 ''')
         boundary.chmod(0o755)
@@ -601,11 +601,11 @@ elif command == 'backend':
         # invoking itself through /usr/bin/env.
         boundary.write_text(boundary.read_text().replace(
             '#!/usr/bin/env python3', f'#!{sys.executable}'))
-        for name in ['python3', 'busctl', 'swaymsg', 'backend']:
+        for name in ['python3', 'busctl', 'swaymsg', 'akari-splash']:
             (binary / name).symlink_to(boundary)
         self.environment = {**os.environ, 'PATH': f'{binary}:{os.environ["PATH"]}',
                             'AKARI_RELEASE': str(self.root), 'AKARI_APP': 'fixture',
-                            'AKARI_BACKEND_BIN': str(binary / 'backend'),
+                            'AKARI_SPLASH_BIN': str(binary / 'akari-splash'),
                             'AKARI_LOG_DIR': str(self.root), 'FIXTURE': str(self.root)}
 
     def run_greeter(self, **environment):
@@ -623,12 +623,13 @@ elif command == 'backend':
     def test_launch_pins_release_and_publishes_readable_real_login_logs(self):
         release = self.root / 'release'
         (release / 'scripts').mkdir(parents=True)
+        (release / 'scripts/splash.sh').write_text((REPOSITORY / 'scripts/splash.sh').read_text())
         (self.root / 'logs').mkdir()
         source = (REPOSITORY / 'scripts/login/launch.sh').read_text()
         (release / 'launch.sh').write_text(source.replace(
             '/var/log/akari/greeter', str(self.root / 'logs')))
-        (release / 'backend').write_text('#!/bin/sh\nprintf "prepared\\n"\n')
-        (release / 'backend').chmod(0o755)
+        (release / 'akari-splash').write_text('#!/bin/sh\nprintf "prepared\\n"\n')
+        (release / 'akari-splash').chmod(0o755)
         chmod = self.root / 'bin/chmod'
         chmod.write_text('''#!/bin/sh
 printf 'launcher stdout\\n'

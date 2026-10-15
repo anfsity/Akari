@@ -10,6 +10,7 @@ exec >> "$AKARI_LOG_DIR/lifecycle.log" 2>&1
 chmod 0755 "$AKARI_LOG_DIR"
 export AKARI_BACKEND_MODE=real
 export AKARI_BACKEND_BIN="$test_root/backend"
+export AKARI_SPLASH_BIN="$test_root/akari-splash"
 export AKARI_APP="$test_root/frontend/greeter"
 export AKARI_FLUTTER_LOG="$AKARI_LOG_DIR/flutter.log"
 export AKARI_WINDOW_MODE=fullscreen
@@ -25,6 +26,7 @@ export XDG_SESSION_DESKTOP=sway
 export XDG_SESSION_TYPE=wayland
 # This is a standalone DRM test. Do not inherit nested desktop backend settings.
 unset DISPLAY WAYLAND_DISPLAY WAYLAND_SOCKET SWAYSOCK WLR_BACKENDS WLR_WAYLAND_DISPLAY
-"$AKARI_BACKEND_BIN" --prepare-transition || true
+source "$test_root/scripts/splash.sh"
+akari_show_splash || true
 exec "$test_root/scripts/debug-dbus.sh" \
   /usr/bin/sway --config "$run_dir/sway.conf" > "$AKARI_LOG_DIR/sway.log" 2>&1

@@ -1,80 +1,68 @@
-# Login handoff experiments
+# Native login handoff
 
-Status: the ASCII transition is implemented for testing on real VTs. The
-graphics-mode alternative remains a retained option. Visual continuity across
-Sway/greetd handoff has not yet been verified on hardware.
+Status: the native window preview and process-ordering tests pass. The DRM/KMS
+implementation is connected to both VT launch boundaries; visual continuity,
+VT switching and driver-specific behavior still require hardware acceptance.
+The previous ASCII animator has been removed.
 
-## Current boundary
+## Launch boundaries
 
-Akari discovers the selected desktop command from session desktop files and
-submits it through greetd's `start_session(cmd, env)` request. The user command
-starts after the greeter process exits. Today the Sway greeter and user desktop
-use the configured greetd VT, leaving a possible text-console interval between
-compositors.
+The production and greetd-test launchers run the pinned release's `akari-splash
+kms` before starting Sway. `scripts/splash.sh` owns that child and waits for its
+exit before allowing Sway to acquire the display. Signals terminate and reap the
+child; launcher death also stops the renderer.
 
-The generic Akari session launcher wraps the discovered command without editing
-distribution desktop files or recognizing individual desktops. It is part of
-the installed backend, preserves command arguments and session environment,
-and execs the desktop with its original process identity. User-session logging
-belongs in the user's XDG state directory.
+After successful authentication, greetd starts the user launcher only after the
+greeter has exited. The launcher captures native shell output in `startup-*.log`,
+initializes the session log, and runs the same splash executable before execing
+the desktop. The desktop retains the launcher's process identity and exit status.
+Authentication remains in the existing backend actor and does not acquire DRM.
 
-## Option: graphics-mode transition
+## Rendering and lifetime
 
-Explore the SDDM approach of clearing the target VT and setting `KD_GRAPHICS`
-during handoff, with desktop output redirected to logs. Determine where this
-operation must happen: a user launcher cannot act before its execution begins.
-Sway or greetd may change terminal state during that earlier interval.
+The independent Rust program embeds the selected portrait PNG and Quicksand
+font. Both its desktop window and KMS outputs use one CPU renderer. Images and
+fonts load once; scaled portraits and glyph layers are cached per output size.
+Only the slight float and status dots change each frame.
 
-Verify normal login, startup failure, desktop exit, and VT switching on hardware.
-Confirm terminal restoration and whether the earliest text flash is eliminated.
-Keep terminal operations conditional on an actual supported console session.
+The minimum display time defaults to 1.2 seconds, starting at the first successful
+presentation. Zero removes the artificial hold. `--splash-duration` controls the
+window preview; `AKARI_SPLASH_DURATION` can be set in the VT launcher's environment
+and is forwarded through greetd to the user launcher. This time is not a desktop
+startup timeout or a desktop readiness signal.
 
-## Implemented experiment: ASCII transition screen
+KMS access goes through libseat's logind/seatd management. The program enumerates
+primary DRM nodes, connected outputs, active CRTCs and their modes. Each output
+uses its actual resolution; cloned connectors share a buffer. It creates and maps
+XRGB dumb buffers without selecting a fixed GPU number.
 
-`scripts/ascii-transition.py` contains a FIGlet Slant AKARI wordmark and a cyan
-light sweep. Its source is embedded in the backend so both greeter and user
-executor use the same implementation from their pinned release.
+On normal exit, failure, termination or seat revocation, drawing stops before
+resources and seat control are released. Revocation ends the renderer permanently;
+a later enable cannot revive it. No previous compositor state is restored after
+release. CLOSEFB retains the last scanout when the kernel and console transition
+permit; older kernels fall back to RMFB. Console mode restoration or a compositor
+mode change may still blank the screen. Process exit is the release acknowledgement.
 
-Production and harness launchers prepare a cleared VT buffer before starting
-Sway, and again before asking Sway to exit. Preparation leaves the cursor
-visible in case user execution never begins. The user executor starts the
-animator before execing the desktop. Desktop output stays redirected to its
-private session log, and normal Akari log-path messages no longer reach the VT.
+## Console and log guarantees
 
-The renderer opens the controlling terminal and uses `KDGETMODE` to exclude
-PTYs and missing consoles. It never sets display/keyboard modes or switches
-VTs. Rendering follows actual terminal dimensions and falls back to a compact
-wordmark on small consoles. It clears once, then updates the wordmark in place.
+Renderer errors go to the existing lifecycle/session logs and allow normal login
+to continue. PTYs cannot enter the KMS path. Before Sway exits, `akari-splash clear`
+erases hidden terminal text and scrollback without acquiring display control.
+The KMS renderer clears these again during its own cleanup, before releasing the
+seat. Launcher, native shell and desktop output retain their existing redirection.
+No detached animation can repaint the console after the desktop takes over.
 
-The animator detaches, allowing the executor to keep desktop process identity,
-signals, and exit status. A pidfd follows that session across exec without PID
-reuse ambiguity. Animation stops on graphics takeover, session exit, a stop
-signal, or a 15-second limit. It clears the VT text buffer and scrollback before
-restoring the cursor, including when graphics mode has already taken over, to
-prevent desktop exit from revealing the last animation frame. Renderer errors are logged
-and do not prevent desktop startup. Animation requires Python's Linux pidfd
-support; a failure leaves the prepared static frame and is recorded in the log.
+## Hardware acceptance
 
-Preview the animation in an ordinary terminal without operating a VT:
-
-```sh
-python3 scripts/ascii-transition.py preview
-```
-
-When piped, preview prints only the static ASCII wordmark. Preparation and
-animation on a real VT are invoked by the installed backend, not this preview.
-
-Verify that terminal contents survive Sway exit and greetd handoff, including
-console resets and display-mode changes. Check different console dimensions,
-startup failure, desktop exit, and cursor restoration. Do not use continuous
-redrawing to compete with logs. An ASCII screen needs text-mode rendering;
-graphics mode is a separate transition strategy.
-
-Neither option guarantees that compositor mode changes avoid a short black
-screen. Nested and headless tests cannot establish the visual hardware result.
+Check both transitions on a real VT: before Sway and before the user desktop.
+Cover different GPUs, mixed resolutions, cloned and extended outputs, VT switches,
+renderer termination, missing devices, compositor startup failure and logout.
+Confirm no lingering process, DRM master conflict, old frame or startup log returns
+on desktop exit. Measure the actual blank interval between compositors; nested
+and headless tests cannot establish this result.
 
 ## References
 
+- [DRM primary nodes and framebuffer lifetime](https://docs.kernel.org/gpu/drm-uapi.html)
+- [libseat API](https://git.sr.ht/~kennylevinsen/seatd/tree/master/item/include/libseat.h)
 - [greetd session protocol](https://manpages.debian.org/testing/greetd/greetd-ipc.7.en.html)
-- [SDDM VT handling](https://github.com/sddm/sddm/blob/v0.21.0/src/common/VirtualTerminal.cpp)
-- [SDDM session launch and logging](https://github.com/sddm/sddm/blob/v0.21.0/src/helper/UserSession.cpp)
