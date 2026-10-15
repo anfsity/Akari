@@ -20,7 +20,6 @@ use std::{
 };
 
 use crate::session_catalog::SessionEntry;
-use crate::terminal_transition::start_transition_animation;
 use serde::{Deserialize, Serialize};
 
 pub const START_SESSION: &str = "--start-session";
@@ -58,6 +57,15 @@ pub fn get_session_launch(session: &SessionEntry) -> io::Result<(Vec<String>, Ve
     }
     environment.push(format!("AKARI_SESSION_EXECUTABLE={executable}"));
     environment.push(format!("AKARI_SESSION_INVOCATION={invocation}"));
+    environment.push(format!(
+        "AKARI_SPLASH_BIN={}",
+        Path::new(&executable)
+            .with_file_name("akari-splash")
+            .display()
+    ));
+    if let Ok(duration) = env::var("AKARI_SPLASH_DURATION") {
+        environment.push(format!("AKARI_SPLASH_DURATION={duration}"));
+    }
     Ok((command, environment))
 }
 
@@ -143,10 +151,23 @@ pub fn exec_desktop() -> io::Result<()> {
     command
         .stdout(Stdio::from(log.try_clone()?))
         .stderr(Stdio::from(log.try_clone()?));
-    // Display preparation is optional; a missing console or failed renderer
-    // must not prevent an otherwise valid desktop session from starting.
-    if let Err(error) = start_transition_animation(&log) {
-        writeln!(log, "event=transition_animation_failed error={error:?}")?;
+    let splash = match env::var_os("AKARI_SPLASH_BIN") {
+        Some(path) => PathBuf::from(path),
+        None => env::current_exe()?.with_file_name("akari-splash"),
+    };
+    // This code is the user launcher, not the authentication runtime. A reaped
+    // renderer has closed every display FD before the desktop may acquire one.
+    // Failure remains optional, and renderer/shell output never reaches the VT.
+    match Command::new(&splash)
+        .arg("kms")
+        .env("AKARI_SPLASH_PARENT_PID", std::process::id().to_string())
+        .stdin(Stdio::null())
+        .stdout(log.try_clone()?)
+        .stderr(log.try_clone()?)
+        .status()
+    {
+        Ok(status) => writeln!(log, "event=splash_finished status={status}")?,
+        Err(error) => writeln!(log, "event=splash_unavailable error={error:?}")?,
     }
     let error = command.exec();
     writeln!(

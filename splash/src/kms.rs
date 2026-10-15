@@ -205,12 +205,8 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
         }
         let mut display = session.display.borrow_mut();
         for card in &mut display.cards {
-            card.present(
-                timing.get_elapsed(Instant::now()).as_secs_f32(),
-                &mut options.snapshot,
-            )?;
+            card.present(&mut timing, &mut options.snapshot)?;
         }
-        timing.mark_presented(Instant::now());
         drop(display);
         // Dispatch instead of sleeping so VT revocation is acknowledged promptly.
         session.seat.dispatch(33)?;
@@ -265,6 +261,7 @@ struct Output {
     framebuffer: framebuffer::Handle,
     scene: Scene,
     presented: bool,
+    flush_damage: bool,
 }
 
 impl Card {
@@ -275,20 +272,23 @@ impl Card {
         let mut connectors = resources
             .connectors()
             .iter()
-            .map(|handle| card.get_connector(*handle, true))
+            .map(|handle| {
+                let connector = card.get_connector(*handle, true)?;
+                let current = connector
+                    .current_encoder()
+                    .map(|encoder| card.get_encoder(encoder))
+                    .transpose()?
+                    .and_then(|encoder| encoder.crtc());
+                Ok((connector, current))
+            })
             .collect::<io::Result<Vec<_>>>()?;
         // Reserve active CRTCs first. New outputs must not steal one from an
         // already lit connector; cloned connectors share that CRTC's buffer.
-        connectors.sort_by_key(|connector| connector.current_encoder().is_none());
-        for connector in connectors {
+        connectors.sort_by_key(|(_, current)| current.is_none());
+        for (connector, current) in connectors {
             if connector.state() != connector::State::Connected {
                 continue;
             }
-            let current = connector
-                .current_encoder()
-                .map(|encoder| card.get_encoder(encoder))
-                .transpose()?
-                .and_then(|encoder| encoder.crtc());
             if let Some(output) =
                 current.and_then(|crtc| self.outputs.iter_mut().find(|output| output.crtc == crtc))
             {
@@ -337,16 +337,19 @@ impl Card {
                 framebuffer,
                 scene,
                 presented: false,
+                flush_damage: true,
             });
             used.insert(crtc);
         }
         Ok(())
     }
 
-    fn present(&mut self, seconds: f32, snapshot: &mut Option<PathBuf>) -> Result {
+    fn present(&mut self, timing: &mut Presentation, snapshot: &mut Option<PathBuf>) -> Result {
         let card = &self.device;
         for output in &mut self.outputs {
-            output.scene.draw(seconds);
+            output
+                .scene
+                .draw(timing.get_elapsed(Instant::now()).as_secs_f32());
             let pitch = output.buffer.pitch() as usize;
             {
                 let mut mapping = card.map_dumb_buffer(&mut output.buffer)?;
@@ -367,6 +370,17 @@ impl Card {
                     }
                 }
             }
+            // Shadow framebuffers need damage notification to upload CPU
+            // writes. Native scanout drivers can report this as unsupported.
+            if output.flush_damage {
+                match card.dirty_framebuffer(output.framebuffer, &[]) {
+                    Ok(()) => {}
+                    Err(error) if error.raw_os_error() == Some(libc::ENOSYS) => {
+                        output.flush_damage = false;
+                    }
+                    Err(error) => return Err(error.into()),
+                }
+            }
             if !output.presented {
                 card.set_crtc(
                     output.crtc,
@@ -376,6 +390,7 @@ impl Card {
                     Some(output.mode),
                 )?;
                 output.presented = true;
+                timing.mark_presented(Instant::now());
                 eprintln!(
                     "event=splash_presented connectors={:?} resolution={:?}",
                     output.connectors,

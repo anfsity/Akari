@@ -7,7 +7,6 @@ mod service;
 mod session_catalog;
 mod session_launch;
 mod state;
-mod terminal_transition;
 mod users;
 
 use std::{error::Error, sync::Arc};
@@ -32,12 +31,7 @@ fn main() -> AppResult<()> {
         Some(session_launch::EXEC_DESKTOP) if arguments.len() == 1 => {
             session_launch::exec_desktop().map_err(Into::into)
         }
-        Some(terminal_transition::PREPARE_TRANSITION) if arguments.len() == 1 => {
-            terminal_transition::prepare_transition().map_err(Into::into)
-        }
-        _ => Err(
-            "expected no arguments, --start-session, --exec-desktop or --prepare-transition".into(),
-        ),
+        _ => Err("expected no arguments, --start-session or --exec-desktop".into()),
     }
 }
 

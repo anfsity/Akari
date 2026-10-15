@@ -37,16 +37,15 @@ while the startup log stays in the original location. greetd's own profile
 loading and PAM output precede this launcher and are outside its redirection.
 Greeter launch and shutdown diagnostics go to each greeter's `lifecycle.log`.
 
-The ASCII handoff experiment prepares an AKARI wordmark before Sway exits and
-animates a light sweep while the user session starts on a text-mode Linux VT.
-It stops when graphics mode takes over, the session exits, or 15 seconds elapse,
-then clears the VT buffer and scrollback so the last frame does not reappear
-when the desktop exits.
-PTYs and missing controlling terminals skip this behavior. Preview it with
-`python3 scripts/ascii-transition.py preview`; see the
-[handoff experiment](../proposals/login-handoff.md) for lifecycle and hardware
-checks. Real VT testing must establish whether Sway/greetd preserves the prepared
-buffer, including desktop startup failure, logout and VT switching.
+The native splash runs before Sway and before the user desktop, using libseat and
+DRM/KMS on real VTs. Each launcher waits for renderer exit before allowing the
+next compositor to acquire the display. Failure remains optional. The default
+minimum hold is 1.2 seconds from first presentation; `AKARI_SPLASH_DURATION` in
+the greeter launcher environment adjusts both transitions. Console text and
+scrollback are cleared before release. Preview the shared renderer with
+`akari preview --splash-duration 3`; see the
+[handoff implementation](../proposals/login-handoff.md) for lifetime and hardware
+checks. Actual blank intervals, VT switching, failure and logout need real VT tests.
 
 Desktop and systemd service readiness belongs to the selected desktop/session
 manager. UWSM-managed selections retain UWSM's environment and cleanup behavior.

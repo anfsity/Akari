@@ -187,7 +187,7 @@ const cliOptions = {
 const cliCommands = [
   CliCommand(
     'build',
-    'Build the selected frontend and production Rust backend.',
+    'Build the selected frontend, production Rust backend and native splash.',
     options: ['--theme', '--jobs', '--mode', '--platform'],
     development: DevelopmentCommand.build,
   ),

@@ -96,7 +96,7 @@ Future<void> main(List<String> arguments) async {
 
   for (final workflow in [
     'login_workflow_test.py',
-    'ascii_transition_test.py',
+    'splash_workflow_test.py',
   ]) {
     test('$workflow isolates systemd and runtime boundaries', () async {
       final result = await Process.run('python3', [

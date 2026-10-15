@@ -11,8 +11,8 @@ description: 查命令、选项、显示配置和运行报告。
 
 | 命令 | 用途 | 命令专属选项 |
 | --- | --- | --- |
-| `build` | 构建所选主题和正式版后端 | `--theme`、`--jobs`、`--mode`、`--platform` |
-| `preview` | 使用演示登录状态预览主题 | `--theme`、`--jobs`、`--mode` |
+| `build` | 构建所选主题、正式版后端和原生启动画面 | `--theme`、`--jobs`、`--mode`、`--platform` |
+| `preview` | 显示原生启动画面，再进入主题的模拟登录界面 | `--theme`、`--jobs`、`--mode`、`--splash-duration` |
 | `run` | 使用私有 D-Bus 和后端运行登录界面 | `--theme`、`--jobs`、`--mode`、`--backend` |
 | `run sway` | 在嵌套或无头 Sway 中运行登录界面 | `run` 选项，以及 `--display-profile`、`--resolution`、`--scale`、`--sway-backend` |
 | `run studio` | 使用已编译主题编辑场景 | `--theme`、`--jobs` |

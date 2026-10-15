@@ -84,6 +84,8 @@ elif name == 'chmod':
             target.write_text(script)
             target.chmod(0o755)
         (self.root / "frontend").mkdir()
+        (self.root / 'scripts').mkdir()
+        shutil.copy2(SOURCE.parent / 'splash.sh', self.root / 'scripts/splash.sh')
         for path in [self.root / "frontend/greeter", self.root / "backend"]:
             path.touch()
             path.chmod(0o755)
@@ -186,7 +188,6 @@ elif name == 'chmod':
 
     def test_each_greeter_keeps_its_own_logs(self):
         self.assertEqual(self.run_script("start.sh").returncode, 0)
-        (self.root / 'scripts').mkdir()
         launcher = self.root / 'scripts/debug-dbus.sh'
         launcher.write_text('#!/bin/sh\nprintf backend > "$AKARI_LOG_DIR/backend.log"\nexec "$@"\n')
         launcher.chmod(0o755)
@@ -226,7 +227,7 @@ class InstallerTest(unittest.TestCase):
         layout_script = self.source / 'display-layout.py'
         layout_script.write_text(layout_script.read_text().replace(
             '/run/user/{os.getuid()}', str(self.root / 'runtime') + '/{os.getuid()}'))
-        for name in ["lib.sh", "debug-dbus.sh"]:
+        for name in ["lib.sh", "debug-dbus.sh", "splash.sh"]:
             shutil.copy2(SOURCE.parent / name, self.repo / "scripts" / name)
         (self.repo / "source-version").write_text("new")
         self.bin = self.root / "bin"

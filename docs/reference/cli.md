@@ -10,8 +10,8 @@ From the repository root, use `fvm dart run tool/akari.dart COMMAND`. After
 
 | Command | Purpose | Command-specific options |
 | --- | --- | --- |
-| `build` | Build a selected theme and production backend | `--theme`, `--jobs`, `--mode`, `--platform` |
-| `preview` | Preview a theme with demo login state | `--theme`, `--jobs`, `--mode` |
+| `build` | Build a selected theme, production backend and native splash | `--theme`, `--jobs`, `--mode`, `--platform` |
+| `preview` | Show the native splash, then preview a theme with demo login state | `--theme`, `--jobs`, `--mode`, `--splash-duration` |
 | `run` | Run the greeter with a private D-Bus and backend | `--theme`, `--jobs`, `--mode`, `--backend` |
 | `run sway` | Run that greeter inside nested or headless Sway | Run options plus `--display-profile`, `--resolution`, `--scale`, `--sway-backend` |
 | `run studio` | Edit scenes with the selected compiled theme | `--theme`, `--jobs` |
@@ -79,8 +79,8 @@ akari login enable
 akari login status
 ```
 
-`install` builds the selected theme and production backend in Linux release mode,
-then requests sudo to deploy the complete Flutter bundle and Rust executable.
+`install` builds the selected theme, production backend and native splash in Linux
+release mode, then requests sudo to deploy the complete bundle and Rust executables.
 Build failure leaves the installed environment untouched. Relative theme paths
 belong to the invocation directory. SDK selection follows the ordinary build
 command, including `AKARI_FLUTTER_BIN` and `AKARI_DART_BIN`.

@@ -9,6 +9,7 @@ exec >> "$AKARI_LOG_DIR/lifecycle.log" 2>&1
 chmod 0755 "$AKARI_LOG_DIR"
 export AKARI_BACKEND_MODE=real
 export AKARI_BACKEND_BIN="$AKARI_RELEASE/backend"
+export AKARI_SPLASH_BIN="$AKARI_RELEASE/akari-splash"
 export AKARI_APP="$AKARI_RELEASE/frontend/greeter"
 export AKARI_BUS_MODE=private
 export AKARI_WINDOW_MODE=fullscreen
@@ -18,6 +19,7 @@ export XDG_CURRENT_DESKTOP=Sway
 export XDG_SESSION_DESKTOP=sway
 export XDG_SESSION_TYPE=wayland
 unset DISPLAY WAYLAND_DISPLAY WAYLAND_SOCKET SWAYSOCK WLR_BACKENDS WLR_WAYLAND_DISPLAY
-"$AKARI_BACKEND_BIN" --prepare-transition || true
+source "$AKARI_RELEASE/scripts/splash.sh"
+akari_show_splash || true
 exec "$AKARI_RELEASE/scripts/debug-dbus.sh" \
   /usr/bin/sway --config /etc/akari/sway.conf > "$AKARI_LOG_DIR/sway.log" 2>&1

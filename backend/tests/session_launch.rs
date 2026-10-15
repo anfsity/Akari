@@ -72,6 +72,7 @@ print('desktop stderr', file=sys.stderr)
             .env("XDG_STATE_HOME", self.root.join("state"))
             .env("AKARI_TEST_SECRET", "greeter-internal")
             .env("AKARI_SESSION_EXECUTABLE", &self.backend)
+            .env("AKARI_SPLASH_BIN", self.root.join("akari-splash"))
             .env(
                 "AKARI_SESSION_INVOCATION",
                 serde_json::json!({
@@ -108,6 +109,61 @@ print('desktop stderr', file=sys.stderr)
 impl Drop for SessionFixture {
     fn drop(&mut self) {
         fs::remove_dir_all(&self.root).unwrap();
+    }
+}
+
+#[test]
+fn desktop_waits_for_splash_exit_and_renderer_failures_remain_optional() {
+    for status in [0, 1] {
+        let fixture = SessionFixture::create();
+        let splash = fixture.root.join("akari-splash");
+        fs::write(
+            &splash,
+            format!(
+                r#"#!/usr/bin/python3
+import os, pathlib, sys, time
+root = pathlib.Path(os.environ['HOME'])
+assert sys.argv[1:] == ['kms']
+assert os.environ['AKARI_SPLASH_DURATION'] == '3'
+assert int(os.environ['AKARI_SPLASH_PARENT_PID']) == os.getppid()
+(root / 'splash.pid').write_text(str(os.getpid()))
+time.sleep(0.05)
+(root / 'released').touch()
+print('splash stdout')
+print('splash stderr', file=sys.stderr)
+sys.exit({status})
+"#
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&splash, fs::Permissions::from_mode(0o700)).unwrap();
+        let probe = fs::read_to_string(&fixture.probe).unwrap();
+        fs::write(
+            &fixture.probe,
+            probe.replace(
+                "import json, os, sys",
+                r#"import json, os, sys, pathlib
+root = pathlib.Path(sys.argv[1]).parent
+assert (root / 'released').exists()
+try: os.kill(int((root / 'splash.pid').read_text()), 0)
+except ProcessLookupError: pass
+else: raise AssertionError('desktop started before splash exit')"#,
+            ),
+        )
+        .unwrap();
+        let output = fixture
+            .get_command("/bin/sh", false, &[])
+            .env("AKARI_SPLASH_DURATION", "3")
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        assert!(output.stdout.is_empty());
+        assert!(output.stderr.is_empty());
+        fixture.get_report();
+        let log = fs::read_to_string(&fixture.get_logs("state", "session-")[0]).unwrap();
+        assert!(log.contains("splash stdout"));
+        assert!(log.contains("splash stderr"));
+        assert!(log.contains("event=splash_finished"));
     }
 }
 

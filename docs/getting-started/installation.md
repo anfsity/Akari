@@ -8,7 +8,8 @@ description: Prepare the Linux toolchain for Akari development.
 Akari currently builds and runs on Linux. Install:
 
 - Git and [FVM](https://fvm.app/) to use the repository's Flutter SDK.
-- Rust and Cargo for the backend.
+- Rust and Cargo for the backend and native splash; libseat development files
+  (`libseat-dev` on Debian/Ubuntu, provided by `seatd` on Arch).
 - Clang, CMake, Ninja, pkg-config, and GTK 3 development files for Flutter Linux.
 - D-Bus tools, including `dbus-run-session` and `busctl`, for backend sessions.
 

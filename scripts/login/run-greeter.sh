@@ -10,7 +10,7 @@ cleanup() {
       wait "$child" >/dev/null 2>&1 || true
     fi
   done
-  "$AKARI_BACKEND_BIN" --prepare-transition || true
+  "$AKARI_SPLASH_BIN" clear || true
   swaymsg exit >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
