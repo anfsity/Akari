@@ -150,9 +150,13 @@ impl Scene {
 
     pub fn copy_xrgb(&self, target: &mut [u32]) {
         for (pixel, rgba) in target.iter_mut().zip(self.pixels.data().as_chunks::<4>().0) {
-            *pixel = (u32::from(rgba[0]) << 16) | (u32::from(rgba[1]) << 8) | u32::from(rgba[2]);
+            *pixel = get_xrgb_pixel(rgba);
         }
     }
+}
+
+pub fn get_xrgb_pixel(rgba: &[u8; 4]) -> u32 {
+    (u32::from(rgba[0]) << 16) | (u32::from(rgba[1]) << 8) | u32::from(rgba[2])
 }
 
 fn get_text_width(font: &FontVec, text: &str, size: f32, spacing: f32) -> f32 {

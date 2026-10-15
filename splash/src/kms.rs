@@ -24,7 +24,7 @@ use libseat::{Device, Seat, SeatEvent, SeatRef};
 
 use crate::{
     Options, Result,
-    renderer::{Renderer, Scene},
+    renderer::{Renderer, Scene, get_xrgb_pixel},
     timing::Presentation,
 };
 
@@ -366,7 +366,7 @@ impl Card {
                         .iter()
                         .zip(target.as_chunks_mut::<4>().0)
                     {
-                        pixel.copy_from_slice(&[rgba[2], rgba[1], rgba[0], 0]);
+                        pixel.copy_from_slice(&get_xrgb_pixel(rgba).to_le_bytes());
                     }
                 }
             }
