@@ -28,7 +28,11 @@ void main() {
 
   Future<void> createArtifacts(BuildMode mode) async {
     final artifacts = createBuildPlan(repo, theme, mode: mode).artifactPaths;
-    for (final key in ['executable', 'backend_executable']) {
+    for (final key in [
+      'executable',
+      'backend_executable',
+      'splash_executable',
+    ]) {
       final file = File('${repo.path}/${artifacts[key]}');
       await file.parent.create(recursive: true);
       await file.writeAsString(mode.name);
@@ -51,6 +55,10 @@ void main() {
       expect(await File('${bundle.path}/greeter').readAsString(), 'release');
       expect(await File('${bundle.path}/data/asset').readAsString(), 'asset');
       expect(await File(backend.path).readAsString(), 'release');
+      expect(
+        await File('${repo.path}/build/out/akari-splash').readAsString(),
+        'release',
+      );
       await createArtifacts(BuildMode.debug);
       await updateBuildLinks(repo, theme, BuildMode.debug);
       expect(await File('${bundle.path}/greeter').readAsString(), 'debug');
@@ -132,6 +140,7 @@ void main() {
       expect(plan.steps.last.id, 'build.links');
       expect(plan.steps.last.dependencies, [
         'backend.build',
+        'splash.build',
         'flutter.build_linux',
       ]);
       expect(

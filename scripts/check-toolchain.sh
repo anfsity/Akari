@@ -34,6 +34,12 @@ check_command clang
 check_command cmake
 check_command ninja
 check_command pkg-config
+if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists libseat; then
+  printf 'ok   %-20s libseat development files\n' libseat
+else
+  printf 'miss %-20s install libseat development files\n' libseat
+  missing=1
+fi
 
 if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists gtk+-3.0; then
   printf 'ok   %-20s GTK 3 development files\n' gtk+-3.0

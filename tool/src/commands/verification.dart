@@ -49,6 +49,16 @@ RunPlan createVerificationPlan(
         ],
         workingDirectory: 'backend',
       ),
+      RunStep(
+        id: 'splash.format',
+        command: ['cargo', 'fmt', '--all', '--', '--check'],
+        workingDirectory: 'splash',
+      ),
+      RunStep(
+        id: 'splash.test',
+        command: ['cargo', 'test', '--locked'],
+        workingDirectory: 'splash',
+      ),
       for (final theme in themes)
         RunStep(
           id: '${theme.packageName}.pub_get',

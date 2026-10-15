@@ -60,6 +60,9 @@ class LoginWorkflowTest(unittest.TestCase):
         self.backend = self.root / 'backend'
         self.backend.write_text('original backend')
         self.backend.chmod(0o700)
+        self.splash = self.root / 'akari-splash'
+        self.splash.write_text('original splash')
+        self.splash.chmod(0o700)
         self.calls = []
         self.failures = []
         self.enabled = {'sddm.service'}
@@ -109,7 +112,7 @@ class LoginWorkflowTest(unittest.TestCase):
         return result
 
     def install(self, layout=None, keyring='auto'):
-        self.manager.create_installation(REPOSITORY, self.bundle, self.backend, layout, keyring)
+        self.manager.create_installation(REPOSITORY, self.bundle, self.backend, self.splash, layout, keyring)
 
     def test_install_deploys_complete_bundle_and_preserves_system_login(self):
         self.install()
@@ -120,6 +123,8 @@ class LoginWorkflowTest(unittest.TestCase):
         self.assertEqual((release / 'frontend/greeter').stat().st_mode & 0o777, 0o755)
         self.assertTrue((release / 'scripts/debug-dbus.sh').is_file())
         self.assertTrue((release / 'display_profile.py').is_file())
+        self.assertEqual((release / 'akari-splash').read_text(), 'original splash')
+        self.assertEqual((release / 'akari-splash').stat().st_mode & 0o777, 0o755)
         self.assertEqual(os.readlink(self.manager.DISPLAY_MANAGER), '/usr/lib/systemd/system/sddm.service')
         self.assertEqual(self.enabled, {'sddm.service'})
         self.assertFalse(self.manager.SNAPSHOT.exists())

@@ -33,6 +33,7 @@ build_report="$(runuser -u "$build_user" -- bash -c '
 }
 
 backend="$repo_root/build/out/backend"
+splash="$repo_root/build/out/akari-splash"
 # Theme package names determine build links and may differ from directory names.
 bundle="$(python3 - "$repo_root" "$build_report" <<'PY'
 import json
@@ -45,6 +46,7 @@ print(root / report['artifacts']['bundle_link'])
 PY
 )"
 test -x "$backend"
+test -x "$splash"
 test -x "$bundle/greeter"
 if layout="$(runuser -u "$build_user" -- python3 "$source_dir/display-layout.py" capture)"; then
   echo 'Captured the current desktop display order.'
@@ -54,13 +56,14 @@ else
 fi
 backup="$test_root/backups/$(date +%Y%m%d-%H%M%S)-$$"
 install -d -m 0755 "$backup"
-for path in frontend backend scripts start.sh restore.sh launch.sh greetd.toml sway.conf display-layout.json display-layout.py display_profile.py screenshot.py mock-power; do
+for path in frontend backend akari-splash scripts start.sh restore.sh launch.sh greetd.toml sway.conf display-layout.json display-layout.py display_profile.py screenshot.py mock-power; do
   if [[ -e "$test_root/$path" ]]; then
     cp -a "$test_root/$path" "$backup/"
   fi
 done
 cp -aL "$bundle/." "$test_root/frontend/"
 install -m 0755 "$backend" "$test_root/backend"
+install -m 0755 "$splash" "$test_root/akari-splash"
 install -m 0755 "$source_dir/start.sh" "$source_dir/restore.sh" "$source_dir/launch.sh" "$test_root/"
 python3 - "$source_dir/greetd.toml" "$test_root" <<'PY'
 import json

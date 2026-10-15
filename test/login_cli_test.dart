@@ -38,7 +38,8 @@ elif command == 'builder':
         sys.exit(23)
     print(json.dumps({'status': 'passed', 'report_path': 'build/report.json',
                      'artifacts': {'executable': 'fixture bundle/greeter',
-                                   'backend_executable': 'fixture backend'}}))
+                                   'backend_executable': 'fixture backend',
+                                   'splash_executable': 'fixture splash'}}))
 elif command == 'python3':
     if sys.argv[1].endswith('display-layout.py'):
         sys.exit(1)
@@ -143,6 +144,8 @@ Future<void> main(List<String> arguments) async {
           '${Directory.current.path}/fixture bundle',
           '--backend',
           '${Directory.current.path}/fixture backend',
+          '--splash',
+          '${Directory.current.path}/fixture splash',
         ],
       );
       expect(File('${temporary.path}/unexpected').existsSync(), isFalse);

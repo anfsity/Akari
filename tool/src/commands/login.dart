@@ -98,6 +98,8 @@ Future<int> runLoginCommand(
             '<successful-build-bundle>',
             '--backend',
             '<successful-build-backend>',
+            '--splash',
+            '<successful-build-splash>',
           ],
         ],
       }),
@@ -151,6 +153,8 @@ Future<int> runLoginCommand(
       bundle.path,
       '--backend',
       backend.path,
+      '--splash',
+      '${repoRoot.path}/${artifacts['splash_executable']}',
       if (layout != null) ...['--layout', layout.path],
     ]);
   } finally {

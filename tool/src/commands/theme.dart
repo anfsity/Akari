@@ -29,11 +29,13 @@ RunPlan createBuildPlan(
       'build_directory': '$host/build/$platform',
       if (platform == 'linux') ...{
         'executable': getLinuxExecutablePath(host, mode),
+        'splash_executable': getSplashExecutablePath(mode),
         ...getBuildLinkPaths(theme),
       },
     },
     steps: [
       _createBackendBuildStep(BackendMode.real, mode, jobs),
+      if (platform == 'linux') _createSplashBuildStep(mode, jobs),
       ..._createHostPreparationSteps(
         repoRoot,
         theme,
@@ -63,7 +65,11 @@ RunPlan createBuildPlan(
             theme.directory.path,
             mode.name,
           ],
-          dependencies: const ['backend.build', 'flutter.build_linux'],
+          dependencies: const [
+            'backend.build',
+            'splash.build',
+            'flutter.build_linux',
+          ],
           action: () => updateBuildLinks(repoRoot, theme, mode),
         ),
     ],

@@ -6,6 +6,7 @@ import 'model.dart';
 Map<String, String> getBuildLinkPaths(ThemePackage theme) => {
   'bundle_link': 'build/out/${theme.packageName.substring('theme_'.length)}',
   'backend_link': 'build/out/backend',
+  'splash_link': 'build/out/akari-splash',
 };
 
 /// Publishes convenient paths only after both cached executables exist.
@@ -19,9 +20,11 @@ Future<void> updateBuildLinks(
   final host = getThemeHostDirectory(theme, ThemeHostKind.greeter);
   final frontend = getLinuxExecutablePath(host, buildMode);
   final backend = getBackendExecutablePath(BackendMode.real, buildMode);
+  final splash = getSplashExecutablePath(buildMode);
   final targets = {
     'bundle_link': File(frontend).parent.path,
     'backend_link': backend,
+    'splash_link': splash,
   };
   final paths = getBuildLinkPaths(theme);
   if (paths['bundle_link'] == paths['backend_link']) {
@@ -57,7 +60,7 @@ Future<void> updateBuildLinks(
         }
       }
     }
-    for (final executable in [frontend, backend]) {
+    for (final executable in [frontend, backend, splash]) {
       if (!await File('${repoRoot.path}/$executable').exists()) {
         throw FileSystemException('Build artifact is missing', executable);
       }

@@ -27,5 +27,6 @@ fi
 
 fvm flutter pub get
 cargo fetch --manifest-path "$repo_root/backend/Cargo.toml" --locked
+cargo fetch --manifest-path "$repo_root/splash/Cargo.toml" --locked
 printf '%s\n' 'Flutter toolchain ready.'
 fvm flutter doctor -v
