@@ -26,6 +26,7 @@ description: 查命令、选项、显示配置和运行报告。
 | `clean` | 清理已停止运行的正式、测试环境及安装残留 | `--dry-run` |
 | `login enable` / `login disable` | 选择 Akari 或恢复原来的开机登录服务 | `--dry-run` |
 | `login rollback` | 选择上一个已安装版本 | `--dry-run` |
+| `login configure-keyring` | 无需重新构建即可配置 greetd 密钥环 PAM | `--keyring`、`--dry-run` |
 | `login status` | 查看安装和服务状态 | `--format` |
 | `login logs` | 查看服务 journal 或最新登录界面日志 | `--component`、`--lines`、`--follow` |
 | `completion` | 输出命令补全脚本 | `--shell` |
@@ -70,11 +71,13 @@ akari login status
 
 使用 `--keyring gnome` 或 `--keyring kwallet` 只配置指定提供方。指定的模块缺失时，必须在终端同意后才安装软件包。无终端时，`auto` 跳过缺失模块，显式指定的缺失模块则报错。`--keyring none` 只移除 Akari 管理的密钥环配置块。原有直接规则和 include 引入的 PAM 规则会保留，不重复添加。新增 auth 与 session 规则使用 `optional`；GNOME Keyring 通过 `use_authtok` 接收认证口令，并使用 `auto_start` 启动会话服务；KWallet 使用 `auto_start force_run` 适配 greetd。首次修改前将 PAM 配置备份到 `/var/lib/akari/greetd.pam.before-keyring`。部署失败时恢复此前的 PAM 内容；卸载只移除 Akari 的配置块，保留其他编辑、已安装的密钥环软件包和备份。
 
-自动解锁要求认证口令与密钥环密码一致。生物识别登录需要提供方额外提供该口令，例如 [Gaze 可选的 TPM 密钥环集成](../guides/greetd-testing.md#人脸认证)，见 [GNOME 的 PAM 文档](https://wiki.gnome.org/Projects/GnomeKeyring/Pam)。KWallet 还需要桌面的 `pam_kwallet_init` 自启动完成初始化，见 [KDE 集成源码](https://invent.kde.org/plasma/kwallet-pam)。无需重新构建即可通过仓库控制器配置 PAM，也可用此命令为旧版 Akari 管理的配置块补上 `use_authtok`：
+自动解锁要求认证口令与密钥环密码一致。生物识别登录需要提供方额外提供该口令，例如 [Gaze 可选的 TPM 密钥环集成](../guides/greetd-testing.md#人脸认证)，见 [GNOME 的 PAM 文档](https://wiki.gnome.org/Projects/GnomeKeyring/Pam)。KWallet 还需要桌面的 `pam_kwallet_init` 自启动完成初始化，见 [KDE 集成源码](https://invent.kde.org/plasma/kwallet-pam)。无需重新构建即可配置 PAM，也可用此命令为旧版 Akari 管理的配置块补上 `use_authtok`：
 
 ```sh
-sudo python3 scripts/login/manage.py configure-keyring --keyring gnome
+akari login configure-keyring --keyring gnome
 ```
+
+该命令使用仓库中的最新控制器，需要时自动请求 sudo，因此无需重新部署即可更新旧安装。提供方选择与 PAM 备份行为和安装命令相同。
 
 安装会创建独立的 `akari-greeter` 系统账户，将各版本放到 `/opt/akari/releases/`，用 `current` 符号链接选择运行版本。`akari.service` 使用 `/etc/akari/greetd.toml` 启动 greetd，登录界面使用 `/etc/akari/sway.conf` 在 Sway 内运行。原有 `/etc/greetd/config.toml` 和 `/opt/akari-test` 测试资源不变。登录偏好保存在 `/var/lib/akari/greeter/`。
 
@@ -103,7 +106,7 @@ akari clean --dry-run
 akari clean
 ```
 
-`install`、`uninstall`、`clean`、`login enable`、`login disable` 和 `login rollback` 接受 `--dry-run`，只输出 JSON 计划，不构建、不请求 sudo，也不修改文件。状态和日志操作只读。CLI 启动器仍依赖仓库和 SDK，已安装的登录服务独立运行。在 TTY 中恢复时，也可以直接调用已安装的控制器：
+`install`、`uninstall`、`clean`、`login enable`、`login disable`、`login rollback` 和 `login configure-keyring` 接受 `--dry-run`，只输出 JSON 计划，不构建、不请求 sudo，也不修改文件。状态和日志操作只读。CLI 启动器仍依赖仓库和 SDK，已安装的登录服务独立运行。在 TTY 中恢复时，也可以直接调用已安装的控制器：
 
 ```sh
 sudo python3 /opt/akari/manage.py disable

@@ -25,6 +25,7 @@ From the repository root, use `fvm dart run tool/akari.dart COMMAND`. After
 | `clean` | Clean inactive production and test installations, including leftovers | `--dry-run` |
 | `login enable` / `login disable` | Select Akari or restore the previous boot login service | `--dry-run` |
 | `login rollback` | Select the previous installed release | `--dry-run` |
+| `login configure-keyring` | Configure greetd keyring PAM without rebuilding | `--keyring`, `--dry-run` |
 | `login status` | Inspect deployment and service state | `--format` |
 | `login logs` | Read the service journal or latest greeter logs | `--component`, `--lines`, `--follow` |
 | `completion` | Print a completion script | `--shell` |
@@ -113,11 +114,15 @@ See [GNOME's PAM documentation](https://wiki.gnome.org/Projects/GnomeKeyring/Pam
 KWallet also needs the desktop's `pam_kwallet_init` autostart to complete startup;
 see the [KDE integration sources](https://invent.kde.org/plasma/kwallet-pam).
 To configure PAM without rebuilding, or update an older Akari-managed block to
-include `use_authtok`, use the repository controller:
+include `use_authtok`, run:
 
 ```sh
-sudo python3 scripts/login/manage.py configure-keyring --keyring gnome
+akari login configure-keyring --keyring gnome
 ```
+
+This command uses the repository's current controller and requests sudo when
+needed, so it can update an older installation without redeploying it. It shares
+the installation command's provider selection and PAM backup behavior.
 
 The installation uses a separate `akari-greeter` system account, release directories
 beneath `/opt/akari/releases/`, and a `current` symlink. The service runs greetd
@@ -184,8 +189,9 @@ akari clean --dry-run
 akari clean
 ```
 
-`install`, `uninstall`, `clean`, `login enable`, `login disable`, and `login rollback`
-accept `--dry-run`, which prints a JSON plan without building, requesting sudo,
+`install`, `uninstall`, `clean`, `login enable`, `login disable`, `login rollback`,
+and `login configure-keyring` accept `--dry-run`, which prints a JSON plan without
+building, requesting sudo,
 or changing files. Status and logs are read-only. The CLI launcher still needs
 this repository and its SDK; the installed login service does not. Recovery
 from a TTY can use the installed controller directly:

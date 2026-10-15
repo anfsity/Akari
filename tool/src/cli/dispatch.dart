@@ -26,6 +26,7 @@ Future<int> runCliCommand(CliCommand command, CliArguments input) async {
     case 'login enable':
     case 'login disable':
     case 'login rollback':
+    case 'login configure-keyring':
     case 'login status':
     case 'login logs':
       return runLoginCommand(command, arguments, repoRoot: _findRepoRoot());

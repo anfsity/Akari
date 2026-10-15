@@ -26,8 +26,7 @@ Future<int> runLoginCommand(
   }
   final controller = File('${root.path}/manage.py');
   final script =
-      operation == 'install' ||
-          operation == 'clean' ||
+      const {'install', 'clean', 'configure-keyring'}.contains(operation) ||
           (query && !controller.existsSync())
       ? File('${repoRoot.path}/scripts/login/manage.py')
       : controller;
@@ -55,7 +54,10 @@ Future<int> runLoginCommand(
     'python3',
     script.path,
     operation,
-    if (operation == 'install') ...['--keyring', values['--keyring'] ?? 'auto'],
+    if (operation == 'install' || operation == 'configure-keyring') ...[
+      '--keyring',
+      values['--keyring'] ?? 'auto',
+    ],
     if (values.containsKey('--format')) ...['--format', values['--format']!],
     if (values.containsKey('--component')) ...[
       '--component',

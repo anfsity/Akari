@@ -289,6 +289,11 @@ const cliCommands = [
     options: ['--dry-run'],
   ),
   CliCommand(
+    'login configure-keyring',
+    'Configure greetd keyring PAM without rebuilding the login environment.',
+    options: ['--keyring', '--dry-run'],
+  ),
+  CliCommand(
     'login status',
     'Show the installed release, boot login service and runtime state.',
     options: ['--format'],
