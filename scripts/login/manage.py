@@ -221,9 +221,9 @@ def validate_runtime():
         raise ValueError(f'Missing PAM configuration: {PAM}; install greetd first.')
 
 
-def create_installation(source, bundle, backend, layout, keyring='auto'):
+def create_installation(source, bundle, backend, splash, layout, keyring='auto'):
     validate_runtime()
-    for executable in [bundle / 'greeter', backend]:
+    for executable in [bundle / 'greeter', backend, splash]:
         if not executable.is_file() or not os.access(executable, os.X_OK):
             raise ValueError(f'Missing built executable: {executable}')
     managed = (INSTALLATION / 'installation.json').is_file()
@@ -259,6 +259,7 @@ def create_installation(source, bundle, backend, layout, keyring='auto'):
     try:
         shutil.copytree(bundle, release / 'frontend')
         shutil.copy2(backend, release / 'backend')
+        shutil.copy2(splash, release / 'akari-splash')
         for name in ['launch.sh', 'run-greeter.sh']:
             shutil.copy2(source / 'scripts/login' / name, release / name)
             (release / name).chmod(0o755)
@@ -485,7 +486,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     install = commands.add_parser('install')
-    for name in ['source', 'bundle', 'backend']:
+    for name in ['source', 'bundle', 'backend', 'splash']:
         install.add_argument(f'--{name}', required=True, type=Path)
     install.add_argument('--layout', type=Path)
     keyring_options = ['auto', *KEYRINGS, 'none']
@@ -526,7 +527,7 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX)
         match arguments.command:
             case 'install':
-                create_installation(arguments.source, arguments.bundle, arguments.backend, arguments.layout, arguments.keyring)
+                create_installation(arguments.source, arguments.bundle, arguments.backend, arguments.splash, arguments.layout, arguments.keyring)
             case 'configure-keyring':
                 providers = select_keyrings(arguments.keyring)
                 update_pam(get_keyring_pam_configuration(PAM.read_text(), providers))

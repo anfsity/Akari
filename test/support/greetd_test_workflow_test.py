@@ -264,7 +264,7 @@ if name == 'dart':
     assert os.environ['PATH'].split(':')[0] == str(root / 'builder-home/.cargo/bin')
     version = (repo / 'source-version').read_text()
     for relative in [bundle + '/greeter', bundle + '/lib/libapp.so',
-                     'build/out/backend']:
+                     'build/out/backend', 'build/out/akari-splash']:
         path = repo / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(version)
