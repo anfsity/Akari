@@ -31,6 +31,7 @@ KDGETMODE = 0x4B3B
 KD_TEXT = 0
 FRAME_SECONDS = 0.08
 MAX_SECONDS = 15
+CLEAR = "\x1b[0;37;40m\x1b[2J\x1b[3J\x1b[H"
 RESTORE = "\x1b[0m\x1b[?25h"
 
 
@@ -96,8 +97,7 @@ def prepare_transition():
         rows, columns = get_terminal_size(terminal)
         # Prepare the buffer even while Sway owns graphics mode. Showing the
         # cursor here leaves it usable if the launcher never gets to animate.
-        terminal.write(('\x1b[0;37;40m\x1b[2J\x1b[H' +
-                        get_frame(rows, columns, 0) + RESTORE).encode('ascii'))
+        terminal.write((CLEAR + get_frame(rows, columns, 0) + RESTORE).encode('ascii'))
 
 
 def animate_transition(owner):
@@ -121,7 +121,10 @@ def animate_transition(owner):
                 result = 1
             finally:
                 try:
-                    terminal.write(RESTORE.encode('ascii'))
+                    # Graphics mode hides the VT buffer but does not discard it.
+                    # Erase our frame and scrollback before the desktop can exit
+                    # back to this console; no display mode change is needed.
+                    terminal.write((CLEAR + RESTORE).encode('ascii'))
                 finally:
                     os._exit(result)
 
@@ -145,7 +148,7 @@ def run_animation(terminal, owner_fd):
             return
         size = get_terminal_size(terminal)
         if size != previous_size:
-            terminal.write(b'\x1b[0;37;40m\x1b[2J\x1b[H\x1b[?25l')
+            terminal.write((CLEAR + '\x1b[?25l').encode('ascii'))
             previous_size = size
         terminal.write(get_frame(*size, frame).encode('ascii'))
         frame += 1
