@@ -52,8 +52,12 @@ class ThemeSession {
               .map(Directory.new)
               .toList();
     final flutter = getFlutterCommand(repoRoot);
-    if (Platform.environment['AKARI_SPLASH_BIN'] case final splash?) {
-      final interrupted = await _showSplash(splash);
+    final previewApplication =
+        Platform.environment['AKARI_PREVIEW_APPLICATION'];
+    if (previewApplication != null) {
+      final interrupted = await _showSplash(
+        Platform.environment['AKARI_SPLASH_BIN']!,
+      );
       if (interrupted != null) return interrupted;
     }
     _process = await Process.start(flutter.first, [
@@ -65,8 +69,8 @@ class ThemeSession {
       '--no-pub',
       '--machine',
       '--dart-define=AKARI_BACKEND=$backend',
-      if (Platform.environment['AKARI_PREVIEW_APPLICATION'] case final binary?)
-        '--use-application-binary=$binary',
+      if (previewApplication != null)
+        '--use-application-binary=$previewApplication',
     ], workingDirectory: host.path);
     final outputDone = Completer<void>();
     _subscriptions.add(
