@@ -17,7 +17,8 @@ use drm::{
     Device as _,
     buffer::{Buffer, DrmFourcc},
     control::{
-        Device as _, Mode, ModeTypeFlags, connector, crtc, dumbbuffer::DumbBuffer, framebuffer,
+        ClipRect, Device as _, Mode, ModeTypeFlags, connector, crtc, dumbbuffer::DumbBuffer,
+        framebuffer,
     },
 };
 use libseat::{Device, Seat, SeatEvent, SeatRef};
@@ -373,7 +374,13 @@ impl Card {
             // Shadow framebuffers need damage notification to upload CPU
             // writes. Native scanout drivers can report this as unsupported.
             if output.flush_damage {
-                match card.dirty_framebuffer(output.framebuffer, &[]) {
+                // drm-rs gives even an empty slice a non-null clips pointer.
+                // The kernel rejects that count/pointer mismatch with EINVAL
+                // before checking whether the driver needs damage notification.
+                let (width, height) = output.mode.size();
+                match card
+                    .dirty_framebuffer(output.framebuffer, &[ClipRect::new(0, 0, width, height)])
+                {
                     Ok(()) => {}
                     Err(error) if error.raw_os_error() == Some(libc::ENOSYS) => {
                         output.flush_damage = false;
