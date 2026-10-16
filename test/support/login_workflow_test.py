@@ -430,7 +430,30 @@ class LoginWorkflowTest(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError):
                 self.manager.get_status()
 
-    def test_clean_removes_both_installations_and_restores_login_without_removing_user_data(self):
+    def test_test_only_uninstall_preserves_running_production_and_pam(self):
+        self.install()
+        self.manager.enable_login()
+        self.manager.TEST_INSTALLATION.mkdir()
+        pam = self.manager.PAM.read_text()
+        self.unit_states = {'akari.service': 'active'}
+        self.manager.remove_installation('test')
+        self.assertFalse(self.manager.TEST_INSTALLATION.exists())
+        self.assertTrue(self.manager.INSTALLATION.exists())
+        self.assertTrue(self.manager.SNAPSHOT.exists())
+        self.assertEqual(self.manager.PAM.read_text(), pam)
+        self.assertEqual(self.enabled, {'akari.service'})
+
+    def test_login_uninstall_removes_partial_install_and_preserves_active_test(self):
+        self.manager.INSTALLATION.mkdir(parents=True)
+        (self.manager.INSTALLATION / 'partial').touch()
+        self.manager.TEST_INSTALLATION.mkdir()
+        self.unit_states = {'akari-test.service': 'active'}
+        for _ in range(2):
+            self.manager.remove_installation()
+        self.assertFalse(self.manager.INSTALLATION.exists())
+        self.assertTrue(self.manager.TEST_INSTALLATION.exists())
+
+    def test_uninstall_all_removes_both_installations_and_restores_login_without_removing_user_data(self):
         self.install()
         self.manager.enable_login()
         self.manager.TEST_INSTALLATION.mkdir()
@@ -442,7 +465,7 @@ class LoginWorkflowTest(unittest.TestCase):
         (self.manager.TEST_INSTALLATION / 'current-run').symlink_to(logs)
         self.manager.PAM.write_text(self.manager.PAM.read_text() + '# user edit\n')
         for _ in range(2):
-            self.manager.clean_installations()
+            self.manager.remove_installation('all')
         for path in [self.manager.INSTALLATION, self.manager.TEST_INSTALLATION,
                      self.manager.CONFIGURATION, self.manager.UNIT, self.manager.SNAPSHOT]:
             self.assertFalse(path.exists(), str(path))
@@ -453,21 +476,21 @@ class LoginWorkflowTest(unittest.TestCase):
         self.assertEqual(self.enabled, {'sddm.service'})
         self.assertFalse(any(call[1] in ['start', 'stop', 'restart'] for call in self.calls))
 
-    def test_clean_removes_partial_installations_without_controller_manifest_or_pam(self):
+    def test_uninstall_all_removes_partial_installations_without_controller_manifest_or_pam(self):
         self.manager.INSTALLATION.mkdir(parents=True)
         (self.manager.INSTALLATION / 'partial-bundle').touch()
         self.manager.CONFIGURATION.mkdir()
         self.manager.UNIT.touch()
         self.manager.TEST_INSTALLATION.mkdir()
         self.manager.PAM.unlink()
-        with patch.object(self.manager.sys, 'argv', ['manage.py', 'clean']), \
+        with patch.object(self.manager.sys, 'argv', ['manage.py', 'uninstall', '--scope', 'all']), \
                 patch.object(self.manager.os, 'geteuid', return_value=0):
             self.assertEqual(self.manager.main(), 0)
         for path in [self.manager.INSTALLATION, self.manager.CONFIGURATION,
                      self.manager.TEST_INSTALLATION, self.manager.UNIT]:
             self.assertFalse(path.exists())
 
-    def test_clean_checks_all_service_lifecycles_before_any_changes(self):
+    def test_uninstall_all_checks_all_service_lifecycles_before_any_changes(self):
         self.install()
         self.manager.enable_login()
         self.manager.TEST_INSTALLATION.mkdir()
@@ -477,54 +500,54 @@ class LoginWorkflowTest(unittest.TestCase):
                 with self.subTest(unit=unit, state=state):
                     self.unit_states = {unit: state}
                     with self.assertRaisesRegex(ValueError, 'running'):
-                        self.manager.clean_installations()
+                        self.manager.remove_installation('all')
                     self.assertTrue(self.manager.INSTALLATION.exists())
                     self.assertTrue(self.manager.TEST_INSTALLATION.exists())
                     self.assertTrue(self.manager.SNAPSHOT.exists())
                     self.assertEqual(self.manager.PAM.read_text(), pam)
                     self.assertEqual(self.enabled, {'akari.service'})
 
-    def test_clean_does_not_follow_installation_symlinks(self):
+    def test_uninstall_all_does_not_follow_installation_symlinks(self):
         self.manager.INSTALLATION.parent.mkdir(parents=True)
         self.manager.INSTALLATION.symlink_to(self.bundle)
         self.manager.TEST_INSTALLATION.symlink_to(self.backend)
         self.manager.CONFIGURATION.symlink_to(self.root / 'missing-configuration')
-        self.manager.clean_installations()
+        self.manager.remove_installation('all')
         self.assertEqual((self.bundle / 'greeter').read_text(), 'original frontend')
         self.assertEqual(self.backend.read_text(), 'original backend')
         for path in [self.manager.INSTALLATION, self.manager.CONFIGURATION, self.manager.TEST_INSTALLATION]:
             self.assertFalse(path.is_symlink())
 
-    def test_clean_keeps_recovery_files_when_login_restoration_fails(self):
+    def test_uninstall_all_keeps_recovery_files_when_login_restoration_fails(self):
         self.install()
         self.manager.enable_login()
         self.manager.TEST_INSTALLATION.mkdir()
         self.failures.append(['enable', '--force', 'sddm.service'])
         with self.assertRaises(subprocess.CalledProcessError):
-            self.manager.clean_installations()
+            self.manager.remove_installation('all')
         self.assertTrue(self.manager.SNAPSHOT.exists())
         self.assertTrue(self.manager.UNIT.exists())
         self.assertTrue(self.manager.INSTALLATION.exists())
         self.assertTrue(self.manager.TEST_INSTALLATION.exists())
-        self.manager.clean_installations()
+        self.manager.remove_installation('all')
         self.assertEqual(self.enabled, {'sddm.service'})
 
-    def test_clean_rejects_missing_snapshot_and_malformed_pam_before_deletion(self):
+    def test_uninstall_all_rejects_missing_snapshot_and_malformed_pam_before_deletion(self):
         self.install()
         self.manager.enable_login()
         snapshot = self.manager.SNAPSHOT.read_text()
         self.manager.SNAPSHOT.unlink()
         with self.assertRaisesRegex(ValueError, 'snapshot is missing'):
-            self.manager.clean_installations()
+            self.manager.remove_installation('all')
         self.manager.SNAPSHOT.write_text(snapshot)
         self.manager.PAM.write_text(self.original_pam + self.manager.KEYRING_START)
         with self.assertRaisesRegex(ValueError, 'Malformed'):
-            self.manager.clean_installations()
+            self.manager.remove_installation('all')
         self.assertTrue(self.manager.INSTALLATION.exists())
         self.assertTrue(self.manager.UNIT.exists())
         self.assertEqual(self.enabled, {'akari.service'})
 
-    def test_clean_restores_boot_selection_after_unit_and_controller_were_removed(self):
+    def test_uninstall_all_restores_boot_selection_after_unit_and_controller_were_removed(self):
         for previous in ['sddm.service', None]:
             with self.subTest(previous=previous):
                 self.install()
@@ -535,7 +558,7 @@ class LoginWorkflowTest(unittest.TestCase):
                 self.manager.UNIT.unlink()
                 (self.manager.INSTALLATION / 'manage.py').unlink()
                 self.calls.clear()
-                self.manager.clean_installations()
+                self.manager.remove_installation('all')
                 self.assertNotIn(['systemctl', 'disable', 'akari.service'], self.calls)
                 self.assertFalse(self.manager.SNAPSHOT.exists())
                 if previous is None:
@@ -543,25 +566,25 @@ class LoginWorkflowTest(unittest.TestCase):
                 else:
                     self.assertEqual(Path(os.readlink(self.manager.DISPLAY_MANAGER)).name, previous)
 
-    def test_clean_accepts_missing_units_but_rejects_failed_systemd_connection(self):
+    def test_uninstall_all_accepts_missing_units_but_rejects_failed_systemd_connection(self):
         self.manager.INSTALLATION.mkdir(parents=True)
         with patch.object(self.manager.subprocess, 'run', return_value=subprocess.CompletedProcess(
                 ['systemctl'], 1, '', 'Failed to connect to systemd')):
             with self.assertRaises(subprocess.CalledProcessError):
-                self.manager.clean_installations()
+                self.manager.remove_installation('all')
         self.assertTrue(self.manager.INSTALLATION.exists())
         with patch.object(self.manager.subprocess, 'run', return_value=subprocess.CompletedProcess(
                 ['systemctl'], 1, 'inactive\n', '')):
             self.manager.validate_inactive_units(['akari.service'])
         self.unit_states = {'akari.service': 'failed'}
-        self.manager.clean_installations()
+        self.manager.remove_installation('all')
         self.assertFalse(self.manager.INSTALLATION.exists())
 
-    def test_clean_rejects_concurrent_test_setup_before_deletion(self):
+    def test_uninstall_all_rejects_concurrent_test_setup_before_deletion(self):
         self.manager.TEST_INSTALLATION.mkdir(parents=True)
         with self.manager.TEST_LOCK.open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            with patch.object(self.manager.sys, 'argv', ['manage.py', 'clean']), \
+            with patch.object(self.manager.sys, 'argv', ['manage.py', 'uninstall', '--scope', 'all']), \
                     patch.object(self.manager.os, 'geteuid', return_value=0):
                 with self.assertRaisesRegex(ValueError, 'Another test setup'):
                     self.manager.main()

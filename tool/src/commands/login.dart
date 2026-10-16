@@ -28,7 +28,7 @@ Future<int> runLoginCommand(
   final script =
       const {
             'install',
-            'clean',
+            'uninstall',
             'configure-keyring',
             'enable-gaze',
             'disable-gaze',
@@ -64,6 +64,7 @@ Future<int> runLoginCommand(
       '--keyring',
       values['--keyring'] ?? 'auto',
     ],
+    if (operation == 'uninstall') ...['--scope', values['--scope'] ?? 'login'],
     if (values.containsKey('--format')) ...['--format', values['--format']!],
     if (values.containsKey('--component')) ...[
       '--component',

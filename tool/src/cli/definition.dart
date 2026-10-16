@@ -99,6 +99,12 @@ const cliOptions = {
     'Minimum native splash display time in seconds (default: 3; 0 skips the hold).',
     valueName: 'SECONDS',
   ),
+  '--scope': CliOption(
+    '--scope',
+    'Installation scope (default: login).',
+    valueName: 'SCOPE',
+    values: ['login', 'test', 'all'],
+  ),
   '--keyring': CliOption(
     '--keyring',
     'Configure installed keyring PAM modules (default: auto); offer installation when missing.',
@@ -294,17 +300,12 @@ const cliCommands = [
   ),
   CliCommand(
     'uninstall',
-    'Remove an inactive production installation; retain preferences and logs.',
-    examples: ['akari uninstall --dry-run'],
+    'Remove login or test installations, including partial installs; retain preferences and logs.',
+    examples: ['akari uninstall --scope all --dry-run'],
     group: CommandGroup.installation,
-    options: ['--dry-run'],
+    options: ['--scope', '--dry-run'],
   ),
-  CliCommand(
-    'clean',
-    'Clean inactive production and test installations, including leftover registrations; retain preferences and logs.',
-    group: CommandGroup.installation,
-    options: ['--dry-run'],
-  ),
+
   CliCommand(
     'login',
     'Manage the production login service.',
