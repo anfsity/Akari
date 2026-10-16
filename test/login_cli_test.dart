@@ -57,7 +57,7 @@ import '${Directory.current.uri}tool/src/commands/login.dart';
 import '${Directory.current.uri}tool/src/cli/definition.dart';
 Future<void> main(List<String> arguments) async {
   try {
-    final name = ['install', 'uninstall', 'clean'].contains(arguments.first)
+    final name = ['install', 'uninstall'].contains(arguments.first)
         ? arguments.first : 'login ' + arguments.first;
     exitCode = await runLoginCommand(getCliCommand(name), arguments.skip(1).toList(),
       repoRoot: Directory(Platform.environment['REPOSITORY']!),
@@ -193,7 +193,6 @@ Future<void> main(List<String> arguments) async {
       'enable-gaze',
       'disable-gaze',
       'uninstall',
-      'clean',
     ]) {
       final result = await runFixture([target, '--dry-run']);
       expect(result.exitCode, 0, reason: '${result.stderr}');
@@ -240,11 +239,11 @@ Future<void> main(List<String> arguments) async {
   );
 
   test(
-    'clean uses repository controller even with an old or missing installation',
+    'scoped uninstall uses current controller even with a missing installation',
     () async {
       for (final installed in [true, false]) {
         if (!installed) await File('${installation.path}/manage.py').delete();
-        final result = await runFixture(['clean']);
+        final result = await runFixture(['uninstall', '--scope', 'all']);
         expect(result.exitCode, 17, reason: '${result.stderr}');
         expect(
           jsonDecode(await File('${temporary.path}/sudo.json').readAsString()),
@@ -252,7 +251,9 @@ Future<void> main(List<String> arguments) async {
             '--',
             'python3',
             '${Directory.current.path}/scripts/login/manage.py',
-            'clean',
+            'uninstall',
+            '--scope',
+            'all',
           ],
         );
       }
@@ -357,7 +358,7 @@ Future<void> main(List<String> arguments) async {
       ['disable-gaze', '--theme', 'themes/default'],
       ['enable', '--keyring', 'gnome'],
       ['enable', '--theme', 'themes/default'],
-      ['clean', '--theme', 'themes/default'],
+      ['uninstall', '--scope', 'invalid'],
       ['logs', '--lines', '0'],
       ['logs', '--component', 'unknown'],
     ]) {
@@ -377,7 +378,6 @@ Future<void> main(List<String> arguments) async {
         ['install'],
         ['install', 'cli'],
         ['uninstall'],
-        ['clean'],
         ['login'],
         ['login', 'enable'],
         ['login', 'disable'],
@@ -401,7 +401,6 @@ Future<void> main(List<String> arguments) async {
       for (final words in [
         ['install'],
         ['uninstall'],
-        ['clean'],
         ['login', 'enable'],
         ['login', 'configure-keyring'],
         ['login', 'enable-gaze'],

@@ -6,6 +6,7 @@ repository or Dart SDK. Release switches affect only the next greeter launch.
 """
 
 import argparse
+from contextlib import ExitStack
 import fcntl
 import json
 import os
@@ -506,13 +507,6 @@ def rollback_installation():
     print(f'Next greeter launch will use {current.resolve()}.')
 
 
-def remove_installation():
-    validate_installation()
-    validate_inactive_units([UNIT.name])
-    remove_login_files()
-    print('Akari uninstalled. Greeter account, preferences and logs were retained.')
-
-
 def validate_inactive_units(units):
     for unit in units:
         result = subprocess.run(['systemctl', 'show', '--property=ActiveState', '--value', unit],
@@ -547,13 +541,18 @@ def remove_login_files():
     remove_registered_paths([CONFIGURATION, INSTALLATION])
 
 
-def clean_installations():
-    # Check every lifecycle before deleting anything: the test timer and
-    # ExecStopPost still depend on restore.sh even after the greeter exits.
-    validate_inactive_units([UNIT.name, 'akari-test.service', 'akari-restore.service', 'akari-restore.timer'])
-    remove_login_files()
-    remove_registered_paths([TEST_INSTALLATION])
-    print('Akari production and test files cleaned. Greeter accounts, preferences, logs and CLI launcher were retained.')
+def remove_installation(scope='login'):
+    # Validate the entire selected scope before removing recovery resources.
+    # Test-only removal must not alter production PAM or boot selection.
+    units = [UNIT.name] if scope in ['login', 'all'] else []
+    if scope in ['test', 'all']:
+        units += ['akari-test.service', 'akari-restore.service', 'akari-restore.timer']
+    validate_inactive_units(units)
+    if scope in ['login', 'all']:
+        remove_login_files()
+    if scope in ['test', 'all']:
+        remove_registered_paths([TEST_INSTALLATION])
+    print(f'Akari {scope} installation resources removed. Greeter accounts, preferences, logs and CLI launcher were retained.')
 
 
 def get_status():
@@ -602,7 +601,9 @@ def parse_arguments():
     install.add_argument('--keyring', choices=keyring_options, default='auto')
     keyring = commands.add_parser('configure-keyring', help='Configure greetd keyring PAM without rebuilding Akari.')
     keyring.add_argument('--keyring', choices=keyring_options, default='auto')
-    for name in ['enable', 'disable', 'rollback', 'uninstall', 'clean', 'enable-gaze', 'disable-gaze']:
+    uninstall = commands.add_parser('uninstall')
+    uninstall.add_argument('--scope', choices=['login', 'test', 'all'], default='login')
+    for name in ['enable', 'disable', 'rollback', 'enable-gaze', 'disable-gaze']:
         commands.add_parser(name)
     status = commands.add_parser('status')
     status.add_argument('--format', choices=['text', 'json'], default='text')
@@ -632,8 +633,16 @@ def main():
         return show_logs(arguments.component, arguments.lines, arguments.follow)
     if os.geteuid() != 0:
         raise ValueError('This operation requires root; invoke it through akari or sudo python3.')
-    with LOCK.open('a') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    lock_paths = [LOCK]
+    if arguments.command == 'uninstall':
+        lock_paths = {'login': [LOCK], 'test': [TEST_LOCK], 'all': [LOCK, TEST_LOCK]}[arguments.scope]
+    with ExitStack() as resources:
+        for path in lock_paths:
+            lock = resources.enter_context(path.open('a'))
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | (fcntl.LOCK_NB if path == TEST_LOCK else 0))
+            except BlockingIOError:
+                raise ValueError('Another test setup is running; retry uninstall after it finishes.') from None
         match arguments.command:
             case 'install':
                 create_installation(arguments.source, arguments.bundle, arguments.backend, arguments.splash, arguments.layout, arguments.keyring)
@@ -652,14 +661,7 @@ def main():
             case 'rollback':
                 rollback_installation()
             case 'uninstall':
-                remove_installation()
-            case 'clean':
-                with TEST_LOCK.open('a') as test_lock:
-                    try:
-                        fcntl.flock(test_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    except BlockingIOError:
-                        raise ValueError('Another test setup is running; retry cleanup after it finishes.') from None
-                    clean_installations()
+                remove_installation(arguments.scope)
     return 0
 
 

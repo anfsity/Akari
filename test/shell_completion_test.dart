@@ -53,8 +53,10 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       ]),
       isEmpty,
     );
-    expect(await completeBashWords(['akari', 'cl']), ['clean']);
-    expect(await completeBashWords(['akari', 'clean', '--d']), ['--dry-run']);
+    expect(await completeBashWords(['akari', 'cl']), isEmpty);
+    expect(await completeBashWords(['akari', 'uninstall', '--scope', 't']), [
+      'test',
+    ]);
     expect(await completeBashWords(['akari', 'tr']), ['trace-perf', 'trace']);
     expect(await completeBashWords(['akari', 'st']), isEmpty);
     expect(await completeBashWords(['akari', 'run', 'st']), ['studio']);
