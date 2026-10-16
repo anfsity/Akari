@@ -7,33 +7,40 @@ void writeCliUsage([CliCommand? command]) {
   final bool forwardsArguments;
   if (command == null) {
     stdout.writeln('Usage: akari <command> [options]');
-    stdout.writeln('\nCommands:');
-    for (final definition in cliCommands) {
-      stdout.writeln(
-        '  ${definition.spellings.join(', ').padRight(24)} ${definition.description}',
-      );
-    }
-    options = cliOptions.values;
-    forwardsArguments = true;
-  } else {
-    final subcommands = getCliSubcommands(command.name);
-    stdout.writeln(
-      'Usage: akari ${command.name}${subcommands.isEmpty ? '' : ' [target]'} [options]',
-    );
-    stdout.writeln('\n${command.description}');
-    if (subcommands.isNotEmpty) {
-      stdout.writeln('\nTargets:');
-      for (final subcommand in subcommands) {
-        final target = subcommand.name.substring(command.name.length + 1);
-        stdout.writeln('  ${target.padRight(24)} ${subcommand.description}');
+    for (final group in CommandGroup.values) {
+      stdout.writeln('\n${group.label}:');
+      for (final definition in cliCommands.where(
+        (entry) => entry.group == group && !entry.name.contains(' '),
+      )) {
+        stdout.writeln(
+          '  ${definition.spellings.join(', ').padRight(24)} ${definition.description}',
+        );
       }
-      stdout.writeln(
-        '\nUse akari ${command.name} <target> --help for target options.',
-      );
     }
-    options = getCliOptions(command);
-    forwardsArguments = command.forwardsArguments;
+    stdout.writeln('\nExamples:');
+    for (final name in ['preview', 'run', 'uninstall']) {
+      stdout.writeln('  ${getCliCommand(name).examples.first}');
+    }
+    stdout.writeln('\nUse akari <command> --help for options and examples.');
+    return;
   }
+  final subcommands = getCliSubcommands(command.name);
+  stdout.writeln(
+    'Usage: akari ${command.name}${subcommands.isEmpty ? '' : ' [target]'}${command.positionalUsage == null ? '' : ' ${command.positionalUsage}'} [options]',
+  );
+  stdout.writeln('\n${command.description}');
+  if (subcommands.isNotEmpty) {
+    stdout.writeln('\nTargets:');
+    for (final subcommand in subcommands) {
+      final target = subcommand.name.substring(command.name.length + 1);
+      stdout.writeln('  ${target.padRight(24)} ${subcommand.description}');
+    }
+    stdout.writeln(
+      '\nUse akari ${command.name} <target> --help for target options.',
+    );
+  }
+  options = getCliOptions(command);
+  forwardsArguments = command.forwardsArguments;
   stdout.writeln('\nOptions:');
   for (final option in options) {
     final label =
@@ -42,7 +49,13 @@ void writeCliUsage([CliCommand? command]) {
   }
   if (forwardsArguments) {
     stdout.writeln(
-      '  -- [arguments]           Forward arguments to the theme perf command.',
+      '  -- [arguments]           Forward arguments to the underlying command.',
     );
+  }
+  if (command.examples.isNotEmpty) {
+    stdout.writeln('\nExamples:');
+    for (final example in command.examples) {
+      stdout.writeln('  $example');
+    }
   }
 }

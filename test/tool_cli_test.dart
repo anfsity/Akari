@@ -109,7 +109,9 @@ runDirectory: 'run',
   test('help exposes the Studio run target and its scoped options', () async {
     final help = await _runTool(['--help']);
     expect(help.exitCode, 0);
-    expect(help.stdout, contains('run studio'));
+    expect(help.stdout, contains('Development and preview:'));
+    expect(help.stdout, contains('Examples:'));
+    expect(help.stdout, isNot(contains('Options:')));
     final runHelp = await _runTool(['run', '--help']);
     expect(runHelp.exitCode, 0);
     expect(runHelp.stdout, contains('Usage: akari run [target] [options]'));

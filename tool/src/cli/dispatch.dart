@@ -8,13 +8,22 @@ import 'completion.dart';
 import '../commands/development.dart';
 import '../commands/greetd_test.dart';
 import '../commands/login.dart';
+import '../commands/scripts.dart';
 import '../execution/paths.dart';
 
 Future<int> runCliCommand(CliCommand command, CliArguments input) async {
   // Installed service commands retain their own argument boundary; they can
   // run without preparing a theme, a run directory, or development reports.
   final arguments = input.raw;
+  if (command.scriptPath != null ||
+      command.name == 'script list' ||
+      command.name == 'script run') {
+    return runScriptCommand(command, input, _findRepoRoot());
+  }
   switch (command.name) {
+    case 'script':
+    case 'toolchain':
+    case 'docs':
     case 'greetd-test':
     case 'login':
       getCliOptionValues(command, arguments);

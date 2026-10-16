@@ -37,6 +37,22 @@ printf '%s\\0' "\${COMPREPLY[@]}"
   }
 
   test('bash completes commands, scoped options and enum values', () async {
+    expect(await completeBashWords(['akari', 'script', '']), ['list', 'run']);
+    expect(await completeBashWords(['akari', 'script', 'run', 'check']), [
+      'check-toolchain.sh',
+    ]);
+    expect(await completeBashWords(['akari', 'script', 'run', 'lib']), isEmpty);
+    expect(
+      await completeBashWords([
+        'akari',
+        'script',
+        'run',
+        'verify-docs.py',
+        '--',
+        '',
+      ]),
+      isEmpty,
+    );
     expect(await completeBashWords(['akari', 'cl']), ['clean']);
     expect(await completeBashWords(['akari', 'clean', '--d']), ['--dry-run']);
     expect(await completeBashWords(['akari', 'tr']), ['trace-perf', 'trace']);
