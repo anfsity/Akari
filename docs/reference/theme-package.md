@@ -44,7 +44,7 @@ fvm dart run tool/akari.dart build
 # Build an independent project, including a project outside this repository.
 fvm dart run tool/akari.dart build --theme /path/to/my_theme --mode release
 
-# Build and launch a Linux preview with simulated login state.
+# Demonstrate the automated UI journeys once.
 fvm dart run tool/akari.dart preview --theme themes/default
 
 # Inspect the complete execution plan without generating files.
@@ -60,14 +60,16 @@ The platform manifest is not modified during a theme build.
 `build` defaults to release mode and builds the frontend plus production Rust
 backend. `run --theme PATH` starts a complete greeter on a private D-Bus session
 with a Rust mock backend; `--backend real` selects production transport.
-`preview` runs with frontend demo state and no session preference persistence.
+`preview --theme PATH` automatically demonstrates face success and password
+fallback in one window and then exits. Select one with `--scenario`. It uses
+controlled authentication events without a backend or preference persistence,
+and always uses debug mode without hot reload.
 
-`run` and `preview` use `flutter run`, default to debug, and reload source changes
-on save. Scene JSON edits trigger code generation before reload; a failed
-regeneration retains the running theme. `r` regenerates and reloads, `R` hot
-restarts, and `q` quits. `--mode profile|release` disables hot reload.
-Both commands currently support Linux. `--jobs COUNT` limits native compile/link
-jobs and, when building a backend, Cargo tasks.
+`run` defaults to debug mode and reloads Dart/assets on save, regenerating scene
+JSON first; failed generation retains the working theme. `r` regenerates and
+reloads, `R` restarts, and `q` quits. Use `AKARI_WINDOW_MODE=windowed` for a window.
+Both commands accept `--jobs COUNT`. `run splash` independently previews loading
+until manually closed.
 
 The JSON run report lists the generated host project, build directory, and
 Linux executable path. Child process output is recorded in the run logs.

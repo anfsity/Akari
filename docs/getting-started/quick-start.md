@@ -17,13 +17,16 @@ The fallback theme is a small, static example. To preview the default theme:
 fvm dart run tool/akari.dart preview --theme themes/default
 ```
 
-Preview uses simulated frontend state and does not require a backend. It opens
-a resizable desktop window. The CLI resolves the theme's dependencies, generates
-its scene Dart, and creates a reusable application host.
+Preview opens one resizable desktop window, automatically demonstrates face
+recognition success and password fallback, and exits after both journeys. It uses
+controlled frontend authentication events without a backend, camera, or PAM.
+Each journey checks prompts, credential focus, and a simulated session handoff.
+Use `--scenario face-success` or `--scenario password-fallback` to select one.
+A failed journey produces a nonzero exit status and retains logs in `build/tool/runs/`.
 
-In debug mode, saving Dart or asset changes triggers hot reload. Scene JSON
-changes are regenerated before reload. In the launching terminal, `r` regenerates
-and reloads, `R` restarts, and `q` quits.
+To inspect the native loading animation separately, run
+`fvm dart run tool/akari.dart run splash`. It stays open until closed or Escape is
+pressed and does not launch a login screen. Real VT handoff still needs hardware.
 
 ## Run the mock backend
 
@@ -36,6 +39,10 @@ It exercises the same frontend transport as production. The mock conversation
 accepts `password`; it does not authenticate a system account or launch a real
 desktop session. The greeter defaults to fullscreen; use
 `AKARI_WINDOW_MODE=windowed` before the command for a windowed session.
+
+Debug `run` sessions reload Dart and assets on save, regenerating changed scene
+JSON first. In the launching terminal, `r` regenerates and reloads, `R` restarts,
+and `q` quits. Preview runs once and does not hot reload.
 
 Fullscreen renders the same login state on all connected monitors. Follow
 [display and scaling testing](../guides/display-testing.md) to check focus,

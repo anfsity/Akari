@@ -29,7 +29,7 @@ the folder name. See the [theme package contract](../reference/theme-package.md)
 ## Preview and iterate
 
 ```sh
-fvm dart run tool/akari.dart preview --theme themes/ocean
+AKARI_WINDOW_MODE=windowed fvm dart run tool/akari.dart run --theme themes/ocean
 ```
 
 Edit the scene JSON to change layout and visibility. Edit `theme.dart` to change

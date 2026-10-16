@@ -11,9 +11,10 @@ From the repository root, use `fvm dart run tool/akari.dart COMMAND`. After
 | Command | Purpose | Command-specific options |
 | --- | --- | --- |
 | `build` | Build a selected theme, production backend and native splash | `--theme`, `--jobs`, `--mode`, `--platform` |
-| `preview` | Show the native splash, then preview a theme with demo login state | `--theme`, `--jobs`, `--mode`, `--splash-duration` |
+| `preview` | Automatically demonstrate login journeys in one window, then exit | `--theme`, `--jobs`, `--scenario` |
 | `run` | Run the greeter with a private D-Bus and backend | `--theme`, `--jobs`, `--mode`, `--backend` |
 | `run sway` | Run that greeter inside nested or headless Sway | Run options plus `--display-profile`, `--resolution`, `--scale`, `--sway-backend` |
+| `run splash` | Preview the native loading animation until closed | `--jobs`, `--mode`, `--light` |
 | `run studio` | Edit scenes with the selected compiled theme | `--theme`, `--jobs` |
 | `verify` | Check shared code, backend, and theme projects | `--theme` |
 | `generate-scenes` | Generate typed Dart from scene JSON | `--theme` |
@@ -21,14 +22,16 @@ From the repository root, use `fvm dart run tool/akari.dart COMMAND`. After
 | `trace-perf` / `trace` | Run the theme's declared performance trace | `--theme`, arguments after `--` |
 | `install` | Build and deploy the production login environment | `--theme`, `--jobs`, `--dry-run` |
 | `install cli` | Install the repository-bound launcher and completion | `--shell`, `--prefix`, `--rc` |
-| `uninstall` | Remove an inactive production installation | `--dry-run` |
-| `clean` | Clean inactive production and test installations, including leftovers | `--dry-run` |
+| `uninstall` | Remove login or test installations, including partial installs | `--scope`, `--dry-run` |
 | `login enable` / `login disable` | Select Akari or restore the previous boot login service | `--dry-run` |
 | `login rollback` | Select the previous installed release | `--dry-run` |
 | `login configure-keyring` | Configure greetd keyring PAM without rebuilding | `--keyring`, `--dry-run` |
 | `login enable-gaze` / `login disable-gaze` | Enable Gaze on stock Arch greetd or restore password authentication | `--dry-run` |
 | `login status` | Inspect deployment and service state | `--format` |
 | `login logs` | Read the service journal or latest greeter logs | `--component`, `--lines`, `--follow` |
+| `toolchain check` / `toolchain setup` | Check or initialize development dependencies | `--dry-run` |
+| `docs build-api` / `docs verify` | Build API docs or check a built site | `--dry-run`; site path after `--` for `verify` |
+| `script list` / `script run` | Discover and invoke repository scripts | `list --format`, `run SCRIPT --dry-run -- arguments` |
 | `completion` | Print a completion script | `--shell` |
 | `greetd-test` | Manage standalone login testing | [Operation-specific options](../guides/greetd-testing.md) |
 
@@ -37,7 +40,7 @@ commands also accept `--format text|json`, `--report PATH`, and `--dry-run`.
 Every command accepts `--help` (`-h`). Installation, `login`, `completion`, and
 the `greetd-test` family use their own output and option contracts.
 
-`run sway` and `run studio` are targets of `run`, so use
+`run sway`, `run splash`, and `run studio` are targets of `run`, so use
 `akari run TARGET --help` to see their accepted options. Studio always runs in
 debug mode without a backend; it does not accept `--mode` or `--backend`.
 Its developing user guide remains in the repository's
@@ -57,8 +60,8 @@ Use `-t`, `-m`, and `-j` for `--theme`, `--mode`, and `--jobs`.
 `perf` aliases `verify-perf`, and `trace` aliases `trace-perf`.
 Long options also accept `--name=value`. Mixing short and long spellings of
 the same option is still a duplicate error. `COMMAND --help` lists only options
-accepted by that command. Only performance commands accept arguments after `--`;
-they pass them literally to the theme's runner.
+accepted by that command. Performance commands, `script run`, and `docs verify` accept arguments after
+`--` and forward them literally.
 
 ```sh
 fvm dart run tool/akari.dart build -t themes/default -m release -j 4
@@ -180,25 +183,27 @@ logs remain on disk. `uninstall` requires an inactive service, restores any reco
 boot login service, and removes the deployment and `/etc/akari` configuration;
 it retains the greeter account, preferences, and logs.
 
-Use `clean` to also remove test artifacts or leftovers from an incomplete
-installation. It removes `/opt/akari`, `/opt/akari-test`, `/etc/akari`, and
-`/etc/systemd/system/akari.service`, restores the recorded boot login service,
-and removes only Akari's keyring block from `/etc/pam.d/greetd`. It works without
-an installed controller or installation manifest and can be repeated when these
-files are already absent. Accounts, preferences, PAM backups, production/test
-logs outside the installation directories, and the CLI launcher are retained.
-The production service, test service, recovery service, and recovery timer must
-all be inactive or failed. For a running production session, use `login disable`
-and reboot first; for an armed test, use `greetd-test restore`. Cleanup refuses to
-remove recovery files if restoring the recorded login service fails or its
-snapshot is missing while Akari is selected for boot.
+`uninstall` defaults to the login installation. `--scope test` removes only the
+standalone test installation without changing production PAM, configuration, or
+boot selection. `--scope all` removes both. Every scope handles partial installs
+and repeat calls without requiring an installed controller or manifest. The old
+`clean` command has been removed.
+
+Login removal restores the recorded boot service, removes `/opt/akari`,
+`/etc/akari`, and the Akari unit, and removes Akari's keyring configuration and
+Gaze route. Test removal deletes `/opt/akari-test`. Accounts, preferences, PAM
+backups, logs outside installation directories, and the CLI launcher remain.
+Services and recovery timers in the selected scope must be inactive or failed.
+Use `login disable` and reboot before removing a running login installation, or
+`greetd-test restore` for an armed test. Failed restoration retains recovery files.
 
 ```sh
-akari clean --dry-run
-akari clean
+akari uninstall --scope all --dry-run
+akari uninstall --scope test
+akari uninstall --scope all
 ```
 
-`install`, `uninstall`, `clean`, `login enable`, `login disable`, `login rollback`,
+`install`, `uninstall`, `login enable`, `login disable`, `login rollback`,
 `login configure-keyring`, `login enable-gaze`, and `login disable-gaze` accept
 `--dry-run`, which prints a JSON plan without building, requesting sudo, or
 changing files. Status and logs are read-only. The CLI launcher still needs
@@ -249,6 +254,28 @@ The `akari` launcher still needs the repository and SDK. Emergency recovery
 remains `sudo /opt/akari-test/restore.sh`, independent of both.
 See [Standalone greetd testing](../guides/greetd-testing.md) for options and prerequisites.
 
+## Repository scripts
+
+`akari -h` groups development, checks, installation, and tools, with common
+examples. Subcommand help lists only its accepted options.
+
+```sh
+akari script list
+akari script list --format json
+akari script run run-backend.sh -- --help
+akari script run greetd-test/display-layout.py -- capture
+akari docs verify -- docs/site/dist
+```
+
+The CLI scans the script directory; explicit metadata describes purposes and
+calling conditions. It invokes Bash/Python scripts through their interpreters,
+preserving arguments and exit status, with the repository root as the working
+directory. It does not request sudo or create a greetd environment for raw scripts.
+Internal entrypoints still require their documented installed layout, environment,
+or VT. `lib.sh` is discoverable but is a sourced library, not a standalone command.
+Put a script's own `--help` after `--`. Classify new scripts in the registry;
+coverage tests detect missing entries.
+
 ## Build, preview, and run
 
 `build` accepts a theme project with `--theme PATH`, defaulting to
@@ -263,16 +290,23 @@ It compiles and starts the Rust mock backend by default; `--backend real` select
 production transport. The frontend always uses D-Bus. `run` directly owns the
 selected theme's Flutter session.
 
-Use `preview --theme PATH` to preview the theme with frontend demo state.
-Both commands default to debug mode and reload Dart and asset changes on save.
-Scene JSON edits first run incremental code generation; failed generation keeps
-the last working theme. `r` regenerates and reloads, `R` restarts, and `q` quits.
-Profile/release sessions do not hot reload. Both commands accept `--jobs COUNT`.
+`preview --theme PATH` opens one login window and uses Flutter integration tests
+to demonstrate `face-success` and `password-fallback`, releasing authentication
+state between journeys and exiting when complete. `--scenario NAME` selects one;
+the default is `all`. Preview always uses debug mode, without hot reload, a backend,
+or a native splash. Reports include `preview_scenarios`; incomplete or failed
+journeys return a nonzero status. This checks UI behavior under controlled events;
+camera, PAM, and VT handoff still require real hardware testing.
 
-Preview opens directly in the current desktop without a nested compositor. Preview defaults to a resizable, undecorated window. `run` and built
-greeter bundles default to undecorated fullscreen. Set
-`AKARI_WINDOW_MODE=fullscreen` for a fullscreen preview or `windowed` for a
-windowed greeter. Exit live sessions with `q` in the launching terminal.
+`run` defaults to debug mode and reloads Dart and assets on save, regenerating
+changed scene JSON first. Failed generation retains the working theme. `r`
+regenerates and reloads, `R` restarts, and `q` quits. Profile/release sessions do
+not hot reload. Both `preview` and `run` accept `--jobs COUNT`.
+
+Preview uses one resizable, undecorated window. `run` and production bundles
+default to undecorated fullscreen; set `AKARI_WINDOW_MODE=windowed` for a windowed
+`run`. `run splash` independently shows the native loading animation until Escape
+or window close, without a duration limit or a following login screen.
 
 Fullscreen greeters render the same theme on every connected monitor, using
 each output's logical size and scale. Account, session, authentication, dormant

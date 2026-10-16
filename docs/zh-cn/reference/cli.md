@@ -12,9 +12,10 @@ description: 查命令、选项、显示配置和运行报告。
 | 命令 | 用途 | 命令专属选项 |
 | --- | --- | --- |
 | `build` | 构建所选主题、正式版后端和原生启动画面 | `--theme`、`--jobs`、`--mode`、`--platform` |
-| `preview` | 显示原生启动画面，再进入主题的模拟登录界面 | `--theme`、`--jobs`、`--mode`、`--splash-duration` |
+| `preview` | 在一个窗口中自动演示登录场景，完成后退出 | `--theme`、`--jobs`、`--scenario` |
 | `run` | 使用私有 D-Bus 和后端运行登录界面 | `--theme`、`--jobs`、`--mode`、`--backend` |
 | `run sway` | 在嵌套或无头 Sway 中运行登录界面 | `run` 选项，以及 `--display-profile`、`--resolution`、`--scale`、`--sway-backend` |
+| `run splash` | 独立预览原生 loading 动画，手动关闭 | `--jobs`、`--mode`、`--light` |
 | `run studio` | 使用已编译主题编辑场景 | `--theme`、`--jobs` |
 | `verify` | 检查共享代码、后端和主题项目 | `--theme` |
 | `generate-scenes` | 从场景 JSON 生成类型化 Dart | `--theme` |
@@ -22,20 +23,22 @@ description: 查命令、选项、显示配置和运行报告。
 | `trace-perf` / `trace` | 运行主题声明的性能跟踪 | `--theme`、`--` 后的参数 |
 | `install` | 构建并部署正式登录环境 | `--theme`、`--jobs`、`--dry-run` |
 | `install cli` | 安装绑定到当前仓库的启动器和补全脚本 | `--shell`、`--prefix`、`--rc` |
-| `uninstall` | 卸载已停止运行的正式环境 | `--dry-run` |
-| `clean` | 清理已停止运行的正式、测试环境及安装残留 | `--dry-run` |
+| `uninstall` | 卸载正式或测试环境，包括安装残留 | `--scope`、`--dry-run` |
 | `login enable` / `login disable` | 选择 Akari 或恢复原来的开机登录服务 | `--dry-run` |
 | `login rollback` | 选择上一个已安装版本 | `--dry-run` |
 | `login configure-keyring` | 无需重新构建即可配置 greetd 密钥环 PAM | `--keyring`、`--dry-run` |
 | `login enable-gaze` / `login disable-gaze` | 为标准 Arch greetd 启用 Gaze，或恢复密码认证 | `--dry-run` |
 | `login status` | 查看安装和服务状态 | `--format` |
 | `login logs` | 查看服务 journal 或最新登录界面日志 | `--component`、`--lines`、`--follow` |
+| `toolchain check` / `toolchain setup` | 检查或初始化开发环境 | `--dry-run` |
+| `docs build-api` / `docs verify` | 构建 API 文档或校验已构建站点 | `--dry-run`；`verify` 的站点路径放在 `--` 后 |
+| `script list` / `script run` | 查看并调用仓库脚本 | `list --format`、`run SCRIPT --dry-run -- 参数` |
 | `completion` | 输出命令补全脚本 | `--shell` |
 | `greetd-test` | 管理独立登录测试 | [各操作的选项](../guides/greetd-testing.md) |
 
 构建、预览、运行目标、验证、场景生成和性能命令还接受 `--format text|json`、`--report PATH` 和 `--dry-run`。所有命令都接受 `--help`（`-h`）。安装、`login`、`completion` 和 `greetd-test` 命令组有各自的输出和选项约定。
 
-`run sway` 和 `run studio` 是 `run` 的目标；使用 `akari run TARGET --help` 查看它们支持的选项。Studio 始终以 debug 模式运行且不启动后端，不接受 `--mode` 或 `--backend`。它的开发用户指南暂存于仓库的 [Studio 说明](https://github.com/anfsity/Akari/blob/main/docs/internal/theme-studio.md)。
+`run sway`、`run splash` 和 `run studio` 是 `run` 的目标；使用 `akari run TARGET --help` 查看它们支持的选项。Studio 始终以 debug 模式运行且不启动后端，不接受 `--mode` 或 `--backend`。它的开发用户指南暂存于仓库的 [Studio 说明](https://github.com/anfsity/Akari/blob/main/docs/internal/theme-studio.md)。
 
 通过 Dart 入口运行构建和检查命令：
 
@@ -102,14 +105,17 @@ akari uninstall
 
 重新安装会保留旧版本，在部署成功后切换 `current`。`login rollback` 交换 `current` 和 `previous`，下一次启动登录界面时使用所选版本；已经运行的登录界面继续使用原版本。回退不修改系统配置和偏好。旧版本与会话日志会保留在磁盘上。`uninstall` 要求服务已停止运行，恢复已记录的开机登录服务，并删除部署产物和 `/etc/akari` 配置；账户、偏好和日志保留。
 
-使用 `clean` 可同时清理测试环境和未完成安装的残留。它删除 `/opt/akari`、`/opt/akari-test`、`/etc/akari` 和 `/etc/systemd/system/akari.service`，恢复已记录的开机登录服务，并只移除 `/etc/pam.d/greetd` 中 Akari 添加的密钥环配置块。已安装的控制器或安装清单缺失时仍可使用；文件已经不存在时可重复执行。账户、偏好、PAM 备份、安装目录之外的正式及测试日志，以及 CLI 启动器保留。正式服务、测试服务、恢复服务及恢复定时器必须处于 inactive 或 failed 状态。正式会话仍在运行时，先执行 `login disable` 并重启；测试已启动时，先执行 `greetd-test restore`。恢复原登录服务失败，或 Akari 仍被选为开机登录服务但恢复快照缺失时，会拒绝删除恢复所需的文件。
+`uninstall` 默认卸载正式登录环境；`--scope test` 只删除独立测试安装，不修改正式环境的 PAM、配置或开机登录服务；`--scope all` 卸载两者。所有范围均支持不完整安装和重复执行，不要求已安装的控制器或 manifest 存在。原来的 `clean` 命令已移除。
+
+正式环境卸载会恢复已记录的开机登录服务，删除 `/opt/akari`、`/etc/akari` 和 Akari unit，并移除 Akari 的密钥环配置与 Gaze 路由；测试范围删除 `/opt/akari-test`。账户、偏好、PAM 备份、安装目录外的日志及 CLI 启动器保留。所选范围内的服务和恢复计时器必须处于 inactive 或 failed 状态；正式会话仍运行时先 `login disable` 并重启，测试运行时先 `greetd-test restore`。恢复失败会保留恢复所需文件。
 
 ```sh
-akari clean --dry-run
-akari clean
+akari uninstall --scope all --dry-run
+akari uninstall --scope test
+akari uninstall --scope all
 ```
 
-`install`、`uninstall`、`clean`、`login enable`、`login disable`、`login rollback`、`login configure-keyring`、`login enable-gaze` 和 `login disable-gaze` 接受 `--dry-run`，只输出 JSON 计划，不构建、不请求 sudo，也不修改文件。状态和日志操作只读。CLI 启动器仍依赖仓库和 SDK，已安装的登录服务独立运行。在 TTY 中恢复时，也可以直接调用已安装的控制器：
+`install`、`uninstall`、`login enable`、`login disable`、`login rollback`、`login configure-keyring`、`login enable-gaze` 和 `login disable-gaze` 接受 `--dry-run`，只输出 JSON 计划，不构建、不请求 sudo，也不修改文件。状态和日志操作只读。CLI 启动器仍依赖仓库和 SDK，已安装的登录服务独立运行。在 TTY 中恢复时，也可以直接调用已安装的控制器：
 
 ```sh
 sudo python3 /opt/akari/manage.py disable
@@ -135,15 +141,31 @@ fvm dart run tool/akari.dart install cli --shell bash
 
 独立登录测试使用 `akari greetd-test install`、`start`、`restore`、`status` 和 `logs`。此命令组直接调用已安装的测试生命周期脚本，将诊断信息保存在仓库运行报告之外。`greetd-test install --theme PATH`（或 `-t PATH`）会构建并安装所选主题项目，默认使用仓库的 `themes/default`。只有安装操作需要仓库构建产物；状态/日志查询和服务控制不会获取主题锁，也不会创建开发运行目录。`akari` 启动器本身仍需要仓库和 SDK。紧急恢复命令 `sudo /opt/akari-test/restore.sh` 可独立于二者运行。操作选项和前置条件见[独立 greetd 测试](../guides/greetd-testing.md)。
 
+## 仓库脚本
+
+`akari -h` 按开发、检查、安装、工具分类，并给出常用示例；子命令帮助只列出自己的参数。
+
+```sh
+akari script list
+akari script list --format json
+akari script run run-backend.sh -- --help
+akari script run greetd-test/display-layout.py -- capture
+akari docs verify -- docs/site/dist
+```
+
+脚本目录由 CLI 扫描，声明表提供用途和调用条件。Bash/Python 脚本通过对应解释器调用，参数保持原样，工作目录为仓库根目录，并保留退出码。CLI 不替脚本请求 sudo 或构造 greetd 环境。内部入口仍要求列表中说明的安装目录、环境变量或 VT；`lib.sh` 是函数库，可被发现，但不能作为独立命令运行。转发给脚本的 `--help` 应放在 `--` 后。新增脚本必须在声明表中归类，覆盖测试会检查遗漏。
+
 ## 构建、预览和运行
 
 `build` 通过 `--theme PATH` 接受主题项目，默认值为 `themes/default`。它会解析项目依赖、生成场景源文件，并在 `build/tool/hosts/` 下创建可复用宿主。宿主只导入所选主题；项目可以位于 Akari 仓库外。详情见[主题项目约定](theme-package.md)。
 
 使用 `run --theme PATH` 在私有 D-Bus 会话中启动完整登录界面。默认会编译并启动 Rust 模拟后端；`--backend real` 则选择真实后端通信。前端始终使用 D-Bus。`run` 会直接管理所选主题的 Flutter 会话。
 
-使用 `preview --theme PATH` 可以用模拟登录数据预览主题。两个命令默认使用 debug 模式，并在保存后重新加载 Dart 和资源变更。场景 JSON 修改会先执行增量代码生成；生成失败时仍保留上次可用主题。按 `r` 重新生成并加载，按 `R` 重启，按 `q` 退出。profile/release 会话不支持热重载。两个命令都接受 `--jobs COUNT`。
+`preview --theme PATH` 只创建一个登录窗口，使用 Flutter 集成测试依次演示 `face-success` 和 `password-fallback`，每条结束后释放认证状态，再进入下一条，全部完成后退出。`--scenario NAME` 选择单条，默认 `all`。预览固定使用 debug 模式，不热重载、不启动后端或原生 splash。报告中的 `preview_scenarios` 记录每条结果；未完成或失败时返回非零退出码。预览验证受控事件下的 UI 流程，真实摄像头、PAM、VT 交接仍需实机测试。
 
-Preview 直接在当前桌面打开，不使用嵌套合成器；默认使用可调整大小、无装饰的窗口。`run` 和构建后的登录程序默认以无装饰全屏模式运行。可设置 `AKARI_WINDOW_MODE=fullscreen` 令 preview 全屏，或设为 `windowed` 令登录界面使用窗口模式。在启动终端按 `q` 退出运行中的会话。
+`run` 默认 debug 模式，保存后热重载 Dart 和资源；场景 JSON 先增量生成，失败时保留上次可用主题。按 `r` 重新生成并加载，`R` 重启，`q` 退出。profile/release 会话不支持热重载。`preview` 与 `run` 都接受 `--jobs COUNT`。
+
+`preview` 使用可调整大小、无装饰的单窗口。`run` 和正式程序默认无装饰全屏；设置 `AKARI_WINDOW_MODE=windowed` 可让 `run` 使用窗口。`run splash` 独立展示原生 loading 动画，不限展示时间，按 Escape 或关闭窗口结束；它不启动登录界面。
 
 全屏登录界面会在每台已连接显示器上显示相同主题，并使用各自输出的逻辑尺寸和缩放。账户、会话、身份验证、休眠状态及凭据文本会共享；键盘操作由获得焦点的窗口处理。连接或断开输出会更新对应窗口，不会重启身份验证。窗口模式的预览只打开一个窗口。
 

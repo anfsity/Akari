@@ -41,8 +41,10 @@ bash scripts/bootstrap-toolchain.sh
 fvm dart run tool/akari.dart preview --theme themes/fallback
 ```
 
-Preview opens a resizable desktop window with simulated login state. Dart,
-asset, and scene changes reload on save in debug mode.
+Preview opens one resizable login window, demonstrates face success and password
+fallback, and exits. Use `--scenario` to select one journey. `run` supports
+interactive D-Bus testing and debug hot reload; `run splash` independently
+previews the native loading animation until closed.
 
 `themes/fallback` is a small, static starting point for a new theme. Use
 `--theme themes/default` to try the default theme, or follow the

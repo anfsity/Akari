@@ -35,10 +35,10 @@ Only the slight float and status dots change each frame.
 
 The background defaults to pure black (`#000000`), matching the login compositor.
 The minimum display time defaults to 3 seconds, starting at the first successful
-presentation. Zero removes the artificial hold. `--splash-duration` controls the
-window preview; `AKARI_SPLASH_DURATION` can be set in the VT launcher's environment
-and is forwarded through greetd to the user launcher. This time is not a desktop
-startup timeout or a desktop readiness signal.
+presentation. Zero removes the artificial hold. `akari run splash` keeps the
+independent window preview open until closed. `AKARI_SPLASH_DURATION` can be set
+in the VT launcher's environment and is forwarded through greetd to the user
+launcher. This time is not a desktop startup timeout or a desktop readiness signal.
 
 KMS access goes through libseat's logind/seatd management. The program enumerates
 primary DRM nodes, connected outputs, active CRTCs and their modes. Each output
