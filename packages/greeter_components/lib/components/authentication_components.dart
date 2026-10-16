@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
@@ -26,7 +28,7 @@ class CredentialField extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.person_search_outlined, color: scheme.primary),
+              const _IdentityScan(),
               const SizedBox(width: 12),
               Flexible(
                 child: Text(
@@ -93,6 +95,137 @@ class CredentialField extends StatelessWidget {
       ),
     );
   }
+}
+
+class _IdentityScan extends StatefulWidget {
+  const _IdentityScan();
+
+  @override
+  State<_IdentityScan> createState() => _IdentityScanState();
+}
+
+class _IdentityScanState extends State<_IdentityScan>
+    with SingleTickerProviderStateMixin {
+  late final _animation = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2400),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _animation.stop();
+      _animation.value = 0;
+      return;
+    }
+    _animation.repeat();
+  }
+
+  @override
+  void dispose() {
+    _animation.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: RepaintBoundary(
+      child: CustomPaint(
+        size: const Size.square(40),
+        painter: _IdentityScanPainter(
+          animation: _animation,
+          color: Theme.of(context).colorScheme.primary,
+          animate: !MediaQuery.disableAnimationsOf(context),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Only the glyph repaints on each tick, keeping the prompt layout still while
+/// authentication waits for the backend.
+class _IdentityScanPainter extends CustomPainter {
+  _IdentityScanPainter({
+    required this.animation,
+    required this.color,
+    required this.animate,
+  }) : super(repaint: animation);
+
+  final Animation<double> animation;
+  final Color color;
+  final bool animate;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 40, size.height / 40);
+    final phase = animation.value * math.pi * 2;
+    final gaze = animate ? math.sin(phase) * 1.5 : 0.0;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round;
+    final frame = Path()
+      ..moveTo(4, 13)
+      ..lineTo(4, 9)
+      ..quadraticBezierTo(4, 4, 9, 4)
+      ..lineTo(13, 4)
+      ..moveTo(27, 4)
+      ..lineTo(31, 4)
+      ..quadraticBezierTo(36, 4, 36, 9)
+      ..lineTo(36, 13)
+      ..moveTo(36, 27)
+      ..lineTo(36, 31)
+      ..quadraticBezierTo(36, 36, 31, 36)
+      ..lineTo(27, 36)
+      ..moveTo(13, 36)
+      ..lineTo(9, 36)
+      ..quadraticBezierTo(4, 36, 4, 31)
+      ..lineTo(4, 27);
+    canvas.drawPath(frame, paint);
+    for (final x in [14.0, 26.0]) {
+      canvas.drawLine(Offset(x + gaze, 14), Offset(x + gaze, 17), paint);
+    }
+    canvas.drawPath(
+      Path()
+        ..moveTo(20 + gaze, 18)
+        ..lineTo(20 + gaze, 23)
+        ..lineTo(18 + gaze, 23),
+      paint,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(14, 27)
+        ..quadraticBezierTo(20, 31, 26, 27),
+      paint,
+    );
+    if (animate) {
+      final scanY = 7 + (1 - math.cos(phase)) * 13;
+      final scanRect = Rect.fromLTWH(7, scanY - 3, 26, 6);
+      canvas.drawRect(
+        scanRect,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              color.withValues(alpha: 0),
+              color.withValues(alpha: 0.22),
+              color.withValues(alpha: 0),
+            ],
+          ).createShader(scanRect),
+      );
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_IdentityScanPainter oldDelegate) =>
+      oldDelegate.animation != animation ||
+      oldDelegate.color != color ||
+      oldDelegate.animate != animate;
 }
 
 class PrimaryAction extends StatelessWidget {
