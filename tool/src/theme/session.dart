@@ -52,14 +52,6 @@ class ThemeSession {
               .map(Directory.new)
               .toList();
     final flutter = getFlutterCommand(repoRoot);
-    final previewApplication =
-        Platform.environment['AKARI_PREVIEW_APPLICATION'];
-    if (previewApplication != null) {
-      final interrupted = await _showSplash(
-        Platform.environment['AKARI_SPLASH_BIN']!,
-      );
-      if (interrupted != null) return interrupted;
-    }
     _process = await Process.start(flutter.first, [
       ...flutter.skip(1),
       'run',
@@ -69,8 +61,6 @@ class ThemeSession {
       '--no-pub',
       '--machine',
       '--dart-define=AKARI_BACKEND=$backend',
-      if (previewApplication != null)
-        '--use-application-binary=$previewApplication',
     ], workingDirectory: host.path);
     final outputDone = Completer<void>();
     _subscriptions.add(
@@ -332,46 +322,5 @@ class ThemeSession {
     for (final subscription in _subscriptions) {
       await subscription.cancel();
     }
-  }
-}
-
-/// The splash is a completed, separate process before Flutter is launched.
-/// A window close skips the hold; a terminal signal cancels the whole preview.
-Future<int?> _showSplash(String executable) async {
-  try {
-    final process = await Process.start(
-      executable,
-      ['window'],
-      environment: {'AKARI_SPLASH_PARENT_PID': '$pid'},
-    );
-    int? interrupted;
-    final signals = [
-      for (final signal in [ProcessSignal.sigint, ProcessSignal.sigterm])
-        signal.watch().listen((_) {
-          interrupted = signal == ProcessSignal.sigint ? 130 : 143;
-          process.kill(signal);
-        }),
-    ];
-    try {
-      final output = Future.wait([
-        process.stdout.listen(stdout.add).asFuture<void>(),
-        process.stderr.listen(stderr.add).asFuture<void>(),
-      ]);
-      final status = await process.exitCode;
-      await output;
-      if (status != 0 && interrupted == null) {
-        stderr.writeln(
-          'Native splash exited with $status; continuing preview.',
-        );
-      }
-      return interrupted;
-    } finally {
-      for (final signal in signals) {
-        await signal.cancel();
-      }
-    }
-  } on ProcessException catch (error) {
-    stderr.writeln('Native splash unavailable; continuing preview: $error');
-    return null;
   }
 }

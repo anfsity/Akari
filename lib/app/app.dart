@@ -15,6 +15,7 @@ class MyApp extends StatefulWidget {
   const MyApp({
     required this.themeBuilder,
     this.sessionStore = const NoopSessionStore(),
+    this.gateway,
     super.key,
   });
 
@@ -22,6 +23,9 @@ class MyApp extends StatefulWidget {
 
   /// Persistence for the selected session; the default keeps tests isolated.
   final SessionStore sessionStore;
+
+  /// The app owns and closes an injected gateway just as it does its transport.
+  final GreeterGateway? gateway;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -52,11 +56,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       'AKARI_BACKEND',
       defaultValue: 'demo',
     );
-    final gateway = backendMode == 'demo'
-        ? DemoGreeterGateway()
-        : DBusGreeterGateway();
     _feature = GreeterFeature(
-      gateway: gateway,
+      gateway:
+          widget.gateway ??
+          (backendMode == 'demo' ? DemoGreeterGateway() : DBusGreeterGateway()),
       sessionStore: widget.sessionStore,
     );
     _theme = widget.themeBuilder();

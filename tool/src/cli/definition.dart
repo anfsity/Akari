@@ -1,4 +1,5 @@
 import '../theme/model.dart';
+import '../../preview/scenarios.dart';
 
 enum CommandGroup {
   development('Development and preview'),
@@ -78,7 +79,7 @@ const cliOptions = {
   ),
   '--mode': CliOption(
     '--mode',
-    'Flutter build mode (build: release; run/preview: debug).',
+    'Flutter build mode (build: release; run: debug).',
     short: '-m',
     valueName: 'MODE',
     values: ['debug', 'profile', 'release'],
@@ -94,10 +95,11 @@ const cliOptions = {
     valueName: 'MODE',
     values: ['mock', 'real'],
   ),
-  '--splash-duration': CliOption(
-    '--splash-duration',
-    'Minimum native splash display time in seconds (default: 3; 0 skips the hold).',
-    valueName: 'SECONDS',
+  '--scenario': CliOption(
+    '--scenario',
+    'Preview journey (default: all).',
+    valueName: 'NAME',
+    values: ['all', ...previewScenarioNames],
   ),
   '--light': CliOption('--light', 'Use the light splash variant.'),
   '--scope': CliOption(
@@ -229,9 +231,13 @@ const cliCommands = [
   ),
   CliCommand(
     'preview',
-    'Show the native splash, then run the selected theme with demo login state.',
-    examples: ['akari preview --theme themes/default'],
-    options: ['--theme', '--jobs', '--mode', '--splash-duration'],
+    'Show each automated login journey once in one window, then exit.',
+    examples: [
+      'akari preview --theme themes/default',
+      'akari preview --scenario face-success',
+      'akari preview --scenario password-fallback',
+    ],
+    options: ['--theme', '--jobs', '--scenario'],
     development: DevelopmentCommand.preview,
   ),
   CliCommand(
@@ -572,7 +578,7 @@ enum DevelopmentCommand {
   splash,
   run(runTarget: ThemeRunTarget.greeter),
   sway(runTarget: ThemeRunTarget.sway),
-  preview(runTarget: ThemeRunTarget.preview),
+  preview,
   studio(runTarget: ThemeRunTarget.studio),
   verify,
   verifyPerf,

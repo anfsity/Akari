@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../execution/model.dart';
+import '../../preview/scenarios.dart';
 import '../execution/paths.dart';
 import '../sdk_commands.dart';
 import '../theme/build_links.dart';
@@ -86,7 +87,6 @@ RunPlan createThemeRunPlan(
   int? jobs,
   Map<String, Object?>? displayProfile,
   SwayBackend swayBackend = SwayBackend.wayland,
-  String? splashDuration,
 }) {
   final kind = target.hostKind;
   final themes = kind == ThemeHostKind.studio
@@ -95,8 +95,6 @@ RunPlan createThemeRunPlan(
   final host = getThemeHostDirectory(theme, kind);
   final hasBackend = kind == ThemeHostKind.greeter;
   final sway = target == ThemeRunTarget.sway;
-  final preview = target == ThemeRunTarget.preview;
-  final splash = Platform.environment['AKARI_SPLASH_BIN'];
   final displayReport = '$runDirectory/sway/display-report.json';
   return RunPlan(
     command: target.commandName,
@@ -114,7 +112,6 @@ RunPlan createThemeRunPlan(
       'host_project': host,
       'build_directory': '$host/build/linux',
       'executable': getLinuxExecutablePath(host, mode),
-      if (preview) 'splash_executable': splash ?? getSplashExecutablePath(mode),
       if (sway) ...{
         'display_report': displayReport,
         'display_snapshot': '$runDirectory/sway/outputs.json',
@@ -132,23 +129,6 @@ RunPlan createThemeRunPlan(
         host,
         themes: themes,
       ),
-      if (preview) ...[
-        if (splash == null) _createSplashBuildStep(mode, jobs),
-        RunStep(
-          id: 'theme.preview.build',
-          command: [
-            ...getFlutterCommand(repoRoot),
-            'build',
-            'linux',
-            '--${mode.name}',
-            '--no-pub',
-            '--dart-define=AKARI_BACKEND=demo',
-          ],
-          workingDirectory: host,
-          dependencies: const ['theme.host.pub_get'],
-          environment: {if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs'},
-        ),
-      ],
       RunStep(
         id: 'theme.${target.stepName}',
         command: [
@@ -173,14 +153,7 @@ RunPlan createThemeRunPlan(
           kind.backendDefine,
         ],
         workingDirectory: host,
-        dependencies: [
-          if (hasBackend) 'backend.build',
-          if (preview) ...[
-            if (splash == null) 'splash.build',
-            'theme.preview.build',
-          ] else
-            'theme.host.pub_get',
-        ],
+        dependencies: [if (hasBackend) 'backend.build', 'theme.host.pub_get'],
         interactive: true,
         environment: {
           if (kind == ThemeHostKind.studio)
@@ -194,16 +167,6 @@ RunPlan createThemeRunPlan(
               Platform.environment['AKARI_WINDOW_MODE'] ??
               (hasBackend ? 'fullscreen' : 'windowed'),
           if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs',
-          if (preview) ...{
-            'AKARI_SPLASH_BIN':
-                splash ??
-                getAbsolutePath(repoRoot, getSplashExecutablePath(mode)),
-            'AKARI_PREVIEW_APPLICATION': getAbsolutePath(
-              repoRoot,
-              getLinuxExecutablePath(host, mode),
-            ),
-            'AKARI_SPLASH_DURATION': ?splashDuration,
-          },
           if (sway) 'AKARI_DISPLAY_PROFILE_JSON': jsonEncode(displayProfile!),
           if (hasBackend) ...{
             'AKARI_BACKEND_MODE': backend.name,
@@ -217,6 +180,94 @@ RunPlan createThemeRunPlan(
       ),
     ],
   );
+}
+
+RunPlan createPreviewPlan(
+  Directory repoRoot,
+  ThemePackage theme,
+  String runDirectory, {
+  int? jobs,
+  String scenario = 'all',
+}) {
+  final host = getThemeHostDirectory(theme, ThemeHostKind.preview);
+  final resultPath = '$runDirectory/preview.json';
+  final scenarios = scenario == 'all' ? previewScenarioNames : [scenario];
+  return RunPlan(
+    command: 'preview',
+    themes: [theme],
+    artifactPaths: {
+      'host_project': host,
+      'build_directory': '$host/build/linux',
+      'executable': getLinuxExecutablePath(host, BuildMode.debug),
+      'preview_result': resultPath,
+    },
+    collectResult: (result) => collectPreviewResult(
+      File(getAbsolutePath(repoRoot, resultPath)),
+      scenarios,
+      result,
+    ),
+    steps: [
+      ..._createHostPreparationSteps(
+        repoRoot,
+        theme,
+        ThemeHostKind.preview,
+        host,
+      ),
+      RunStep(
+        id: 'theme.preview',
+        command: [
+          ...getFlutterCommand(repoRoot),
+          'test',
+          'integration_test/preview_test.dart',
+          '-d',
+          'linux',
+          '--no-pub',
+          '--reporter',
+          'expanded',
+          '--dart-define=AKARI_BACKEND=demo',
+          '--dart-define=AKARI_PREVIEW_SCENARIO=$scenario',
+          '--dart-define=AKARI_PREVIEW_RESULT=${getAbsolutePath(repoRoot, resultPath)}',
+        ],
+        workingDirectory: host,
+        environment: {
+          'AKARI_DISPLAY_MODE': 'single',
+          'AKARI_WINDOW_MODE': 'windowed',
+          if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs',
+        },
+      ),
+    ],
+  );
+}
+
+Future<RunCompletion> collectPreviewResult(
+  File manifest,
+  List<String> scenarios,
+  RunResult result,
+) async {
+  if (!result.isPassed && !await manifest.exists()) {
+    return RunCompletion(failureExitCode: result.getFirstFailureExitCode());
+  }
+  try {
+    final results = jsonDecode(await manifest.readAsString());
+    if (results is! Map<String, dynamic> ||
+        results.length != scenarios.length ||
+        !scenarios.every((scenario) => results[scenario] == 'passed')) {
+      return RunCompletion(
+        error: 'Preview did not complete every selected scenario.',
+        fields: {'preview_scenarios': results},
+        failureExitCode: result.getFirstFailureExitCode(),
+      );
+    }
+    return RunCompletion(
+      fields: {'preview_scenarios': results},
+      failureExitCode: result.getFirstFailureExitCode(),
+    );
+  } catch (error) {
+    return RunCompletion(
+      error: 'Could not read preview results: $error',
+      failureExitCode: result.getFirstFailureExitCode(),
+    );
+  }
 }
 
 RunPlan createSplashRunPlan(

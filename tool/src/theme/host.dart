@@ -36,6 +36,14 @@ void createThemeHost({
     final link = Link('${lib.path}/$name');
     if (!link.existsSync()) link.createSync(source.path);
   }
+  if (preview) {
+    names.add('akari_preview');
+    final link = Link('${lib.path}/akari_preview');
+    if (FileSystemEntity.typeSync(link.path, followLinks: false) ==
+        FileSystemEntityType.notFound) {
+      link.createSync('${repoRoot.path}/tool/preview');
+    }
+  }
   for (final entity in lib.listSync(followLinks: false)) {
     final name = entity.uri.pathSegments.where((part) => part.isNotEmpty).last;
     if (!names.contains(name)) entity.deleteSync(recursive: true);
@@ -66,7 +74,14 @@ void createThemeHost({
         project.packageName: {'path': project.directory.path},
     },
     'flutter': {'uses-material-design': true},
-    if (devDependencies.isNotEmpty) 'dev_dependencies': devDependencies,
+    if (preview || devDependencies.isNotEmpty)
+      'dev_dependencies': {
+        if (preview) ...{
+          'flutter_test': {'sdk': 'flutter'},
+          'integration_test': {'sdk': 'flutter'},
+        },
+        ...devDependencies,
+      },
   };
   _writeIfChanged(
     File('${output.path}/pubspec.yaml'),
@@ -120,6 +135,43 @@ void main() {
   );
 }
 ''');
+  if (preview) {
+    final integration = Directory('${output.path}/integration_test')
+      ..createSync(recursive: true);
+    _writeIfChanged(File('${integration.path}/preview_test.dart'), '''
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:greeter/akari_preview/journey.dart';
+import 'package:greeter/akari_preview/scenarios.dart';
+import 'package:${theme.packageName}/theme.dart' show ${theme.builderName};
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized()
+    ..framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
+  const selected = String.fromEnvironment('AKARI_PREVIEW_SCENARIO', defaultValue: 'all');
+  const resultPath = String.fromEnvironment('AKARI_PREVIEW_RESULT');
+  final results = <String, String>{};
+  for (final scenario in previewScenarioNames.where((name) => selected == 'all' || selected == name)) {
+    testWidgets(scenario, (tester) async {
+      try {
+        await runPreviewScenario(tester, ${theme.builderName}, scenario);
+        results[scenario] = 'passed';
+      } catch (_) {
+        results[scenario] = 'failed';
+        rethrow;
+      } finally {
+        final file = File(resultPath);
+        await file.parent.create(recursive: true);
+        await file.writeAsString(jsonEncode(results));
+      }
+    }, timeout: const Timeout(Duration(seconds: 45)));
+  }
+}
+''');
+  }
 }
 
 // These belong to Flutter in each host. Copying the root's plugin registrants

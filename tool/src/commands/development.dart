@@ -57,7 +57,6 @@ Future<int> runDevelopmentCommand(
     ),
     DevelopmentCommand.run ||
     DevelopmentCommand.sway ||
-    DevelopmentCommand.preview ||
     DevelopmentCommand.studio => createThemeRunPlan(
       repoRoot,
       themes.single,
@@ -68,7 +67,13 @@ Future<int> runDevelopmentCommand(
       jobs: options.jobs,
       displayProfile: display,
       swayBackend: options.swayBackend,
-      splashDuration: options.splashDuration,
+    ),
+    DevelopmentCommand.preview => createPreviewPlan(
+      repoRoot,
+      themes.single,
+      runDirectory,
+      jobs: options.jobs,
+      scenario: options.previewScenario,
     ),
     DevelopmentCommand.verify => createVerificationPlan(
       repoRoot,
