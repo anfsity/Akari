@@ -9,13 +9,13 @@ description: 检查多屏、缩放和截图，对比桌面预览与真实登录�
 
 | 检查内容 | 会话 |
 | --- | --- |
-| 当前桌面上的主题布局和本地交互 | `preview` |
+| 当前桌面上的自动登录 UI 流程 | `preview` |
 | 实际多台显示器上的共享登录状态和键盘焦点 | 全屏 `run` |
 | Wayland 桌面中的独立内容缩放 | `run sway` |
 | 可重复的分辨率和截图 | `run sway --sway-backend headless` |
 | 硬件输出模式、DRM、PAM 和恢复流程 | [独立 greetd 测试](greetd-testing.md) |
 
-`preview` 使用演示状态。`run` 和 `run sway` 默认使用模拟后端；它们的前端仍通过 D-Bus 通信。合成器工作流需要 Python 3、Sway、`swaymsg` 和 grim。原生输入检查还需要 wtype。
+`preview` 在一个窗口中自动演示受控 UI 流程，完成后退出。`run` 和 `run sway` 默认使用模拟后端；它们的前端仍通过 D-Bus 通信。合成器工作流需要 Python 3、Sway、`swaymsg` 和 grim。原生输入检查还需要 wtype。
 
 ## 检查多台显示器上的共享状态
 
@@ -27,7 +27,7 @@ fvm dart run tool/akari.dart run --theme themes/default
 
 按 Escape 会隐藏所有显示器上的控件并清除共享凭据文本。唤醒后会恢复原有身份验证提示。在提示激活时拔掉当前焦点所在的显示器再重新连接：其余视图应保留对话，重新连接的视图应显示当前状态。每个视图会依据各自的逻辑尺寸和缩放进行布局。
 
-如需一个可调整大小的窗口，可使用 `preview`，或在运行 `run` 前设置 `AKARI_WINDOW_MODE=windowed`。在启动命令的终端中按 `q` 退出。
+如需持续交互的可调整大小窗口，在运行 `run` 前设置 `AKARI_WINDOW_MODE=windowed`。在启动命令的终端中按 `q` 退出。
 
 <a id="compare-a-nested-session-with-standalone-login"></a>
 

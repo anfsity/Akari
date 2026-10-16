@@ -43,7 +43,7 @@ next compositor to acquire the display. Failure remains optional. The background
 defaults to pure black, with a minimum hold of 3 seconds from first presentation;
 `AKARI_SPLASH_DURATION` in the greeter launcher environment adjusts both transitions. Console text and
 scrollback are cleared before release. Preview the shared renderer with
-`akari preview --splash-duration 3`; see the
+`akari run splash`; see the
 [handoff implementation](https://github.com/anfsity/Akari/blob/main/docs/proposals/login-handoff.md) for lifetime and hardware
 checks. Actual blank intervals, VT switching, failure and logout need real VT tests.
 
@@ -168,7 +168,7 @@ akari login disable-gaze
 ```
 
 This also removes an unchanged Akari helper and retains the backup. A modified
-helper is retained for the administrator. Current uninstall and cleanup commands
+helper is retained for the administrator. Current scoped uninstall commands
 remove Akari's Gaze routing and its unchanged helper as well.
 
 ### Verify real login

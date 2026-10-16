@@ -164,7 +164,10 @@ inject builders directly; `tool/dev_main.dart` explicitly selects the default
 theme for debugging. The fallback theme remains an independently selectable
 minimal static theme with no blur or continuous animation.
 
-`preview --theme PATH` builds and launches that same host with demo login state.
+`preview --theme PATH` uses the same app in a single-window integration-test host
+with controlled authentication events. It demonstrates face success and password
+fallback once, releases state between journeys, and exits. `run` retains live
+D-Bus interaction and hot reload; `run splash` previews loading independently.
 Each theme project owns its scenes, component assembly, tokens, and assets. A
 theme may depend on SDK or explicitly shared component packages, but one theme
 must not import another theme package. Its Dart and Flutter code is compiled

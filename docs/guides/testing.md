@@ -31,7 +31,9 @@ fvm dart run tool/akari.dart run --theme themes/fallback
 ```
 
 Use this for the complete frontend/D-Bus path without system PAM calls. Use
-`preview` when only the theme's rendering and local behavior matter.
+`preview` to automatically demonstrate face success and password fallback once
+in one window; `--scenario` selects a single journey. It exits automatically and
+does not exercise a camera or PAM.
 
 ## Compositor and real login
 
@@ -55,21 +57,15 @@ are separate from `akari verify` and retain logs and screenshots in the printed
 temporary directory. Install Sway, `swaymsg`, and grim; the multi-display script
 also needs wtype.
 
-For monitor lifetime and focus checks, first run a release demo preview:
+For monitor lifetime and focus checks, build an ordinary default-theme demo
+bundle. Automated `preview` executables contain a test entrypoint and cannot be
+used for persistent multi-monitor checks.
 
 ```sh
-fvm dart run tool/akari.dart preview --theme themes/default --mode release \
-  --report build/tool/native-preview.json
-```
-
-Quit with `q` after it starts. Read `artifacts.executable` from that report and
-replace `/path/to/preview/bundle/greeter` below with that path. Report artifact
-paths within this checkout are relative to the repository root. Keep the
-executable in its complete Flutter bundle.
-
-```sh
+fvm dart run tool/akari.dart generate-scenes --theme themes/default
+fvm flutter build linux --release --target tool/dev_main.dart --dart-define=AKARI_BACKEND=demo
 python3 test/support/multi_display_workflow_test.py \
-  --app /path/to/preview/bundle/greeter
+  --app build/linux/x64/release/bundle/greeter
 ```
 
 This checks mixed output scales, pointer focus across views, display addition,

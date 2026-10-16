@@ -22,7 +22,7 @@ fvm dart run tool/akari.dart verify --theme themes/fallback
 fvm dart run tool/akari.dart run --theme themes/fallback
 ```
 
-这个命令会测试前端通过 D-Bus 与后端通信的完整流程，不会调用系统 PAM。如果只想看主题效果和本地交互，使用 `preview` 即可。
+这个命令会测试前端通过 D-Bus 与后端通信的完整流程，不会调用系统 PAM。如果想自动查看一次人脸成功和密码回退的 UI 流程，使用 `preview`；`--scenario` 可选择单条。预览在一个窗口中运行并自动退出，不验证真实摄像头或 PAM。
 
 ## 合成器和真实登录
 
@@ -41,18 +41,13 @@ fvm dart run tool/akari.dart run sway --display-profile reference --sway-backend
 
 这些可选脚本会在隔离合成器中启动真正的 Flutter 窗口。它们与 `akari verify` 分开运行，并将日志和截图保留在输出的临时目录中。请安装 Sway、`swaymsg` 和 grim；多显示器脚本还需要 wtype。
 
-要检查显示器生命周期和焦点，先运行 release 模式的演示预览：
+要检查显示器生命周期和焦点，先构建默认主题的普通演示程序包。自动 `preview` 的可执行文件带有测试入口，不能用于持续运行的多屏检查。
 
 ```sh
-fvm dart run tool/akari.dart preview --theme themes/default --mode release \
-  --report build/tool/native-preview.json
-```
-
-启动后按 `q` 退出。从报告中读取 `artifacts.executable`，并将下方 `/path/to/preview/bundle/greeter` 替换为该路径。报告中位于当前仓库内的资源路径相对于仓库根目录。请将可执行文件保留在完整的 Flutter 程序包中。
-
-```sh
+fvm dart run tool/akari.dart generate-scenes --theme themes/default
+fvm flutter build linux --release --target tool/dev_main.dart --dart-define=AKARI_BACKEND=demo
 python3 test/support/multi_display_workflow_test.py \
-  --app /path/to/preview/bundle/greeter
+  --app build/linux/x64/release/bundle/greeter
 ```
 
 此检查覆盖混合输出缩放、跨视图的指针焦点、显示器添加、主视图显示器移除、所有显示器移除、重新连接和单窗口模式。共享凭据及单次响应键盘分发由常规 Flutter 测试套件中的 `test/multi_display_test.dart` 覆盖。

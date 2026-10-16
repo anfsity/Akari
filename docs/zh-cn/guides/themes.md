@@ -23,12 +23,12 @@ cp -R themes/fallback themes/ocean
 ## 边改边看效果
 
 ```sh
-fvm dart run tool/akari.dart preview --theme themes/ocean
+AKARI_WINDOW_MODE=windowed fvm dart run tool/akari.dart run --theme themes/ocean
 ```
 
 布局和显示条件在场景 JSON 中修改；配色、字体等样式参数、背景渲染器和组件工厂在 `theme.dart` 中修改。场景字段的含义见[场景格式](../reference/scene-format.md)。
 
-工具会自动把场景 JSON 生成为 Dart 代码，生成文件无需手动编辑。如果 JSON 有误，预览会继续显示上一次成功生成的场景；修正后保存即可重试。
+工具会自动把场景 JSON 生成为 Dart 代码，生成文件无需手动编辑。如果 JSON 有误，运行中的窗口会继续显示上一次成功生成的场景；修正后保存即可重试。
 
 ## 添加资源
 

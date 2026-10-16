@@ -34,7 +34,7 @@ fvm dart run tool/akari.dart build
 # 构建独立项目，也支持仓库外的项目。
 fvm dart run tool/akari.dart build --theme /path/to/my_theme --mode release
 
-# 用模拟登录状态启动 Linux 预览。
+# 自动演示一次登录 UI 流程。
 fvm dart run tool/akari.dart preview --theme themes/default
 
 # 检查完整执行计划，不生成文件。
@@ -45,9 +45,9 @@ CLI 会解析所选主题的依赖、生成场景源文件，并在 `build/tool/
 
 `build` 默认使用 release 模式，同时构建前端和正式版 Rust 后端。`run --theme PATH` 会在私有 D-Bus 会话中启动完整登录界面，默认使用 Rust 模拟后端；`--backend real` 可选择真实后端通信。前端始终使用 D-Bus。`run` 直接管理所选主题的 Flutter 会话。
 
-`preview --theme PATH` 使用前端演示状态预览主题。两个命令默认运行在 debug 模式，并会在保存后重新加载 Dart 和资源变更。场景 JSON 修改会先执行增量代码生成；如果生成失败，会继续使用上一次可用主题。按 `r` 重新生成并加载，按 `R` 热重启，按 `q` 退出。profile/release 会话不支持热重载。两个命令都接受 `--jobs COUNT`。
+`preview --theme PATH` 在一个窗口中自动演示人脸成功和密码回退，完成后退出；可通过 `--scenario` 选择一条。预览使用受控认证事件，不启动后端，不进行热重载，固定为 debug 模式。
 
-Preview 直接在当前桌面中打开，不会启动嵌套合成器；默认使用可调整大小、无装饰的窗口。`run` 和构建后的登录程序默认以无装饰全屏模式启动。设置 `AKARI_WINDOW_MODE=fullscreen` 可令 preview 全屏，设置为 `windowed` 可令登录界面以窗口模式运行。在启动终端按 `q` 退出运行中的会话。
+`run` 默认 debug 模式并支持保存后热重载；场景 JSON 先生成，失败时保留原主题。在终端按 `r` 重新生成并加载，`R` 重启，`q` 退出。设置 `AKARI_WINDOW_MODE=windowed` 可使用窗口。`preview` 和 `run` 都接受 `--jobs COUNT`。独立 loading 预览使用 `run splash`，持续到手动关闭。
 
 全屏登录界面会在每台已连接显示器上渲染相同主题，并使用该输出的逻辑尺寸和缩放。账户、会话、身份验证、休眠状态和凭据文本在各显示器间共享；键盘操作由获得焦点的窗口处理。连接或断开输出时，窗口会更新而无需重新启动身份验证。窗口模式的预览只打开一个窗口。
 

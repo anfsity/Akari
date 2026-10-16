@@ -11,13 +11,13 @@ default theme; `--theme PATH` selects another compiled theme.
 
 | What to check | Session |
 | --- | --- |
-| Theme layout and local interaction on the current desktop | `preview` |
+| Automated login UI journeys on the current desktop | `preview` |
 | Shared login state and keyboard focus across actual monitors | Fullscreen `run` |
 | Standalone content scale inside a Wayland desktop | `run sway` |
 | Repeatable resolution and screenshots | `run sway --sway-backend headless` |
 | Hardware output modes, DRM, PAM, and recovery | [Standalone greetd testing](greetd-testing.md) |
 
-Preview uses demo state. `run` and `run sway` use the mock backend by default;
+Preview runs controlled UI journeys once in one window and exits. `run` and `run sway` use the mock backend by default;
 their frontend still communicates through D-Bus. The compositor workflows need
 Python 3, Sway, `swaymsg`, and grim. Native input checks also need wtype.
 
@@ -38,7 +38,7 @@ monitor while a prompt is active, then reconnect it: the remaining view should
 retain the conversation, and the reconnected view should show its current state.
 Each view lays out against its own logical dimensions and scale.
 
-For a single resizable window instead, use `preview` or set
+For persistent interaction in a resizable window, set
 `AKARI_WINDOW_MODE=windowed` before `run`. Quit with `q` in the launching terminal.
 
 ## Compare a nested session with standalone login
