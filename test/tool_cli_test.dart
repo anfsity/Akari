@@ -819,7 +819,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
                       entry.key.startsWith('scene_codegen.'),
                 )
                 .every((entry) => entry.value.first == dartBin) &&
-            sdkSteps['dbus.smoke']![2] == dartBin,
+            sdkSteps['dbus.smoke']![2] == flutterBin,
         isTrue,
       );
       expect(

@@ -131,8 +131,8 @@ RunPlan createVerificationPlan(
         command: [
           'bash',
           'scripts/debug-dbus.sh',
-          ...getDartCommand(repoRoot),
-          'run',
+          ...getFlutterCommand(repoRoot),
+          'test',
           'tool/dbus_gateway_smoke.dart',
         ],
         environment: {
