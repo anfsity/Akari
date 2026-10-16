@@ -99,6 +99,7 @@ const cliOptions = {
     'Minimum native splash display time in seconds (default: 3; 0 skips the hold).',
     valueName: 'SECONDS',
   ),
+  '--light': CliOption('--light', 'Use the light splash variant.'),
   '--scope': CliOption(
     '--scope',
     'Installation scope (default: login).',
@@ -247,6 +248,13 @@ const cliCommands = [
       '--sway-backend',
     ],
     development: DevelopmentCommand.sway,
+  ),
+  CliCommand(
+    'run splash',
+    'Preview the native loading animation until closed.',
+    options: ['--jobs', '--mode', '--light'],
+    development: DevelopmentCommand.splash,
+    examples: ['akari run splash', 'akari run splash --light'],
   ),
   CliCommand(
     'run studio',
@@ -561,6 +569,7 @@ Map<String, String> getCliOptionValues(
 // Development workflows consume the identity without parsing command strings.
 enum DevelopmentCommand {
   build,
+  splash,
   run(runTarget: ThemeRunTarget.greeter),
   sway(runTarget: ThemeRunTarget.sway),
   preview(runTarget: ThemeRunTarget.preview),
@@ -574,7 +583,7 @@ enum DevelopmentCommand {
   final ThemeRunTarget? runTarget;
 
   bool get isThemeSelectionRequired => switch (this) {
-    verify || generateScenes => false,
+    verify || generateScenes || splash => false,
     _ => true,
   };
 }

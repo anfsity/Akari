@@ -52,6 +52,7 @@ class DevCommandOptions {
       resolution = values['--resolution'],
       scale = values['--scale'],
       splashDuration = values['--splash-duration'],
+      splashLight = values.containsKey('--light'),
       swayBackend = SwayBackend.values.byName(
         values['--sway-backend'] ?? 'wayland',
       );
@@ -107,4 +108,5 @@ class DevCommandOptions {
   final String? scale;
   final SwayBackend swayBackend;
   final String? splashDuration;
+  final bool splashLight;
 }

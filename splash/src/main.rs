@@ -16,7 +16,7 @@ enum Target {
 
 struct Options {
     target: Target,
-    duration: Duration,
+    duration: Option<Duration>,
     dark: bool,
     snapshot: Option<PathBuf>,
 }
@@ -33,8 +33,10 @@ fn run() -> Result {
     if arguments.iter().any(|argument| argument == "--help") {
         println!(
             "Usage: akari-splash window|kms [--duration SECONDS] [--dark|--light] [--snapshot PNG]\n\
+                  akari-splash window --hold [--dark|--light] [--snapshot PNG]\n\
                   akari-splash clear\n\
                   Defaults: black background, 3 seconds minimum; 0 skips the hold.\n\
+                  --hold keeps the window open until closed or interrupted.\n\
                   AKARI_SPLASH_DURATION also sets the minimum display time."
         );
         return Ok(());
@@ -79,25 +81,39 @@ impl Options {
             }
             return Ok(Self {
                 target,
-                duration: Duration::ZERO,
+                duration: Some(Duration::ZERO),
                 dark: false,
                 snapshot: None,
             });
         }
-        let mut duration = environment_duration.unwrap_or_else(|| "3".to_owned());
+        let mut duration = None;
+        let mut hold = false;
         let mut dark = true;
         let mut snapshot = None;
         while let Some(argument) = arguments.next() {
             match argument.as_str() {
-                "--duration" => duration = arguments.next().ok_or("missing duration")?,
+                "--duration" => duration = Some(arguments.next().ok_or("missing duration")?),
+                "--hold" => hold = true,
                 "--dark" => dark = true,
                 "--light" => dark = false,
                 "--snapshot" => snapshot = Some(arguments.next().ok_or("missing PNG path")?.into()),
                 _ => return Err(format!("unknown option: {argument}").into()),
             }
         }
-        let duration = Duration::try_from_secs_f64(duration.parse()?)
-            .map_err(|_| "duration must be a finite, non-negative number of seconds")?;
+        if hold && (!matches!(target, Target::Window) || duration.is_some()) {
+            return Err("--hold is only valid for window without --duration".into());
+        }
+        let duration = if hold {
+            None
+        } else {
+            let value = duration
+                .or(environment_duration)
+                .unwrap_or_else(|| "3".to_owned());
+            Some(
+                Duration::try_from_secs_f64(value.parse()?)
+                    .map_err(|_| "duration must be a finite, non-negative number of seconds")?,
+            )
+        };
         Ok(Self {
             target,
             duration,
@@ -129,20 +145,38 @@ mod tests {
             )
             .unwrap();
             assert_eq!(
-                options.duration.as_secs_f64(),
+                options.duration.unwrap().as_secs_f64(),
                 value.parse::<f64>().unwrap()
             );
         }
         assert_eq!(
             Options::parse(vec!["kms".into()], None).unwrap().duration,
-            Duration::from_secs(3)
+            Some(Duration::from_secs(3))
         );
         assert_eq!(
             Options::parse(vec!["kms".into()], Some("3".into()))
                 .unwrap()
                 .duration,
-            Duration::from_secs(3)
+            Some(Duration::from_secs(3))
         );
+    }
+
+    #[test]
+    fn hold_is_window_only_and_overrides_environment_duration() {
+        assert!(
+            Options::parse(vec!["window".into(), "--hold".into()], Some("3".into()))
+                .unwrap()
+                .duration
+                .is_none()
+        );
+        for arguments in [
+            vec!["kms", "--hold"],
+            vec!["window", "--hold", "--duration", "0"],
+        ] {
+            assert!(
+                Options::parse(arguments.into_iter().map(String::from).collect(), None).is_err()
+            );
+        }
     }
 
     #[test]

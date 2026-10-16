@@ -28,6 +28,7 @@ void main() {
     expect(getCliCommand('run studio').development, DevelopmentCommand.studio);
     expect(getCliSubcommands('run').map((command) => command.name), [
       'run sway',
+      'run splash',
       'run studio',
     ]);
     expect(() => getCliCommand('studio'), throwsFormatException);

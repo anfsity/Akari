@@ -60,7 +60,11 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(await completeBashWords(['akari', 'tr']), ['trace-perf', 'trace']);
     expect(await completeBashWords(['akari', 'st']), isEmpty);
     expect(await completeBashWords(['akari', 'run', 'st']), ['studio']);
-    expect(await completeBashWords(['akari', 'run', '']), ['sway', 'studio']);
+    expect(await completeBashWords(['akari', 'run', '']), [
+      'sway',
+      'splash',
+      'studio',
+    ]);
     expect(await completeBashWords(['akari', 'run', 'sw']), ['sway']);
     expect(await completeBashWords(['akari', 'install', 'c']), ['cli']);
     expect(await completeBashWords(['akari', 'install', '--t']), ['--theme']);

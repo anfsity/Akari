@@ -19,7 +19,9 @@ Future<int> runDevelopmentCommand(
   Directory repoRoot,
 ) async {
   final command = options.command;
-  final themes = options.themePath != null || command.isThemeSelectionRequired
+  final themes = command == DevelopmentCommand.splash
+      ? <ThemePackage>[]
+      : options.themePath != null || command.isThemeSelectionRequired
       ? [
           getThemePackage(
             Directory(options.themePath ?? '${repoRoot.path}/themes/default'),
@@ -40,6 +42,12 @@ Future<int> runDevelopmentCommand(
     reserve: !options.dryRun,
   );
   final plan = switch (command) {
+    DevelopmentCommand.splash => createSplashRunPlan(
+      repoRoot,
+      mode: options.buildMode,
+      jobs: options.jobs,
+      light: options.splashLight,
+    ),
     DevelopmentCommand.build => createBuildPlan(
       repoRoot,
       themes.single,
