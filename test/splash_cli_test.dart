@@ -30,7 +30,7 @@ void main() {
         '--hold',
         '--light',
       ]);
-      expect(steps.last['interactive'], isTrue);
+    expect(steps.last['interactive'], isFalse);
     },
   );
 }

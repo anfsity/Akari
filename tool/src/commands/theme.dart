@@ -288,7 +288,6 @@ RunPlan createSplashRunPlan(
       RunStep(
         id: 'splash.preview',
         command: [executable, 'window', '--hold', if (light) '--light'],
-        interactive: true,
       ),
     ],
   );
