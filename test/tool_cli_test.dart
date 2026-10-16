@@ -582,8 +582,15 @@ sys.exit(1)
     expect(steps.first['working_directory'], project.path);
     expect(steps[1]['id'], 'scenes.generate_theme_ocean');
     final session = steps.last;
-    expect(session['command'], containsAll(['debug', 'demo']));
-    expect(session['interactive'], isTrue);
+    expect(
+      session['command'],
+      containsAll([
+        'test',
+        'integration_test/preview_test.dart',
+        '--dart-define=AKARI_BACKEND=demo',
+      ]),
+    );
+    expect(session['interactive'], isFalse);
     expect(steps.last['id'], 'theme.preview');
     expect(steps.where((step) => step['id'] == 'backend.build'), isEmpty);
     expect(
@@ -598,6 +605,8 @@ sys.exit(1)
       ['verify', '--preview'],
       ['preview', '--platform', 'web'],
       ['build', '--theme', 'themes/default', '--theme', 'themes/fallback'],
+      ['preview', '--scenario', 'unknown'],
+      ['preview', '--mode', 'release'],
       ['preview', '--splash-duration=-1'],
       ['preview', '--splash-duration=NaN'],
       ['preview', '--splash-duration=Infinity'],
@@ -609,62 +618,50 @@ sys.exit(1)
     }
   });
 
-  test('preview completes both builds before presenting the splash', () async {
-    for (final duration in ['0', '1.2', '3']) {
-      final result = await _runTool([
-        'preview',
-        '--splash-duration',
-        duration,
-        '--dry-run',
-      ]);
-      expect(result.exitCode, 0, reason: result.stderr);
-      final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
-      final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
-      final session = steps.last;
-      expect(
-        session['dependencies'],
-        containsAll(['splash.build', 'theme.preview.build']),
-      );
-      expect(session['environment']['AKARI_SPLASH_DURATION'], duration);
-      expect(
-        session['environment']['AKARI_PREVIEW_APPLICATION'],
-        endsWith('/debug/bundle/greeter'),
-      );
-      expect(
-        steps.singleWhere(
-          (step) => step['id'] == 'theme.preview.build',
-        )['command'],
-        containsAllInOrder(['build', 'linux', '--debug']),
-      );
-    }
-  });
+  test(
+    'preview runs selected journeys in one window without a splash or backend',
+    () async {
+      for (final scenario in ['all', 'face-success', 'password-fallback']) {
+        final result = await _runTool([
+          'preview',
+          '--scenario',
+          scenario,
+          '--dry-run',
+        ]);
+        expect(result.exitCode, 0, reason: result.stderr);
+        final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+        final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
+        expect(
+          steps.map((step) => step['id']),
+          isNot(contains('splash.build')),
+        );
+        expect(
+          steps.map((step) => step['id']),
+          isNot(contains('backend.build')),
+        );
+        expect(steps.last['environment']['AKARI_WINDOW_MODE'], 'windowed');
+        expect(steps.last['environment']['AKARI_DISPLAY_MODE'], 'single');
+        expect(
+          steps.last['command'],
+          contains('--dart-define=AKARI_PREVIEW_SCENARIO=$scenario'),
+        );
+        expect(plan['artifacts'], contains('preview_result'));
+      }
+    },
+  );
 
   test('preview launches an external theme using only its selected theme dependency', () async {
     final project = await _createThemeProject(tempRoot);
     final platformManifest = File('pubspec.yaml');
     final manifestBefore = await platformManifest.readAsString();
-    final launchMarker = File('${tempRoot.path}/preview-started');
     final flutter = File('${tempRoot.path}/flutter');
     final dart = File('${tempRoot.path}/dart');
-    final preview = File('${tempRoot.path}/preview');
-    final compiled = File('${tempRoot.path}/compiled');
-    final shown = File('${tempRoot.path}/shown');
-    final splash = File('${tempRoot.path}/splash');
-    await splash.writeAsString('''#!/bin/sh
-test -f ${_shellQuote(compiled.path)} || exit 24
-test "\$1" = window || exit 25
-printf shown > ${_shellQuote(shown.path)}
-''');
-    await preview.writeAsString(
-      '#!/bin/sh\ntest -f ${_shellQuote(shown.path)} || exit 26\nprintf launched > ${_shellQuote(launchMarker.path)}\n',
-    );
-    await flutter.writeAsString('''#!/bin/sh
-if [ "\$1" = build ]; then
-  printf compiled > ${_shellQuote(compiled.path)}
-fi
-if [ "\$1" = run ]; then
-  ${_shellQuote(preview.path)}
-fi
+    await flutter.writeAsString(r'''#!/usr/bin/env python3
+import json, pathlib, sys
+if sys.argv[1] == 'test':
+    assert 'integration_test/preview_test.dart' in sys.argv
+    path = next(argument.split('=', 2)[2] for argument in sys.argv if argument.startswith('--dart-define=AKARI_PREVIEW_RESULT='))
+    pathlib.Path(path).write_text(json.dumps({'face-success': 'passed', 'password-fallback': 'passed'}))
 ''');
     final dartCommand = getDartCommand(Directory.current);
     await dart.writeAsString('''#!/bin/sh
@@ -676,20 +673,13 @@ if [ "\$1" = tool/theme_host.dart ]; then
 fi
 exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
 ''');
-    final chmod = await Process.run('chmod', [
-      '+x',
-      flutter.path,
-      dart.path,
-      preview.path,
-      splash.path,
-    ]);
+    final chmod = await Process.run('chmod', ['+x', flutter.path, dart.path]);
     expect(chmod.exitCode, 0, reason: chmod.stderr);
     final result = await _runTool(
       ['preview', '--theme', project.path, '--format', 'json'],
       environment: {
         'AKARI_FLUTTER_BIN': flutter.path,
         'AKARI_DART_BIN': dart.path,
-        'AKARI_SPLASH_BIN': splash.path,
       },
     );
     expect(result.exitCode, 0, reason: result.stderr);
@@ -705,7 +695,10 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
       )['in_process'],
       isTrue,
     );
-    expect(await launchMarker.readAsString(), 'launched');
+    expect(report['preview_scenarios'], {
+      'face-success': 'passed',
+      'password-fallback': 'passed',
+    });
     expect(await platformManifest.readAsString(), manifestBefore);
     final host = Directory(
       '${Directory.current.path}/${report['artifacts']['host_project']}',

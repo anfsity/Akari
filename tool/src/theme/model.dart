@@ -22,7 +22,6 @@ enum ThemeHostKind {
 enum ThemeRunTarget {
   greeter('run', 'run', ThemeHostKind.greeter),
   sway('run sway', 'sway', ThemeHostKind.greeter),
-  preview('preview', 'preview', ThemeHostKind.preview),
   studio('run studio', 'studio', ThemeHostKind.studio);
 
   const ThemeRunTarget(this.commandName, this.stepName, this.hostKind);

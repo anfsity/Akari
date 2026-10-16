@@ -144,13 +144,10 @@ void main() {
         'flutter.build_linux',
       ]);
       expect(
-        createThemeRunPlan(
+        createPreviewPlan(
           repo,
           theme,
           'runs/preview',
-          target: ThemeRunTarget.preview,
-          mode: BuildMode.debug,
-          backend: BackendMode.mock,
         ).steps.any((step) => step.id == 'build.links'),
         isFalse,
       );
