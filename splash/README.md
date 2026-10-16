@@ -6,7 +6,7 @@ DRM/KMS outputs. No browser, Flutter engine or authentication service runs here.
 
 ```sh
 cargo build --locked --manifest-path splash/Cargo.toml
-splash/target/debug/akari-splash window
+splash/target/debug/akari-splash window --hold
 splash/target/debug/akari-splash window --snapshot /tmp/akari-splash.png
 ```
 
@@ -15,7 +15,9 @@ Use `--light` to preview the light variant; `--dark` remains accepted.
 The default minimum display time is 3 seconds after the first successful
 presentation. `--duration` overrides `AKARI_SPLASH_DURATION`; zero skips the
 artificial hold while still presenting one frame. Closing the window or pressing
-Escape ends the preview early. SIGINT, SIGTERM, SIGHUP and launcher death stop it.
+Escape ends the preview early. `akari run splash` uses `window --hold` to keep
+the standalone preview open until closed; it never launches a login screen.
+`--hold` is window-only and cannot be combined with `--duration`. SIGINT, SIGTERM, SIGHUP and launcher death stop it.
 
 `kms` requires a real controlling VT and device access through libseat (logind or
 seatd). It enumerates primary DRM nodes on the seat, preserves active output

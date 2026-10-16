@@ -219,6 +219,30 @@ RunPlan createThemeRunPlan(
   );
 }
 
+RunPlan createSplashRunPlan(
+  Directory repoRoot, {
+  required BuildMode mode,
+  int? jobs,
+  bool light = false,
+}) {
+  final executable =
+      Platform.environment['AKARI_SPLASH_BIN'] ??
+      getAbsolutePath(repoRoot, getSplashExecutablePath(mode));
+  return RunPlan(
+    command: 'run splash',
+    artifactPaths: {'splash_executable': executable},
+    steps: [
+      if (!Platform.environment.containsKey('AKARI_SPLASH_BIN'))
+        _createSplashBuildStep(mode, jobs),
+      RunStep(
+        id: 'splash.preview',
+        command: [executable, 'window', '--hold', if (light) '--light'],
+        interactive: true,
+      ),
+    ],
+  );
+}
+
 RunStep _createSplashBuildStep(BuildMode mode, int? jobs) => RunStep(
   id: 'splash.build',
   command: [
