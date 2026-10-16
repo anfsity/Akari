@@ -1,5 +1,15 @@
 import '../theme/model.dart';
 
+enum CommandGroup {
+  development('Development and preview'),
+  verification('Checks and performance'),
+  installation('Installation and login'),
+  tools('Tools');
+
+  const CommandGroup(this.label);
+  final String label;
+}
+
 /// Shared command grammar for parsing, help, and shell completion. Keep aliases,
 /// accepted options, and enumerated values here so those consumers cannot drift.
 class CliOption {
@@ -30,6 +40,10 @@ class CliCommand {
     this.options = const [],
     this.forwardsArguments = false,
     this.development,
+    this.group = CommandGroup.development,
+    this.examples = const [],
+    this.scriptPath,
+    this.positionalUsage,
   });
 
   final String name;
@@ -38,6 +52,10 @@ class CliCommand {
   final List<String> options;
   final bool forwardsArguments;
   final DevelopmentCommand? development;
+  final CommandGroup group;
+  final List<String> examples;
+  final String? scriptPath;
+  final String? positionalUsage;
 
   bool get hasRunReport => development != null;
 
@@ -188,18 +206,24 @@ const cliCommands = [
   CliCommand(
     'build',
     'Build the selected frontend, production Rust backend and native splash.',
+    examples: ['akari build --theme themes/default --jobs 4'],
     options: ['--theme', '--jobs', '--mode', '--platform'],
     development: DevelopmentCommand.build,
   ),
   CliCommand(
     'run',
     'Run the greeter on a private D-Bus session (default), or a selected target.',
+    examples: [
+      'akari run --theme themes/default',
+      'akari run sway --display-profile reference',
+    ],
     options: ['--theme', '--jobs', '--mode', '--backend'],
     development: DevelopmentCommand.run,
   ),
   CliCommand(
     'preview',
     'Show the native splash, then run the selected theme with demo login state.',
+    examples: ['akari preview --theme themes/default'],
     options: ['--theme', '--jobs', '--mode', '--splash-duration'],
     development: DevelopmentCommand.preview,
   ),
@@ -227,12 +251,14 @@ const cliCommands = [
   CliCommand(
     'verify',
     'Verify shared code, backend, and theme projects.',
+    group: CommandGroup.verification,
     options: ['--theme'],
     development: DevelopmentCommand.verify,
   ),
   CliCommand(
     'verify-perf',
     'Execute the selected theme performance gate.',
+    group: CommandGroup.verification,
     aliases: ['perf'],
     options: ['--theme'],
     forwardsArguments: true,
@@ -247,6 +273,7 @@ const cliCommands = [
   CliCommand(
     'trace-perf',
     'Execute the selected theme performance trace.',
+    group: CommandGroup.verification,
     aliases: ['trace'],
     options: ['--theme'],
     forwardsArguments: true,
@@ -255,94 +282,182 @@ const cliCommands = [
   CliCommand(
     'install',
     'Build and install the production login environment without switching services.',
+    examples: ['akari install --theme themes/default'],
+    group: CommandGroup.installation,
     options: ['--theme', '--jobs', '--keyring', '--dry-run'],
   ),
   CliCommand(
     'install cli',
     'Install the akari launcher and shell completion.',
+    group: CommandGroup.installation,
     options: ['--shell', '--prefix', '--rc'],
   ),
   CliCommand(
     'uninstall',
     'Remove an inactive production installation; retain preferences and logs.',
+    examples: ['akari uninstall --dry-run'],
+    group: CommandGroup.installation,
     options: ['--dry-run'],
   ),
   CliCommand(
     'clean',
     'Clean inactive production and test installations, including leftover registrations; retain preferences and logs.',
+    group: CommandGroup.installation,
     options: ['--dry-run'],
   ),
-  CliCommand('login', 'Manage the production login service.'),
+  CliCommand(
+    'login',
+    'Manage the production login service.',
+    group: CommandGroup.installation,
+  ),
   CliCommand(
     'login enable',
     'Select Akari for the next boot and save the previous login service.',
+    group: CommandGroup.installation,
     options: ['--dry-run'],
   ),
   CliCommand(
     'login disable',
     'Restore the previous login service for the next boot.',
+    group: CommandGroup.installation,
     options: ['--dry-run'],
   ),
   CliCommand(
     'login rollback',
     'Select the previous installed release for the next greeter launch.',
+    group: CommandGroup.installation,
     options: ['--dry-run'],
   ),
   CliCommand(
     'login configure-keyring',
     'Configure greetd keyring PAM without rebuilding the login environment.',
+    group: CommandGroup.installation,
     options: ['--keyring', '--dry-run'],
   ),
   CliCommand(
     'login enable-gaze',
     'Enable Gaze for the stock Arch greetd PAM stack with password fallback.',
+    group: CommandGroup.installation,
     options: ['--dry-run'],
   ),
   CliCommand(
     'login disable-gaze',
     'Restore greetd password authentication and remove the managed Gaze helper.',
+    group: CommandGroup.installation,
     options: ['--dry-run'],
   ),
   CliCommand(
     'login status',
     'Show the installed release, boot login service and runtime state.',
+    group: CommandGroup.installation,
     options: ['--format'],
   ),
   CliCommand(
     'login logs',
     'Read the production service journal or newest greeter logs.',
+    group: CommandGroup.installation,
     options: ['--component', '--lines', '--follow'],
   ),
   CliCommand(
     'completion',
     'Print a shell completion script.',
+    group: CommandGroup.tools,
     options: ['--shell'],
   ),
-  CliCommand('greetd-test', 'Manage standalone greetd testing.'),
+  CliCommand(
+    'greetd-test',
+    'Manage standalone greetd testing.',
+    group: CommandGroup.installation,
+  ),
   CliCommand(
     'greetd-test install',
     'Build, back up and install the test environment; save desktop display order.',
+    group: CommandGroup.installation,
     options: ['--theme', '--dry-run'],
   ),
   CliCommand(
     'greetd-test start',
     'Check service configuration, arm recovery and start the test service.',
+    group: CommandGroup.installation,
     options: ['--scale', '--log-dir', '--dry-run'],
   ),
   CliCommand(
     'greetd-test restore',
     'Restore SDDM using the independently installed recovery script.',
+    group: CommandGroup.installation,
     options: ['--dry-run'],
   ),
   CliCommand(
     'greetd-test status',
     'Show installation, service, recovery timer and saved log paths.',
+    group: CommandGroup.installation,
     options: ['--format'],
   ),
   CliCommand(
     'greetd-test logs',
     'Read startup, greeter or recovery logs without sudo.',
+    group: CommandGroup.installation,
     options: ['--run', '--file', '--lines', '--follow'],
+  ),
+  CliCommand(
+    'toolchain',
+    'Check or configure the development toolchain.',
+    group: CommandGroup.tools,
+  ),
+  CliCommand(
+    'toolchain check',
+    'Check development dependencies.',
+    group: CommandGroup.tools,
+    scriptPath: 'check-toolchain.sh',
+    options: ['--dry-run'],
+  ),
+  CliCommand(
+    'toolchain setup',
+    'Install the configured SDK and fetch dependencies.',
+    group: CommandGroup.tools,
+    scriptPath: 'bootstrap-toolchain.sh',
+    options: ['--dry-run'],
+  ),
+  CliCommand(
+    'docs',
+    'Build and check documentation.',
+    group: CommandGroup.tools,
+  ),
+  CliCommand(
+    'docs build-api',
+    'Build Dart API documentation.',
+    group: CommandGroup.tools,
+    scriptPath: 'build-api-docs.sh',
+    options: ['--dry-run'],
+  ),
+  CliCommand(
+    'docs verify',
+    'Check a built documentation site.',
+    group: CommandGroup.tools,
+    scriptPath: 'verify-docs.py',
+    options: ['--dry-run'],
+    forwardsArguments: true,
+    examples: ['akari docs verify -- docs/site/dist'],
+  ),
+  CliCommand(
+    'script',
+    'Discover and invoke repository scripts.',
+    group: CommandGroup.tools,
+  ),
+  CliCommand(
+    'script list',
+    'List all scripts and their calling conditions.',
+    group: CommandGroup.tools,
+    options: ['--format'],
+  ),
+  CliCommand(
+    'script run',
+    'Invoke a script with its original calling contract.',
+    group: CommandGroup.tools,
+    options: ['--dry-run'],
+    forwardsArguments: true,
+    positionalUsage: 'SCRIPT',
+    examples: ['akari script run greetd-test/display-layout.py -- capture'],
   ),
 ];
 
@@ -351,6 +466,29 @@ CliCommand getCliCommand(String spelling) {
     if (command.spellings.contains(spelling)) return command;
   }
   throw FormatException('Unknown command: $spelling');
+}
+
+(CliCommand, List<String>) getCliInvocation(List<String> arguments) {
+  CliCommand? selected;
+  var consumed = 0;
+  for (final command in cliCommands) {
+    for (final spelling in command.spellings) {
+      final words = spelling.split(' ');
+      if (words.length > consumed &&
+          arguments.length >= words.length &&
+          List.generate(
+            words.length,
+            (index) => arguments[index] == words[index],
+          ).every((matches) => matches)) {
+        selected = command;
+        consumed = words.length;
+      }
+    }
+  }
+  if (selected == null) {
+    throw FormatException('Unknown command: ${arguments.first}');
+  }
+  return (selected, arguments.sublist(consumed));
 }
 
 List<CliCommand> getCliSubcommands(String parent) => [

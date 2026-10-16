@@ -1,4 +1,5 @@
 import 'definition.dart';
+import 'scripts.dart';
 
 String getShellCompletion(String shell) =>
     shell == 'zsh' ? _getZshCompletion() : _getBashCompletion();
@@ -34,8 +35,14 @@ _akari() {
     r'''  case "$words[2] $words[3]" in
 ''',
     subcommandCases,
-    r'''  esac
-  local -a options
+    '''  esac
+  if [[ \$command == 'script run' ]] && (( CURRENT == 4 )); then
+    local -a scripts=(${repositoryScripts.where((script) => script.kind != ScriptKind.library).map((script) => encodeShellArgument(script.path)).join(' ')})
+    _describe 'script' scripts
+    return
+  fi
+''',
+    r'''  local -a options
   case "$command" in
 ''',
     cliCommands.map(_encodeZshCommandOptions).join(),
@@ -124,8 +131,13 @@ String _getBashCompletion() {
     r'''  case "${COMP_WORDS[1]} ${COMP_WORDS[2]}" in
 ''',
     subcommandCases,
-    r'''  esac
-  local option="$prev" value="$cur" prefix='' candidate options
+    '''  esac
+  if [[ \$command == 'script run' ]] && (( COMP_CWORD == 3 )); then
+    mapfile -t COMPREPLY < <(compgen -W ${encodeShellArgument(repositoryScripts.where((script) => script.kind != ScriptKind.library).map((script) => script.path).join(' '))} -- "\$cur")
+    return 0
+  fi
+''',
+    r'''  local option="$prev" value="$cur" prefix='' candidate options
   if [[ "$cur" == -*=* ]]; then
     option="${cur%%=*}"
     value="${cur#*=}"

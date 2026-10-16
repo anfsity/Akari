@@ -12,11 +12,8 @@ Future<void> main(List<String> arguments) async {
       writeCliUsage();
       return;
     }
-    final commandWords = arguments
-        .takeWhile((argument) => !argument.startsWith('-'))
-        .toList();
-    final command = getCliCommand(commandWords.join(' '));
-    final input = CliArguments(arguments.skip(commandWords.length).toList());
+    final (command, remaining) = getCliInvocation(arguments);
+    final input = CliArguments(remaining);
     if (input.hasHelp) {
       writeCliUsage(command);
       return;
