@@ -3,15 +3,19 @@ title: 开发主题组件
 description: 用 Flutter 编写主题组件，读取登录状态并响应用户操作。
 ---
 
-## 组件工厂
+主题组件是标准的 Flutter Widget，负责展示 `GreeterHost` 提供的类型化状态并触发操作回调，无需直接处理 PAM 认证逻辑或 D-Bus 通信。
 
-`ThemeDefinition.components` 是主题的组件工厂。它接收 `GreeterThemeContext`，从中取得样式参数和 `GreeterHost`，再返回 `GreeterThemeComponents`。运行时调用 `build(context, node)`，由工厂根据场景中的组件标识符创建 Flutter widget。标识符由主题自己定义，不需要遵循统一的组件列表。
+## 1. 在组件工厂中映射节点
 
-使用 `StandardGreeterComponents` 时，可以沿用 fallback 场景中的标识符。自己写工厂时，确保场景里使用的每个标识符都有对应组件。节点的 `properties` 是字符串配置，具体含义和解析方式由组件决定。
+`ThemeDefinition.components` 接收 `GreeterThemeContext`（包含 `tokens` 与 `host`），并返回 `GreeterThemeComponents`。渲染时，运行时调用 `build(context, node)` 将场景节点的 `component` 标识符转换为具体的 Widget：
 
-## 读取需要显示的状态
+- **复用内置组件集**：直接使用 `StandardGreeterComponents`，并沿用 fallback 场景中的组件标识符。
+- **自定义组件工厂**：在 `*.scene.json` 与工厂实现中约定专属的组件标识符。
+- **解析节点属性**：节点的 `node.properties` 是字符串键值映射，由对应组件自行解析其业务含义。
 
-通过 slot 订阅组件需要的状态。例如，显示服务状态的标签只需订阅 `serviceSlots`：
+## 2. 按需订阅局部状态（Slot）
+
+使用 `SceneRegion` 仅订阅当前组件所需的 Slot，避免账户、会话或电源状态变化引起无关重绘：
 
 ```dart
 import 'package:flutter/material.dart';
@@ -32,16 +36,29 @@ class ServiceLabel extends StatelessWidget {
 }
 ```
 
-这样，账户、会话或电源状态变化时，这个标签无需重新构建。`SceneRuntime` 已经为每个节点设置了重绘边界；只有性能分析发现问题时，才需要添加额外的边界。
+:::tip
+`SceneRuntime` 已默认在每个场景节点外层包裹 `RepaintBoundary`。除非性能分析表明某个复杂子组件需要独立重绘，否则无需在组件内部重复添加 `RepaintBoundary`。
+:::
 
-## 响应用户操作
+## 3. 调用宿主操作回调
 
-用户选择账户、切换桌面、提交密码、启动桌面会话或操作电源时，组件调用对应的宿主回调：`onSelectUser`、`onSelectSession`、`onRespondToPrompt`、`onStartSession` 和 `onRequestPowerAction`。根据对应 slot 的状态决定控件是否可用，并保留键盘操作、焦点和无障碍支持。登录功能层和后端会处理身份验证及 D-Bus 通信。
+通过 `GreeterHost` 回调响应用户交互，并根据 Slot 状态控制按钮可用性、键盘导航与无障碍焦点：
 
-输入凭据的 widget 可以使用宿主提供的 `credentialController` 和 `credentialFocusNode`。它们由宿主管理和释放，主题组件不要调用它们的 `dispose`。密码等输入也不要复制到场景属性、样式配置或日志中。
+| 宿主回调 | 作用 |
+| --- | --- |
+| `onSelectUser` | 切换登录账户 |
+| `onSelectSession` | 选择要启动的桌面会话 |
+| `onRespondToPrompt` | 提交当前认证提示的输入内容 |
+| `onStartSession` | 启动已通过认证的桌面环境 |
+| `onRequestPowerAction` | 请求挂起、重启或关机 |
 
-## 管理组件生命周期
+:::caution[凭据控制器的所有权]
+密码输入框借用宿主的 `host.credentialController` 与 `host.credentialFocusNode`。它们的生命周期由外层应用管理——主题组件**不得**调用它们的 `dispose()`，也严禁将密码文本复制到场景属性或日志中。
+:::
 
-在进入、退出动画或预热期间，隐藏节点可能仍然挂载着。避免让隐藏组件的订阅和计时器做太多工作；组件卸载时，释放自己创建的资源。动效 builder 使用运行时提供的动画，动画控制器由运行时管理。
+## 4. 遵守挂载生命周期约定
 
-具体类型见 [API 参考](../reference/api.md)。各部分由谁管理、何时释放，见[前端架构](../architecture/frontend.md)。
+- **隐藏节点的资源开销**：在进入/退出过渡动画期间，不可见节点仍处于挂载状态。请避免在隐藏状态下运行高开销定时器，并在组件卸载（`dispose`）时释放自有订阅。
+- **动效控制器所有权**：`SceneMotionBuilder` 直接使用运行时传入的 `Animation<double>`，无需自行创建或销毁节点进出场的 `AnimationController`。
+
+详细的 Slot 类型定义请查阅 [API 参考](../reference/api.md)，前后端职责边界请参阅[前端架构](../architecture/frontend.md)。

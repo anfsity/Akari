@@ -3,31 +3,27 @@ title: Maintain the documentation
 description: Preview, verify, and publish the Starlight handbook and API reference.
 ---
 
-## Content and configuration
+Markdown files under `docs/` are the source for the Akari handbook, while `docs/site/` owns the Astro/Starlight configuration, styles, and build scripts.
 
-Markdown under `docs/` is the handbook's source. `docs/site/` owns the Astro
-configuration, dependency lockfile, styles, and build commands. The content
-loader reads these categories directly:
+## Directory layout & locales
 
-- `getting-started/`: environment setup and the first successful run.
-- `guides/`: task-oriented workflows.
-- `reference/`: exact external contracts and lookup pages.
-- `architecture/`: module relationships, ownership, and design reasoning.
+| Directory | Published to site? | Purpose |
+| --- | --- | --- |
+| `getting-started/` | Yes | Toolchain setup and first successful run |
+| `guides/` | Yes | Task-oriented workflows for themes, displays, and testing |
+| `reference/` | Yes | CLI options, JSON schemas, D-Bus specs, and Dart API links |
+| `architecture/` | Yes | Module ownership, runtime boundaries, and code navigation |
+| `internal/` | No (repo only) | In-progress tool documentation (such as Theme Studio notes) |
+| `proposals/` | No (repo only) | Design proposals and hardware validation specs |
 
-Published pages have a Simplified Chinese counterpart under `zh-cn/`, using the
-same category and filename. Astro serves English at the site root and Chinese
-under `/zh-cn/` (`zh-CN`). Keep Markdown links relative so the link plugin
-resolves each page within its own locale. The generated API under
-`docs/site/public/api/` remains a shared, untranslated reference.
+Every directory has a Simplified Chinese counterpart under `docs/zh-cn/` with matching filenames:
+- Astro serves English at the site root (`/Akari/`) and Simplified Chinese under `/Akari/zh-cn/` (`zh-CN`).
+- Use relative `.md` links in Markdown so links work both in GitHub and in localized site routes.
+- Generated Dart API docs under `docs/site/public/api/` are shared across locales.
 
-`internal/` and `proposals/` remain repository documents. They are excluded from
-the site's loader, page generation, and search index. Studio user documentation
-stays in `internal/` while the editor is in development.
+## Preview and verify locally
 
-## Preview and build
-
-Install Node.js 22.12 or newer and Python 3. API generation also needs the
-repository's Flutter/Dart toolchain.
+Requires Node.js `>= 22.12`, Python 3, and the repository's FVM Flutter/Dart toolchain.
 
 ```sh
 cd docs/site
@@ -35,8 +31,7 @@ npm ci
 npm run dev
 ```
 
-The local handbook is served under `/Akari/`, matching GitHub Pages. The API
-links become available after generation. For a complete build:
+To build the Dart API reference, compile the static site, and run link/fragment verification:
 
 ```sh
 npm run api
@@ -46,49 +41,23 @@ npm run verify
 npm run preview
 ```
 
-`check` validates the Astro configuration and components. `verify` checks local
-links, assets, and fragment targets in the generated handbook, plus the expected
-API entrypoints. Dependencies are locked; generated HTML and search indexes are
-not committed.
+- `npm run check`: Validates Astro configuration and component types.
+- `npm run verify`: Checks all local links, assets, anchor fragments, API entrypoints, and ensures `internal/` and `proposals/` are excluded from the published bundle.
 
-## Add a page
+:::note
+Generated directories (`docs/site/dist/`, `docs/site/public/api/`, and `docs/site/node_modules/`) are git-ignored and must never be committed.
+:::
 
-Add a Markdown file to the appropriate category with `title` and `description`
-frontmatter. Add its slug to the explicit sidebar in `astro.config.mjs`.
-Repository-relative `.md` links remain readable on GitHub and are converted to
-website routes by the Markdown plugin. Mermaid fences render as diagrams.
+## Add or update a page
 
-For every published English page, add a translation at the matching path below
-`docs/zh-cn/`. Translate the sidebar label in the item's `translations` map using
-the `zh-CN` language tag. Keep `internal/` and `proposals/` outside the loader;
-they are repository documents rather than published pages.
+1. Create or edit the English Markdown file with `title` and `description` frontmatter.
+2. Add or update the corresponding Simplified Chinese page under `docs/zh-cn/`.
+3. If adding a new published page, register its slug and `translations: { 'zh-CN': '...' }` label in `docs/site/astro.config.mjs`.
+4. When changing a public Dart API contract, update its `///` doc comment and relevant guide in the same commit. Always import package entrypoints (`package:theme_sdk/theme_sdk.dart`) in examples rather than `lib/src/`.
 
-When changing an API contract, update its source comment and relevant guide in
-the same change. Explain constraints and reasons rather than narrating the code.
-The public API follows the exported package entrypoints; avoid importing `lib/src/`
-from examples.
+## GitHub Pages deployment
 
-## GitHub Pages
+The handbook is published to `https://anfsity.github.io/Akari/` via GitHub Actions (`.github/workflows/docs.yml`):
 
-The website is hosted at `https://anfsity.github.io/Akari/`. Pushes to `gh-pages`
-or manual workflow runs trigger the documentation workflow.
-The workflow builds the handbook and Dart reference, verifies the output, and
-deploys a Pages artifact directly using GitHub's official deployment actions.
-
-GitHub Pages uses **GitHub Actions** as its publishing source. The build and
-deployment implementation lives in `.github/workflows/docs.yml` on `main`.
-It also accepts reusable workflow calls with an explicit `source_ref`.
-Manual **Documentation** runs on `main` build their selected revision.
-Main-branch pushes and pull requests do not automatically start this workflow.
-
-The `gh-pages` branch contains a small publication workflow and a README,
-without generated HTML, API pages, or search assets. Pushing that branch or
-running its **Publish documentation** workflow manually calls the main workflow
-with `source_ref: main`, rebuilding and deploying the latest main source. It
-does not publish files directly from the branch. Main and publication-branch
-runs share one publication concurrency group.
-
-The initial static snapshot remains in the branch's history for recovery.
-Subsequent publications upload the verified `docs/site/dist/` directory as a
-Pages artifact. Keep `dist/`, `public/api/`, and `node_modules/` out of commits;
-the source checkout's ignore rules already exclude them.
+- **Triggers**: Manual **Documentation** workflow dispatch on `main`, or pushing/dispatching on the `gh-pages` branch (which invokes the `main` workflow with `source_ref: main`).
+- **Pipeline**: Builds the Starlight site and `dart doc` reference, runs `npm run verify`, and uploads `docs/site/dist/` directly as a GitHub Pages artifact.
