@@ -73,8 +73,9 @@ fvm dart run tool/akari.dart perf -t themes/default -- --cycles 5
 `install` now deploys the production login environment. The previous launcher
 installation command is `install cli`; `install --shell` is no longer accepted.
 Run installation as your regular user on Linux with systemd, greetd at
-`/usr/bin/greetd`, Sway at `/usr/bin/sway`, Python 3, `swaymsg`, `swaybg`, `dbus-run-session`,
-and `busctl`. Install greetd's PAM configuration at `/etc/pam.d/greetd` through
+`/usr/bin/greetd`, Sway at `/usr/bin/sway`, Python 3, `swaymsg`, `swaybg`, `dbus-daemon`,
+`busctl`, and `setpriv` (util-linux).
+Install greetd's PAM configuration at `/etc/pam.d/greetd` through
 your distribution. Akari retains that authentication policy and adds optional
 keyring integration as described below.
 

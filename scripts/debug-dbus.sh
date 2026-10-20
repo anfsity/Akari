@@ -33,26 +33,22 @@ if [[ "${1:-}" == --inside-private-bus ]]; then
   shift
 fi
 
-if [[ "$inside_private_bus" -eq 0 ]]; then
-  # Re-enter after dbus-run-session sets the bus address so backend and client
-  # inherit one isolated bus. The internal flag prevents recursive bus creation.
-  if [[ -z "${AKARI_LOG_DIR:-}" ]]; then
-    export AKARI_LOG_DIR="$repo_root/logs/debug-$(date +%Y%m%d-%H%M%S)-$$"
-  fi
-  export AKARI_PRIVATE_BUS=1
-  exec dbus-run-session -- "$script_dir/debug-dbus.sh" --inside-private-bus "$@"
-fi
-
-if [[ "${AKARI_PRIVATE_BUS:-0}" != 1 ]]; then
+if [[ "$inside_private_bus" -eq 1 && "${AKARI_PRIVATE_BUS:-0}" != 1 ]]; then
   printf '%s\n' 'Internal error: private D-Bus marker is missing.' >&2
   exit 1
 fi
 
+if [[ "$inside_private_bus" -eq 0 && -z "${AKARI_LOG_DIR:-}" ]]; then
+  export AKARI_LOG_DIR="$repo_root/logs/debug-$(date +%Y%m%d-%H%M%S)-$$"
+fi
 log_dir="$(akari_log_dir "$repo_root")"
 backend_pid=''
 command_pid=''
+bus_pid=''
+bus_directory=''
 
 cleanup() {
+  trap '' INT TERM HUP
   if [[ -n "$command_pid" ]] && kill -0 "$command_pid" >/dev/null 2>&1; then
     kill "$command_pid" >/dev/null 2>&1 || true
     wait "$command_pid" >/dev/null 2>&1 || true
@@ -63,12 +59,48 @@ cleanup() {
   if [[ -n "$backend_pid" ]]; then
     wait "$backend_pid" >/dev/null 2>&1 || true
   fi
+  if [[ -n "$bus_pid" ]]; then
+    kill "$bus_pid" >/dev/null 2>&1 || true
+    wait "$bus_pid" >/dev/null 2>&1 || true
+    rm -rf -- "$bus_directory"
+  fi
 }
 trap cleanup EXIT
-# Keep EXIT cleanup as the single owner of both children, including failures
+# Keep EXIT cleanup as the owner of the bus and children, including failures
 # during readiness checks and termination while the interactive client runs.
 trap 'exit 130' INT
 trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+if [[ "$inside_private_bus" -eq 0 ]]; then
+  akari_require_command dbus-daemon
+  akari_require_command busctl
+  akari_require_command setpriv
+  # Own normal shutdown and also bind the bus to this supervisor's lifetime.
+  # greetd teardown can end the launcher before its shell traps finish.
+  bus_directory="$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/akari-bus-XXXXXXXX")"
+  export DBUS_SESSION_BUS_ADDRESS="unix:path=$bus_directory/bus"
+  export AKARI_PRIVATE_BUS=1
+  setpriv --pdeathsig TERM dbus-daemon --session --nofork --nopidfile \
+    --address="$DBUS_SESSION_BUS_ADDRESS" > "$log_dir/bus.log" 2>&1 &
+  bus_pid=$!
+  bus_ready=0
+  for _ in {1..100}; do
+    if ! kill -0 "$bus_pid" >/dev/null 2>&1; then
+      printf '%s\n' 'Private D-Bus exited during startup.' >&2
+      exit 1
+    fi
+    if busctl --user --no-pager list >/dev/null 2>&1; then
+      bus_ready=1
+      break
+    fi
+    sleep 0.1
+  done
+  if [[ "$bus_ready" -ne 1 ]]; then
+    printf '%s\n' 'Timed out waiting for the private D-Bus.' >&2
+    exit 1
+  fi
+fi
 
 start_backend="${AKARI_START_BACKEND:-1}"
 if [[ "$start_backend" != 0 && "$start_backend" != 1 ]]; then
