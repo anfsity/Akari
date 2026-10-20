@@ -3,11 +3,13 @@ title: Scene format
 description: The current version 2 authoring document and its validation rules.
 ---
 
-The authoritative model and codec live in `packages/scene_schema`. Theme builds
-validate JSON there before generating Dart. Production uses generated Dart;
-it does not load authoring JSON during login.
+Scene JSON files (`*.scene.json`) define a theme's canvas, background, nodes, transforms, and visibility rules. `packages/scene_schema` validates the JSON at build time and generates typed Dart (`*.scene.g.dart`) for production.
 
-## Minimal document
+:::note
+Current schema version is `2`. The decoder still accepts version `1` and normalizes legacy `kind`/`action` fields, but all new scenes should be authored in version `2`.
+:::
+
+## Minimal example
 
 ```json
 {
@@ -34,82 +36,64 @@ it does not load authoring JSON during login.
 }
 ```
 
-The example uses an identifier understood by `StandardGreeterComponents`.
-A custom factory defines its own identifiers. A scene must contain at least
-one node; node IDs must be unique and component identifiers non-empty.
+- A scene must contain at least one node.
+- Node `id` values must be unique within the document, and `component` identifiers must be non-empty.
 
 ## Canvas
 
-| Field | Values/default | Meaning |
-| --- | --- | --- |
-| `fit` | `cover`, `contain`, `reflow`; required | Canvas fit policy |
-| `useSafeArea` | `true` | Respect the safe-area-adjusted canvas |
-| `referenceWidth` | `1920` | Reference width in pixels; 1–16384 |
-| `referenceHeight` | `1080` | Reference height in pixels; 1–16384 |
-
-Layout rectangles are normalized fractions of the available canvas, rather
-than stored pixel coordinates.
+| Field | Type / Values | Default | Description |
+| --- | --- | --- | --- |
+| `fit` | `"cover"` \| `"contain"` \| `"reflow"` | Required | How the canvas scales to the output viewport |
+| `useSafeArea` | `boolean` | `true` | Lay out nodes inside the safe-area-adjusted canvas |
+| `referenceWidth` | `1..16384` | `1920` | Reference width in pixels (used by Studio pixel authoring) |
+| `referenceHeight` | `1..16384` | `1080` | Reference height in pixels (used by Studio pixel authoring) |
 
 ## Background
 
-| Field | Default | Meaning |
-| --- | --- | --- |
-| `kind` | Required | `image`, `solid`, `video`, or `custom` |
-| `asset` | Absent | Bundled image or renderer configuration reference |
-| `color` | `#0d151a` | Background fill |
-| `scrimOpacity` | `0.35` | Scrim opacity in [0, 1] |
-| `blurSigma` | `0` | Non-negative blur strength |
-| `rendererId` | Absent | Optional custom renderer identifier |
+| Field | Type / Values | Default | Description |
+| --- | --- | --- | --- |
+| `kind` | `"image"` \| `"solid"` \| `"video"` \| `"custom"` | Required | Background renderer category |
+| `asset` | `string` | Omit | Bundled image or renderer asset path (e.g., `packages/theme_ocean/assets/bg.jpg`) |
+| `color` | `#RRGGBB` \| `#AARRGGBB` | `"#0d151a"` | Solid fill or fallback color |
+| `scrimOpacity` | `0.0..1.0` | `0.35` | Darkening scrim overlay opacity |
+| `blurSigma` | `>= 0` | `0` | Static canvas blur strength |
+| `rendererId` | `string` | Omit | Custom renderer key registered in `ThemeBundle` |
 
-Built-in renderers implement `image` and `solid`. Other kinds need an implementation
-registered by the compiled theme. Asset references cannot contain `..`; image
-assets use `assets/` or Flutter `packages/` paths. Theme-owned assets normally use
-`packages/<package-name>/assets/...`.
-
-Colors accept six-digit RGB or eight-digit ARGB hex strings, conventionally
-written as `#RRGGBB` or `#AARRGGBB`.
+:::caution
+Built-in renderers support `image` and `solid`. Using `video` or `custom` requires registering a matching renderer in the theme's `ThemeBundle`. Asset paths must not contain `..`.
+:::
 
 ## Nodes
 
-| Field | Default | Meaning |
-| --- | --- | --- |
-| `id` | Required | Unique node identifier |
-| `component` | Required | Identifier handled by the theme's component factory |
-| `rect` | Required | Normalized `x`, `y`, `width`, and `height` |
-| `z` | `0` | Spatial depth |
-| `renderOrder` | `0` | Paint order |
-| `focusOrder` | `0` | Keyboard traversal order |
-| `motion` | `none` | Motion preset |
-| `visibleWhen` | Absent | Declarative presence condition |
-| `interactive` | `false` | Whether the node is interactive |
-| `properties` | `{}` | Component-owned string-to-string map |
-| `transform` | Identity | Node-local translation, scale, rotation, and pivot |
-
-Rectangles require non-negative X/Y and positive width/height. Their right and
-bottom edges must stay within 1. Depth, paint order, and keyboard order have
-separate meanings; do not infer one from another.
-
-Motion names are `none`, `fade`, `fadeSlide`, `fadeScale`, `hoverLift`, and
-`focusGlow`. The theme registers the builders and visual timing; the runtime
-owns animation lifetime.
+| Field | Type / Values | Default | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | Required | Unique node identifier |
+| `component` | `string` | Required | Component key resolved by the theme's component factory |
+| `rect` | `{ x, y, width, height }` | Required | Normalized canvas coordinates (`x >= 0`, `y >= 0`, `width > 0`, `height > 0`, `x + width <= 1`, `y + height <= 1`) |
+| `z` | `number` | `0` | Spatial depth |
+| `renderOrder` | `integer` | `0` | Paint order (independent of `z` and `focusOrder`) |
+| `focusOrder` | `integer` | `0` | Keyboard focus traversal order |
+| `motion` | `"none"` \| `"fade"` \| `"fadeSlide"` \| `"fadeScale"` \| `"hoverLift"` \| `"focusGlow"` | `"none"` | Presence/interaction motion preset |
+| `visibleWhen` | Condition object / string | Omit | Declarative visibility condition (always visible when omitted) |
+| `interactive` | `boolean` | `false` | Enforce minimum hit target and focus traversal |
+| `properties` | `Record<string, string>` | `{}` | String key-value pairs interpreted by the component |
+| `transform` | Transform object | Identity | Node-local translation, scale, rotation, and pivot |
 
 ## Transforms
 
-| Fields | Units/default |
-| --- | --- |
-| `translateX`, `translateY` | Logical pixels; 0 |
-| `scaleX`, `scaleY` | Multipliers; 1 |
-| `rotationX`, `rotationY`, `rotationZ` | Degrees; 0 |
-| `pivotX`, `pivotY` | Fractions of the laid-out node size; 0.5 |
-| `perspective` | Matrix perspective coefficient; 0 |
+Unlike `rect` (which uses normalized `0..1` canvas fractions), `transform` fields use the following units:
 
-These units differ from the rectangle's normalized canvas coordinates.
+| Field | Unit | Default |
+| --- | --- | --- |
+| `translateX`, `translateY` | Logical pixels | `0` |
+| `scaleX`, `scaleY` | Multiplier | `1` |
+| `rotationX`, `rotationY`, `rotationZ` | Degrees | `0` |
+| `pivotX`, `pivotY` | Fraction of node size (`0..1`) | `0.5` |
+| `perspective` | Matrix perspective coefficient | `0` |
 
-## Presence conditions
+## Presence conditions (`visibleWhen`)
 
-A predicate name is a condition by itself. Compose it using `all`, `any`, or
-`not`; each condition object has exactly one operator. `all` and `any` accept
-non-empty lists of conditions.
+A condition can be a single `ScenePredicate` name or a boolean combination using `all`, `any`, or `not` (each condition object may contain only one operator):
 
 ```json
 {
@@ -120,20 +104,8 @@ non-empty lists of conditions.
 }
 ```
 
-Use the `ScenePredicate` enum in the [API reference](api.md) for the complete
-vocabulary. Conditions do not run arbitrary expressions or scripts. The greeter
-adapter projects semantic state into predicates; themes do not derive them from
-backend transport objects.
+See `ScenePredicate` in the [API reference](api.md) for all supported predicate names.
 
-Dormancy does not end an authentication prompt. An authentication predicate
-can therefore remain active while `isDormant` is also active. Combine login
-control conditions with `{ "not": "isDormant" }` when they should hide on
-Escape. The default theme's confirm arrow uses this gate for prompting,
-submitting, and authentication errors.
-
-## Versions
-
-The current version is 2. The decoder also accepts version 1, normalizing the old
-`kind` and `action` vocabulary into the current component/interactivity model.
-Encoding writes the current document representation. Author new documents in
-version 2.
+:::tip[Handling the dormant state]
+Pressing `Escape` enters `isDormant` without cancelling the active PAM prompt, so authentication predicates (`isAuthPrompting`, `isAuthError`) can remain true while `isDormant` is also true. Gate interactive login controls with `{ "not": "isDormant" }` if they should hide when dormant.
+:::

@@ -7,61 +7,47 @@ description: 查命令、选项、显示配置和运行报告。
 
 ## 命令与目标
 
-在仓库根目录运行 `fvm dart run tool/akari.dart COMMAND`。安装[启动器](#shell-launcher-and-completion)后，也可以运行 `akari COMMAND`。
+在仓库根目录执行 `fvm dart run tool/akari.dart COMMAND`；安装[命令行启动器](#shell-launcher-and-completion)后，可直接运行 `akari COMMAND`。
 
 | 命令 | 用途 | 命令专属选项 |
 | --- | --- | --- |
-| `build` | 构建所选主题、正式版后端和原生启动画面 | `--theme`、`--jobs`、`--mode`、`--platform` |
-| `preview` | 在一个窗口中自动演示登录场景，完成后退出 | `--theme`、`--jobs`、`--scenario` |
-| `run` | 使用私有 D-Bus 和后端运行登录界面 | `--theme`、`--jobs`、`--mode`、`--backend` |
-| `run sway` | 在嵌套或无头 Sway 中运行登录界面 | `run` 选项，以及 `--display-profile`、`--resolution`、`--scale`、`--sway-backend` |
-| `run splash` | 独立预览原生 loading 动画，手动关闭 | `--jobs`、`--mode`、`--light` |
-| `run studio` | 使用已编译主题编辑场景 | `--theme`、`--jobs` |
-| `verify` | 检查共享代码、后端和主题项目 | `--theme` |
-| `generate-scenes` | 从场景 JSON 生成类型化 Dart | `--theme` |
-| `verify-perf` / `perf` | 运行主题声明的性能检查 | `--theme`、`--` 后的参数 |
-| `trace-perf` / `trace` | 运行主题声明的性能跟踪 | `--theme`、`--` 后的参数 |
-| `install` | 构建并部署正式登录环境 | `--theme`、`--jobs`、`--dry-run` |
-| `install cli` | 安装绑定到当前仓库的启动器和补全脚本 | `--shell`、`--prefix`、`--rc` |
-| `uninstall` | 卸载正式或测试环境，包括安装残留 | `--scope`、`--dry-run` |
-| `login enable` / `login disable` | 选择 Akari 或恢复原来的开机登录服务 | `--dry-run` |
-| `login rollback` | 选择上一个已安装版本 | `--dry-run` |
-| `login configure-keyring` | 无需重新构建即可配置 greetd 密钥环 PAM | `--keyring`、`--dry-run` |
-| `login enable-gaze` / `login disable-gaze` | 为标准 Arch greetd 启用 Gaze，或恢复密码认证 | `--dry-run` |
-| `login status` | 查看安装和服务状态 | `--format` |
-| `login logs` | 查看服务 journal 或最新登录界面日志 | `--component`、`--lines`、`--follow` |
-| `toolchain check` / `toolchain setup` | 检查或初始化开发环境 | `--dry-run` |
-| `docs build-api` / `docs verify` | 构建 API 文档或校验已构建站点 | `--dry-run`；`verify` 的站点路径放在 `--` 后 |
-| `script list` / `script run` | 查看并调用仓库脚本 | `list --format`、`run SCRIPT --dry-run -- 参数` |
-| `completion` | 输出命令补全脚本 | `--shell` |
-| `greetd-test` | 管理独立登录测试 | [各操作的选项](../guides/greetd-testing.md) |
+| `build` | 构建所选主题、正式版后端与原生启动画面 | `--theme`（`-t`）、`--jobs`（`-j`）、`--mode`（`-m`）、`--platform` |
+| `preview` | 在单窗口中自动演示登录 UI 流程并退出 | `--theme`、`--jobs`、`--scenario` |
+| `run` | 在私有 D-Bus 会话中启动登录界面与后端 | `--theme`、`--jobs`、`--mode`、`--backend` |
+| `run sway` | 在嵌套或无头 Sway 中运行登录界面 | `run` 选项 + `--display-profile`、`--resolution`、`--scale`、`--sway-backend` |
+| `run splash` | 单独预览原生启动加载动画，直至手动关闭 | `--jobs`、`--mode`、`--light` |
+| `run studio` | 使用已编译主题可视化编辑场景 | `--theme`、`--jobs` |
+| `verify` | 检查共享代码、Rust 后端、Studio 与主题项目 | `--theme` |
+| `generate-scenes` | 从场景 JSON 生成类型化 Dart（`*.scene.g.dart`） | `--theme` |
+| `verify-perf`（`perf`） | 运行主题声明的性能门槛检查 | `--theme`、`--` 后的透传参数 |
+| `trace-perf`（`trace`） | 运行主题声明的性能耗时跟踪 | `--theme`、`--` 后的透传参数 |
+| `install` | 构建并部署正式开机登录环境 | `--theme`、`--jobs`、`--keyring`、`--dry-run` |
+| `install cli` | 安装绑定当前仓库的 `akari` 启动器与补全脚本 | `--shell`、`--prefix`、`--rc` |
+| `uninstall` | 卸载正式（`login`）、测试（`test`）或全部（`all`）环境 | `--scope`、`--dry-run` |
+| `login enable` / `disable` | 启用 Akari 开机登录或恢复原显示管理器 | `--dry-run` |
+| `login rollback` | 在 `current` 与 `previous` 已部署版本间回滚切换 | `--dry-run` |
+| `login configure-keyring` | 无需重新构建即可配置 greetd 密钥环 PAM 规则 | `--keyring`、`--dry-run` |
+| `login enable-gaze` / `disable-gaze` | 在标准 Arch greetd 上启用 Gaze 人脸认证或恢复密码栈 | `--dry-run` |
+| `login status` | 查看部署状态与 systemd 服务状态 | `--format` |
+| `login logs` | 查看服务 journal 或最新登录界面会话日志 | `--component`、`--lines`（`-n`）、`--follow`（`-f`） |
+| `toolchain check` / `setup` | 检查或初始化开发环境依赖 | `--dry-run` |
+| `docs build-api` / `verify` | 构建 Dart API 文档或校验已构建的文档站点 | `--dry-run`；`verify` 在 `--` 后传入站点目录 |
+| `script list` / `run` | 查看并调用仓库 `scripts/` 下的辅助脚本 | `list --format`、`run SCRIPT --dry-run -- 参数` |
+| `completion` | 输出 Shell 补全脚本 | `--shell` |
+| `greetd-test` | 管理独立 TTY 真实登录测试 | 详见[独立 greetd 测试](../guides/greetd-testing.md) |
 
-构建、预览、运行目标、验证、场景生成和性能命令还接受 `--format text|json`、`--report PATH` 和 `--dry-run`。所有命令都接受 `--help`（`-h`）。安装、`login`、`completion` 和 `greetd-test` 命令组有各自的输出和选项约定。
+### 通用选项与约定
 
-`run sway`、`run splash` 和 `run studio` 是 `run` 的目标；使用 `akari run TARGET --help` 查看它们支持的选项。Studio 始终以 debug 模式运行且不启动后端，不接受 `--mode` 或 `--backend`。它的开发用户指南暂存于仓库的 [Studio 说明](https://github.com/anfsity/Akari/blob/main/docs/internal/theme-studio.md)。
-
-通过 Dart 入口运行构建和检查命令：
-
-```sh
-fvm dart run tool/akari.dart build
-fvm dart run tool/akari.dart verify
-fvm dart run tool/akari.dart verify-perf
-fvm dart run tool/akari.dart generate-scenes
-fvm dart run tool/akari.dart trace-perf
-```
-
-`-t`、`-m`、`-j` 分别是 `--theme`、`--mode`、`--jobs` 的短选项。`perf` 是 `verify-perf` 的别名，`trace` 是 `trace-perf` 的别名。长选项也接受 `--name=value`。同一选项混用短写和长写仍会被视为重复。`COMMAND --help` 只列出该命令接受的选项。仅性能命令接受 `--` 后的参数；这些参数会原样传给主题 runner。
-
-```sh
-fvm dart run tool/akari.dart build -t themes/default -m release -j 4
-fvm dart run tool/akari.dart perf -t themes/default -- --cycles 5
-```
+- **报告与演练选项**：`build`、`preview`、`run*`、`verify`、`generate-scenes` 与 `*-perf` 均支持 `--format text|json`、`--report PATH` 和 `--dry-run`。
+- **短选项**：`-t`（`--theme`）、`-m`（`--mode`）、`-j`（`--jobs`）。同一次调用中同一参数请勿混用长短选项。
+- **透传参数**：`perf`、`trace`、`script run` 和 `docs verify` 会将 `--` 之后的参数原样转发给底层命令。
+- **Theme Studio 说明**：`akari run studio` 固定使用 debug 模式且不启动后端（不接受 `--mode` 或 `--backend`）。操作说明见仓库内的 [Theme Studio 文档](https://github.com/anfsity/Akari/blob/main/docs/zh-cn/internal/theme-studio.md)。
 
 <a id="production-login-installation"></a>
 
 ## 安装正式登录环境
 
-`install` 现在用于部署正式登录环境。原来的启动器安装改为 `install cli`；`install --shell` 不再接受。请在使用 systemd 的 Linux 主机上，以普通用户运行安装命令。运行环境需要 `/usr/bin/greetd`、`/usr/bin/sway`、Python 3、`swaymsg`、`swaybg`、`dbus-daemon`、`busctl`、`setpriv`（util-linux）和 AccountsService（`accountsservice`）。通过发行版安装 greetd 的 `/etc/pam.d/greetd`；Akari 保留原有认证策略，并添加下述可选的密钥环集成。
+在已安装 `systemd`、`/usr/bin/greetd`、`/usr/bin/sway`、`python3`、`swaymsg`、`swaybg`、`dbus-daemon`、`busctl`、`setpriv` 和 `accountsservice` 的 Linux 主机上，以普通用户部署开机登录环境：
 
 ```sh
 akari install --theme themes/default --jobs 4
@@ -69,65 +55,60 @@ akari login enable
 akari login status
 ```
 
-`install` 先以 Linux release 模式构建所选主题和正式版后端，再请求 sudo 部署完整 Flutter 程序包和 Rust 可执行文件。构建失败时不会修改已安装环境。相对主题路径以命令调用目录为准；SDK 选择遵循普通构建命令，包括 `AKARI_FLUTTER_BIN` 和 `AKARI_DART_BIN`。
+### 部署目录与资源结构
 
-`install --keyring auto`（默认）通过 `pam_gnome_keyring.so` 和 `pam_kwallet5.so` 检测 GNOME Keyring 与 KWallet，支持多架构库路径，并将已安装的提供方配置到 `/etc/pam.d/greetd`。两者都缺失时，在终端询问安装 GNOME Keyring、KWallet 或跳过。自动安装支持 Arch、Debian/Ubuntu 和 Fedora；其他发行版需手动安装软件包。安装后会重新检测 PAM 模块，确认存在才写配置。
+| 路径 / 资源 | 说明 |
+| --- | --- |
+| `akari-greeter` | 运行登录界面的专用无特权系统账户 |
+| `/opt/akari/releases/` | 按版本存放的发布程序包，通过 `current` 和 `previous` 符号链接切换 |
+| `/etc/akari/greetd.toml` 与 `sway.conf` | Akari 专用配置文件（不修改系统原有的 `/etc/greetd/config.toml`） |
+| `/etc/akari/display-layout.json` | 首次安装时从当前 Sway/Hyprland 桌面捕获的显示器排列顺序 |
+| `/var/lib/akari/greeter/` | 持久化的登录账户与桌面会话偏好 |
+| `/var/log/akari/greeter/session-*/` | 每次启动生成的 `backend.log`、`flutter.log` 与 `sway.log`（无需 `sudo` 即可读取） |
 
-使用 `--keyring gnome` 或 `--keyring kwallet` 只配置指定提供方。指定的模块缺失时，必须在终端同意后才安装软件包。无终端时，`auto` 跳过缺失模块，显式指定的缺失模块则报错。`--keyring none` 只移除 Akari 管理的密钥环配置块。原有直接规则和 include 引入的 PAM 规则会保留，不重复添加。新增 auth 与 session 规则使用 `optional`；GNOME Keyring 通过 `use_authtok` 接收认证口令，并使用 `auto_start` 启动会话服务；KWallet 使用 `auto_start force_run` 适配 greetd。首次修改前将 PAM 配置备份到 `/var/lib/akari/greetd.pam.before-keyring`。部署失败时恢复此前的 PAM 内容；卸载只移除 Akari 的配置块，保留其他编辑、已安装的密钥环软件包和备份。
+### 密钥环（Keyring）与 PAM 配置
 
-自动解锁要求认证口令与密钥环密码一致。生物识别登录需要提供方额外提供该口令，例如 [Gaze 可选的 TPM 密钥环集成](../guides/greetd-testing.md#人脸认证)，见 [GNOME 的 PAM 文档](https://wiki.gnome.org/Projects/GnomeKeyring/Pam)。KWallet 还需要桌面的 `pam_kwallet_init` 自启动完成初始化，见 [KDE 集成源码](https://invent.kde.org/plasma/kwallet-pam)。无需重新构建即可配置 PAM，也可用此命令为旧版 Akari 管理的配置块补上 `use_authtok`：
+`akari install` 会自动配置 `/etc/pam.d/greetd`（首次修改前备份至 `/var/lib/akari/greetd.pam.before-keyring`）：
+
+- `--keyring auto`（默认）：自动检测已安装的 `pam_gnome_keyring.so` 与 `pam_kwallet5.so`（若均未安装，在 Arch、Debian/Ubuntu、Fedora 终端下会提示是否安装）。
+- `--keyring gnome` / `--keyring kwallet`：仅配置指定提供方（GNOME Keyring 使用 `use_authtok` + `auto_start`；KWallet 使用 `auto_start force_run`）。
+- `--keyring none`：仅移除 Akari 管理的密钥环配置块，保留其他 PAM 规则。
+- 无需重新构建即可单独更新已有安装的密钥环 PAM 规则：
+  ```sh
+  akari login configure-keyring --keyring gnome
+  ```
+- 在 Arch Linux 上启用或移除 Gaze 人脸认证：使用 `akari login enable-gaze` 与 `akari login disable-gaze`（详见 [Gaze 接入指南](../guides/greetd-testing.md#在-arch-上接入-greetd)）。
+
+### 服务管理、日志与卸载
 
 ```sh
-akari login configure-keyring --keyring gnome
-```
-
-该命令使用仓库中的最新控制器，需要时自动请求 sudo，因此无需重新部署即可更新旧安装。提供方选择与 PAM 备份行为和安装命令相同。
-
-人脸认证通过 `akari login enable-gaze` 单独启用，通过 `akari login disable-gaze` 移除。这两个命令使用仓库中的最新控制器、自动请求 sudo，并保留 account、session 与密钥环钩子。自动接入仅接受标准 Arch auth 规则，遇到自定义认证要求时会拒绝修改。辅助规则、备份、密码回退与恢复方式见 [Gaze 接入](../guides/greetd-testing.md#在-arch-上接入-greetd)。应先部署当前后端，避免识别等待被旧版十秒传输超时截断。
-
-安装会创建独立的 `akari-greeter` 系统账户，将各版本放到 `/opt/akari/releases/`，用 `current` 符号链接选择运行版本。`akari.service` 使用 `/etc/akari/greetd.toml` 启动 greetd，登录界面使用 `/etc/akari/sway.conf` 在 Sway 内运行。原有 `/etc/greetd/config.toml` 和 `/opt/akari-test` 测试资源不变。登录偏好保存在 `/var/lib/akari/greeter/`。
-
-安装不会切换开机登录服务。`login enable` 要求现有默认 target 为 `graphical.target`，先保存原显示管理器的符号链接和启用状态，再启用 `akari.service` 替代它。它不启动、停止或重启任何服务；准备好后重启系统使用 Akari。`login disable` 恢复已记录的开机登录服务，同样不会中断当前桌面。切换失败时会立即尝试恢复；若恢复也失败，保留快照，可再次运行 `login disable`。
-
-首次安装会在可用时捕获当前 Sway 或 Hyprland 的显示器顺序。后续安装保留 `/etc/akari` 下的配置，包括 `display-layout.json`。可在 `sway.conf` 配置显示模式和缩放，在 `display-layout.json` 配置输出名称顺序及 `x` 或 `y` 排列轴。如果没有捕获布局，则使用 Sway 自动排列。
-
-```sh
+# 查看服务 journal 或组件日志（backend、flutter、sway）
 akari login logs
 akari login logs --component backend --lines 200
 akari login logs --component flutter --follow
-akari login status --format json
+
+# 回滚到上一版本或恢复原开机显示管理器
 akari login rollback
 akari login disable
+
+# 卸载环境（--scope login | test | all）
+akari uninstall --scope all --dry-run
 akari uninstall
 ```
 
-`login logs` 默认读取 `akari.service` 的 journal，访问权限由主机配置决定。`backend`、`flutter` 和 `sway` 读取 `/var/log/akari/greeter/session-*/` 下最新一次登录界面的日志，无需 sudo。`--follow` 跟踪选中的这次会话文件。每次登录界面启动都会创建独立日志。后端、前端和合成器使用私有总线；前端退出或后端断开时释放 Sway，让 greetd 启动桌面或重新提供登录界面。
-
-重新安装会保留旧版本，在部署成功后切换 `current`。`login rollback` 交换 `current` 和 `previous`，下一次启动登录界面时使用所选版本；已经运行的登录界面继续使用原版本。回退不修改系统配置和偏好。旧版本与会话日志会保留在磁盘上。`uninstall` 要求服务已停止运行，恢复已记录的开机登录服务，并删除部署产物和 `/etc/akari` 配置；账户、偏好和日志保留。
-
-`uninstall` 默认卸载正式登录环境；`--scope test` 只删除独立测试安装，不修改正式环境的 PAM、配置或开机登录服务；`--scope all` 卸载两者。所有范围均支持不完整安装和重复执行，不要求已安装的控制器或 manifest 存在。原来的 `clean` 命令已移除。
-
-正式环境卸载会恢复已记录的开机登录服务，删除 `/opt/akari`、`/etc/akari` 和 Akari unit，并移除 Akari 的密钥环配置与 Gaze 路由；测试范围删除 `/opt/akari-test`。账户、偏好、PAM 备份、安装目录外的日志及 CLI 启动器保留。所选范围内的服务和恢复计时器必须处于 inactive 或 failed 状态；正式会话仍运行时先 `login disable` 并重启，测试运行时先 `greetd-test restore`。恢复失败会保留恢复所需文件。
-
-```sh
-akari uninstall --scope all --dry-run
-akari uninstall --scope test
-akari uninstall --scope all
-```
-
-`install`、`uninstall`、`login enable`、`login disable`、`login rollback`、`login configure-keyring`、`login enable-gaze` 和 `login disable-gaze` 接受 `--dry-run`，只输出 JSON 计划，不构建、不请求 sudo，也不修改文件。状态和日志操作只读。CLI 启动器仍依赖仓库和 SDK，已安装的登录服务独立运行。在 TTY 中恢复时，也可以直接调用已安装的控制器：
-
+:::tip[TTY 紧急恢复]
+`login enable` 和 `login disable` 只更新开机服务符号链接，不会中断当前桌面。如果在 TTY 下无法访问源码仓库或 Dart SDK，可直接调用已安装的控制器恢复原显示管理器：
 ```sh
 sudo python3 /opt/akari/manage.py disable
 ```
-
-这会恢复下一次开机的登录服务；随后重启系统，退出当前由 Akari 管理的会话并回到原显示管理器。
+随后重启系统即可回到原来的登录管理器。
+:::
 
 <a id="shell-launcher-and-completion"></a>
 
 ## Shell 启动器与补全
 
-在用户级目录中安装绑定到仓库的 `akari` 命令和 Shell 补全：
+在用户目录安装绑定当前仓库的 `akari` 启动器（`~/.local/bin/akari`）与补全脚本（`~/.local/share/akari/`）：
 
 ```sh
 fvm dart run tool/akari.dart install cli --shell zsh
@@ -135,49 +116,33 @@ fvm dart run tool/akari.dart install cli --shell zsh
 fvm dart run tool/akari.dart install cli --shell bash
 ```
 
-启动器写入 `~/.local/bin/akari`，补全脚本写入 `~/.local/share/akari/`。安装过程会向 `.zshrc`（遵循 `ZDOTDIR`）或 `.bashrc` 追加一行 source 命令；重复安装不会重复添加。打开新 Shell，或加载输出的环境脚本以启用它。该启动器可以从任意目录运行，会保留相对参数路径，并使用当前仓库的 SDK 及 `AKARI_*_BIN` 覆盖项。安装后，仓库需要保留在原来的位置；移动仓库后请重新安装。`install cli --prefix PATH --rc PATH` 用于选择安装目录和启动文件。
-
-补全支持命令、别名、各命令的长短选项、可选值和路径。遇到 `--` 后便会停止补全，因为之后的参数属于主题。解析器、帮助文本和生成脚本共用 `tool/src/cli/definition.dart`。修改该定义后需重新安装，刷新已安装的补全脚本。手动注册时，运行 `akari completion --shell zsh` 或 `--shell bash` 会输出对应脚本。
-
-独立登录测试使用 `akari greetd-test install`、`start`、`restore`、`status` 和 `logs`。此命令组直接调用已安装的测试生命周期脚本，将诊断信息保存在仓库运行报告之外。`greetd-test install --theme PATH`（或 `-t PATH`）会构建并安装所选主题项目，默认使用仓库的 `themes/default`。只有安装操作需要仓库构建产物；状态/日志查询和服务控制不会获取主题锁，也不会创建开发运行目录。`akari` 启动器本身仍需要仓库和 SDK。紧急恢复命令 `sudo /opt/akari-test/restore.sh` 可独立于二者运行。操作选项和前置条件见[独立 greetd 测试](../guides/greetd-testing.md)。
+- 可通过 `--prefix PATH` 和 `--rc PATH` 自定义安装路径与 Shell 配置文件。
+- 若移动了仓库位置，或修改了 `tool/src/cli/definition.dart` 中的命令定义，请重新执行 `install cli`。
+- 使用 `akari completion --shell zsh|bash` 可直接输出补全脚本内容。
 
 ## 仓库脚本
 
-`akari -h` 按开发、检查、安装、工具分类，并给出常用示例；子命令帮助只列出自己的参数。
+在仓库根目录下查找并运行 `scripts/` 中的辅助脚本：
 
 ```sh
 akari script list
 akari script list --format json
 akari script run run-backend.sh -- --help
 akari script run greetd-test/display-layout.py -- capture
-akari docs verify -- docs/site/dist
 ```
-
-脚本目录由 CLI 扫描，声明表提供用途和调用条件。Bash/Python 脚本通过对应解释器调用，参数保持原样，工作目录为仓库根目录，并保留退出码。CLI 不替脚本请求 sudo 或构造 greetd 环境。内部入口仍要求列表中说明的安装目录、环境变量或 VT；`lib.sh` 是函数库，可被发现，但不能作为独立命令运行。转发给脚本的 `--help` 应放在 `--` 后。新增脚本必须在声明表中归类，覆盖测试会检查遗漏。
 
 ## 构建、预览和运行
 
-`build` 通过 `--theme PATH` 接受主题项目，默认值为 `themes/default`。它会解析项目依赖、生成场景源文件，并在 `build/tool/hosts/` 下创建可复用宿主。宿主只导入所选主题；项目可以位于 Akari 仓库外。详情见[主题项目约定](theme-package.md)。
-
-使用 `run --theme PATH` 在私有 D-Bus 会话中启动完整登录界面。默认会编译并启动 Rust 模拟后端；`--backend real` 则选择真实后端通信。前端始终使用 D-Bus。`run` 会直接管理所选主题的 Flutter 会话。
-
-`preview --theme PATH` 只创建一个登录窗口，使用 Flutter 集成测试依次演示 `face-success` 和 `password-fallback`，每条结束后释放认证状态，再进入下一条，全部完成后退出。`--scenario NAME` 选择单条，默认 `all`。预览固定使用 debug 模式，不热重载、不启动后端或原生 splash。报告中的 `preview_scenarios` 记录每条结果；未完成或失败时返回非零退出码。预览验证受控事件下的 UI 流程，真实摄像头、PAM、VT 交接仍需实机测试。
-
-`run` 默认 debug 模式，保存后热重载 Dart 和资源；场景 JSON 先增量生成，失败时保留上次可用主题。按 `r` 重新生成并加载，`R` 重启，`q` 退出。profile/release 会话不支持热重载。`preview` 与 `run` 都接受 `--jobs COUNT`。
-
-`preview` 使用可调整大小、无装饰的单窗口。`run` 和正式程序默认无装饰全屏；设置 `AKARI_WINDOW_MODE=windowed` 可让 `run` 使用窗口。`run splash` 独立展示原生 loading 动画，不限展示时间，按 Escape 或关闭窗口结束；它不启动登录界面。
-
-全屏登录界面会在每台已连接显示器上显示相同主题，并使用各自输出的逻辑尺寸和缩放。账户、会话、身份验证、休眠状态及凭据文本会共享；键盘操作由获得焦点的窗口处理。连接或断开输出会更新对应窗口，不会重启身份验证。窗口模式的预览只打开一个窗口。
-
-要进行原生多显示器回归检查，请构建演示预览程序包并运行 `python3 test/support/multi_display_workflow_test.py --app PATH/greeter`。此可选检查需要 Sway、wtype 和 grim。它会使用混合输出缩放启动隔离的无头合成器，检查热插拔及两种窗口模式，并将截图和日志保存在输出的临时目录中。
+- **`build`**：解析主题依赖、生成场景代码、在 `build/tool/hosts/` 下准备可复用宿主，并编译 release 前端包与正式版 Rust 后端。
+- **`run`**：在私有 D-Bus 会话中启动登录界面与 Rust 模拟后端（`--backend real` 切换正式通信）。支持保存后热重载；默认全屏（`AKARI_WINDOW_MODE=windowed` 切换窗口模式）。
+- **`preview`**：在无边框单窗口中依次自动演示 `face-success` 与 `password-fallback`（可通过 `--scenario NAME` 单选），完成后自动退出。
+- **`run splash`**：打开独立窗口预览原生启动加载动画，按 `Escape` 或关闭窗口退出。
 
 <a id="sway-sessions-and-display-profiles"></a>
 
 ## Sway 会话与显示配置
 
-步骤说明和故障排查见[显示测试](../guides/display-testing.md)。
-
-Hyprland 上的 preview 会继承所在输出的缩放。使用 `run sway` 可在嵌套合成器中应用独立登录界面的缩放：
+在嵌套或无头 Sway 合成器中复现独立登录界面的显示比例：
 
 ```sh
 akari run sway
@@ -187,80 +152,50 @@ akari run sway --resolution 1920x1080 --scale 1.6
 akari run sway --display-profile reference --sway-backend headless
 ```
 
-所选主题、构建模式、构建任务数、模拟/真实后端以及重载按键与 `run` 相同。`scripts/debug-sway.sh` 会转发到相同 CLI 入口。该会话需要 Python 3、Sway、swaymsg 和 grim。默认 Wayland 后端会在当前 Wayland 桌面中打开虚拟输出；无头模式不需要桌面。两个模式都不会切换显示管理器。会话管理自己的私有 D-Bus、后端、合成器、前端进程组和临时运行目录；退出或失败时会清理这些资源并保留日志。
+### 显示配置模式（`--display-profile`）
 
-`--display-profile` 接受 `auto`（默认值）、`login` 和 `reference`。`auto` 会从 `/opt/akari-test/current-run/greeter/session-*/` 导入最新的完整、已标记 DRM 登录快照；如果已有更新的已保存登录配置，则继续使用它。若没有快照，则使用 `config/sway/reference.json`：单输出、1920×1080 像素、缩放 1、逻辑视口 1920×1080。没有有效登录配置时，`login` 会报错；`reference` 跳过登录发现和导入，可用于团队间保持一致的对比。重新安装 greetd 测试工具以生成带标记的快照；旧版未标记 `outputs.json` 仍可用于诊断。
+| 模式 | 行为说明 |
+| --- | --- |
+| `auto`（默认） | 自动从 `/opt/akari-test/current-run/greeter/session-*/` 导入最新的 DRM 登录快照至 `${XDG_STATE_HOME:-~/.local/state}/akari/display-profiles/login.json`；若无快照则回退到 `reference`。 |
+| `login` | 强制使用已导入或新捕获的真实 TTY 登录快照；若不存在有效快照则直接报错。 |
+| `reference` | 固定使用 `config/sway/reference.json`（`1920x1080`，缩放 `1.0`）。在多屏环境下使用 `--resolution` 或 `--scale` 单输出覆盖时必须指定此模式。 |
 
-导入的配置保存在 `${XDG_STATE_HOME:-~/.local/state}/akari/display-profiles/login.json`，写入时会原子替换旧文件，且只允许文件所有者访问。它会保留模式（包括刷新率）、缩放、变换、逻辑矩形、显示器身份、捕获时间、原始快照路径和测试/会话来源。不完整或损坏的快照、失败测试的快照，以及嵌套或无头输出，都不会覆盖已有的有效登录配置。原始登录日志仍保留在原始路径；删除日志后，已保存的配置仍可使用。dry-run 会解析默认值，但不会导入文件或创建运行目录。
+### 输出校验与 Hyprland 缩放补偿
 
-分辨率和缩放先取自一个基础配置，再应用显式覆盖。`--resolution WIDTHxHEIGHT` 表示参考输出像素；`--scale NUMBER` 是期望的独立登录缩放，且必须为正数。无头输出会强制使用该分辨率：例如 1920×1080、缩放 1.6 时，逻辑视口为 1200×675。在 Hyprland 上，外层合成器决定实际输出尺寸。任一选项都可以覆盖单输出配置中的对应值，同时保留另一个基础值；完整目标会标记为自定义。多输出配置不接受这些全局覆盖；如果要覆盖单输出，请选择 `reference`。
+- **运行产物**：保存在 `build/tool/runs/<run-id>/sway/` 下，包含 `display-report.json`、`outputs.json`、`sway.log`、`flutter.log` 以及 `screenshots/` 下的首帧输出截图。
+- **Hyprland 缩放补偿**：在 Hyprland 下，`run sway` 会读取窗口所在显示器的缩放并自动应用 `内层缩放 = 目标登录缩放 / Hyprland 显示器缩放`。在同一显示器上全屏时，逻辑视口与独立 TTY Sway 完全一致。
+- **无头模式校验**：`--sway-backend headless` 强制校验输出尺寸与缩放，若实际输出与目标存在偏差则判定运行失败。
 
-多个登录显示器会按从上到下、再从左到右的顺序映射到 `WL-1`、`WL-2`、… 或 `HEADLESS-1`、`HEADLESS-2`、…，并保留各显示器的参考模式、缩放、变换和逻辑位置。报告中仍会保留原始显示器名称。
-
-启动时会打印来源、完整目标、实际输出以及日志/截图位置。`--format json` 会在运行报告的 `display` 字段中包含这些信息。Sway 资源位于 `build/tool/runs/<run-id>/sway/`：包括 `display-report.json`、原始 `outputs.json`、`sway.log`、`flutter.log`、生成的配置和 `screenshots/<virtual-output>.png`。所有登录窗口出现后，会在 Sway 内部为每个输出按其像素缩放截图。虚拟后端会自行选择刷新率；报告将物理刷新率保留为来源信息。固定尺寸模式会检查显示模式尺寸、缩放、变换和布局矩形；Hyprland 下的检查方式见下文。
-
-在 Hyprland 上，窗口遵循桌面的常规平铺和全屏管理。会话会读取自己窗口所在的显示器，并使用 `inner scale = selected standalone scale / Hyprland monitor scale` 补偿。例如 TTY 缩放为 1、显示器 Hyprland 缩放为 1.6 时，内层缩放为 0.625。在同一显示器及物理模式下全屏，逻辑视口和内容尺寸将与独立 TTY Sway 一致。全屏尺寸取自显示器，而不是配置中的参考分辨率。使用 Hyprland 常用全屏快捷键与 TTY 对比。
-
-调整窗口大小或进入/退出全屏都会更新视口，不会停止主题。将窗口移到另一显示器时会重新计算缩放。会话只读取 Hyprland IPC 并修改自身的内层 Sway 输出；不需要浮动规则、固定窗口尺寸或桌面配置更改。报告会保留原始 `target`、补偿后的 `effective_target`（包括宿主显示器和缩放）以及 `actual`。当窗口尺寸由外层合成器决定时，`matched` 会比较有效输出设置。内层截图使用采用的输出缩放和尺寸，因此即使显示内容大小相同，像素尺寸也可能与 TTY 截图不同。
-
-无头会话采用固定配置校验，输出偏差会使其失败。其他外层合成器仍需要能接受所请求配置尺寸的窗口。固定分辨率截图请使用无头模式。嵌套/无头测试不能替代 DRM 硬件测试或独立 TTY 测试。
-
-对已构建的登录界面和模拟后端运行原生嵌套回归矩阵：
-
-```sh
-python3 test/support/sway_native_workflow_test.py \
-  --app build/out/default/greeter \
-  --backend backend/target/akari-mock/debug/backend
-```
-
-它会启动隔离的无头外层 Sway，使用 1 和 1.6 两种缩放，并测试内层缩放为 1 和 1.6 的情况。它会保留目标/实际输出报告，并检查所有四种组合下 1920×1080 的内层截图。此测试不会改动开发者桌面配置，也不能验证 Hyprland 特有的窗口定位。
+详细对比步骤请参阅[显示器与缩放测试](../guides/display-testing.md)。
 
 ## 验证与生成宿主
 
-`build` 默认使用 release 模式，同时编译前端和正式版 Rust 后端。
+`akari verify` 会检查共享包、Rust 后端、Theme Studio 以及 `themes/` 下的全部主题（或通过 `--theme PATH` 指定单个主题）。
 
-`verify` 会分析共享代码、后端和 `themes/` 下发现的全部项目。指定 `--theme PATH` 时，只检查所选主题以及共享代码和后端。主题专属 UI 测试放在对应主题包中。如果主题项目的 `test/` 下包含 `*_test.dart`，验证也会运行该项目的 Flutter 测试。
-
-根项目包含共享应用代码和仓库测试。CLI 会为所选主题生成可执行入口。仓库调试使用显式注入默认主题的 `tool/dev_main.dart`；CLI 和 Sway 包装脚本使用所选主题的生成宿主。生成场景后，如需直接使用演示登录状态运行仓库入口：
+如需在 IDE 中直接调试根项目入口，可使用默认注入 `themes/default` 的 `tool/dev_main.dart`：
 
 ```sh
+fvm dart run tool/akari.dart generate-scenes --theme themes/default
 fvm flutter run -d linux --target tool/dev_main.dart
 ```
 
-构建、运行、检查、生成场景和测试性能时，请使用 CLI。安装启动器后可运行 `akari build`、`akari run`、`akari verify`、`akari generate-scenes`、`akari perf` 和 `akari trace`。Shell 脚本负责工具链安装/检查、独立后端启动以及私有 D-Bus、Sway 等 Linux 会话工作。`scripts/debug-dbus.sh` 可接收要在私有总线上运行的后端命令；未提供命令时会直接调用 CLI 的 `run` 命令。
-
 ## 报告与构建输出
 
-使用 `--format json` 将机器可读报告输出到 stdout。每次运行还会在 `build/tool/runs/<run-id>/` 下写入报告和事件日志。每个命令步骤分别保存 stdout 和 stderr 日志。使用 `--report PATH` 可将报告写入指定路径。
-
-支持报告的命令在加上 `--dry-run` 后，会输出包含文件路径的 JSON 执行计划。此时不会执行构建、启动会话、写入报告或创建运行目录。Sway 的执行计划只解析显示配置，不会导入它。合成器尚未启动，因此计划里没有实际输出信息或截图。
-
-构建报告列出生成的宿主项目、构建目录和 Linux 可执行文件。即使所选主题项目位于仓库之外，SDK 命令仍使用仓库配置的 Flutter SDK。可通过 `AKARI_FLUTTER_BIN` 和 `AKARI_DART_BIN` 覆盖二进制路径。
-
-Linux 构建成功后，会创建相对符号链接 `build/out/<theme-name>`（指向完整前端程序包）和 `build/out/backend`（指向正式版后端）。例如运行 `build/out/default/greeter` 或 `build/out/backend`。报告记录 `bundle_link` 和 `backend_link`，文本输出则打印这些短路径。只有两个构建都成功后，链接才会更新。它们指向构建缓存；重新构建可能改变内容，清理缓存会使链接失效，且不会保留上次成功构建的内容。后端链接指向最近一次成功构建。不同项目如使用相同主题名，不能共用同一个前端链接；切换项目时须明确删除旧链接。主题名 `backend` 保留给后端输出链接。
-
-运行报告使用 schema 版本 1，包括命令、运行状态和耗时、生成资源路径，以及按顺序列出的命令步骤、参数、工作目录、退出码、耗时和日志路径。`events.jsonl` 记录运行及步骤的开始和完成事件。子命令输出保存在各步骤日志中，以便 JSON stdout 始终可解析。
+- **运行报告**：每次 CLI 运行都会在 `build/tool/runs/<run-id>/` 下生成 `report.json`（Schema v1）、`events.jsonl` 及各步骤的 `stdout`/`stderr` 日志。可通过 `--format json` 输出到标准输出，或用 `--report PATH` 写入指定文件。
+- **执行演练（Dry Run）**：`--dry-run` 以 JSON 格式打印计划的步骤图与产物路径，不执行实际构建或创建运行目录。
+- **构建产物符号链接**：Linux 构建成功后，会在 `build/out/<theme-name>` 和 `build/out/backend` 创建指向构建缓存的相对符号链接。
 
 ## 主题性能命令
 
-`verify-perf` 和 `trace-perf` 通过 `--theme PATH` 选择一个主题，默认使用 `themes/default`。它们会解析依赖并生成场景，然后执行该主题声明的性能命令。CLI 不提供交互脚本、指标 schema、基线或通过阈值。详情见[主题性能约定](theme-package.md#performance-protocol)。
-
-`--` 之后的参数会原样传给主题命令。默认主题可用下面的命令请求五个测量周期：
-
 ```sh
 fvm dart run tool/akari.dart verify-perf --theme themes/default -- --cycles 5
+fvm dart run tool/akari.dart trace-perf --theme themes/default
 ```
 
-默认主题在 `themes/default/perf/` 下自行管理 Linux profile 集成测试样本、测量和 trace 工具及基线。其检查器默认使用三个周期、至少要求三个周期，并接受 `--` 后的 `--baseline PATH`。fallback 主题当前没有声明性能命令。
-
-每个性能命令都会收到绝对路径 `AKARI_PERF_OUTPUT_DIR`，指向 `build/tool/runs/<run-id>/perf/`。成功命令必须生成 `result.json`；运行报告会在不解析资源内容的情况下，将校验后的资源路径记录在 `theme_artifacts` 中。失败命令也可以生成诊断资源。非零退出码会保留，缺失的失败 manifest 不会掩盖命令失败。协议错误会令运行失败，但日志和报告仍会保留。JSON 控制台输出仍只有一份 CLI 报告。
+`verify-perf`（`perf`）与 `trace-perf`（`trace`）会执行所选主题在 `pubspec.yaml` 的 `perf:` 块中声明的命令，并校验 `AKARI_PERF_OUTPUT_DIR`（`build/tool/runs/<run-id>/perf/`）下的 `result.json`。详见[主题性能约定](theme-package.md#performance-protocol)。
 
 ## 构建缓存和并行执行
 
-宿主项目会在多次运行间保留 Flutter 和原生构建缓存。共享应用源代码会链接到宿主；Linux 原生运行器文件只有发生更改时才同步。CLI 进程内部执行宿主同步和构建链接发布，避免额外启动 Dart VM。计划/报告仍会列出等价的独立命令，并标记 `in_process: true`；失败时仍会记录步骤日志并停止依赖该步骤的后续流程。
-
-宿主依赖解析完成后，构建和会话会向 Flutter 传入 `--no-pub`，避免重复检查。重载控制器只加载查找 SDK 和管理会话所需的代码，以减少启动时间。
-
-生产构建也会编译 Rust 后端。后端编译与主题准备并行运行。`build --jobs COUNT` 会通过 CMake Ninja pool 限制 Cargo 任务数和原生 C++ 编译/链接任务数。未指定时，各工具使用自身的多核默认值；它不会设置 Dart 编译器线程数。
-
-Rust 模拟版和生产版构建使用独立且稳定的目标目录：`backend/target/akari-mock/` 和 `backend/target/akari-real/`。相同主题的命令通过进程锁串行执行；不同主题可以并行构建。
+- **宿主缓存复用**：`build/tool/hosts/` 下的生成宿主会保留 Flutter 与 CMake 缓存，并在解析依赖后传入 `--no-pub` 加速后续运行。
+- **并行任务数（`--jobs COUNT`）**：在并行编译 Rust 后端与 Flutter 前端时，通过 CMake Ninja pool 限制 Cargo 与原生 C++ 编译/链接并发数。
+- **构建目录隔离**：模拟后端与正式后端分别使用 `backend/target/akari-mock/` 和 `backend/target/akari-real/`，同一主题通过进程锁串行执行，不同主题可并行构建。

@@ -1,14 +1,13 @@
 ---
 title: D-Bus contract
+description: IPC interface, authentication state machine, and security boundaries for io.akari.Greeter1.
 ---
 
-This specification defines the inter-process communication (IPC) boundaries, state machine invariants, security policies, and technical implementations for the **Akari Greeter** backend-frontend abstraction layer.
+This specification defines the inter-process communication (IPC) contract, transaction invariants, state machine, and security boundaries between the Flutter UI client and the Rust backend daemon.
 
----
+## 1. Architecture & communication flow
 
-## 1. System Architecture & Component Separation
-
-The architecture decouples the user interface (Flutter client) from underlying system daemons (`greetd` and `systemd-logind`) using a dedicated, unprivileged backend bridge.
+The backend bridge decouples the unprivileged Flutter UI from `greetd` and `systemd-logind`:
 
 ```text
 ┌───────────────────────────────────────────────────────────┐
@@ -26,8 +25,8 @@ The architecture decouples the user interface (Flutter client) from underlying s
 └──────────────┬─────────────────────────────┬──────────────┘
                │                             │
                │ Unix Domain Socket          │ System D-Bus
-               │ 32-bit native-endian      │ (org.freedesktop.login1)
-               │ length + UTF-8 JSON       │
+               │ 32-bit native-endian        │ (org.freedesktop.login1)
+               │ length + UTF-8 JSON         │
                ▼                             ▼
 ┌─────────────────────────────┐   ┌─────────────────────────┐
 │           greetd            │   │     systemd-logind      │
@@ -35,9 +34,7 @@ The architecture decouples the user interface (Flutter client) from underlying s
 └─────────────────────────────┘   └─────────────────────────┘
 ```
 
-### Communication Flow
-
-The component diagram above shows ownership boundaries. The following sequence diagram details the runtime communication path. Session desktop files are read locally by the backend daemon; they do not constitute a separate IPC endpoint.
+### Runtime sequence
 
 ```mermaid
 sequenceDiagram
@@ -82,155 +79,60 @@ sequenceDiagram
     end
 ```
 
-For `info` and `error` authentication messages, the backend emits the prompt for display and may submit an empty response automatically. For `visible` and `secret` messages, it must wait for the UI response. The loop must not assume that there is only one password prompt.
+### Factor-agnostic PAM handling
 
-The authentication contract is factor-agnostic. A PAM stack may use a
-password, fingerprint, face provider, smart card, or more than one factor.
-Akari does not identify a user from a face or fingerprint; the UI starts an
-attempt for the explicitly selected username and the system authentication
-stack decides which factors are required.
+- **Multi-step & multi-factor**: A single authentication attempt may emit multiple `visible`, `secret`, `info`, or `error` prompts (passwords, biometrics, OTP, or smart cards).
+- **Automatic vs. interactive prompts**: For `info` and `error` messages, the backend emits `Prompt` for display and automatically replies to `greetd` with an empty response. For `visible` and `secret` messages, it waits for `Respond()`.
+- **Single-actor concurrency**: One actor serializes all state-changing authentication commands (`BeginAuthentication`, `Respond`, `Cancel`, `StartSession`), while `GetState()` reads a lock-free `watch` snapshot.
 
-The current `Prompt` signal describes greetd/PAM conversation messages only:
-`visible`, `secret`, `info`, and `error`. The UI must not infer a biometric
-provider from arbitrary prompt text. If a future backend can obtain
-authoritative provider progress, it should expose a separate typed
-display-safe interaction event rather than changing the meaning of these
-prompt kinds. Raw camera frames, fingerprint data, biometric templates, and
-provider secrets must remain outside the D-Bus contract.
+## 2. Interface specification: `io.akari.Greeter1`
 
-### Key Architectural Benefits
-* **Framework Isolation**: The Flutter frontend remains strictly agnostic of Unix domain sockets, PAM message formats, binary frame packing, and `systemd` DBus interfaces.
-* **Testability**: A separate mock backend build (`cargo run --features mock`) can be used on a private D-Bus session (`dbus-run-session`), allowing complete UI development and automated integration testing without running a real `greetd` daemon or requiring elevated privileges. The production build does not contain the mock transport and never selects it from a runtime environment variable.
-* **Least Privilege Enforcement**: The UI runs as an unprivileged client with zero direct access to root or system-level control interfaces.
+- **Bus Name**: `io.akari.Greeter`
+- **Object Path**: `/io/akari/Greeter`
+- **Interface**: `io.akari.Greeter1`
 
-### Concurrency Model
+### Methods
 
-Authentication is owned by one actor. D-Bus state-changing methods enqueue commands and await a per-call reply; the actor exclusively owns `AuthStateMachine`, the active `GreetdTransport`, cancellation handles, caller ownership. `GetState()` reads a `watch` snapshot and does not contend with greetd I/O.
+| Method | Signature | Description |
+| --- | --- | --- |
+| `GetState()` | `() -> (s state, s detail)` | Returns the current `AuthState` phase and display-safe status/error text. |
+| `ListUsers()` | `() -> a(sss)` | Returns interactive system accounts as `(username, display_name, icon_path)`. |
+| `ListSessions()` | `() -> a(ssas)` | Parses `/usr/share/wayland-sessions` and `/usr/share/xsessions` into `(session_id, name, desktop_names)`. |
+| `BeginAuthentication(username)` | `(s) -> s attempt_id` | Starts a PAM transaction for `username` and returns a unique `attempt_id` before waiting for PAM I/O. |
+| `Respond(attempt_id, response)` | `(ss) -> ()` | Submits user input for an active `WaitingForInput` prompt; zeroes out plaintext memory after socket write. |
+| `Cancel(attempt_id)` | `(s) -> ()` | Sends `cancel_session` to `greetd` and resets the state machine to `Idle`. |
+| `StartSession(attempt_id, session_id)` | `(ss) -> ()` | Resolves `session_id` against the validated catalog and sends `start_session(cmd, env)` to `greetd`. |
+| `PowerAction(action)` | `(s) -> ()` | Executes `PowerOff`, `Reboot`, `Suspend`, or `Hibernate` via `systemd-logind` independently of auth state. |
 
-The actor processes one authentication command at a time, so a greetd request and its state transition cannot overlap with `Respond()`, `Cancel()`, or a replacement `BeginAuthentication()`. Session catalog scans remain outside the actor on blocking worker tasks; their completion is committed only if the attempt ID is still current. This is the stale-result boundary for catalog work and removes the need for backend, operation, transport, and request-gate locks.
+:::note[`BeginAuthentication` signal ordering]
+`BeginAuthentication` returns `attempt_id` immediately upon accepting the command. Clients must subscribe to `Prompt` and `StateChanged` **before** calling `BeginAuthentication` and buffer any signals that arrive before the method reply.
+:::
 
-The process owns and observes the actor task. SIGINT, SIGTERM, or loss of the greeter D-Bus connection closes the service, interrupts pending greetd I/O, and waits for bounded authentication cleanup. Actor failure closes the service and exits with an error; state queries reject a stopped actor instead of returning a retained snapshot. Actor and disconnect watchers hold weak command senders, so releasing all external handles also triggers cleanup.
+### Session catalog model
 
-A successful `StartSession` response uses zbus response-dispatch notification before requesting process shutdown. `HandingOff` signals may precede the method reply. The backend does not use connection activity or a fixed delay as evidence of reply completion.
+Each `ListSessions()` entry maps to a validated `.desktop` file:
 
----
+| Internal field | Exposed to UI? | Meaning |
+| --- | --- | --- |
+| `session_id` | Yes | Stable identifier (e.g., `"wayland:sway"`), distinct from `desktop_names` |
+| `name` | Yes | User-facing `Name=` from the `.desktop` entry |
+| `desktop_names` | Yes | `DesktopNames=` split on `;` in declared order (e.g., `["sway", "wlroots"]`) |
+| `session_type` | No | `"wayland"` or `"x11"` |
+| `exec` | No | Sanitized `Exec=` argument vector owned strictly by the backend |
+| `available` | No | Whether `TryExec` and executable checks pass |
 
-## 2. Interface Specification: `io.akari.Greeter1`
+:::caution
+The UI only passes `session_id` to `StartSession()`. It can never supply raw `Exec` strings or arbitrary environment maps.
+:::
 
-### Service Coordinates
-* **Bus Name**: `io.akari.Greeter`
-* **Object Path**: `/io/akari/Greeter`
-* **Interface**: `io.akari.Greeter1`
+### Signals
 
----
+| Signal | Signature | Description |
+| --- | --- | --- |
+| `Prompt` | `(s attempt_id, s prompt_kind, s text)` | Emitted when PAM sends a prompt (`prompt_kind`: `visible`, `secret`, `info`, or `error`). |
+| `StateChanged` | `(s attempt_id, s state, s detail)` | Emitted on `AuthState` transitions with display-safe `detail`. |
 
-### Methods Specification
-
-#### Query Operations
-
-##### `GetState() -> (String state, String detail)`
-* **Description**: Returns the current state of the backend authentication engine.
-* **Returns**:
-  * `state`: The current authentication phase (e.g., `Idle`, `CreatingSession`, `WaitingForInput`, `Authenticated`).
-  * `detail`: Additional status metadata or display-safe error text.
-* **Wire Signature**: `ss`
-
-##### `ListUsers() -> Array<Struct<String, String, String>>`
-* **Description**: Enumerates system users available for interactive login.
-* **Returns**: Array of user records containing `username`, `display_name`, and `icon_path`.
-* **Wire Signature**: `a(sss)`
-
-##### `ListSessions() -> Array<Struct<String, String, Array<String>>>`
-* **Description**: Parses and returns available Wayland and X11 sessions from `/usr/share/wayland-sessions` and `/usr/share/xsessions`.
-* **Returns**: Array of session records containing `session_id`, `name`, and `desktop_names` (e.g., `["sway", "wlroots"]`, `["Hyprland"]`).
-* **Wire Signature**: `a(ssas)`
-
----
-
-### Session Discovery and `DesktopNames` Data Model
-
-Each session record represents one desktop entry file, not a running compositor. The backend retains and validates the following internal fields:
-
-```text
-session_id     Stable identifier, e.g., "wayland:sway"
-session_type   "wayland" or "x11"
-name           User-facing Name= value from .desktop entry
-exec           Parsed Exec= argv array, backend-owned and sanitized
-desktop_names  DesktopNames= split on ';', preserving specified order
-available      Boolean indicating whether TryExec and binary checks pass
-source         Absolute desktop entry file path
-```
-
-`DesktopNames` is a semicolon-separated list of desktop environment identifiers from the desktop entry (e.g., `DesktopNames=sway;wlroots`). This describes a single Sway session with two fallback environment identifiers. It does not request multiple compositors.
-
-`session_id` must remain distinct from `desktop_names`: two separate desktop entries may refer to the same compositor while supplying different wrapper scripts or environment variables. The UI receives `session_id`, `name`, and `desktop_names`, while the backend maintains sole ownership over the parsed `Exec` vector and constructs the final `cmd` and `env` parameters for `greetd`.
-
-The backend may normalize or override desktop metadata to handle compatibility issues. Display-only overrides remain in the UI layer. Changes affecting the launched environment must be represented as a validated backend profile, rather than an arbitrary command or environment map supplied by the UI.
-
-This discovery step identifies available session candidates; it does not guarantee that the selected compositor will execute successfully. `greetd` accepts the `start_session` request and spawns the command after the greeter process exits.
-
----
-
-#### Authentication Lifecycle Operations
-
-##### `BeginAuthentication(String username) -> String attempt_id`
-* **Description**: Initiates a PAM authentication transaction for the specified `username`.
-* **Behavior**:
-  * Replaces an active attempt only when the same D-Bus unique sender owns it. Other callers receive `AccessDenied`.
-  * Connects to the underlying `greetd` socket and transmits `create_session`.
-  * Generates and returns a unique `attempt_id` before waiting for greetd/PAM I/O, so the UI can display passive authentication progress and cancel a scan.
-  * The reply acknowledges acceptance, not authentication success. Subsequent connection and authentication failures arrive as `StateChanged(Failed)` for that attempt. Clients must subscribe before calling and buffer signals that precede the reply.
-
-##### `Respond(String attempt_id, String response) -> Void`
-* **Description**: Submits credential input (e.g., password or OTP token) for an ongoing PAM challenge.
-* **Parameters**:
-  * `attempt_id`: The transaction token returned by `BeginAuthentication`.
-  * `response`: The plaintext response string (must be zeroed out in memory immediately after processing).
-
-##### `Cancel(String attempt_id) -> Void`
-* **Description**: Explicitly aborts an active authentication transaction.
-* **Behavior**: Transmits `cancel_session` to `greetd` and resets the backend state machine to `Idle`.
-
-##### `StartSession(String attempt_id, String session_id) -> Void`
-* **Description**: Requests execution of the selected desktop environment upon successful PAM authentication.
-* **Parameters**:
-  * `attempt_id`: Valid token for a currently `Authenticated` session.
-  * `session_id`: The identifier corresponding to a session entry returned by `ListSessions()`.
-* **Selection Rule**: The backend resolves `session_id` against its internally verified session catalog. The UI is strictly prohibited from supplying arbitrary `Exec` strings.
-
----
-
-#### Power Management Operations
-
-##### `PowerAction(String action) -> Void`
-* **Description**: Requests system power state transitions (`PowerOff`, `Reboot`, `Suspend`, `Hibernate`).
-* **Behavior**: Production proxies the request to `systemd-logind` via the System D-Bus (`org.freedesktop.login1`), independently of authentication state and pending greetd I/O. Power requests do not cancel or block authentication. Builds with `mock-power` log the action and return success without connecting to the system bus; `mock` includes `mock-power`.
-
----
-
-### Signals Specification
-
-##### `Prompt(String attempt_id, String prompt_kind, String text)`
-* **Description**: Emitted asynchronously when PAM requests user input.
-* **Parameters**:
-  * `attempt_id`: The associated authentication transaction token.
-  * `prompt_kind`: Enum string indicating input type (`visible` for plain text, `secret` for passwords, `info` for informational notices, `error` for PAM errors).
-  * `text`: The prompt string provided by PAM (e.g., `"Password: "`).
-
-After a retryable `auth_error` in a greetd conversation with submitted user input, the backend emits a display-only `error` prompt and then a new `visible` or `secret` prompt for the same `attempt_id`; the UI answers the new prompt instead of starting a new attempt.
-
-##### `StateChanged(String attempt_id, String state, String detail)`
-* **Description**: Emitted when the authentication engine transitions between internal states.
-* **Parameters**:
-  * `attempt_id`: The associated authentication transaction token.
-  * `state`: New authentication state string.
-  * `detail`: Display-safe explanatory text or failure reason. Must never contain passwords or confidential payload data.
-
----
-
-## 3. The `attempt_id` Transaction Design
-
-To eliminate race conditions, stale UI responses, and replay attempts, all state-modifying authentication operations require a unique `attempt_id`.
+## 3. Transaction invariants (`attempt_id`)
 
 ```mermaid
 sequenceDiagram
@@ -251,72 +153,17 @@ sequenceDiagram
     B-->>UI: D-Bus Error (StaleAttemptId)
 ```
 
-### Protocol Invariants
-1. **Single Active Transaction**: The backend permits **exactly one** active `attempt_id` at a time. Executing `BeginAuthentication` while another attempt is active cancels it only for its original D-Bus unique sender; other callers receive `AccessDenied`.
-2. **Caller Ownership**: `Respond()`, `Cancel()`, and `StartSession()` require the original D-Bus unique sender. Attempt IDs identify transactions and are not authorization credentials. Disconnecting the owner cancels and releases its attempt.
-3. **Stale Token Rejection**: Any `Respond()`, `Cancel()`, or `StartSession()` invocation carrying a mismatched or expired `attempt_id` is rejected immediately without forwarding commands to `greetd`.
+1. **Single active transaction**: At most one `attempt_id` is active at any time. Calling `BeginAuthentication` from the owning D-Bus sender cancels the previous attempt and starts a new one.
+2. **Caller ownership**: `Respond`, `Cancel`, and `StartSession` require the same D-Bus unique sender that called `BeginAuthentication`. Other callers receive `AccessDenied`. Client disconnect automatically cancels the active attempt.
+3. **Stale token rejection**: Any call carrying an expired or unknown `attempt_id` fails immediately without touching `greetd`.
 
----
+## 4. Security boundaries
 
-## 4. Security Policies & Boundaries
+- **Zero-trace secrets**: Passwords and PAM responses travel only over the unicast `Respond()` call, are never written to logs or D-Bus signals, and are zeroed out in memory after transmission.
+- **Bus & privilege isolation**: UI-to-backend IPC uses a private session bus; `PowerAction` uses the system bus (`org.freedesktop.login1`) governed by Polkit. Both UI and backend run under the unprivileged greeter account.
+- **Biometric boundary**: Biometric modules (such as Gaze) run inside PAM. The UI never accesses cameras, fingerprint readers, or biometric templates.
 
-### 1. Zero-Trace Secret Handling
-* **No Logging**: Passwords, response tokens, and raw PAM secret prompts must never be written to stdout, stderr, persistent logs, or ephemeral debug logs (`/tmp/akari-flutter.log`, `/tmp/sway-debug.log`).
-* **No Signal Exposure**: Confidential user input must only traverse the unicast D-Bus method call `Respond()`. Secrets must never be emitted over D-Bus Signals.
-* **Memory Wiping**: Secret buffers must be explicitly zeroed out in memory immediately after socket transmission (e.g., using `explicit_bzero` or `sodium_memzero`). Memory pages holding credentials should be marked with `MADV_DONTDUMP` to prevent leaks in crash dumps.
-
-### 2. D-Bus Bus Segregation & Privilege Model
-* **Session/Private Bus**: Used exclusively for UI-to-Backend IPC.
-* **System Bus Isolation**: System actions (`PowerAction`) are routed across the System D-Bus to `systemd-logind`.
-* **Polkit Authorization**: Power actions rely on Polkit policies residing in `/usr/share/polkit-1/actions/` to grant or restrict shutdown/reboot capabilities to the `greeter` user without requiring `sudo` or `setuid` binaries.
-* **Unprivileged Backend Execution**: The backend daemon executes strictly under the unprivileged `greeter` system user account (belonging to groups `greeter`, `video`, `render`).
-
-### 3. Biometric Integration Boundary
-
-Biometric authentication is integrated through the system authentication stack,
-normally PAM modules used by `greetd`. The Flutter client does not open the
-camera, access the fingerprint device, store biometric templates, or decide
-which account a biometric belongs to.
-
-The UI may render only display-safe states supplied by the backend, such as:
-
-```text
-WaitingForFactor
-ProcessingFactor
-FactorAccepted
-FactorRejected
-FactorUnavailable
-FallbackRequired
-```
-
-These states are presentation information, not replacements for the primary
-`AuthState`. Password fallback, cancellation, timeout, stale-attempt rejection,
-and client disconnect continue to use the same `attempt_id` and backend state
-machine. A provider that cannot report progress remains valid; the UI shows a
-generic authentication-waiting state.
-
----
-
-## 5. State Machine and Transitions
-
-The backend daemon manages multiple orthogonal state domains. The primary public phase exposed via `GetState()` and `StateChanged()` represents the **`AuthState`**.
-
-```text
-ServiceState:  Starting ──► Ready ──► Unavailable ──► Reconnecting ──► Ready
-                              │
-                              └──► Stopping
-
-CatalogState:  Empty ──► Loading ──► Ready
-                           │
-                           ├──► Refreshing ──► Ready
-                           └──► Failure ──► Degraded / Empty
-
-PowerState:    Idle ──► Authorizing ──► Executing ──► Succeeded / Failed
-```
-
-### 5.1 Primary `AuthState` Lifecycle Diagram
-
-The state machine for a single `attempt_id` is defined below:
+## 5. State machine & transitions
 
 ```mermaid
 stateDiagram-v2
@@ -359,66 +206,33 @@ stateDiagram-v2
     Failed --> Idle : Reset State (Retain Display-Safe Error)
 ```
 
-`PromptPending` messages of type `info` or `error` trigger a `Prompt` signal and automatically submit an empty response back to `greetd`. Messages of type `visible` and `secret` transition to `WaitingForInput`. The protocol loop may cycle through `PromptPending` multiple times during multi-factor or multi-step PAM challenges before reaching a terminal state.
+### Retryable vs. terminal authentication errors
 
-An `auth_error` is retryable only when user input was submitted in the current greetd conversation. Automatic acknowledgments of `info` or `error` messages do not count as user input. An `auth_error` without user input is terminal, preventing automatic retries from consuming login attempts. The backend sends `cancel_session` and waits for success after a greetd authentication error, before dropping the socket; closing the socket alone does not release greetd's configured session. A retryable `auth_error` is not terminal. The backend keeps the same `attempt_id`, emits a display-only `error` prompt with the failure, cancels the rejected greetd session, reconnects to `greetd`, and sends a fresh `create_session` so the user can answer the prompt again. The attempt only reaches `Failed` on a non-retryable `error` or on a transport, protocol, or session failure.
+- **Retryable `auth_error` (after user input)**: When `greetd` returns `auth_error` after the user submitted a response, the backend keeps the same `attempt_id`, emits a display-only `error` prompt, cancels and recreates the underlying `greetd` session, and emits a fresh prompt so the user can retry seamlessly.
+- **Terminal `auth_error` (before user input) or `error`**: If `auth_error` occurs without user input (or on a fatal `error` / socket failure), the backend cancels the `greetd` session, transitions to `Failed`, and returns to `Idle` to prevent infinite automatic retry loops.
 
----
+### Transition table
 
-### 5.2 Authentication Transition Rules
+| Current state | Event / guard | Next state | Backend action |
+| --- | --- | --- | --- |
+| `Idle` | `BeginAuthentication(user)` | `CreatingSession` | Generate `attempt_id`, connect to `GREETD_SOCK`, send `create_session`. |
+| `CreatingSession` | `auth_message` | `PromptPending` | Emit `Prompt` signal. |
+| `CreatingSession` | `success` | `Authenticated` | Keep `greetd` session open; await `StartSession()`. |
+| `CreatingSession` | `auth_error` or `error` | `Failed` | Cancel/close socket, invalidate token, record display-safe error. |
+| `PromptPending` | `visible` or `secret` | `WaitingForInput` | Wait for `Respond(attempt_id, response)`. |
+| `PromptPending` | `info` or `error` | `SubmittingResponse` | Emit `Prompt`; auto-send empty response to `greetd`. |
+| `WaitingForInput` | `Respond(attempt_id, resp)` | `SubmittingResponse` | Send `post_auth_message_response`; zero out secret buffer. |
+| `SubmittingResponse` | `auth_message` | `PromptPending` | Continue multi-step PAM loop. |
+| `SubmittingResponse` | `success` | `Authenticated` | Await `StartSession()`. |
+| `SubmittingResponse` | `auth_error` after user input | `CreatingSession` | Emit `error` prompt, restart `greetd` session under the same `attempt_id`. |
+| `SubmittingResponse` | `error` | `Failed` | Close socket and invalidate token. |
+| `Authenticated` | `StartSession(attempt_id, id)` | `ResolvingSession` | Validate `session_id` against catalog. |
+| `ResolvingSession` | Invalid `session_id` | `Authenticated` | Return D-Bus error; allow choosing another session. |
+| `ResolvingSession` | Valid `session_id` | `StartingSession` | Send sanitized `start_session(cmd, env)` to `greetd`. |
+| `StartingSession` | `success` | `HandingOff` | Emit `StateChanged("HandingOff")`, dispatch reply, and exit greeter. |
+| *Any Active State* | `Cancel()`, timeout, or disconnect | `Cancelling` -> `Idle` | Send `cancel_session`, clear buffers, and invalidate token. |
 
-| Current State | Event or Guard Condition | Next State | Required Backend Action |
-| :--- | :--- | :--- | :--- |
-| `Idle` | Valid `BeginAuthentication(user)` | `CreatingSession` | Invalidate previous token, generate new `attempt_id`, open socket to `GREETD_SOCK`, send `create_session`. |
-| `CreatingSession` | Receives `auth_message` | `PromptPending` | Parse prompt type and text; emit `Prompt` signal. |
-| `CreatingSession` | Receives `success` | `Authenticated` | Maintain active `greetd` socket connection; await desktop selection. |
-| `CreatingSession` | Receives `auth_error` or `error` | `Failed` | Record display-safe error description; close socket; invalidate transaction token. |
-| `PromptPending` | `prompt_kind` is `visible` or `secret` | `WaitingForInput` | Await exactly one valid `Respond()` invocation for the matching `attempt_id`. |
-| `PromptPending` | `prompt_kind` is `info` or `error` | `SubmittingResponse` | Emit prompt text to UI; automatically send empty `post_auth_message_response` to `greetd`. |
-| `WaitingForInput` | Valid `Respond(attempt_id, resp)` | `SubmittingResponse` | Transmit `post_auth_message_response` over socket; zero out plaintext buffer immediately. |
-| `WaitingForInput` | Stale token or invalid phase | *Unchanged* | Return a D-Bus error to caller; do not send data over `greetd` socket. |
-| `SubmittingResponse`| Receives `auth_message` | `PromptPending` | Continue authentication loop for subsequent PAM challenges. |
-| `SubmittingResponse`| Receives `success` | `Authenticated` | Transition to authenticated state; await `StartSession()`. |
-| `SubmittingResponse`| Receives `auth_error` after user input | `CreatingSession` | Emit a display-only `error` prompt; cancel the rejected greetd session, then reconnect to `GREETD_SOCK` and send `create_session` for the same `attempt_id`; keep the attempt alive so the user can retry. |
-| `SubmittingResponse`| Receives `error` | `Failed` | Record display-safe error description; close socket; invalidate transaction token. |
-| `Authenticated` | Valid `StartSession(attempt_id, id)`| `ResolvingSession` | Resolve `session_id` against backend-owned session catalog. |
-| `ResolvingSession` | Invalid or unavailable `session_id`| `Authenticated` | Reject call with D-Bus error; preserve `Authenticated` state to allow re-selection. |
-| `ResolvingSession` | Valid `session_id` | `StartingSession` | Build sanitized `cmd` and `env` arrays from verified `.desktop` file. |
-| `StartingSession` | Receives `success` | `HandingOff` | Emit `StateChanged("HandingOff")`; close D-Bus connection; terminate greeter process. |
-| `StartingSession` | Receives `error` | `Failed` | Report `session_start_failed`; clean up socket state. |
-| *Any Active State* | `Cancel()`, timeout, or UI disconnect | `Cancelling` | Transmit `cancel_session` to `greetd` if socket is open; invalidate token immediately. |
-| `Cancelling` | Response received or socket closed | `Idle` | Clear prompt buffers, socket references, credentials, and transaction tokens. |
-| *Any Active State* | Socket EOF, malformed JSON, or timeout | `Failed` | Close socket; discard transaction token; preserve structured, non-secret error. |
+## 6. Mock backend & diagnostics
 
-`Failed` is a terminal state for the active authentication transaction, not for the backend process. Upon completing cleanup, the backend returns to `Idle` holding a structured, display-safe `last_error` readable by the UI.
-
----
-
-### 5.3 Transaction and Client Invariants
-
-1. **Strict Atomicity**: At most one active authentication attempt exists at any time.
-2. **Preemptive Cancellation**: Invoking `BeginAuthentication` automatically revokes and cancels any in-flight `attempt_id` before processing the new request.
-3. **Signal Isolation**: Asynchronous signals carry generation tokens; signals matching expired tokens are discarded by the UI.
-4. **Client Disconnect Handling**: Loss of the D-Bus client connection immediately triggers cancellation of the active transaction. A PAM prompt must never remain attached to a dead UI process.
-5. **Failure Classification**: PAM `auth_error` responses following submitted user input represent retryable credential failures. An `auth_error` before user input terminates the attempt without automatic retry. The backend restarts the `greetd` session under the same `attempt_id` and surfaces the rejection as an `error` prompt, so the UI can retry without a new attempt. Non-retryable `error` responses, and protocol, socket, or session execution failures, require complete state cleanup before a new attempt can begin.
-6. **Power Action Isolation**: `PowerAction` maintains an independent state domain. Authentication state never gates a power request, and power requests never mutate or reserve authentication state. System authorization and execution failures are returned to the caller.
-
----
-
-## 6. Development Workflow & Client Implementation
-
-### Mock Backend Strategy
-For local UI development, build and run the backend with `cargo run --manifest-path backend/Cargo.toml --features mock`. The D-Bus integration wrapper `scripts/debug-dbus.sh` establishes a private session bus (`dbus-run-session`) and exports `AKARI_BUS_MODE=private`. `AKARI_BACKEND` is a Flutter UI setting only; it does not select the backend transport.
-
-The mock backend implements the complete `io.akari.Greeter1` interface specification without making system PAM calls or opening a `greetd` socket:
-
-1. `ListUsers()` serves stubbed mock user data.
-2. `ListSessions()` returns deterministic test session entries (Wayland and X11).
-3. `BeginAuthentication()` instantiates a mock transaction and emits realistic `Prompt` signals.
-4. `Respond()` validates against test credentials (e.g., matching `"password"`) and reproduces accurate success/failure transitions.
-
-The helper scripts establish the execution environment and spawn the Flutter client. Full integration testing executes both the mock backend daemon and the Flutter UI client within the same isolated `dbus-run-session` instance.
-
-### Backend diagnostics
-
-The default backend log level is `info`. Authentication events carry `attempt_id`, operation, caller, and state so begin, prompt progression, credential rejection and retry, cancellation, authentication success, and session launch can be followed together. Transport failures retain their underlying error in backend diagnostics; catalog failures include their source path. D-Bus display text remains bounded and sanitized. Response values and PAM prompt bodies are never logged. Failed prompt delivery is a warning while the attempt and bus remain live, and debug during cancellation or disconnect. Startup failures have an explicit `startup_failed` event.
+- **Mock backend**: Built with `cargo run --manifest-path backend/Cargo.toml --features mock` (used automatically by `akari run`). Implements `io.akari.Greeter1` on a private bus (`dbus-run-session`) without PAM or `greetd`, accepting `"password"` for authentication.
+- **Structured logging**: Default log level is `info`. Logs correlate `attempt_id`, operation, caller, and state while redacting all PAM prompt bodies and credential responses.

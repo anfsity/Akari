@@ -5,79 +5,45 @@ description: Command targets, accepted options, display profiles, and execution 
 
 ## Commands and targets
 
-From the repository root, use `fvm dart run tool/akari.dart COMMAND`. After
-[installing the launcher](#shell-launcher-and-completion), use `akari COMMAND`.
+Run commands from the repository root with `fvm dart run tool/akari.dart COMMAND`, or install the [shell launcher](#shell-launcher-and-completion) and use `akari COMMAND`.
 
 | Command | Purpose | Command-specific options |
 | --- | --- | --- |
-| `build` | Build a selected theme, production backend and native splash | `--theme`, `--jobs`, `--mode`, `--platform` |
-| `preview` | Automatically demonstrate login journeys in one window, then exit | `--theme`, `--jobs`, `--scenario` |
-| `run` | Run the greeter with a private D-Bus and backend | `--theme`, `--jobs`, `--mode`, `--backend` |
-| `run sway` | Run that greeter inside nested or headless Sway | Run options plus `--display-profile`, `--resolution`, `--scale`, `--sway-backend` |
+| `build` | Build a selected theme, production backend, and native splash | `--theme` (`-t`), `--jobs` (`-j`), `--mode` (`-m`), `--platform` |
+| `preview` | Run automated login UI journeys in one window and exit | `--theme`, `--jobs`, `--scenario` |
+| `run` | Start the greeter with a private D-Bus and backend | `--theme`, `--jobs`, `--mode`, `--backend` |
+| `run sway` | Run the greeter inside nested or headless Sway | `run` options + `--display-profile`, `--resolution`, `--scale`, `--sway-backend` |
 | `run splash` | Preview the native loading animation until closed | `--jobs`, `--mode`, `--light` |
-| `run studio` | Edit scenes with the selected compiled theme | `--theme`, `--jobs` |
-| `verify` | Check shared code, backend, and theme projects | `--theme` |
-| `generate-scenes` | Generate typed Dart from scene JSON | `--theme` |
-| `verify-perf` / `perf` | Run the theme's declared performance gate | `--theme`, arguments after `--` |
-| `trace-perf` / `trace` | Run the theme's declared performance trace | `--theme`, arguments after `--` |
-| `install` | Build and deploy the production login environment | `--theme`, `--jobs`, `--dry-run` |
-| `install cli` | Install the repository-bound launcher and completion | `--shell`, `--prefix`, `--rc` |
-| `uninstall` | Remove login or test installations, including partial installs | `--scope`, `--dry-run` |
-| `login enable` / `login disable` | Select Akari or restore the previous boot login service | `--dry-run` |
-| `login rollback` | Select the previous installed release | `--dry-run` |
-| `login configure-keyring` | Configure greetd keyring PAM without rebuilding | `--keyring`, `--dry-run` |
-| `login enable-gaze` / `login disable-gaze` | Enable Gaze on stock Arch greetd or restore password authentication | `--dry-run` |
-| `login status` | Inspect deployment and service state | `--format` |
-| `login logs` | Read the service journal or latest greeter logs | `--component`, `--lines`, `--follow` |
-| `toolchain check` / `toolchain setup` | Check or initialize development dependencies | `--dry-run` |
-| `docs build-api` / `docs verify` | Build API docs or check a built site | `--dry-run`; site path after `--` for `verify` |
-| `script list` / `script run` | Discover and invoke repository scripts | `list --format`, `run SCRIPT --dry-run -- arguments` |
-| `completion` | Print a completion script | `--shell` |
-| `greetd-test` | Manage standalone login testing | [Operation-specific options](../guides/greetd-testing.md) |
+| `run studio` | Edit scenes visually with the selected compiled theme | `--theme`, `--jobs` |
+| `verify` | Run analyzer, Rust checks, and tests across packages and themes | `--theme` |
+| `generate-scenes` | Generate typed Dart (`*.scene.g.dart`) from scene JSON | `--theme` |
+| `verify-perf` (`perf`) | Execute the theme's declared performance gate | `--theme`, arguments after `--` |
+| `trace-perf` (`trace`) | Execute the theme's declared performance trace | `--theme`, arguments after `--` |
+| `install` | Build and deploy the production login environment | `--theme`, `--jobs`, `--keyring`, `--dry-run` |
+| `install cli` | Install the repository-bound `akari` launcher and completion | `--shell`, `--prefix`, `--rc` |
+| `uninstall` | Remove production (`login`), `test`, or `all` installations | `--scope`, `--dry-run` |
+| `login enable` / `disable` | Enable Akari for next boot or restore the prior display manager | `--dry-run` |
+| `login rollback` | Switch between `current` and `previous` deployed releases | `--dry-run` |
+| `login configure-keyring` | Configure greetd keyring PAM hooks without rebuilding | `--keyring`, `--dry-run` |
+| `login enable-gaze` / `disable-gaze` | Enable Gaze face auth on stock Arch greetd or restore password stack | `--dry-run` |
+| `login status` | Inspect deployment and systemd service state | `--format` |
+| `login logs` | Read the service journal or latest greeter session logs | `--component`, `--lines` (`-n`), `--follow` (`-f`) |
+| `toolchain check` / `setup` | Verify or initialize development dependencies | `--dry-run` |
+| `docs build-api` / `verify` | Generate Dart API docs or verify a built handbook directory | `--dry-run`, site path after `--` for `verify` |
+| `script list` / `run` | List or invoke repository helper scripts | `list --format`, `run SCRIPT --dry-run -- args` |
+| `completion` | Print a shell completion script | `--shell` |
+| `greetd-test` | Manage standalone TTY login testing | See [Standalone greetd testing](../guides/greetd-testing.md) |
 
-Build, preview, run targets, verification, scene generation, and performance
-commands also accept `--format text|json`, `--report PATH`, and `--dry-run`.
-Every command accepts `--help` (`-h`). Installation, `login`, `completion`, and
-the `greetd-test` family use their own output and option contracts.
+### Shared flags & conventions
 
-`run sway`, `run splash`, and `run studio` are targets of `run`, so use
-`akari run TARGET --help` to see their accepted options. Studio always runs in
-debug mode without a backend; it does not accept `--mode` or `--backend`.
-Its developing user guide remains in the repository's
-[Studio notes](https://github.com/anfsity/Akari/blob/main/docs/internal/theme-studio.md).
-
-Run project checks through the Dart tool entry point:
-
-```sh
-fvm dart run tool/akari.dart build
-fvm dart run tool/akari.dart verify
-fvm dart run tool/akari.dart verify-perf
-fvm dart run tool/akari.dart generate-scenes
-fvm dart run tool/akari.dart trace-perf
-```
-
-Use `-t`, `-m`, and `-j` for `--theme`, `--mode`, and `--jobs`.
-`perf` aliases `verify-perf`, and `trace` aliases `trace-perf`.
-Long options also accept `--name=value`. Mixing short and long spellings of
-the same option is still a duplicate error. `COMMAND --help` lists only options
-accepted by that command. Performance commands, `script run`, and `docs verify` accept arguments after
-`--` and forward them literally.
-
-```sh
-fvm dart run tool/akari.dart build -t themes/default -m release -j 4
-fvm dart run tool/akari.dart perf -t themes/default -- --cycles 5
-```
+- **Report & dry-run flags**: `build`, `preview`, `run*`, `verify`, `generate-scenes`, and `*-perf` accept `--format text|json`, `--report PATH`, and `--dry-run`.
+- **Short options**: `-t` (`--theme`), `-m` (`--mode`), and `-j` (`--jobs`). Do not mix short and long forms of the same flag in one call.
+- **Pass-through arguments**: `perf`, `trace`, `script run`, and `docs verify` forward arguments after `--` verbatim.
+- **Theme Studio notes**: `akari run studio` always runs in debug mode without a backend (`--mode` and `--backend` are not accepted). See the internal [Theme Studio guide](https://github.com/anfsity/Akari/blob/main/docs/internal/theme-studio.md).
 
 ## Production login installation
 
-`install` now deploys the production login environment. The previous launcher
-installation command is `install cli`; `install --shell` is no longer accepted.
-Run installation as your regular user on Linux with systemd, greetd at
-`/usr/bin/greetd`, Sway at `/usr/bin/sway`, Python 3, `swaymsg`, `swaybg`, `dbus-daemon`,
-`busctl`, `setpriv` (util-linux), and AccountsService (`accountsservice`).
-Install greetd's PAM configuration at `/etc/pam.d/greetd` through
-your distribution. Akari retains that authentication policy and adds optional
-keyring integration as described below.
+Deploy Akari as a systemd display manager on Linux hosts with `systemd`, `/usr/bin/greetd`, `/usr/bin/sway`, `python3`, `swaymsg`, `swaybg`, `dbus-daemon`, `busctl`, `setpriv`, and `accountsservice`:
 
 ```sh
 akari install --theme themes/default --jobs 4
@@ -85,249 +51,90 @@ akari login enable
 akari login status
 ```
 
-`install` builds the selected theme, production backend and native splash in Linux
-release mode, then requests sudo to deploy the complete bundle and Rust executables.
-Build failure leaves the installed environment untouched. Relative theme paths
-belong to the invocation directory. SDK selection follows the ordinary build
-command, including `AKARI_FLUTTER_BIN` and `AKARI_DART_BIN`.
+### Deployment layout
 
-`install --keyring auto` (the default) detects GNOME Keyring and KWallet by their
-PAM modules, `pam_gnome_keyring.so` and `pam_kwallet5.so`, including multiarch
-library paths. It configures each installed provider in `/etc/pam.d/greetd`.
-If neither module is present, a terminal prompt offers to install GNOME Keyring,
-KWallet, or skip. Package installation supports Arch, Debian/Ubuntu and Fedora;
-other distributions require manual package installation. The installer checks
-the module again after installing packages before configuring PAM.
+| Path / Resource | Purpose |
+| --- | --- |
+| `akari-greeter` | Dedicated unprivileged system account running the greeter |
+| `/opt/akari/releases/` | Versioned release bundles with `current` and `previous` symlinks |
+| `/etc/akari/greetd.toml` & `sway.conf` | Isolated Akari configuration (leaves `/etc/greetd/config.toml` untouched) |
+| `/etc/akari/display-layout.json` | Monitor order captured from your active Sway/Hyprland desktop on first install |
+| `/var/lib/akari/greeter/` | Persistent account/session preferences |
+| `/var/log/akari/greeter/session-*/` | Per-launch `backend.log`, `flutter.log`, and `sway.log` (readable without `sudo`) |
 
-Use `--keyring gnome` or `--keyring kwallet` to select only that provider. A missing
-selected provider requires approval at the terminal before installing packages.
-Without a terminal, `auto` skips missing providers and an explicit missing provider
-fails. `--keyring none` removes only Akari's managed keyring block. Existing direct
-rules and rules in included PAM policies are retained without duplication.
-Added rules use `optional` for authentication and session startup. GNOME Keyring
-uses `use_authtok` to consume the authentication token and `auto_start` for its
-session hook; KWallet uses `auto_start force_run` for greetd. The first changed
-PAM policy is backed up at
-`/var/lib/akari/greetd.pam.before-keyring`. Deployment failure restores the prior
-PAM content; uninstall removes only Akari's block and preserves other edits.
-Installed keyring packages and the backup are retained.
+### Keyring & PAM configuration
 
-Automatic unlocking requires an authentication token matching the keyring password.
-Biometric login needs a provider that supplies that credential, such as
-[Gaze's optional TPM-backed keyring integration](../guides/greetd-testing.md#facial-authentication).
-See [GNOME's PAM documentation](https://wiki.gnome.org/Projects/GnomeKeyring/Pam).
-KWallet also needs the desktop's `pam_kwallet_init` autostart to complete startup;
-see the [KDE integration sources](https://invent.kde.org/plasma/kwallet-pam).
-To configure PAM without rebuilding, or update an older Akari-managed block to
-include `use_authtok`, run:
+`akari install` configures `/etc/pam.d/greetd` (backing up the original to `/var/lib/akari/greetd.pam.before-keyring`):
+
+- `--keyring auto` (default): Detects installed `pam_gnome_keyring.so` and `pam_kwallet5.so` modules (or prompts to install on Arch, Debian/Ubuntu, and Fedora).
+- `--keyring gnome` / `--keyring kwallet`: Configure only the specified provider (`use_authtok` + `auto_start` for GNOME Keyring; `auto_start force_run` for KWallet).
+- `--keyring none`: Remove Akari's managed keyring PAM block while preserving other edits.
+- Update keyring PAM rules on an existing installation without rebuilding:
+  ```sh
+  akari login configure-keyring --keyring gnome
+  ```
+- Enable or remove Gaze facial authentication on Arch Linux with `akari login enable-gaze` and `akari login disable-gaze` (see [Gaze setup](../guides/greetd-testing.md#connect-greetd-on-arch)).
+
+### Service management, logs, and uninstall
 
 ```sh
-akari login configure-keyring --keyring gnome
-```
-
-This command uses the repository's current controller and requests sudo when
-needed, so it can update an older installation without redeploying it. It shares
-the installation command's provider selection and PAM backup behavior.
-
-Face authentication is enabled separately with `akari login enable-gaze` and
-removed with `akari login disable-gaze`. These commands use the current repository
-controller, request sudo, and preserve account, session and keyring hooks. The
-automatic setup accepts only the stock Arch auth policy and refuses custom
-authentication requirements. See [Gaze setup](../guides/greetd-testing.md#connect-greetd-on-arch)
-for the helper, backup, password fallback and recovery behavior. Deploy the current
-backend first so recognition can outlast the old ten-second transport deadline.
-
-The installation uses a separate `akari-greeter` system account, release directories
-beneath `/opt/akari/releases/`, and a `current` symlink. The service runs greetd
-with `/etc/akari/greetd.toml`; the greeter runs in Sway with
-`/etc/akari/sway.conf`. Existing `/etc/greetd/config.toml` and test resources in
-`/opt/akari-test` are untouched. Greeter preferences live beneath
-`/var/lib/akari/greeter/`.
-
-Installation leaves the boot login service unchanged. `login enable` requires
-`graphical.target` as the existing default target, records the prior display-manager
-symlink and enable state, then enables `akari.service` in its place. It does not
-start, stop, or restart services. Reboot when ready to use Akari. `login disable`
-restores the recorded boot login service, also without interrupting the desktop.
-A failed switch attempts restoration immediately; if restoration fails, the
-snapshot remains available for retrying `login disable`.
-
-The first installation captures the current Sway or Hyprland monitor order when
-available. Subsequent installations preserve `/etc/akari` configuration, including
-`display-layout.json`. Edit `sway.conf` for output modes and scales, and
-`display-layout.json` for the ordered output names and `x` or `y` axis. If no
-layout was captured, Sway arranges outputs automatically.
-
-```sh
+# Read service journal or component logs (backend, flutter, sway)
 akari login logs
 akari login logs --component backend --lines 200
 akari login logs --component flutter --follow
-akari login status --format json
+
+# Switch back to the previous release or prior display manager
 akari login rollback
 akari login disable
+
+# Remove installations (--scope login | test | all)
+akari uninstall --scope all --dry-run
 akari uninstall
 ```
 
-`login logs` defaults to the `akari.service` journal; access follows the host's
-journal permissions. `backend`, `flutter`, and `sway` read the newest session
-under `/var/log/akari/greeter/session-*/`, readable without sudo. `--follow`
-follows that selected session's file. Each greeter launch creates separate logs.
-The backend, frontend and compositor run on a private bus; frontend exit or loss
-of the backend releases Sway so greetd can start the desktop or launch a fresh
-greeter.
-
-Reinstalling retains old releases and switches `current` after deployment succeeds.
-`login rollback` exchanges `current` and `previous`; the next greeter launch uses
-the selected release. A running greeter keeps its original release. Rollback
-does not alter system configuration or preferences. Old releases and session
-logs remain on disk. `uninstall` requires an inactive service, restores any recorded
-boot login service, and removes the deployment and `/etc/akari` configuration;
-it retains the greeter account, preferences, and logs.
-
-`uninstall` defaults to the login installation. `--scope test` removes only the
-standalone test installation without changing production PAM, configuration, or
-boot selection. `--scope all` removes both. Every scope handles partial installs
-and repeat calls without requiring an installed controller or manifest. The old
-`clean` command has been removed.
-
-Login removal restores the recorded boot service, removes `/opt/akari`,
-`/etc/akari`, and the Akari unit, and removes Akari's keyring configuration and
-Gaze route. Test removal deletes `/opt/akari-test`. Accounts, preferences, PAM
-backups, logs outside installation directories, and the CLI launcher remain.
-Services and recovery timers in the selected scope must be inactive or failed.
-Use `login disable` and reboot before removing a running login installation, or
-`greetd-test restore` for an armed test. Failed restoration retains recovery files.
-
-```sh
-akari uninstall --scope all --dry-run
-akari uninstall --scope test
-akari uninstall --scope all
-```
-
-`install`, `uninstall`, `login enable`, `login disable`, `login rollback`,
-`login configure-keyring`, `login enable-gaze`, and `login disable-gaze` accept
-`--dry-run`, which prints a JSON plan without building, requesting sudo, or
-changing files. Status and logs are read-only. The CLI launcher still needs
-this repository and its SDK; the installed login service does not. Recovery
-from a TTY can use the installed controller directly:
-
+:::tip[Emergency TTY recovery]
+`login enable` and `login disable` update boot symlinks without stopping your active desktop. If you need to disable Akari from a TTY without the repository or Dart SDK, run:
 ```sh
 sudo python3 /opt/akari/manage.py disable
 ```
-
-This restores the next boot's login service. Reboot afterward to leave a running
-Akari-managed session and return to the previous manager.
+Then reboot to return to your previous display manager.
+:::
 
 ## Shell launcher and completion
 
-Install a repository-bound `akari` command and shell completion at user level:
+Install the user-level `akari` wrapper (`~/.local/bin/akari`) and completion scripts (`~/.local/share/akari/`):
 
 ```sh
 fvm dart run tool/akari.dart install cli --shell zsh
-# Or, for bash:
+# Or for bash:
 fvm dart run tool/akari.dart install cli --shell bash
 ```
 
-The launcher is written to `~/.local/bin/akari` and completion support to
-`~/.local/share/akari/`. Installation appends one source line to `.zshrc`
-(respecting `ZDOTDIR`) or `.bashrc`; repeating installation does not duplicate it.
-Open a new shell or source the printed environment script to activate it.
-The launcher works from any directory, preserves relative argument paths, and
-uses the repository SDK and its `AKARI_*_BIN` overrides. Its repository must
-remain available at the installed path; reinstall after moving the repository.
-`install cli --prefix PATH --rc PATH` selects installation and startup file locations.
-
-Completion covers commands and aliases, command-specific long and short options,
-enum values, and paths. It stops after `--`, where arguments belong to the theme.
-The parser, help, and generated scripts share `tool/src/cli/definition.dart`.
-Reinstall after changing that definition to refresh installed completion scripts.
-For manual registration, `akari completion --shell zsh` or `--shell bash` prints
-the corresponding script.
-
-Use `akari greetd-test install`, `start`, `restore`, `status` and `logs` for
-standalone login testing. This command family calls the installed test lifecycle
-scripts directly and keeps diagnostics outside repository run reports.
-`greetd-test install --theme PATH` (or `-t PATH`) builds and installs the selected
-theme project, defaulting to the repository's `themes/default`. Only
-installation needs repository build artifacts; status/log queries and service
-control do not acquire theme locks or create development run directories.
-The `akari` launcher still needs the repository and SDK. Emergency recovery
-remains `sudo /opt/akari-test/restore.sh`, independent of both.
-See [Standalone greetd testing](../guides/greetd-testing.md) for options and prerequisites.
+- Use `--prefix PATH` and `--rc PATH` to customize installation locations.
+- Re-run `install cli` if you move the repository or update CLI option definitions in `tool/src/cli/definition.dart`.
+- Print raw completion scripts manually with `akari completion --shell zsh|bash`.
 
 ## Repository scripts
 
-`akari -h` groups development, checks, installation, and tools, with common
-examples. Subcommand help lists only its accepted options.
+Discover and run helper scripts under `scripts/` with the repository root as working directory:
 
 ```sh
 akari script list
 akari script list --format json
 akari script run run-backend.sh -- --help
 akari script run greetd-test/display-layout.py -- capture
-akari docs verify -- docs/site/dist
 ```
-
-The CLI scans the script directory; explicit metadata describes purposes and
-calling conditions. It invokes Bash/Python scripts through their interpreters,
-preserving arguments and exit status, with the repository root as the working
-directory. It does not request sudo or create a greetd environment for raw scripts.
-Internal entrypoints still require their documented installed layout, environment,
-or VT. `lib.sh` is discoverable but is a sourced library, not a standalone command.
-Put a script's own `--help` after `--`. Classify new scripts in the registry;
-coverage tests detect missing entries.
 
 ## Build, preview, and run
 
-`build` accepts a theme project with `--theme PATH`, defaulting to
-`themes/default`. It resolves that project's dependencies, generates its scene
-source, and builds a reusable host project under `build/tool/hosts/`. The host imports
-only the selected theme. Projects can
-live outside the Akari repository. See the
-[theme project contract](theme-package.md).
-
-Use `run --theme PATH` to start a complete greeter on a private D-Bus session.
-It compiles and starts the Rust mock backend by default; `--backend real` selects
-production transport. The frontend always uses D-Bus. `run` directly owns the
-selected theme's Flutter session.
-
-`preview --theme PATH` opens one login window and uses Flutter integration tests
-to demonstrate `face-success` and `password-fallback`, releasing authentication
-state between journeys and exiting when complete. `--scenario NAME` selects one;
-the default is `all`. Preview always uses debug mode, without hot reload, a backend,
-or a native splash. Reports include `preview_scenarios`; incomplete or failed
-journeys return a nonzero status. This checks UI behavior under controlled events;
-camera, PAM, and VT handoff still require real hardware testing.
-
-`run` defaults to debug mode and reloads Dart and assets on save, regenerating
-changed scene JSON first. Failed generation retains the working theme. `r`
-regenerates and reloads, `R` restarts, and `q` quits. Profile/release sessions do
-not hot reload. Both `preview` and `run` accept `--jobs COUNT`.
-
-Preview uses one resizable, undecorated window. `run` and production bundles
-default to undecorated fullscreen; set `AKARI_WINDOW_MODE=windowed` for a windowed
-`run`. `run splash` independently shows the native loading animation until Escape
-or window close, without a duration limit or a following login screen.
-
-Fullscreen greeters render the same theme on every connected monitor, using
-each output's logical size and scale. Account, session, authentication, dormant
-state, and credential text are shared; keyboard actions belong to the focused
-window. Connecting or disconnecting an output updates its window without
-restarting authentication. Windowed previews use one window.
-
-For native multi-monitor regression checks, build a demo preview bundle and run
-`python3 test/support/multi_display_workflow_test.py --app PATH/greeter`.
-This opt-in check requires Sway, wtype, and grim. It starts an isolated headless
-compositor with mixed output scales, tests hotplug and both window modes, and
-retains screenshots and logs in the printed temporary directory.
+- **`build`**: Resolves dependencies, generates scene code, builds the reusable Flutter host under `build/tool/hosts/`, and compiles the release bundle + production Rust backend.
+- **`run`**: Starts the Flutter greeter and Rust mock backend (`--backend real` for production transport) on a private D-Bus session. Supports hot reload on Dart/asset/JSON saves. Fullscreen by default (`AKARI_WINDOW_MODE=windowed` for a window).
+- **`preview`**: Runs `face-success` and `password-fallback` (or `--scenario NAME`) once in an undecorated window using controlled frontend events and exits.
+- **`run splash`**: Opens a standalone preview window of the native loading screen until closed.
 
 ## Sway sessions and display profiles
 
-For a step-by-step comparison and troubleshooting, see
-[display testing](../guides/display-testing.md).
-
-A preview on Hyprland inherits that output's scale. Use `run sway` to apply
-the standalone greeter's scale in a nested compositor:
+Reproduce standalone greeter scaling inside a nested or headless Sway compositor:
 
 ```sh
 akari run sway
@@ -337,201 +144,50 @@ akari run sway --resolution 1920x1080 --scale 1.6
 akari run sway --display-profile reference --sway-backend headless
 ```
 
-The selected theme, build mode, build jobs, mock/real backend and reload keys
-follow `run`. `scripts/debug-sway.sh` forwards to this same CLI entry point.
-The session requires Python 3, Sway, swaymsg and grim. The default Wayland backend
-opens virtual outputs in the current Wayland desktop; headless needs no desktop.
-Neither switches the display manager. The session owns its private D-Bus,
-backend, compositor, frontend process group and temporary runtime directory.
-Quitting or a failure cleans them up and retains logs.
+### Display profile modes (`--display-profile`)
 
-`--display-profile` accepts `auto` (default), `login` and `reference`. Auto imports
-the newest complete, marked DRM login snapshot from
-`/opt/akari-test/current-run/greeter/session-*/`, or keeps a newer saved login
-profile. Without one, it uses `config/sway/reference.json`: one output,
-1920×1080 pixels, scale 1, logical viewport 1920×1080. `login` reports an error
-when no valid login profile exists. `reference` bypasses login discovery and
-import, allowing consistent team comparisons. Reinstall the greetd harness to
-produce marked snapshots; older unmarked `outputs.json` files remain diagnostics.
+| Profile | Behavior |
+| --- | --- |
+| `auto` (default) | Imports the newest marked DRM snapshot from `/opt/akari-test/current-run/greeter/session-*/` into `${XDG_STATE_HOME:-~/.local/state}/akari/display-profiles/login.json`, or falls back to `reference`. |
+| `login` | Requires a valid imported or newly captured TTY login profile; fails if none exists. |
+| `reference` | Uses `config/sway/reference.json` (`1920x1080`, scale `1.0`), ignoring saved login captures. Required when overriding `--resolution` or `--scale` on a multi-monitor setup. |
 
-Imported profiles live at
-`${XDG_STATE_HOME:-~/.local/state}/akari/display-profiles/login.json`, with
-atomic replacement and owner-only access. They retain mode including refresh,
-scale, transform, logical rectangle, display identity, capture time, original
-snapshot path and test/session provenance. Failed attempts, partial or corrupt
-snapshots, and nested/headless outputs cannot replace a valid login record.
-Raw login logs stay at their original paths; the saved profile remains usable
-after those logs are removed. Dry-run resolves defaults without importing files
-or creating run directories.
+### Output verification & Hyprland compensation
 
-Resolution and scale come from one base profile before explicit overrides.
-`--resolution WIDTHxHEIGHT` means reference output pixels; `--scale NUMBER`
-is the intended standalone scale and must be positive. Headless outputs enforce
-that resolution: at 1920×1080 and scale 1.6 the logical viewport is 1200×675.
-On Hyprland, the outer compositor determines the actual output dimensions. Either
-option can override a single output while preserving the other base values;
-the complete resulting target is reported as customized. Multi-output profiles
-reject these global overrides; select `reference` for a single-output override.
-Multiple login displays map in top-to-bottom, then left-to-right order to
-`WL-1`, `WL-2`, … or `HEADLESS-1`, `HEADLESS-2`, … while retaining each display's
-reference mode, scale, transform and logical position. Reports keep their original names.
+- **Artifacts**: Saved under `build/tool/runs/<run-id>/sway/`, including `display-report.json`, `outputs.json`, `sway.log`, `flutter.log`, and initial per-output PNGs under `screenshots/`.
+- **Hyprland scale compensation**: On Hyprland, `run sway` reads the host monitor's scale and sets `inner_scale = target_login_scale / hyprland_monitor_scale`. When fullscreened on the same monitor, the logical viewport matches standalone TTY Sway.
+- **Headless verification**: `--sway-backend headless` enforces fixed output dimensions and fails if actual Sway outputs drift from the requested target.
 
-Startup prints the source, complete targets, actual outputs, and log/screenshot
-locations. `--format json` includes this information in the run report's
-`display` field. Sway artifacts live under `build/tool/runs/<run-id>/sway/`:
-`display-report.json`, raw `outputs.json`, `sway.log`, `flutter.log`, generated
-configuration and `screenshots/<virtual-output>.png`. Screenshots are taken
-inside Sway after all greeter windows appear, at each output's own pixel scale.
-Virtual backends choose refresh rates independently; reports retain physical
-refresh as provenance. Fixed geometry verifies mode dimensions, scale, transform
-and rect; Hyprland geometry verifies the settings described below.
-
-On Hyprland, windows stay under the desktop's normal tiling and fullscreen
-management. The session reads each owned window's monitor and applies
-`inner scale = selected standalone scale / Hyprland monitor scale`. For example,
-TTY scale 1 on a monitor with Hyprland scale 1.6 uses inner scale 0.625. When
-fullscreen on the same monitor and physical mode, the logical viewport and
-content size match standalone TTY Sway. Fullscreen dimensions come from the
-monitor rather than the profile's reference resolution. Use your normal
-Hyprland fullscreen key to compare with TTY.
-
-Resizing, entering or leaving fullscreen updates the viewport without stopping
-the theme. Moving the window to another monitor recalculates its scale. The
-session only reads Hyprland IPC and changes its own inner Sway outputs; it
-requires no floating rules, fixed window sizes, or desktop configuration edits.
-Reports retain the original `target`, the compensated `effective_target`
-(including host monitor and scale), and `actual`. `matched` checks the effective
-output settings for compositor-managed geometry. Inner screenshots use the
-adopted output's scale and dimensions, so they may differ in pixel dimensions
-from TTY captures even when the displayed content size matches.
-
-Headless sessions keep fixed-profile verification and fail on output drift.
-Other outer compositors still require windows that accept the requested profile
-sizes. Use headless for fixed-resolution screenshots. Nested/headless tests do
-not replace DRM hardware or standalone TTY tests.
-
-Run the native nested regression matrix against a built greeter and mock backend:
-
-```sh
-python3 test/support/sway_native_workflow_test.py \
-  --app build/out/default/greeter \
-  --backend backend/target/akari-mock/debug/backend
-```
-
-This creates an isolated headless outer Sway at scales 1 and 1.6, then tests
-inner scales 1 and 1.6. It retains target/actual reports and checks 1920×1080
-inner screenshot dimensions for all four combinations. It does not alter the
-developer's desktop configuration or certify Hyprland-specific placement.
+For step-by-step usage, see [Test displays and scaling](../guides/display-testing.md).
 
 ## Verification and generated hosts
 
-Production `build` defaults to release and compiles both frontend and Rust backend.
+`akari verify` checks shared packages, the Rust backend, Theme Studio, and all themes under `themes/` (or a single theme with `--theme PATH`).
 
-`verify` analyzes shared code, the backend, and every project discovered under
-`themes/`. With `--theme PATH`, it checks only the selected theme alongside shared
-code and the backend. Theme-specific UI tests live in their theme package. It
-also runs a theme project's Flutter tests when it contains `*_test.dart` files under `test/`.
-
-The root project contains shared application code and repository tests. The CLI
-generates the executable entrypoint for each selected theme. For repository
-debugging, `tool/dev_main.dart` explicitly injects the default theme;
-the CLI and Sway wrapper use the selected theme's generated host. To run the
-repository entrypoint directly with demo login state after generating scenes:
+For direct IDE debugging without the CLI host generator, `tool/dev_main.dart` injects the default theme into the root project:
 
 ```sh
+fvm dart run tool/akari.dart generate-scenes --theme themes/default
 fvm flutter run -d linux --target tool/dev_main.dart
 ```
 
-Use the CLI for build, run, verification, scene generation, and performance
-workflows. After installing the launcher, use `akari build`, `akari run`,
-`akari verify`, `akari generate-scenes`, `akari perf`,
-and `akari trace`.
-Shell scripts handle toolchain setup and checks, standalone backend startup,
-and Linux session work such as private D-Bus and Sway. `scripts/debug-dbus.sh`
-accepts a command to run with the backend on a private bus; without a command,
-it invokes the CLI's `run` command directly.
-
 ## Reports and build outputs
 
-Use `--format json` for a machine-readable report on stdout. Every run also
-writes a report and event log beneath `build/tool/runs/<run-id>/`. Each command
-step has separate stdout and stderr log files. A report can be written to a
-chosen path with `--report PATH`.
-
-For commands using this report protocol, `--dry-run` prints a JSON execution
-plan, including artifact paths, without running build or session steps. It does
-not write the report or reserve its run directory. A Sway plan resolves the
-selected display profile without importing it, but has no actual outputs or
-screenshots because no compositor has started.
-
-Build reports list the generated host project, build directory, and Linux
-executable. SDK commands use the repository's configured Flutter SDK even when
-the selected theme project lives outside the repository. `AKARI_FLUTTER_BIN`
-and `AKARI_DART_BIN` can override those binaries.
-
-Successful Linux builds publish relative symlinks at `build/out/<theme-name>`
-(the entire frontend bundle) and `build/out/backend` (the production backend).
-For example, run `build/out/default/greeter` or `build/out/backend`.
-The report records `bundle_link` and `backend_link` and text output prints these
-short paths. Links update only after both builds succeed. They point into build
-caches, so rebuilding can change their contents and cleaning caches breaks them;
-they do not preserve a previous successful build. The backend link follows the
-latest successful build. A frontend link cannot be claimed by another project
-with the same theme name; remove that link explicitly to switch projects.
-The theme name `backend` is reserved for the backend output link.
-
-Run reports use schema version 1. They include the command, run status and
-timing, generated artifact paths, and an ordered list of command steps with
-their arguments, working directories, exit codes, timing, and log paths. The
-`events.jsonl` file records run and step start and finish events. Child command
-output stays in the per-step logs so JSON stdout remains parseable.
+- **Run reports**: Every CLI run writes `report.json` (schema v1), `events.jsonl`, and per-step stdout/stderr logs under `build/tool/runs/<run-id>/`. Use `--format json` to print the report to stdout or `--report PATH` to copy it to a custom file.
+- **Dry runs**: `--dry-run` outputs the planned step graph and artifact paths as JSON without executing commands or creating run directories.
+- **Build symlinks**: Successful Linux builds create relative symlinks at `build/out/<theme-name>` and `build/out/backend` pointing into the active build cache.
 
 ## Theme performance commands
 
-`verify-perf` and `trace-perf` select one theme with `--theme PATH`, defaulting
-to `themes/default`. They execute that theme's explicitly declared perf command
-after resolving its dependencies and generating its scenes. The CLI does not
-supply interaction scripts, metric schemas, baselines, or pass/fail thresholds.
-See the [theme perf protocol](theme-package.md#performance-protocol).
-
-Arguments following `--` are passed literally to the theme command. For the
-default theme, request five measurement cycles with:
-
 ```sh
 fvm dart run tool/akari.dart verify-perf --theme themes/default -- --cycles 5
+fvm dart run tool/akari.dart trace-perf --theme themes/default
 ```
 
-The default theme owns its Linux profile integration fixture, measurement and
-trace tools, and baseline under `themes/default/perf/`. Its gate defaults to
-three cycles, requires at least three, and accepts `--baseline PATH` after `--`.
-The fallback theme currently declares no performance commands.
-
-Each perf command receives an absolute `AKARI_PERF_OUTPUT_DIR` pointing to
-`build/tool/runs/<run-id>/perf/`. Successful commands must publish `result.json`;
-the run report records its validated artifact paths in `theme_artifacts` without
-parsing the artifact contents. Failed commands can publish diagnostic artifacts
-too. Their nonzero exit codes are preserved, and missing failure manifests do
-not hide the command failure. Protocol errors fail the run while retaining its
-logs and report. JSON console output remains a single CLI report.
+`verify-perf` (`perf`) and `trace-perf` (`trace`) run the commands declared in the selected theme's `pubspec.yaml` `perf:` block and validate `result.json` inside `AKARI_PERF_OUTPUT_DIR` (`build/tool/runs/<run-id>/perf/`). See the [Performance protocol](theme-package.md#performance-protocol).
 
 ## Caches and parallel work
 
-Host projects retain Flutter and native build caches between runs. Shared application
-source is linked into the host, and Linux runner files are synchronized only when
-they change. Run directories contain logs and reports rather than another build.
-Host synchronization and build-link publication run inside the CLI process to
-avoid extra Dart VM startups. Their plan/report entries retain the equivalent
-standalone command and include `in_process: true`; failures still produce step
-logs and stop dependent steps.
-After resolving host dependencies, builds and sessions pass `--no-pub` to
-Flutter to avoid repeating that check. The reload controller loads only SDK
-resolution and session code to reduce its startup work.
-
-Production builds also compile the Rust backend. Backend compilation runs alongside
-theme preparation. `build --jobs COUNT` limits Cargo tasks and native C++ compile/link
-jobs through a CMake Ninja pool. Without it, each tool uses its normal multicore default.
-This does not set the Dart compiler's thread count.
-
-Rust mock and production builds use separate stable target directories beneath
-`backend/target/akari-mock/` and `backend/target/akari-real/`. Commands sharing a
-theme serialize on a process lock; different themes can build independently.
+- **Host reuse**: Generated hosts under `build/tool/hosts/` retain Flutter and CMake caches across runs and pass `--no-pub` after resolving dependencies.
+- **Parallel jobs (`--jobs COUNT`)**: Bounds Cargo build tasks and CMake/Ninja C++ compile/link pools while building the Rust backend and Flutter frontend in parallel.
+- **Target isolation**: Mock and real Rust builds use separate directories (`backend/target/akari-mock/` and `backend/target/akari-real/`), and per-theme locks allow different themes to build in parallel.
