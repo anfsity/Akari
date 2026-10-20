@@ -328,6 +328,13 @@ def validate_runtime():
             raise ValueError(f'Missing executable: {binary}')
     if not PAM.is_file():
         raise ValueError(f'Missing PAM configuration: {PAM}; install greetd first.')
+    accounts = subprocess.run(
+        ['busctl', '--system', 'call', 'org.freedesktop.Accounts',
+         '/org/freedesktop/Accounts', 'org.freedesktop.Accounts', 'ListCachedUsers'],
+        capture_output=True, text=True)
+    if accounts.returncode != 0:
+        raise ValueError('AccountsService is unavailable; install accountsservice and ensure '
+                         'org.freedesktop.Accounts can be activated on the system D-Bus.')
 
 
 def create_installation(source, bundle, backend, splash, layout, keyring='auto'):
@@ -452,6 +459,7 @@ def enable_login():
     if is_akari_target(target):
         print('Akari is already selected for the next boot.')
         return
+    validate_runtime()
     if SNAPSHOT.exists():
         raise ValueError('An unfinished switch exists; run akari login disable to recover first.')
     enabled = False

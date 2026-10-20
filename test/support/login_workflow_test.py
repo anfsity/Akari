@@ -601,6 +601,24 @@ class LoginWorkflowTest(unittest.TestCase):
 
 
 class RuntimeValidationTest(unittest.TestCase):
+    def test_accounts_service_must_be_callable_before_installation(self):
+        manager = importlib.util.module_from_spec(SPEC)
+        SPEC.loader.exec_module(manager)
+        with tempfile.TemporaryDirectory() as directory:
+            manager.PAM = Path(directory) / 'greetd'
+            manager.PAM.touch()
+            with patch.object(manager.shutil, 'which', side_effect=lambda name: f'/usr/bin/{name}'), \
+                    patch.object(manager.os, 'access', return_value=True), \
+                    patch.object(manager.subprocess, 'run') as boundary:
+                boundary.return_value = subprocess.CompletedProcess([], 1, '', 'service unavailable')
+                with self.assertRaisesRegex(ValueError, 'AccountsService is unavailable'):
+                    manager.validate_runtime()
+                boundary.return_value = subprocess.CompletedProcess([], 0, 'ao 0', '')
+                manager.validate_runtime()
+                self.assertEqual(boundary.call_args.args[0], [
+                    'busctl', '--system', 'call', 'org.freedesktop.Accounts',
+                    '/org/freedesktop/Accounts', 'org.freedesktop.Accounts', 'ListCachedUsers'])
+
     def test_missing_background_renderer_is_rejected_before_installation(self):
         manager = importlib.util.module_from_spec(SPEC)
         SPEC.loader.exec_module(manager)
