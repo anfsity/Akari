@@ -3,23 +3,19 @@ title: Develop theme components
 description: Render typed host state without owning authentication.
 ---
 
-## The component factory
+Theme components are standard Flutter widgets that render display-safe state from `GreeterHost` and trigger semantic callbacks. They never manage PAM conversations or D-Bus connections directly.
 
-`ThemeDefinition.components` receives a `GreeterThemeContext`, which contains the
-theme's tokens and `GreeterHost`. Its returned `GreeterThemeComponents` maps
-scene component identifiers to Flutter widgets through `build(context, node)`.
-Identifiers are private to this factory; the Scene runtime does not prescribe
-a universal widget catalog.
+## 1. Map scene nodes in the component factory
 
-When using `StandardGreeterComponents`, keep its supported identifiers from the
-fallback scene. When writing your own factory, make the scene and factory agree
-on each identifier. Node `properties` are string-valued authoring data owned by
-that component; parse them where the component owns their meaning.
+`ThemeDefinition.components` receives a `GreeterThemeContext` (providing `tokens` and `host`) and returns a `GreeterThemeComponents` factory. During rendering, the runtime calls `build(context, node)` to turn each scene node's `component` ID into a widget:
 
-## Subscribe to one region
+- **Reuse standard widgets**: Use `StandardGreeterComponents` and keep the component IDs from the fallback scene.
+- **Custom component catalog**: Define your own component IDs in `*.scene.json` and handle them in your factory.
+- **Custom node properties**: Read string key-value pairs from `node.properties` inside the component that owns them.
 
-Use a typed slot for the content a widget displays. For example, a small service
-status widget can subscribe only to `serviceSlots`:
+## 2. Subscribe to narrow state slots
+
+Subscribe only to the slot listenable your widget needs so unrelated state changes do not trigger rebuilds:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -40,28 +36,29 @@ class ServiceLabel extends StatelessWidget {
 }
 ```
 
-This keeps unrelated account, session, or power updates from rebuilding the label.
-`SceneRuntime` already places a repaint boundary around each scene node. Add an
-extra boundary only when profiling demonstrates a need.
+:::tip
+`SceneRuntime` automatically wraps each scene node in a `RepaintBoundary`. Only add nested `RepaintBoundary` widgets if profiling shows a complex subtree needs independent repainting.
+:::
 
-## Dispatch semantic actions
+## 3. Dispatch semantic actions
 
-Components call host callbacks such as `onSelectUser`, `onSelectSession`,
-`onRespondToPrompt`, `onStartSession`, and `onRequestPowerAction`. Enable controls
-using the appropriate slots and preserve native keyboard, focus, and accessibility behavior.
-Authentication state, transport objects, and D-Bus calls belong to the greeter
-feature and backend.
+Trigger user actions through `GreeterHost` callbacks while preserving native focus, keyboard navigation, and accessibility semantics:
 
-Credential widgets borrow `credentialController` and `credentialFocusNode`.
-Their owner disposes them; theme widgets must not dispose them. Do not copy
-credential text into scene properties, visual configuration, or logs.
+| Callback | Purpose |
+| --- | --- |
+| `onSelectUser` | Switch the active login account |
+| `onSelectSession` | Select the target desktop session |
+| `onRespondToPrompt` | Submit the active credential response |
+| `onStartSession` | Launch the authenticated desktop session |
+| `onRequestPowerAction` | Trigger suspend, reboot, or power-off |
 
-## Respect mount lifetime
+:::caution[Credential controller ownership]
+Password and prompt fields borrow `host.credentialController` and `host.credentialFocusNode`. The application owns their lifecycle—**never** call `dispose()` on them in a theme widget, and never copy credential text into scene properties or logs.
+:::
 
-Presence animations and prewarming can keep a hidden node mounted. Keep hidden
-subscriptions and timers inexpensive, and dispose component-owned resources
-when the widget unmounts. Motion builders borrow runtime-driven animations;
-they do not own an animation controller.
+## 4. Respect node mount lifetime
 
-Use the [API reference](../reference/api.md) for exact types and the
-[frontend architecture](../architecture/frontend.md) for ownership details.
+- **Hidden nodes**: Exit animations or prewarming may keep a hidden node mounted briefly. Keep background timers idle when hidden and clean up widget-owned subscriptions in `dispose()`.
+- **Motion builders**: `SceneMotionBuilder` receives an externally driven `Animation<double>` from `SceneRuntime`—do not create or dispose your own `AnimationController` for node presence transitions.
+
+See the [API reference](../reference/api.md) for slot definitions and [Frontend architecture](../architecture/frontend.md) for runtime boundaries.

@@ -3,80 +3,82 @@ title: Develop a theme
 description: Turn the fallback example into an independent theme package.
 ---
 
-## Start from the small example
+Akari themes are independent Dart/Flutter packages. You can start by copying the static `fallback` theme and customizing its scene layout, visual tokens, and components.
 
-The fallback project is a useful starting point because it has a fixed palette
-and no continuous motion. From the repository root:
+## 1. Scaffold from the fallback theme
+
+Copy `themes/fallback` into a new package directory from the repository root:
 
 ```sh
 cp -R themes/fallback themes/ocean
 ```
 
-Update the copied project:
+Update the copied files to give your theme a unique identity:
 
-1. Set the package name in `pubspec.yaml` to `theme_ocean`.
-2. Rename `lib/fallback.scene.json` to `lib/ocean.scene.json` and set its `id` to `ocean`.
-3. In `lib/theme.dart`, import `ocean.scene.g.dart`, rename the exported builder
-   to `buildOceanTheme`, use `oceanSceneDocument`, and set the theme definition's
-   `id` to `ocean`.
-4. Remove any copied `fallback.scene.g.dart`; the build generates the new source.
+| File | Required changes |
+| --- | --- |
+| `pubspec.yaml` | Set `name: theme_ocean` (keep the existing SDK path dependencies). |
+| `lib/ocean.scene.json` | Rename from `lib/fallback.scene.json` and set `"id": "ocean"`. |
+| `lib/theme.dart` | Import `ocean.scene.g.dart`, rename the builder to `buildOceanTheme`, pass `oceanSceneDocument`, and set `id: 'ocean'`. |
+| `lib/fallback.scene.g.dart` | Delete the copied generated file—the CLI generates `ocean.scene.g.dart` on build. |
 
-Keep the copied SDK path dependencies when the project is in `themes/ocean`.
-Its optional shared widgets come from `greeter_components`; it does not import
-the fallback theme itself. The package name determines the builder name, not
-the folder name. See the [theme package contract](../reference/theme-package.md).
+:::note
+The builder function name derives from the `pubspec.yaml` package name (`theme_ocean` -> `buildOceanTheme`), not the directory name. A theme may import `greeter_components`, but must never import another concrete theme package. See the [Theme package contract](../reference/theme-package.md).
+:::
 
-## Preview and iterate
+## 2. Run and iterate
+
+Launch your new theme in a desktop window with hot reload enabled:
 
 ```sh
 AKARI_WINDOW_MODE=windowed fvm dart run tool/akari.dart run --theme themes/ocean
 ```
 
-Edit the scene JSON to change layout and visibility. Edit `theme.dart` to change
-tokens, renderer registrations, and the component factory. Use the
-[scene format reference](../reference/scene-format.md) for field rules.
+- **Edit layout & visibility**: Modify `lib/ocean.scene.json`. On save, the CLI regenerates `ocean.scene.g.dart` and reloads the scene. If generation fails, the running window keeps the last valid scene until you fix the JSON.
+- **Edit styling & widgets**: Modify `lib/theme.dart` to adjust `ThemeTokens`, background/motion renderers, or the component factory. See the [Scene format reference](../reference/scene-format.md) for JSON schema rules.
 
-The CLI regenerates scene Dart before running the host. Do not hand-edit generated
-files. A failed generation retains the running scene; fix the JSON and save again.
+## 3. Bundle theme assets
 
-## Add assets
+1. Place images under `assets/` in your theme directory and declare them in `pubspec.yaml`:
 
-Put project-owned images under `assets/` and declare them in the theme's
-`pubspec.yaml`. Flutter package paths include the package name:
+   ```yaml
+   flutter:
+     uses-material-design: true
+     assets:
+       - assets/wallpaper.jpg
+   ```
 
-```yaml
-flutter:
-  uses-material-design: true
-  assets:
-    - assets/wallpaper.jpg
-```
+2. Reference bundled assets in your scene JSON using the `packages/<package_name>/` prefix:
 
-```json
-{
-  "kind": "image",
-  "asset": "packages/theme_ocean/assets/wallpaper.jpg",
-  "color": "#0d151a",
-  "scrimOpacity": 0.35,
-  "blurSigma": 0
-}
-```
+   ```json
+   {
+     "kind": "image",
+     "asset": "packages/theme_ocean/assets/wallpaper.jpg",
+     "color": "#0d151a",
+     "scrimOpacity": 0.35,
+     "blurSigma": 0
+   }
+   ```
 
-This object replaces the document's `background` object. The theme's visual
-bundle must register an image renderer, as the fallback example does.
+Ensure your `ThemeBundle` in `lib/theme.dart` registers an `image` background renderer (included by default in the fallback template).
 
-## Keep an external project
+## 4. Maintain an external theme repository
 
-A theme can live outside the repository. Point each SDK path dependency at its
-corresponding package in your Akari checkout, including the `scene_codegen`
-development dependency. Asset paths must use the external theme's package name.
+A theme package can live outside the Akari repository:
 
-```sh
-fvm dart run tool/akari.dart preview --theme /path/to/ocean
-fvm dart run tool/akari.dart build --theme /path/to/ocean
-```
+1. Point all SDK path dependencies (`theme_sdk`, `scene`, `greeter_components`, and `scene_codegen` in `dev_dependencies`) to your local Akari checkout.
+2. Pass the external directory path to `--theme`:
 
-The CLI builds a host for this selected project. Installing new Dart or Flutter
-theme code at runtime is outside the theme contract: production themes are
-compiled into the executable.
+   ```sh
+   fvm dart run tool/akari.dart preview --theme /path/to/ocean
+   fvm dart run tool/akari.dart build --theme /path/to/ocean
+   ```
 
-Continue with [component development](components.md) and [testing](testing.md).
+:::tip
+Production builds compile the selected theme's Dart code and assets directly into the greeter executable. Runtime loading of arbitrary Dart code is not part of the theme contract.
+:::
+
+## Next steps
+
+- [Develop theme components](components.md)
+- [Develop and test](testing.md)

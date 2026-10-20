@@ -3,45 +3,46 @@ title: 开发与测试
 description: 检查代码、登录交互、多屏显示和主题性能。
 ---
 
-## 运行项目检查
+Akari 将测试划分为仓库快速校验、模拟 D-Bus 会话、隔离合成器回归以及真实 TTY 登录验证四个层级。
+
+## 1. 仓库快速校验
+
+运行静态分析、Rust 后端检查以及共享包与主题的单元/组件测试：
 
 ```sh
+# 检查全部共享包、后端及所有内置主题
 fvm dart run tool/akari.dart verify
+
+# 仅针对指定主题运行主题测试，同时保留共享包与后端检查
 fvm dart run tool/akari.dart verify --theme themes/fallback
 ```
 
-这个命令会检查共享代码和 Rust 后端，并运行主题测试。指定 `--theme` 后，只检查这个主题，同时仍会检查共享代码和 Studio。主题的 UI 测试放在主题项目里；运行时和场景模型的测试放在各自的包里。
+编写测试时的原则：
+- **关注行为与核心不变量**：校验场景模型、状态机转换、认证尝试隔离、Slot 通知、键盘焦点遍历、资源释放与帧耗时预算。
+- **避免脆弱的像素坐标断言**：不要断言固定的像素位置；应验证控件可达性、最小点击热区、焦点顺序以及内容不溢出。
 
-测试应覆盖场景校验、状态转换、登录尝试隔离、slot 通知、焦点、键盘交互、资源释放和性能。不要让测试依赖固定的像素位置。
+:::note
+`test/login_cli_test.dart` 还会调用 `test/support/login_workflow_test.py`，在模拟的 systemd 与账户环境中验证部署、回滚与异常恢复，不会修改宿主机的显示管理器。
+:::
 
-`test/login_cli_test.dart` 也会运行 `test/support/login_workflow_test.py`，模拟 systemd 和账户边界，检查正式部署、切换失败、恢复、版本回退、权限及登录子进程清理。这些检查不会修改主机显示管理器；DRM 和 PAM 行为仍通过实际登录验证。
+## 2. 模拟会话与合成器调试
 
-## 测试前后端交互
-
-```sh
-fvm dart run tool/akari.dart run --theme themes/fallback
-```
-
-这个命令会测试前端通过 D-Bus 与后端通信的完整流程，不会调用系统 PAM。如果想自动查看一次人脸成功和密码回退的 UI 流程，使用 `preview`；`--scenario` 可选择单条。预览在一个窗口中运行并自动退出，不验证真实摄像头或 PAM。
-
-## 合成器和真实登录
-
-```sh
-fvm dart run tool/akari.dart run sway --display-profile reference
-fvm dart run tool/akari.dart run sway --display-profile reference --sway-backend headless
-```
-
-嵌套/无头会话包含私有后端、总线、合成器和前端。关于共享状态检查、缩放对比和截图，请参阅[显示测试](display-testing.md)。[CLI 参考](../reference/cli.md#sway-sessions-and-display-profiles)说明显示配置及实际输出校验。
-
-要测试真实登录，请按[独立 greetd 测试](greetd-testing.md)中的步骤安装测试工具、检查 TTY 环境，并准备恢复原来的登录管理器。
+| 测试方式 | 命令 | 适用场景 |
+| --- | --- | --- |
+| 自动 UI 流程演示 | `fvm dart run tool/akari.dart preview --theme themes/fallback` | 在单窗口中自动运行一次人脸成功与密码回退流程并退出 |
+| 交互式模拟后端 | `fvm dart run tool/akari.dart run --theme themes/fallback` | 通过私有 D-Bus 联调 Flutter 前端与 Rust 模拟后端，支持热重载 |
+| 嵌套 / 无头 Sway | `fvm dart run tool/akari.dart run sway --display-profile reference` | 验证显示器缩放还原与固定分辨率截图（详见[显示测试](display-testing.md)） |
+| 真实 TTY 登录 | `akari greetd-test ...` | 验证真实 PAM、DRM/KMS 启动画面与桌面启动（详见[独立 greetd 测试](greetd-testing.md)） |
 
 <a id="native-display-regressions"></a>
 
-## 测试原生窗口和多屏行为
+## 3. 原生窗口与多屏回归测试
 
-这些可选脚本会在隔离合成器中启动真正的 Flutter 窗口。它们与 `akari verify` 分开运行，并将日志和截图保留在输出的临时目录中。请安装 Sway、`swaymsg` 和 grim；多显示器脚本还需要 wtype。
+以下可选脚本会在隔离的无头 Sway 合成器中启动真实 Flutter 窗口，并将日志与截图输出到临时目录。运行前需安装 `sway`、`swaymsg`、`grim` 和 `wtype`。
 
-要检查显示器生命周期和焦点，先构建默认主题的普通演示程序包。自动 `preview` 的可执行文件带有测试入口，不能用于持续运行的多屏检查。
+### 多显示器生命周期与焦点回归
+
+使用 `tool/dev_main.dart` 构建持久运行的演示包（不要使用运行完即退出的 `preview` 产物），然后执行回归脚本：
 
 ```sh
 fvm dart run tool/akari.dart generate-scenes --theme themes/default
@@ -50,35 +51,42 @@ python3 test/support/multi_display_workflow_test.py \
   --app build/linux/x64/release/bundle/greeter
 ```
 
-此检查覆盖混合输出缩放、跨视图的指针焦点、显示器添加、主视图显示器移除、所有显示器移除、重新连接和单窗口模式。共享凭据及单次响应键盘分发由常规 Flutter 测试套件中的 `test/multi_display_test.dart` 覆盖。
+该脚本会验证混合 DPI 缩放、跨屏幕指针焦点切换、热插拔（含拔除主显示器、拔除全部显示器后重连）以及单窗口模式。
 
-要检查嵌套输出矩阵，先用模拟 D-Bus 后端准备登录界面：
+### 嵌套缩放矩阵回归
 
-```sh
-fvm dart run tool/akari.dart run sway --theme themes/default \
-  --display-profile reference --sway-backend headless \
-  --report build/tool/native-sway.json
-```
+1. 先运行一次无头 Sway 会话以生成登录界面与模拟后端构建产物：
 
-启动后退出，再从报告中读取 `artifacts.executable` 和 `artifacts.backend_executable`。将下方两个路径替换为对应资源；脚本需要 `run sway` 构建的模拟后端。
+   ```sh
+   fvm dart run tool/akari.dart run sway --theme themes/default \
+     --display-profile reference --sway-backend headless \
+     --report build/tool/native-sway.json
+   ```
 
-```sh
-python3 test/support/sway_native_workflow_test.py \
-  --app /path/to/greeter/bundle/greeter \
-  --backend /path/to/mock/backend
-```
+2. 启动后按 `q` 退出，从 `build/tool/native-sway.json` 中读取 `artifacts.executable` 与 `artifacts.backend_executable`，替换到以下命令中执行：
 
-测试会启动无头外层 Sway，检查外层和内层缩放为 1、1.6 的四种组合，并校验输出报告及 1920×1080 的内层图片。它不检查 Hyprland 特有的窗口定位、DRM、真实 PAM 身份验证或显示管理器恢复；这些行为请使用手动显示和独立登录流程。
+   ```sh
+   python3 test/support/sway_native_workflow_test.py \
+     --app /path/to/greeter/bundle/greeter \
+     --backend /path/to/mock/backend
+   ```
 
-## 性能
+该测试会遍历外层与内层缩放为 `1.0` 和 `1.6` 的全部四种组合，并校验输出报告与 `1920x1080` 内层截图尺寸。
+
+## 4. 性能测试
+
+运行主题在 `pubspec.yaml` 中声明的性能门槛校验或耗时追踪：
 
 ```sh
 fvm dart run tool/akari.dart verify-perf --theme themes/default
 fvm dart run tool/akari.dart trace-perf --theme themes/default
 ```
 
-主题通过自己的 manifest 声明是否支持这些命令。主题的 runner 负责交互流程、指标、阈值和资源格式。fallback 主题没有性能测试脚本。详情见[性能约定](../reference/theme-package.md#performance-protocol)。
+交互步骤、测量指标与通过标准由主题包自行定义（详见[性能约定](../reference/theme-package.md#performance-protocol)）。
 
-## 命令失败后怎么看日志
+## 5. 排查失败命令
 
-使用 `--format json` 或 `--report PATH` 生成结构化报告。开发命令的报告、事件和子进程日志保存在 `build/tool/runs/`。命令失败后，先看对应步骤的 stderr 日志。真实登录测试的日志位置见 greetd 测试指南。
+每次 CLI 运行都会在 `build/tool/runs/<run-id>/` 下保存结构化报告、事件流与各步骤的子进程日志：
+
+- 使用 `--format json` 或 `--report PATH` 获取机器可读的执行报告。
+- 命令失败时，优先查看对应失败步骤的 `stderr` 日志文件。

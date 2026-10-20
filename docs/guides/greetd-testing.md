@@ -3,386 +3,204 @@ title: Standalone greetd testing
 description: Build and install the real-login harness, capture displays, inspect logs, and restore SDDM.
 ---
 
-The maintained test harness lives in `scripts/greetd-test/` and installs into
-`/opt/akari-test`. It uses the production backend: authentication talks to greetd
-and power actions call logind, performing actual suspend, reboot and shutdown.
-Boot configuration stays on SDDM. Desktop development with `akari run` still
-uses mock authentication and mock power by default.
+The standalone test harness in `scripts/greetd-test/` installs into `/opt/akari-test`. It runs the production backend against real `greetd` and `systemd-logind` while keeping your boot display manager on SDDM and arming automatic recovery timers.
+
+:::caution
+Because the harness uses the production backend, power actions (`Suspend`, `Reboot`, `PowerOff`) execute on the real host. Use `akari run` for mock authentication and mock power during ordinary desktop development.
+:::
 
 ## User session environment
 
-Production and harness greetd configurations enable profile loading. greetd
-loads `/etc/profile` and `~/.profile`, then Akari forwards the authenticated
-user's command to `$SHELL` in non-interactive login mode. The shell loads its
-native configuration; Akari does not choose files or branch on shell names.
-bash, sh, zsh, and fish are covered by native-shell integration tests.
+### Shell & profile initialization
 
-Put exported desktop variables in login configuration, such as zsh's `.zprofile`
-or fish configuration outside `status is-interactive`. `.zshrc` is not loaded.
-POSIX profiles may be read again by the native shell's startup files, so keep
-them safe to evaluate repeatedly. Install preserves existing configuration;
-remove `source_profile = false` from `/etc/akari/greetd.toml` when upgrading an
-older installation, or set it to `true`. Reinstall the harness to update its
-configuration and backend together.
+Production and test greetd configurations enable `source_profile`:
 
-The user-side executor preserves arguments, supplies `LANG=C.UTF-8` only when
-LANG is absent or empty, and logs locale diagnostics without replacing explicit
-locale overrides. Desktop stdout/stderr and startup details go into private
-`session-*.log` files under
-`${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/`. Before entering the native
-login shell, Akari captures its stdout/stderr in a private `startup-*.log` in
-the same directory, resolved from the environment before native shell startup.
-If the shell changes `XDG_STATE_HOME`, the desktop log uses the updated location
-while the startup log stays in the original location. greetd's own profile
-loading and PAM output precede this launcher and are outside its redirection.
-Greeter launch and shutdown diagnostics go to each greeter's `lifecycle.log`.
+1. `greetd` loads `/etc/profile` and `~/.profile`.
+2. Akari forwards the authenticated user's session command to `$SHELL` in non-interactive login mode (`bash`, `sh`, `zsh`, and `fish` are supported).
+3. Your login shell loads its native login files (such as `.zprofile` or fish config outside `status is-interactive`; interactive `.zshrc` is not read).
+4. The user-side executor preserves `argv`, sets `LANG=C.UTF-8` only when `LANG` is unset/empty, and launches the desktop.
 
-The native splash runs before Sway and before the user desktop, using libseat and
-DRM/KMS on real VTs. Each launcher waits for renderer exit before allowing the
-next compositor to acquire the display. Failure remains optional. The background
-defaults to pure black, with a minimum hold of 3 seconds from first presentation;
-`AKARI_SPLASH_DURATION` in the greeter launcher environment adjusts both transitions. Console text and
-scrollback are cleared before release. Preview the shared renderer with
-`akari run splash`; see the
-[handoff implementation](https://github.com/anfsity/Akari/blob/main/docs/proposals/login-handoff.md) for lifetime and hardware
-checks. Actual blank intervals, VT switching, failure and logout need real VT tests.
+:::note[Upgrading older installations]
+Installations preserve existing `/etc/akari/greetd.toml` files. When upgrading an older setup, remove `source_profile = false` (or set `source_profile = true`). Reinstalling the test harness updates its config and backend together.
+:::
 
-The supplied Sway configuration uses a splash snapshot as its background while
-Flutter loads and requires `swaybg`. Existing production installations preserve
-their configuration; update the background line in `/etc/akari/sway.conf` to
-`output * bg "$AKARI_LOG_DIR/splash.png" fit #000000` to enable this hold.
+### Session & startup logs
 
-Desktop and systemd service readiness belongs to the selected desktop/session
-manager. UWSM-managed selections retain UWSM's environment and cleanup behavior.
-Direct compositor sessions keep their existing integration; an additional
-custom rice callback cannot order applications already launched by upstream.
-Validate a compositor child, a newly started user service, and a newly activated
-D-Bus service separately. A successful greetd handoff is not desktop readiness.
+| Log file | Location | Contents |
+| --- | --- | --- |
+| `startup-*.log` | `${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/` | Native login shell stdout/stderr before desktop launch |
+| `session-*.log` | `${XDG_STATE_HOME:-$HOME/.local/state}/akari/sessions/` | Desktop process stdout/stderr and launch metadata |
+| `lifecycle.log` | Greeter session log directory | Greeter startup and shutdown diagnostics |
+
+### Native DRM/KMS splash
+
+On real VTs, `akari-splash` renders a pure black (`#000000`) loading screen via `libseat` and DRM/KMS before Sway starts and again before the user desktop starts:
+
+- **Minimum hold**: Defaults to 3 seconds from first presentation. Set `AKARI_SPLASH_DURATION` in the greeter launcher environment to adjust both transitions (`0` disables the hold).
+- **Sway background handoff**: The supplied Sway config displays a saved snapshot (`output * bg "$AKARI_LOG_DIR/splash.png" fit #000000`) via `swaybg` while Flutter initializes.
+- **Console cleanup**: Terminal text and scrollback are cleared before releasing the VT. See the [login handoff proposal](https://github.com/anfsity/Akari/blob/main/docs/proposals/login-handoff.md) for hardware acceptance checks.
 
 ## Facial authentication
 
-Akari starts authentication when the greeter wakes with an account and session
-selected. A face provider's PAM messages stay visible during recognition;
-successful PAM authentication starts the selected desktop without a password
-submission. If the PAM stack proceeds to a password prompt after a timeout or
-missing camera, the field returns with keyboard focus in the same attempt.
+When the greeter wakes with an account and session selected, Akari automatically starts PAM authentication:
 
-Use [Gaze](https://github.com/GunduLabs/gaze) as the initial face provider. Its
-default sequential PAM mode tries face authentication before falling back to
-the existing password rules. Akari displays PAM instructions without guessing
-the provider from their wording; translated messages work the same way.
-Camera configuration, enrollment, recognition timeouts and fallback policy belong
-to the provider and PAM. Akari does not capture camera frames or store face models.
-Preview and mock mode do not perform facial recognition.
+- **Face match**: PAM messages display during recognition, and the desktop launches immediately without password submission.
+- **Password fallback**: If recognition times out or no camera is available, the password field regains keyboard focus within the same attempt.
 
-Authentication can wait longer than ten seconds for PAM to produce a response,
-and remains cancellable while waiting. Connection, writes, incomplete response
-frames, session startup and cancellation replies retain bounded I/O timeouts.
+Akari uses [Gaze](https://github.com/GunduLabs/gaze) as its reference face provider. Camera access, face models, timeouts, and fallback rules belong entirely to Gaze and PAM—Akari never captures camera frames.
 
 ### Install and verify Gaze
 
-Follow Gaze's [installation guide](https://gaze.gundulabs.com/guide/installation.html).
-On Arch, the facial authentication package is `gaze-bin`; the unrelated AUR
-package named `gaze` is a file watcher. The base package provides the daemon,
-CLI and PAM module; a desktop extension is not needed for Akari.
+1. On Arch Linux, install `gaze-bin` (not the unrelated `gaze` file watcher) and opt out of automatic `sudo` PAM modification if you only want to test `greetd`:
 
-The Arch package's installation hooks also configure sudo and polkit. For a
-greetd-only trial, create `/etc/gaze/pam-sudo.optout` before installing, back up
-the existing polkit policy (including whether `/etc/pam.d/polkit-1` exists),
-and restore that policy after installation. Review those hooks again on upgrades.
-See Gaze's [PAM guide](https://gaze.gundulabs.com/guide/pam.html).
+   ```sh
+   sudo install -d -m 0755 /etc/gaze
+   sudo touch /etc/gaze/pam-sudo.optout
+   yay -S --needed gaze-bin
+   sudo systemctl enable --now gazed
+   gaze config
+   ```
 
-```sh
-sudo install -d -m 0755 /etc/gaze
-sudo touch /etc/gaze/pam-sudo.optout
-yay -S --needed gaze-bin
-sudo systemctl enable --now gazed
-gaze config
-```
+   :::tip[Recommended initial Gaze config]
+   Start with CPU inference, `security.level = "medium"`, liveness enabled, and your RGB camera (`usb:VVVV:PPPP` identifier preferred over `/dev/video*`). See Gaze's [installation](https://gaze.gundulabs.com/guide/installation.html) and [configuration](https://gaze.gundulabs.com/guide/configuration.html) guides.
+   :::
 
-Start with CPU inference, `security.level = "medium"` and liveness enabled.
-Choose the RGB camera first; add IR after verifying its capture and emitter.
-For multiple cameras, prefer a `usb:VVVV:PPPP` identifier over a numbered
-`/dev/video*` path. Gaze captures the hardware directly, so recognition at the
-login screen does not depend on a user's PipeWire session. See the
-[configuration guide](https://gaze.gundulabs.com/guide/configuration.html).
+2. Enroll your face and test recognition from your desktop login account before touching PAM:
 
-Run enrollment from the desktop as the actual login account:
-
-```sh
-gaze add-face default
-gaze auth --verbose
-gaze doctor
-```
-
-These commands request administrator authentication where needed. `gaze auth`
-tests the camera and recognition, but does not exercise greetd's PAM policy.
-Before connecting PAM, verify successful recognition here. Keep an authenticated
-administrator terminal available while editing PAM and back up the original
-policy.
+   ```sh
+   gaze add-face default
+   gaze auth --verbose
+   gaze doctor
+   ```
 
 ### Connect greetd on Arch
 
-After installing the current backend, enable Gaze for the stock Arch greetd stack:
+Once `gaze auth` succeeds, wire Gaze into the stock Arch `greetd` PAM stack:
 
 ```sh
 akari login enable-gaze --dry-run
 akari login enable-gaze
 ```
 
-The command requests sudo, checks the shared Arch auth policies and the installed
-Gaze module, and refuses custom policies that might contain additional factors.
-It backs up greetd to `/var/lib/akari/greetd.pam.before-gaze`, publishes
-`/etc/pam.d/akari-gaze`, and replaces the `auth include system-local-login` rule
-with `auth substack akari-gaze`. Account, session and keyring rules stay in place.
-Repeated execution is idempotent, and no running service is restarted.
+What `enable-gaze` does:
+- Backs up `/etc/pam.d/greetd` to `/var/lib/akari/greetd.pam.before-gaze`.
+- Writes `/etc/pam.d/akari-gaze` and replaces `auth include system-local-login` with `auth substack akari-gaze`.
+- Uses a PAM substack so a `sufficient` face match does not skip parent keyring hooks, while falling back to the standard password stack when face recognition fails or is unavailable.
 
-The helper checks
-shell eligibility and lockout before Gaze. A face match loads the environment,
-clears prior authentication failures and completes only the substack. Failure
-or an unavailable Gaze module skips those three face-success rules and reaches
-the existing password stack. Password failure ends the substack without
-clearing the failed-attempt records. The parent stack still runs its keyring
-auth rules; an ordinary `sufficient` rule in the parent would skip them.
+:::note[Keyring unlocking with face login]
+Without TPM-backed password storage, a face login does not supply a password token to unlock GNOME Keyring or KWallet automatically. If you enable Gaze's optional keyring integration, also run `akari login configure-keyring --keyring gnome` so the GNOME hook includes `use_authtok`.
+:::
 
-The substack keeps a successful `sufficient` rule from ending the parent auth
-section before its keyring hooks run. The numeric failure jump covers only the
-three face-success modules, leaving the original password include intact.
-The maintained policy is defined in the
-[login controller](https://github.com/anfsity/Akari/blob/main/scripts/login/manage.py).
-For a different PAM layout, follow the distribution's policy and Gaze's
-[greetd guide](https://gaze.gundulabs.com/guide/greetd.html).
-
-The initial setup leaves TPM-backed password storage disabled. A face login
-does not unlock a password-protected keyring automatically; unlock it in the
-desktop when requested. Gaze's optional keyring integration is a separate setup
-with additional storage and PAM requirements described in its greetd guide.
-When enabling that feature, run
-`akari login configure-keyring --keyring gnome` to ensure the GNOME auth hook
-uses `use_authtok`. Authentication policy and keyring setup are separate commands.
-
-To restore the original password include while preserving later PAM edits:
+To remove the Gaze PAM routing and restore password-only login:
 
 ```sh
 akari login disable-gaze
 ```
 
-This also removes an unchanged Akari helper and retains the backup. A modified
-helper is retained for the administrator. Current scoped uninstall commands
-remove Akari's Gaze routing and its unchanged helper as well.
-
 ### Verify real login
 
-Use the standalone harness below after installing the current Akari build.
-Verify face success without password submission, an unsuccessful scan followed
-by password login, and password fallback with the camera unavailable. Also
-change the selected account during a scan and confirm the previous attempt
-cannot start a session. A locked-out account must remain denied even when its
-face matches. Inspect backend logs and `journalctl -u gazed -b` for failures.
-Run `akari login disable-gaze` to remove the trial integration.
+When testing with the harness below, verify:
+1. Face match logs in without typing a password.
+2. Failed scan or covered camera falls back to password login.
+3. Switching accounts mid-scan cancels the prior attempt.
+4. A locked-out account remains denied even on a face match.
 
 ## Install and run the harness
 
-Install the repository-bound `akari` launcher as described in
-[Development Tooling](../reference/cli.md). `akari greetd-test --help` lists
-all operations; each operation has its own help and bash/zsh completion.
-Install, start and restore request sudo when needed. Status and ordinary log
-reading do not request elevated privileges.
+### 1. Build and install
 
-Build and install while no previous test or timer is active:
+Ensure no previous test or recovery timer is active, then build and install the harness:
 
 ```sh
+# Install with the default theme
 akari greetd-test install
+
+# Or select another theme project
 akari greetd-test install --theme themes/preset1
 ```
 
-Select a theme project with `--theme PATH` (or `-t PATH`); the default is
-the current repository's `themes/default`. Relative paths use the invocation
-directory, and projects outside the repository are supported. `start` uses the
-installed theme; change it by running `install` again with the desired project.
+`install` compiles the theme and production backend in release mode (`--jobs 4`), backs up previous `/opt/akari-test/` artifacts, and saves your active Sway or Hyprland monitor order to `/opt/akari-test/display-layout.json`.
 
-The installer first builds the selected theme and production backend in Linux
-release mode with four build jobs. It runs the build as the sudo
-caller (or the repository owner when invoked directly as root), keeping SDK and
-repository caches owned by that user. SDK selection uses the same repository
-configuration and `AKARI_FLUTTER_BIN` / `AKARI_DART_BIN` overrides as the CLI.
-A failed build aborts installation before any installed files or backups change.
+### 2. Start from a TTY
 
-After a successful build, installation backs up the previous frontend, backend,
-scripts and configuration beneath `/opt/akari-test/backups/`. It does not switch
-display managers.
-The installer expects the existing test setup's `greeter` account and writable
-`/opt/akari-test/state` directory.
+1. Save your work and log out of your desktop session.
+2. Switch to `tty3`, log in, and start the test:
 
-Installation also captures the active Sway or Hyprland desktop's display order
-in `/opt/akari-test/display-layout.json`. An aligned horizontal row or vertical
-column is supported. This uses the desktop's configured arrangement; display
-hardware cannot report which side of another screen it physically occupies.
-Login computes contiguous positions from Sway's actual logical output sizes,
-retaining the login environment's own modes and scale. Hotplug recomputes those
-positions; newly discovered outputs follow the saved outputs until installation
-captures a new arrangement. If no supported desktop layout can be captured,
-installation preserves the previous layout, or uses Sway's automatic arrangement
-when no layout has been saved. Reinstall from the desktop after rearranging screens.
+   ```sh
+   akari greetd-test start
+   ```
 
-Save work, log out of the desktop, log in on tty3, then run:
+   Optional flags:
+   - `--scale NUMBER`: Override the login output scale (default `1`).
+   - `--log-dir /var/tmp/my-akari-test`: Custom world-traversable log root.
+   - `--dry-run`: Print the execution plan without stopping SDDM.
 
-```sh
-akari greetd-test start
-```
+`start` arms recovery before stopping SDDM. SDDM is restored automatically when:
+- Setup fails during preflight,
+- `akari-test.service` exits (`ExecStopPost`), or
+- The 10-minute fallback recovery timer fires.
 
-Preflight checks SDDM boot configuration and records diagnostics before changing
-services. It does not inspect the caller's terminal or login sessions.
-Recovery is armed before SDDM stops. A failed setup restores it immediately;
-systemd's `ExecStopPost` restores it when the test service exits; an independent
-ten-minute timer remains the fallback while the service is running. A successful
-login exits the greeter, while greetd continues to own the user desktop session.
+### 3. Restore SDDM manually
 
-To restore manually, switch to tty3 and run:
+To end a test and return to SDDM from `tty3`:
 
 ```sh
 akari greetd-test restore
-```
 
-Recovery itself is independent of this CLI. systemd's timer and exit callback
-always invoke `/opt/akari-test/restore.sh` directly. If the repository or
-Flutter/Dart SDK is unavailable, restore from tty3 with:
-
-```sh
+# Emergency fallback if the repository or SDK is unavailable:
 sudo /opt/akari-test/restore.sh
 ```
 
-The CLI, timer and exit callback all use this single recovery implementation.
-`install`, `start` and `restore` accept `--dry-run` to print the command that would
-run without requesting sudo or changing files. Preflight still runs during an
-actual start.
+### 4. Check status and logs
 
-Inspect installed artifacts, SDDM, the test service, the recovery timer and saved
-log paths with:
+Inspect service state, timers, and log paths without `sudo`:
 
 ```sh
 akari greetd-test status
 akari greetd-test status --format json
 ```
 
-Logs live outside `/opt`, under `/var/tmp/akari-greetd-test-<caller-uid>/`.
-For a user with UID 1000 this is `/var/tmp/akari-greetd-test-1000/`.
-All users can read startup, frontend, backend, compositor and recovery logs
-directly, including while the test is running, without sudo or special group
-membership. Direct root invocation uses UID 0 and keeps the same read access.
-Log directories use mode `0755`; log files use mode `0644`. Only their owners
-and root can write to them.
+Logs are world-readable under `/var/tmp/akari-greetd-test-<caller-uid>/` (e.g., `/var/tmp/akari-greetd-test-1000/`):
 
-Each startup attempt that reaches log setup gets its own
-`<timestamp>-<pid>/start.log`. Startup prints its log directory before preflight.
-The `latest` symlink points to the latest attempt, including preflight failures.
-The `current` symlink points to the latest armed test. The installation keeps
-a `current-run` pointer to that directory for launching and recovery, so a
-later rejected attempt cannot redirect recovery logs. Restore prints the test's
-log directory too.
+- `latest`: Symlink to the newest startup attempt (including preflight failures).
+- `current`: Symlink to the latest armed test run.
+- `current/greeter/session-*/`: Contains `backend.log`, `flutter.log`, `sway.log`, `lifecycle.log`, `outputs.json`, and `display-profile.json`.
 
-Each greeter launch retains `backend.log`, `flutter.log`, `sway.log`,
-`lifecycle.log` and `outputs.json` under its own `greeter/session-*/` directory;
-returning from the desktop does not overwrite earlier logs. Recovery saves the
-test and SDDM journal plus its own timestamp/result.
-
-After initial output arrangement, the launch also publishes `display-profile.json`
-with normalized active outputs, DRM login provenance, run/session paths, capture
-time and a checksum of the original `outputs.json`. Publication is atomic and
-follows the raw snapshot. This is the startup state; hotplug keeps rearranging
-outputs but does not update this snapshot. Re-run the test to capture a changed
-display combination. Sessions without a saved arrangement use Sway's initial
-positions and the same snapshot capture path.
-
-Back on the desktop, `akari run sway` automatically imports the newest valid
-marked snapshot into the developer's local state. It ignores incomplete,
-damaged or unmarked captures and keeps any existing valid local profile.
-`--display-profile reference` uses the project's 1920×1080, scale 1
-reference (fixed resolution for headless); `--display-profile login` requires
-a valid login capture.
-See [Development Tooling](../reference/cli.md) for overrides, multi-output
-mapping, actual-output checks and inner screenshots. Reinstall the harness to
-enable these source-marked captures; login processes never write to a
-developer's home directory.
-
-Continue with [display testing](display-testing.md#compare-a-nested-session-with-standalone-login)
-to compare that capture in a desktop session or produce fixed-resolution images.
-
-## Capture the actual TTY login screen
-
-Reinstall with `akari greetd-test install` to include the current capture script,
-and install `grim` on the system. On the actual login screen, press `Print` to
-save a PNG for every active display. `Shift+Print` waits three seconds, giving
-you time to open an account or session menu. The login compositor handles these
-keys without waking the dormant UI or dismissing a menu.
-
-Each capture creates a new directory beneath the current run's
-`greeter/session-*/screenshots/<timestamp>-*/`. Images survive SDDM restoration
-and are readable from the desktop without sudo. For UID 1000 and the default
-log root:
+Query logs directly through the CLI:
 
 ```sh
-ls /var/tmp/akari-greetd-test-1000/current/greeter/session-*/screenshots/
-akari greetd-test logs --run current --file screenshot
-```
-
-Each directory contains `output-1.png`, etc., plus `capture.json` mapping images
-to displays and recording their current modes, logical dimensions and scales.
-Each display uses its own capture scale, avoiding grim's default highest-scale
-resampling on mixed-DPI setups. This does not change the startup
-`display-profile.json`; captures after hotplug retain their own display metadata.
-
-Use these actual images as your styling reference. Back on Hyprland, compare
-with `akari run sway --theme themes/default --display-profile login` fullscreen
-on the same monitor; an ordinary preview window can have a different logical
-viewport.
-
-Inspect the latest startup attempt or the test used by recovery:
-
-```sh
+# Latest start.log
 akari greetd-test logs
+
+# Last 100 lines of backend.log from the armed test
 akari greetd-test logs --run current --file backend -n 100
+
+# Follow flutter.log in real time
 akari greetd-test logs --run current --file flutter --follow
 ```
 
-`logs` defaults to the caller's latest startup attempt and its `start.log`.
-`--run current` selects the last armed test, even after restoration. `--file`
-accepts `start`, `backend`, `flutter`, `sway`, `lifecycle`, `screenshot`, `restore` and `journal`.
-Greeter logs select the newest session; older session files remain at the saved
-run path. `--lines` (`-n`) defaults to 100; `--follow` (`-f`) follows the selected
-file, including its later creation. It does not switch sessions automatically.
+Accepted `--file` values: `start`, `backend`, `flutter`, `sway`, `lifecycle`, `screenshot`, `restore`, and `journal`.
 
-Set a custom location when starting a test (relative paths use the invocation
-directory):
+## Capture the actual TTY login screen
+
+With `grim` installed on the host, you can capture per-monitor screenshots directly from the live login screen without waking the dormant UI or closing open menus:
+
+| Shortcut | Behavior |
+| --- | --- |
+| `Print` | Immediately saves a PNG for each active output |
+| `Shift+Print` | Waits 3 seconds before capturing (useful for opening account/session menus) |
+
+Screenshots and `capture.json` metadata are saved under `greeter/session-*/screenshots/<timestamp>-*/` and remain readable after SDDM restoration:
 
 ```sh
-akari greetd-test start --log-dir /var/tmp/my-akari-test
+akari greetd-test logs --run current --file screenshot
 ```
 
-The greeter must be able to traverse the parent directories of a custom location;
-startup checks access before stopping SDDM. `logs` discovers the saved location
-without needing `--log-dir` again. A private home directory usually
-prevents this, so use a location beneath `/var/tmp`. The installation also retains
-a per-caller `latest-run-<uid>` pointer, including failed preflight attempts. Recovery resolves the saved `current-run` pointer
-automatically and does not require the custom setting again. Each prepared test
-saves its scale and log root in `config.json`. The former `AKARI_TEST_SCALE`
-and `AKARI_TEST_LOG_DIR` settings are replaced by these explicit start options.
+Back on your desktop, `akari run sway` automatically imports `display-profile.json` from the latest valid test so you can [compare nested Sway with standalone login](display-testing.md#compare-a-nested-session-with-standalone-login).
 
-For live system service output, use `sudo journalctl -u akari-test.service -f`;
-the directly readable `journal.log` is saved during recovery. Reinstall the
-scripts to make these changes available in `/opt/akari-test`. Existing logs in
-the old `/opt/akari-test/test-runs/` directory remain there.
+## Offline harness tests
 
-The standalone login environment supplies the local visual reference. Its output scale
-remains 1 by default. `akari greetd-test start --scale NUMBER` explicitly
-overrides it; Sway records the actual output mode and scale in `outputs.json`.
-`akari run sway` compensates for the outer Hyprland monitor scale, so a
-fullscreen nested window on the same monitor and mode has the same logical
-viewport and content size as TTY. The inner scale is the selected login scale
-divided by the Hyprland monitor scale; monitor settings remain untouched.
-Headless tests reproduce the selected profile's fixed resolution and scale.
-
-Validate harness control flow without root or live system changes:
+Validate harness scripts without root privileges or stopping your display manager:
 
 ```sh
 python3 test/support/greetd_test_workflow_test.py

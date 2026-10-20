@@ -3,22 +3,27 @@ title: 维护文档
 description: 修改文档，在本地预览，再发布到 GitHub Pages。
 ---
 
-## 内容与配置
+`docs/` 目录下的 Markdown 文件是手册源文件，`docs/site/` 则管理 Astro/Starlight 配置、样式与构建脚本。
 
-`docs/` 下的 Markdown 是手册源文件。`docs/site/` 管理 Astro 配置、依赖锁文件、样式和构建命令。网站直接读取这些目录：
+## 目录结构与多语言约定
 
-- `getting-started/`：安装工具并运行第一个预览。
-- `guides/`：按具体任务编写的操作指南。
-- `reference/`：接口、格式和命令参考。
-- `architecture/`：模块关系、职责分工和设计说明。
+| 目录 | 是否发布到站点 | 用途 |
+| --- | --- | --- |
+| `getting-started/` | 是 | 环境准备与首次预览构建 |
+| `guides/` | 是 | 按任务组织的操作指南（主题、多屏、测试等） |
+| `reference/` | 是 | CLI 参数、JSON 格式、D-Bus 规范与 Dart API 入口 |
+| `architecture/` | 是 | 模块边界、职责划分与代码导航 |
+| `internal/` | 否（仅仓库内） | 仍在开发中的内部工具文档（如 Theme Studio 说明） |
+| `proposals/` | 否（仅仓库内） | 架构提案与实机验收规范 |
 
-所有已发布页面都在 `zh-cn/` 下提供对应的简体中文版本，分类和文件名保持一致。Astro 在网站根路径提供英文页面，在 `/zh-cn/` 路径下提供中文页面（语言标签为 `zh-CN`）。请使用相对 Markdown 链接，以便链接插件将目标解析到同一种语言。`docs/site/public/api/` 中生成的 API 参考仍共用一份，不单独翻译。
+所有目录在 `docs/zh-cn/` 下均有路径和文件名完全一致的简体中文版本：
+- 英文页面发布在站点根路径（`/Akari/`），简体中文页面发布在 `/Akari/zh-cn/`（语言标签 `zh-CN`）。
+- 请在文档中使用相对 `.md` 链接，这样既能在 GitHub 上直接跳转，也能由构建插件自动解析为对应语言的网页路由。
+- `docs/site/public/api/` 下生成的 Dart API 参考由中英文页面共用。
 
-`internal/` 和 `proposals/` 保留为仓库文档，不加载到网站页面或搜索索引中。Studio 仍在开发时，其用户文档放在 `internal/`。
+## 本地预览与构建校验
 
-## 预览与构建
-
-安装 Node.js 22.12 或更新版本及 Python 3。生成 API 还需要仓库指定的 Flutter/Dart 工具链。
+需要安装 Node.js `>= 22.12`、Python 3，以及仓库配置的 FVM Flutter/Dart 工具链。
 
 ```sh
 cd docs/site
@@ -26,7 +31,7 @@ npm ci
 npm run dev
 ```
 
-本地网站的路径是 `/Akari/`，与 GitHub Pages 一致。先生成 API 页面，对应链接才能打开。完整构建步骤如下：
+执行完整构建（含生成 Dart API 文档、类型检查、构建静态站点与死链校验）：
 
 ```sh
 npm run api
@@ -36,22 +41,23 @@ npm run verify
 npm run preview
 ```
 
-`check` 校验 Astro 配置和组件。`verify` 检查生成手册中的本地链接、资源和片段目标，以及预期的 API 入口。依赖版本由锁文件固定；生成的 HTML 和搜索索引不提交到 Git。
+- `npm run check`：校验 Astro 配置与组件类型。
+- `npm run verify`：检查生成站点中的所有本地链接、静态资源、锚点片段（`#fragment`）与四个公开包的 API 入口，并确认 `internal/` 和 `proposals/` 未被错误发布。
 
-## 添加页面
+:::note
+生成的构建目录（`docs/site/dist/`、`docs/site/public/api/` 和 `docs/site/node_modules/`）均已配置 Git 忽略，请勿提交到仓库。
+:::
 
-在对应目录中新建 Markdown 文件，在文件顶部的 frontmatter 中填写 `title` 和 `description`，再把页面路径加入 `astro.config.mjs` 的侧边栏配置。相对于仓库的 `.md` 链接在 GitHub 上仍可直接使用，并会由 Markdown 插件转换为网站路由。Mermaid 代码块会渲染为图表。
+## 新增或更新页面
 
-每新增一个已发布的英文页面，都要在 `docs/zh-cn/` 下的相同路径补充中文版本。侧边栏项目的 `translations` 映射使用 `zh-CN` 语言标签填写中文名称。`internal/` 和 `proposals/` 保持在内容加载器之外；它们属于仓库文档，不作为网站页面发布。
+1. 在对应分类目录下新建或修改英文 Markdown 文件，并在顶部 frontmatter 中填写 `title` 与 `description`。
+2. 在 `docs/zh-cn/` 下的相同相对路径同步新增或更新中文版本。
+3. 若新增的是已发布页面，将其 slug 与 `translations: { 'zh-CN': '...' }` 侧边栏标题加入 `docs/site/astro.config.mjs`。
+4. 修改公开 Dart API 时，应在同一提交中同步更新源码 `///` 注释与相关指南。示例代码只导入公开包入口（如 `package:theme_sdk/theme_sdk.dart`），不要导入 `lib/src/`。
 
-修改 API 时，要一起更新代码注释和相关指南。文档应解释怎么使用、有什么限制，以及为什么这样设计。公开 API 以导出的包入口为准；示例中不要导入 `lib/src/`。
+## 发布到 GitHub Pages
 
-## GitHub Pages
+文档站点托管于 `https://anfsity.github.io/Akari/`，使用 GitHub Actions（`.github/workflows/docs.yml`）构建并部署：
 
-网站发布地址为 `https://anfsity.github.io/Akari/`。推送到 `gh-pages` 分支或手动运行工作流都会触发文档工作流。该工作流会构建手册和 Dart 参考、验证结果，然后通过 GitHub 官方部署 action 直接发布 Pages 构建产物。
-
-GitHub Pages 将 **GitHub Actions** 设为发布来源。构建和部署逻辑位于 `main` 上的 `.github/workflows/docs.yml`。该工作流也支持传入明确 `source_ref` 的可复用调用。在 `main` 上手动运行 **Documentation** 时，会构建所选修订。main 分支推送和 pull request 不会自动启动此工作流。
-
-`gh-pages` 分支只保留一个发布工作流和 README，不包含生成的 HTML、API 页面或搜索资源。推送该分支，或手动运行 **Publish documentation** 工作流，都会以 `source_ref: main` 调用 main 工作流，从而重新构建并部署最新的 main 源代码；它不会直接发布分支中的文件。main 和发布分支的运行共享同一个发布并发组。
-
-分支历史保留了最初的静态快照以便恢复。之后的发布会将已验证的 `docs/site/dist/` 上传为 Pages 构建产物。不要提交 `dist/`、`public/api/` 或 `node_modules/`；源码仓库的忽略规则已排除这些目录。
+- **触发方式**：在 `main` 分支手动运行 **Documentation** 工作流，或推送/手动触发 `gh-pages` 分支上的发布工作流（会以 `source_ref: main` 调用主工作流）。
+- **构建流程**：自动构建 Starlight 手册与 `dart doc` API 参考，通过 `npm run verify` 校验后，将 `docs/site/dist/` 直接作为 GitHub Pages 产物发布。

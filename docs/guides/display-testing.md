@@ -3,77 +3,63 @@ title: Test displays and scaling
 description: Compare desktop previews, nested Sway, fixed screenshots, and standalone login displays.
 ---
 
-Run these commands from the repository root after
-[environment setup](../getting-started/installation.md). The examples use the
-default theme; `--theme PATH` selects another compiled theme.
+Run these commands from the repository root after [environment setup](../getting-started/installation.md). Replace `themes/default` with `--theme PATH` to test another theme.
 
-## Choose a session
+## Choose a workflow
 
-| What to check | Session |
+| Goal | Command / Workflow |
 | --- | --- |
-| Automated login UI journeys on the current desktop | `preview` |
-| Shared login state and keyboard focus across actual monitors | Fullscreen `run` |
-| Standalone content scale inside a Wayland desktop | `run sway` |
-| Repeatable resolution and screenshots | `run sway --sway-backend headless` |
-| Hardware output modes, DRM, PAM, and recovery | [Standalone greetd testing](greetd-testing.md) |
+| Automated login UI walkthrough on the desktop | `akari preview` |
+| Shared login state and focus across physical monitors | `akari run` (fullscreen default) |
+| Reproduce standalone TTY scaling inside a Wayland desktop | `akari run sway` |
+| Capture repeatable fixed-resolution screenshots without a desktop | `akari run sway --sway-backend headless` |
+| Verify hardware modes, DRM/KMS splash, PAM, and SDDM recovery | [Standalone greetd testing](greetd-testing.md) |
 
-Preview runs controlled UI journeys once in one window and exits. `run` and `run sway` use the mock backend by default;
-their frontend still communicates through D-Bus. The compositor workflows need
-Python 3, Sway, `swaymsg`, and grim. Native input checks also need wtype.
+:::note
+`run` and `run sway` use the Rust mock backend over a private D-Bus session by default. Sway workflows require `python3`, `sway`, `swaymsg`, and `grim`.
+:::
 
-## Check shared state on several monitors
+## Check shared state across multiple monitors
 
 ```sh
 fvm dart run tool/akari.dart run --theme themes/default
 ```
 
-The fullscreen greeter opens a view on each monitor. Click a view to make it
-active, select an account, and type into its credential field. The other views
-should show the same account, session, and credential text. Move focus to another
-view and continue typing; a single Enter press should submit one response.
+In fullscreen mode, Akari opens one view per connected monitor using each output's logical size and scale. Verify the following behaviors:
 
-Escape hides the controls on every display and clears the shared credential
-text. Wake resumes the existing authentication prompt. Disconnect the focused
-monitor while a prompt is active, then reconnect it: the remaining view should
-retain the conversation, and the reconnected view should show its current state.
-Each view lays out against its own logical dimensions and scale.
+1. **Shared state**: Select an account and type a password on one monitor—all other monitors update simultaneously.
+2. **Active focus**: Move focus to another monitor and press `Enter`—only one authentication response is submitted.
+3. **Dormant state (`Escape`)**: Pressing `Escape` hides controls on all displays and clears typed text without cancelling the active PAM prompt; waking the UI resumes the same prompt.
+4. **Monitor hotplug**: Disconnect and reconnect the focused monitor during an active prompt—remaining displays keep the conversation alive, and reconnected displays adopt the current state.
 
-For persistent interaction in a resizable window, set
-`AKARI_WINDOW_MODE=windowed` before `run`. Quit with `q` in the launching terminal.
+:::tip
+Set `AKARI_WINDOW_MODE=windowed` before `run` if you only need a single resizable window. Press `q` in the terminal to quit.
+:::
 
 ## Compare a nested session with standalone login
 
-Start with the project reference when no login capture is available:
+1. **Without a saved TTY capture**, start with the built-in `1920x1080` (scale `1.0`) reference profile:
 
-```sh
-fvm dart run tool/akari.dart run sway --theme themes/default \
-  --display-profile reference
-```
+   ```sh
+   fvm dart run tool/akari.dart run sway --theme themes/default \
+     --display-profile reference
+   ```
 
-After completing the [standalone capture workflow](greetd-testing.md), return to
-the desktop and require that capture explicitly:
+2. **After running a [standalone greetd test](greetd-testing.md)**, replay the captured hardware display profile on your desktop:
 
-```sh
-fvm dart run tool/akari.dart run sway --theme themes/default \
-  --display-profile login
-```
+   ```sh
+   fvm dart run tool/akari.dart run sway --theme themes/default \
+     --display-profile login
+   ```
 
-Check the printed source and output targets before comparing. `login` fails if
-there is no valid capture; the default `auto` can fall back to the reference.
-Use `--dry-run` to inspect profile selection without importing or starting it.
-The [CLI reference](../reference/cli.md#sway-sessions-and-display-profiles)
-defines capture selection, persistence, and multi-output mapping.
+   - `--display-profile login` fails if no valid TTY capture exists, whereas the default `auto` falls back to `reference`.
+   - Pass `--dry-run` to inspect which profile would be selected without launching Sway.
 
-On Hyprland, fullscreen the nested window using your normal desktop shortcut.
-Compare it on the same physical monitor and mode as the standalone test. The
-session compensates for the host monitor's scale; a tiled window can have a
-different viewport. Move it to another monitor or resize it to check that the
-viewport and compensated scale update while the theme keeps running.
+3. **Comparing on Hyprland**: Fullscreen the nested Sway window on the same physical monitor used during the TTY test. `run sway` automatically compensates for your outer Hyprland monitor scale (`inner_scale = login_scale / hyprland_scale`) so the fullscreen logical viewport matches TTY login.
 
-For actual login-screen images, use `Print` or `Shift+Print` in the
-[TTY capture workflow](greetd-testing.md#capture-the-actual-tty-login-screen).
+## Capture fixed-resolution screenshots
 
-## Capture a fixed resolution
+Use `--sway-backend headless` to render an exact resolution and scale without requiring an active Wayland desktop:
 
 ```sh
 fvm dart run tool/akari.dart run sway --theme themes/default \
@@ -81,32 +67,19 @@ fvm dart run tool/akari.dart run sway --theme themes/default \
   --resolution 1920x1080 --scale 1.6
 ```
 
-This profile produces a 1200×675 logical viewport and a 1920×1080 output image.
-Headless needs no active desktop. It remains a live session: inspect the printed
-screenshot paths and quit with `q` in the launching terminal.
+- At `1920x1080` and scale `1.6`, the logical viewport is `1200x675` and the output PNG is `1920x1080`.
+- Once all greeter views appear, initial screenshots are saved under `build/tool/runs/<run-id>/sway/screenshots/`, alongside `display-report.json` and `outputs.json`.
+- Press `q` in the terminal when finished.
 
-The session captures each output after all greeter windows appear. The initial
-images stay under `build/tool/runs/<run-id>/sway/screenshots/`; they are not a
-continuous screenshot recording. `display-report.json` and `outputs.json` track
-the adopted display settings. With `--report PATH`, the CLI report's `artifacts`
-points to these files, and its `display` field includes the display report.
+## Troubleshooting
 
-For headless checks, compare the requested `target` with `actual` and require
-`matched: true`. On Hyprland, inspect `effective_target`, including `host_monitor`
-and `host_scale`, because the outer compositor owns window dimensions. Inner
-image dimensions can differ from TTY images while displayed content size agrees.
-
-## Diagnose a comparison
-
-| Symptom | Next step |
+| Symptom | Resolution |
 | --- | --- |
-| `login` reports no valid profile | Reinstall the current harness and complete a standalone test that publishes `display-profile.json`; inspect the saved run's logs |
-| An override is rejected for several outputs | Use `--display-profile reference` for a single-output resolution or scale override |
-| Nested startup needs a Wayland desktop | Run from an active Wayland session, or select `--sway-backend headless` |
-| Headless reports output drift | Read `display-report.json` checks and `sway.log`; a mismatched output fails the session |
-| A Hyprland comparison has a different viewport | Compare fullscreen on the same monitor and physical mode; inspect the effective target's host scale |
-| Expected controls are absent in the initial image | Check the theme's dormant-state conditions; screenshots capture the initial rendered state |
+| `--display-profile login` reports no valid profile | Reinstall the harness (`akari greetd-test install`) and run a standalone test so `display-profile.json` is published. |
+| `--resolution` or `--scale` is rejected on a multi-output profile | Add `--display-profile reference` to apply single-output overrides. |
+| Nested Sway fails to start without a Wayland session | Run inside an active Wayland desktop, or pass `--sway-backend headless`. |
+| Headless session fails with output drift | Check `display-report.json` and `sway.log`—headless mode requires exact match between requested `target` and `actual`. |
+| Hyprland window viewport differs from TTY | Make the nested window fullscreen on the same physical monitor and check `effective_target.host_scale` in `display-report.json`. |
+| Login controls are missing in the initial screenshot | Initial screenshots capture the startup state; check whether your theme starts in the dormant state (`isDormant`). |
 
-Run the [native regression checks](testing.md#native-display-regressions) to cover
-mixed scales, hotplug, and the nested output matrix. Those checks complement the
-standalone hardware test.
+For automated multi-monitor and nested scale checks, see [Native display regressions](testing.md#native-display-regressions).
