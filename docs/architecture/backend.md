@@ -3,52 +3,45 @@ title: Backend code guide
 description: Locate the Rust owners of process lifetime, authentication, and transport.
 ---
 
+The Rust backend (`backend/`) is an application crate whose external interface is the [D-Bus contract](../reference/dbus.md).
+
+## Module map
+
 | Module | Responsibility |
 | --- | --- |
-| `main.rs` | Select service startup or the user-side desktop executor; service signals and shutdown |
-| `service.rs` | D-Bus methods/signals, authentication actor, and system operations |
-| `auth.rs` | Serialized authentication transactions and greetd handoff, nested under `service` |
-| `greetd.rs` | greetd protocol transport and mock implementation |
-| `state.rs` | Authentication state and transaction data |
-| `session_catalog.rs` | Desktop session discovery and launch data validation |
-| `session_launch.rs` | Native login-shell forwarding, desktop argv, locale diagnostics, and user logs |
-| `users.rs` | Account discovery |
+| `main.rs` | Entrypoint mode dispatch (D-Bus service vs. user-side session launcher), signal handling, and graceful shutdown |
+| `service.rs` | `io.akari.Greeter1` D-Bus interface, authentication actor supervision, and `systemd-logind` power calls |
+| `auth.rs` | Private child module of `service`; serializes authentication commands, `attempt_id` ownership, and `greetd` handoff |
+| `greetd.rs` | Framed JSON Unix socket transport (`GREETD_SOCK`) and mock backend implementation |
+| `state.rs` | Pure authentication state machine (`AuthState`) and transition validation |
+| `session_catalog.rs` | `.desktop` session discovery (`/usr/share/wayland-sessions`, `/usr/share/xsessions`) and `TryExec` validation |
+| `session_launch.rs` | User login-shell forwarding (`--start-session` / `--exec-desktop`), argv preservation, locale checks, and session logs |
+| `users.rs` | Interactive system account discovery |
 
-The backend is currently an application crate. Its externally consumed interface
-is the [D-Bus contract](../reference/dbus.md), rather than a Rust library API.
-`service.rs` declares `auth.rs` as its private authentication module.
+## Lifetime & session handoff
 
-## Lifetime and transactions
+### Service & actor lifecycle
 
-The process observes both service lifetime and authentication actor lifetime.
-Shutdown stops accepting calls before cancelling active protocol work. Session
-handoff must release the greeter so greetd can launch the selected desktop.
+- The process supervises both the D-Bus server and the single authentication actor (`auth.rs`).
+- Each authentication attempt receives a unique generation token (`attempt_id`). Signals and client calls must match the active `attempt_id`; cancellation or client disconnect invalidates it immediately.
+- Power actions (`PowerAction`) run in an independent state domain without blocking or cancelling active PAM prompts.
+- On shutdown (`SIGINT`, `SIGTERM`, or D-Bus disconnect), the backend stops accepting new calls, cancels in-flight `greetd` I/O, and releases the greeter so `greetd` can spawn the selected desktop.
 
-The handoff enters the installed executable with `--start-session`, captures
-startup output in a private log, and execs the authenticated user's login shell.
-The shell then re-enters the same executable with `--exec-desktop`. Both modes
-run without the greeter's async runtime or D-Bus service. Desktop arguments
-travel as JSON in the greetd environment and are executed directly after native
-initialization.
-The [real-login guide](../guides/greetd-testing.md#user-session-environment)
-describes configuration, logs, and service-readiness boundaries.
+### User desktop launch (`session_launch.rs`)
 
-Each authentication attempt has a generation token. UI signals and responses
-must be associated with that attempt, and cancellation invalidates it. Power
-requests use an independent state domain.
+When `greetd` starts the authenticated session, it invokes the installed backend binary in two user-side stages (without starting the greeter's async runtime or D-Bus service):
+
+1. **`--start-session`**: Captures native shell startup output in `startup-*.log` and execs the user's `$SHELL` in non-interactive login mode.
+2. **`--exec-desktop`**: Re-entered from the initialized login shell; reads the JSON-encoded desktop `argv` from the environment, opens `session-*.log`, and execs the desktop command directly.
+
+See [User session environment](../guides/greetd-testing.md#user-session-environment) for profile loading and log paths.
 
 ## Local code reference
 
-For browsing Rust implementation details locally:
+Generate and browse local `rustdoc` pages (including private modules and items):
 
 ```sh
 cargo doc --manifest-path backend/Cargo.toml --no-deps --document-private-items
 ```
 
-The generated pages are under `backend/target/doc/`. Rustdoc reads `///` item
-comments and `//!` module documentation. Explain protocol invariants and resource
-ownership there; keep cross-module flows in this guide.
-
-The public website currently publishes the theme SDK API. Backend code reference
-can be added when there is a Rust API audience or a need for hosted contributor
-reference.
+Generated HTML is written to `backend/target/doc/`. Keep module-level invariants and resource ownership in `//!` and `///` doc comments, and document cross-module flows in this handbook.

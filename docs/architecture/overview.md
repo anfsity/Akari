@@ -16,27 +16,20 @@ flowchart TD
     Bridge --> Logind[systemd-logind]
 ```
 
-## Build boundary
+## Ownership boundaries
 
-A theme package owns its scene JSON, visual tokens, assets, and components. The
-CLI selects one package, generates scene Dart, and creates an executable host
-that imports its builder. Production consumes compiled Dart and bundled assets.
+| Layer | Owner | Responsibilities |
+| --- | --- | --- |
+| **Build boundary** | Theme package + CLI (`tool/`) | A theme package owns its `*.scene.json`, visual tokens, assets, and widgets. The CLI selects one theme, generates `*.scene.g.dart`, and creates a compiled Flutter host importing that theme's builder. |
+| **Frontend boundary** | Flutter app + `greeter_ui` + `scene` | `GreeterFeature` owns business state, credential controllers, and typed commands. `GreeterSceneAdapter` projects semantic state into predicates (`ScenePredicate`) and `GreeterHost` slots. `SceneRuntime` handles normalized layout, 2.5D transforms, and enter/exit animations. |
+| **Backend boundary** | Rust bridge (`backend/`) | Owns the `greetd` Unix socket, PAM conversation, attempt tokens (`attempt_id`), session catalog validation, and `systemd-logind` power actions. Exposes the [D-Bus contract](../reference/dbus.md) over a private session bus. |
 
-## Frontend boundary
+:::note
+Themes never communicate with `greetd`, PAM, or D-Bus directly. They render display-safe state from `GreeterHost` and invoke semantic callbacks.
+:::
 
-The application owns the greeter feature, credential controller, and selected
-theme. The feature owns business state and exposes typed slots and commands.
-The scene adapter maps semantic state into predicates and a narrow theme host.
-The runtime owns layout, transforms, presence, and animation lifetime.
+## Where to go next
 
-Themes never communicate with the backend directly. They receive display state
-and semantic callbacks. See the [frontend architecture](frontend.md).
-
-## Backend boundary
-
-The Rust bridge owns the greetd socket, PAM conversation, attempt generation,
-session validation, and power requests. It exposes the
-[D-Bus contract](../reference/dbus.md). The private/session bus carries frontend
-calls; system D-Bus is used separately for logind operations.
-
-Start with the [code map](code-map.md) to locate each owner in the repository.
+- [Code map](code-map.md): Locate every package, runner, and tool in the repository.
+- [Frontend architecture](frontend.md): Understand how `GreeterFeature`, `ThemeDefinition`, and `SceneRuntime` cooperate.
+- [Backend code guide](backend.md): Explore the Rust authentication actor and session launcher.

@@ -16,18 +16,20 @@ flowchart TD
     Bridge --> Logind[systemd-logind]
 ```
 
-## 主题如何构建
+## 职责边界划分
 
-每个主题包包含自己的场景 JSON、样式参数、资源和组件。CLI 根据选定主题生成场景代码，再创建调用该主题 builder 的 Flutter 应用项目。正式应用使用编译好的 Dart 代码和打包资源。
+| 层级 | 所属模块 | 核心职责 |
+| --- | --- | --- |
+| **构建边界** | 主题包 + CLI（`tool/`） | 每个主题包独立管理自己的 `*.scene.json`、样式参数（Tokens）、资源与组件。CLI 根据选定主题生成 `*.scene.g.dart`，并创建直接导入该主题 Builder 的 Flutter 宿主应用。 |
+| **前端边界** | Flutter 应用 + `greeter_ui` + `scene` | `GreeterFeature` 管理登录业务状态、凭据控制器与类型化命令；`GreeterSceneAdapter` 将业务状态映射为场景谓词（`ScenePredicate`）与 `GreeterHost` 插槽；`SceneRuntime` 负责归一化布局、2.5D 变换及节点进出场动画。 |
+| **后端边界** | Rust 桥接服务（`backend/`） | 管理 `greetd` Unix Socket、PAM 对话、尝试令牌（`attempt_id`）、桌面会话目录校验与 `systemd-logind` 电源操作，通过私有会话总线暴露 [D-Bus 接口约定](../reference/dbus.md)。 |
 
-## Flutter 前端负责什么
+:::note
+主题包不直接与 `greetd`、PAM 或 D-Bus 通信，而是通过 `GreeterHost` 订阅安全显示状态并触发语义回调。
+:::
 
-应用管理登录状态、凭据输入和当前主题。功能层通过带有明确类型的状态接口和命令与主题交互。场景适配器把登录状态转换为场景条件，并向主题提供宿主 API。场景运行时处理布局、变换以及组件进入和退出时的动画。
+## 延伸阅读
 
-主题从宿主读取要显示的状态，并通过回调响应用户操作。与后端通信的细节由应用处理。详情见[前端架构](frontend.md)。
-
-## Rust 后端负责什么
-
-Rust 后端连接 greetd，处理 PAM 身份验证、登录尝试标识、桌面会话校验和电源请求。前端通过私有或会话 D-Bus 调用后端；后端另用系统 D-Bus 调用 logind。接口定义见 [D-Bus 接口约定](../reference/dbus.md)。
-
-要找某个功能的实现，可以先看[代码导航](code-map.md)。
+- [代码导航](code-map.md)：快速定位仓库中各个模块、运行器与工具脚本的位置。
+- [前端架构](frontend.md)：了解 `GreeterFeature`、`ThemeDefinition` 与 `SceneRuntime` 的协作机制。
+- [后端代码指南](backend.md)：了解 Rust 认证 Actor 与用户桌面交接流程。
