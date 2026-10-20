@@ -1,76 +1,40 @@
 # Native login handoff
 
-Status: the native window preview and process-ordering tests pass. The DRM/KMS
-implementation is connected to both VT launch boundaries; visual continuity,
-VT switching and driver-specific behavior still require hardware acceptance.
-The previous ASCII animator has been removed.
+> [!NOTE]
+> **Status**: Native window preview and process-ordering tests pass. The DRM/KMS implementation is wired into both VT launch boundaries; visual continuity, VT switching, and GPU-specific behavior still require hardware acceptance.
 
-## Launch boundaries
+## 1. Launch boundaries
 
-The production and greetd-test launchers start the private bus and wait for the
-backend before running the pinned release's `akari-splash kms`. `scripts/splash.sh`
-owns the renderer and compositor, waiting for the renderer to exit before
-starting Sway, so D-Bus startup does not extend the blank interval after the
-animation. Signals terminate and reap both children; launcher death also stops
-the renderer. The launcher retains its controlling VT for cleanup after Sway.
+| Transition stage | Owner | Handoff behavior |
+| --- | --- | --- |
+| **Before Greeter Sway** | `scripts/splash.sh` + `akari-splash kms` | Starts the private D-Bus and waits for the backend, then runs `akari-splash kms` and waits for it to exit before starting Sway. Saves a snapshot (`splash.png`) displayed by `swaybg` while Flutter loads. |
+| **Before User Desktop** | User-side session launcher (`session_launch.rs`) | After greeter exit, initializes `startup-*.log` and `session-*.log`, runs `akari-splash kms`, and `exec`s the desktop command directly so the desktop retains the launcher's PID and exit status. |
 
-The KMS renderer saves a still in the greeter's log directory. The supplied Sway
-configuration displays it through `swaybg` until the Flutter login screen is
-visible, with a black fallback if no image was saved. Existing production configs
-are preserved; their background line needs the change documented in
-[`splash/README.md`](../../splash/README.md). The image covers Flutter startup,
-not the earlier VT/logind reset or user-desktop initialization.
+- Signals (`SIGINT`, `SIGTERM`) and launcher exit cleanly terminate and reap child processes.
+- Authentication stays inside the backend actor and never acquires DRM master.
 
-After successful authentication, greetd starts the user launcher only after the
-greeter has exited. The launcher captures native shell output in `startup-*.log`,
-initializes the session log, and runs the same splash executable before execing
-the desktop. The desktop retains the launcher's process identity and exit status.
-Authentication remains in the existing backend actor and does not acquire DRM.
+## 2. Rendering & KMS lifetime
 
-## Rendering and lifetime
+`akari-splash` is a standalone Rust binary embedding the portrait PNG and Quicksand font:
 
-The independent Rust program embeds the selected portrait PNG and Quicksand
-font. Both its desktop window and KMS outputs use one CPU renderer. Images and
-fonts load once; scaled portraits and glyph layers are cached per output size.
-Only the slight float and status dots change each frame.
+- **Shared CPU renderer**: Used by both the desktop window preview (`akari run splash`) and KMS outputs. Scaled portraits and glyph layers are cached per output resolution.
+- **Timing & background**: Pure black background (`#000000`) with a default minimum hold of `3` seconds from first presentation (`AKARI_SPLASH_DURATION=0` disables the hold; `akari run splash` stays open until closed).
+- **Multi-GPU & multi-output KMS**: Acquires the seat via `libseat` (logind/seatd), enumerates all primary DRM nodes and active CRTCs without hardcoding a GPU index, and maps XRGB dumb buffers at each display's native resolution (cloned connectors share one buffer).
+- **Teardown & scanout retention**: Drawing stops before releasing resources and seat control. Uses `CLOSEFB` (falling back to `RMFB` on older kernels) so the kernel retains the last frame until the next compositor sets a mode.
 
-The background defaults to pure black (`#000000`), matching the login compositor.
-The minimum display time defaults to 3 seconds, starting at the first successful
-presentation. Zero removes the artificial hold. `akari run splash` keeps the
-independent window preview open until closed. `AKARI_SPLASH_DURATION` can be set
-in the VT launcher's environment and is forwarded through greetd to the user
-launcher. This time is not a desktop startup timeout or a desktop readiness signal.
+## 3. Console & log guarantees
 
-KMS access goes through libseat's logind/seatd management. The program enumerates
-primary DRM nodes, connected outputs, active CRTCs and their modes. Each output
-uses its actual resolution; cloned connectors share a buffer. It creates and maps
-XRGB dumb buffers without selecting a fixed GPU number.
+- **Non-fatal fallback**: Splash errors are logged to `lifecycle.log` / `session-*.log` and never block login. PTYs never enter the KMS path.
+- **VT text cleanup**: Both the KMS renderer (before releasing the seat) and the VT launcher (`akari-splash clear` after Sway exits) erase hidden terminal text and scrollback so console output does not flash between compositors.
 
-On normal exit, failure, termination or seat revocation, drawing stops before
-resources and seat control are released. Revocation ends the renderer permanently;
-a later enable cannot revive it. No previous compositor state is restored after
-release. CLOSEFB retains the last scanout when the kernel and console transition
-permit; older kernels fall back to RMFB. Console mode restoration or a compositor
-mode change may still blank the screen. Process exit is the release acknowledgement.
+## 4. Hardware acceptance checklist
 
-## Console and log guarantees
+Verify both transitions (before Greeter Sway and before the user desktop) on physical VTs:
 
-Renderer errors go to the existing lifecycle/session logs and allow normal login
-to continue. PTYs cannot enter the KMS path. After Sway exits, the VT-owning
-launcher runs `akari-splash clear` to erase hidden terminal text and scrollback
-without acquiring display control.
-The KMS renderer clears these again during its own cleanup, before releasing the
-seat. Launcher, native shell and desktop output retain their existing redirection.
-No detached animation can repaint the console after the desktop takes over.
-
-## Hardware acceptance
-
-Check both transitions on a real VT: before Sway and before the user desktop.
-Cover different GPUs, mixed resolutions, cloned and extended outputs, VT switches,
-renderer termination, missing devices, compositor startup failure and logout.
-Confirm no lingering process, DRM master conflict, old frame or startup log returns
-on desktop exit. Measure the actual blank interval between compositors; nested
-and headless tests cannot establish this result.
+- [ ] Different GPU vendors, mixed monitor resolutions, and cloned/extended layouts.
+- [ ] VT switching during splash hold and compositor startup.
+- [ ] Renderer termination, missing DRM devices, compositor startup failure, and desktop logout.
+- [ ] No lingering `akari-splash` process, DRM master conflict, stale frame, or visible console text on logout.
 
 ## References
 
