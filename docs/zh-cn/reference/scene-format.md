@@ -3,9 +3,13 @@ title: 场景格式
 description: 场景 JSON 的字段、示例和校验规则，当前版本为 2。
 ---
 
-场景的数据模型和编解码器定义在 `packages/scene_schema`。构建主题时，工具先校验 JSON，再生成 Dart 代码。正式应用直接使用生成的代码，登录时无需读取场景 JSON。
+场景 JSON 文件（`*.scene.json`）定义主题的画布、背景、节点、几何变换与可见性条件。构建时由 `packages/scene_schema` 校验 JSON 并生成类型化 Dart 代码（`*.scene.g.dart`），正式应用直接运行生成代码，无需在登录时解析 JSON。
 
-## 最小文档
+:::note
+当前场景格式版本为 `2`。解码器仍兼容版本 `1`（会自动将旧版 `kind`/`action` 字段规范化为当前模型），新建场景请统一使用版本 `2`。
+:::
+
+## 最小示例
 
 ```json
 {
@@ -32,71 +36,66 @@ description: 场景 JSON 的字段、示例和校验规则，当前版本为 2�
 }
 ```
 
-示例使用 `StandardGreeterComponents` 支持的标识符。自定义工厂可定义自己的标识符。场景至少包含一个节点；节点 ID 必须唯一，组件标识符不能为空。
+- 每个场景至少包含一个节点。
+- 节点 `id` 在文档内必须唯一，`component` 标识符不能为空。
 
-## 画布
+## 画布（`canvas`）
 
-| 字段 | 可选值/默认值 | 含义 |
-| --- | --- | --- |
-| `fit` | `cover`、`contain`、`reflow`；必填 | 画布适配策略 |
-| `useSafeArea` | `true` | 是否遵循安全区域调整后的画布 |
-| `referenceWidth` | `1920` | 参考宽度（像素）；1–16384 |
-| `referenceHeight` | `1080` | 参考高度（像素）；1–16384 |
+| 字段 | 类型 / 可选值 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `fit` | `"cover"` \| `"contain"` \| `"reflow"` | 必填 | 画布相对屏幕视口的缩放适配策略 |
+| `useSafeArea` | `boolean` | `true` | 是否在安全区域（Safe Area）内排布节点 |
+| `referenceWidth` | `1..16384` | `1920` | 参考宽度（像素，供 Studio 像素模式换算使用） |
+| `referenceHeight` | `1..16384` | `1080` | 参考高度（像素，供 Studio 像素模式换算使用） |
 
-布局位置和尺寸按画布比例填写。例如，宽度 `0.5` 表示画布可用宽度的一半。
+## 背景（`background`）
 
-## 背景
+| 字段 | 类型 / 可选值 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `kind` | `"image"` \| `"solid"` \| `"video"` \| `"custom"` | 必填 | 背景渲染器类型 |
+| `asset` | `string` | 不设置 | 打包图片或渲染配置路径（如 `packages/theme_ocean/assets/bg.jpg`） |
+| `color` | `#RRGGBB` \| `#AARRGGBB` | `"#0d151a"` | 纯色填充或回退底色 |
+| `scrimOpacity` | `0.0..1.0` | `0.35` | 遮罩层不透明度 |
+| `blurSigma` | `>= 0` | `0` | 静态画布高斯模糊强度 |
+| `rendererId` | `string` | 不设置 | 在 `ThemeBundle` 中注册的自定义渲染器标识符 |
 
-| 字段 | 默认值 | 含义 |
-| --- | --- | --- |
-| `kind` | 必填 | `image`、`solid`、`video` 或 `custom` |
-| `asset` | 不设置 | 打包图像或渲染器配置引用 |
-| `color` | `#0d151a` | 背景填充色 |
-| `scrimOpacity` | `0.35` | 遮罩不透明度，范围 [0, 1] |
-| `blurSigma` | `0` | 非负的模糊强度 |
-| `rendererId` | 不设置 | 可选自定义渲染器标识符 |
+:::caution
+内置渲染器默认支持 `image` 和 `solid`。若使用 `video` 或 `custom`，需在主题的 `ThemeBundle` 中注册对应实现。资源路径不得包含 `..`。
+:::
 
-内置渲染器实现 `image` 和 `solid`。其他类型需要由编译进主题的实现注册。资源引用不得包含 `..`；图像资源使用 `assets/` 或 Flutter `packages/` 路径。主题自有资源通常使用 `packages/<package-name>/assets/...`。
+## 节点（`nodes`）
 
-颜色接受六位 RGB 或八位 ARGB 十六进制字符串，通常写作 `#RRGGBB` 或 `#AARRGGBB`。
-
-## 节点
-
-| 字段 | 默认值 | 含义 |
-| --- | --- | --- |
-| `id` | 必填 | 唯一节点标识符 |
-| `component` | 必填 | 由主题组件工厂处理的标识符 |
-| `rect` | 必填 | 归一化的 `x`、`y`、`width` 和 `height` |
-| `z` | `0` | 空间深度 |
-| `renderOrder` | `0` | 绘制顺序 |
-| `focusOrder` | `0` | 键盘遍历顺序 |
-| `motion` | `none` | 动效预设 |
-| `visibleWhen` | 不设置 | 控制节点何时显示的条件 |
-| `interactive` | `false` | 节点是否可交互 |
-| `properties` | `{}` | 由组件解释的字符串键值配置 |
-| `transform` | 单位变换 | 节点局部的平移、缩放、旋转和轴心 |
-
-矩形的 X/Y 必须非负，宽和高必须为正，右边和下边不能超出 1。深度、绘制顺序和键盘顺序含义不同；不要根据其中一个推断另一个。
-
-动效名称为 `none`、`fade`、`fadeSlide`、`fadeScale`、`hoverLift` 和 `focusGlow`。主题注册 builder 和视觉时间参数；运行时负责动画生命周期。
+| 字段 | 类型 / 可选值 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `string` | 必填 | 唯一节点 ID |
+| `component` | `string` | 必填 | 交给主题组件工厂解析的组件标识符 |
+| `rect` | `{ x, y, width, height }` | 必填 | 归一化画布坐标（`x >= 0`、`y >= 0`、`width > 0`、`height > 0`，且右/下边界 `<= 1`） |
+| `z` | `number` | `0` | 空间深度 |
+| `renderOrder` | `integer` | `0` | 绘制顺序（与 `z` 和 `focusOrder` 相互独立） |
+| `focusOrder` | `integer` | `0` | 键盘 Tab 焦点遍历顺序 |
+| `motion` | `"none"` \| `"fade"` \| `"fadeSlide"` \| `"fadeScale"` \| `"hoverLift"` \| `"focusGlow"` | `"none"` | 进出场或交互动效预设 |
+| `visibleWhen` | 条件对象 / 字符串 | 不设置 | 声明式显示条件（省略时始终显示） |
+| `interactive` | `boolean` | `false` | 是否为可交互节点（启用最小命中热区与焦点遍历） |
+| `properties` | `Record<string, string>` | `{}` | 由具体组件解析的字符串键值属性 |
+| `transform` | 变换对象 | 单位变换 | 节点局部的平移、缩放、旋转与轴心 |
 
 <a id="transforms"></a>
 
-## 变换
+## 几何变换（`transform`）
 
-| 字段 | 单位/默认值 |
-| --- | --- |
-| `translateX`、`translateY` | 逻辑像素；0 |
-| `scaleX`、`scaleY` | 倍率；1 |
-| `rotationX`、`rotationY`、`rotationZ` | 度；0 |
-| `pivotX`、`pivotY` | 相对布局节点尺寸的比例；0.5 |
-| `perspective` | 矩阵透视系数；0 |
+节点 `rect` 使用画布归一化比例（`0..1`），而 `transform` 字段使用以下单位：
 
-变换字段使用上表中的单位；节点矩形的位置和尺寸仍按画布比例填写。
+| 字段 | 单位 | 默认值 |
+| --- | --- | --- |
+| `translateX`、`translateY` | 逻辑像素 | `0` |
+| `scaleX`、`scaleY` | 缩放倍率 | `1` |
+| `rotationX`、`rotationY`、`rotationZ` | 角度（度） | `0` |
+| `pivotX`、`pivotY` | 相对节点自身尺寸的比例（`0..1`） | `0.5` |
+| `perspective` | 矩阵透视系数 | `0` |
 
-## 显示条件
+## 显示条件（`visibleWhen`）
 
-谓词名称本身就是一个条件；可使用 `all`、`any` 或 `not` 组合。每个条件对象只能包含一个运算符，`all` 和 `any` 接受非空条件列表。
+单个 `ScenePredicate` 名称本身即构成条件，也可通过 `all`、`any`、`not` 组合（每个条件对象仅包含一个运算符）：
 
 ```json
 {
@@ -107,10 +106,8 @@ description: 场景 JSON 的字段、示例和校验规则，当前版本为 2�
 }
 ```
 
-[API 参考](api.md)中的 `ScenePredicate` 枚举列出完整谓词。条件不会执行任意表达式或脚本。登录适配器会将语义状态投影为谓词；主题不会根据后端传输对象推导条件。
+完整谓词列表请查阅 [API 参考](api.md)中的 `ScenePredicate` 枚举。
 
-休眠状态不会结束身份验证提示，因此身份验证谓词和 `isDormant` 可能同时生效。如果登录控件需要在按下 Escape 后隐藏，请添加 `{ "not": "isDormant" }`。默认主题的确认箭头在提示、提交和身份验证错误状态下都使用这个显示条件。
-
-## 版本
-
-当前版本为 2。解码器也接受版本 1，并会将旧版 `kind` 和 `action` 词汇规范化为当前组件/交互模型。编码始终写入当前文档格式。新文档请使用版本 2。
+:::tip[配合休眠状态使用]
+按下 `Escape` 进入休眠状态（`isDormant`）不会中断正在进行的认证提示，因此 `isAuthPrompting` 等谓词可能与 `isDormant` 同时为真。若希望登录控件在休眠时隐藏，请在外层组合 `{ "not": "isDormant" }`。
+:::
