@@ -3,57 +3,74 @@ title: Environment setup
 description: Prepare the Linux toolchain for Akari development.
 ---
 
+Akari builds and runs on Linux. Complete the steps below before running previews or builds.
+
 ## Prerequisites
 
-Akari currently builds and runs on Linux. Install:
+### Core build dependencies
 
-- Git and [FVM](https://fvm.app/) to use the repository's Flutter SDK.
-- Rust and Cargo for the backend and native splash; libseat development files
-  (`libseat-dev` on Debian/Ubuntu, provided by `seatd` on Arch).
-- Clang, CMake, Ninja, pkg-config, and GTK 3 development files for Flutter Linux.
-- D-Bus tools, including `dbus-run-session` and `busctl`, for backend sessions.
+| Component | Required packages / tools | Purpose |
+| --- | --- | --- |
+| Source & SDK | `git`, [FVM](https://fvm.app/) | Manage the pinned Flutter SDK in `.fvmrc` |
+| Rust & seat | `rustc`, `cargo`, `libseat` headers (`libseat-dev` on Debian/Ubuntu, `seatd` on Arch) | Build the D-Bus backend and native splash |
+| Flutter Linux | `clang`, `cmake`, `ninja`, `pkg-config`, GTK 3 development files | Compile the Linux Flutter host |
+| D-Bus | `dbus-run-session`, `busctl` | Run isolated backend sessions |
 
-The optional compositor workflows also need Sway, `swaymsg`, `swaybg`, Python 3, and grim.
-Native input regression checks use wtype. Standalone login testing needs greetd
-and the existing test environment described in its guide.
+### Optional workflow tools
 
-## Check out the project
+- **Nested or headless compositor tests**: `sway`, `swaymsg`, `swaybg`, `python3`, `grim`
+- **Native input regression tests**: `wtype`
+- **Real login testing**: `greetd` (see [Standalone greetd testing](../guides/greetd-testing.md))
+
+## Initialize the repository
+
+1. Clone the repository and bootstrap the pinned SDKs and dependencies:
+
+   ```sh
+   git clone https://github.com/anfsity/Akari.git
+   cd Akari
+   bash scripts/bootstrap-toolchain.sh
+   ```
+
+   `bootstrap-toolchain.sh` installs the Flutter version from `.fvmrc`, enables Flutter Linux desktop support, resolves root Dart packages, and fetches locked Cargo dependencies.
+
+2. Verify your environment:
+
+   ```sh
+   bash scripts/check-toolchain.sh
+   ```
+
+:::note
+`bootstrap-toolchain.sh` does not install system packages. When running `check-toolchain.sh` outside a live Wayland session, a missing `WAYLAND_DISPLAY` warning only affects nested compositor windows—headless tests still work.
+:::
+
+## Install the `akari` launcher
+
+Install a user-level `akari` command and shell completion so you do not need to type `fvm dart run tool/akari.dart`:
 
 ```sh
-git clone https://github.com/anfsity/Akari.git
-cd Akari
-bash scripts/bootstrap-toolchain.sh
-```
-
-Bootstrap installs/selects the SDK specified in `.fvmrc`, enables Flutter Linux
-development, resolves root Dart dependencies, and fetches locked Cargo
-dependencies. It does not install the Linux system packages listed above.
-
-```sh
-bash scripts/check-toolchain.sh
-```
-
-The checker covers both ordinary development and the optional Sway/greetd
-workflows. A missing `WAYLAND_DISPLAY` is a warning for nested compositor use;
-headless compositor tests do not require a live Wayland desktop.
-
-## Optional shell launcher
-
-```sh
+# For zsh
 fvm dart run tool/akari.dart install cli --shell zsh
+
+# For bash
+fvm dart run tool/akari.dart install cli --shell bash
 ```
 
-For bash, use `--shell bash`. Open a new shell or source the environment file
-printed by the installer. The installed `akari` command refers to this checkout;
-reinstall it after moving the repository.
+Open a new terminal (or source the environment file printed by the installer) to activate `akari`.
 
-Proceed to the [quick start](quick-start.md). For alternate SDK locations, see
-the [CLI reference](../reference/cli.md).
+:::caution
+The installed `akari` launcher points to your current repository path. Re-run `install cli` if you move the checkout.
+:::
 
-## Use Akari for boot login
+## Deploy for boot login
 
-With systemd, greetd and Sway installed, run `akari install` as your regular user
-to build and deploy the production environment. Then run `akari login enable`
-to select it for the next boot. Neither command stops the current desktop.
-See [production login installation](../reference/cli.md#production-login-installation)
-for prerequisites, configuration, logs and restoration of the previous manager.
+On a machine with `systemd`, `greetd`, and `sway` installed, you can build and register Akari as your system display manager:
+
+```sh
+akari install
+akari login enable
+```
+
+Neither command interrupts your current desktop session. For PAM keyring setup, logs, and rollback, see [Production login installation](../reference/cli.md#production-login-installation).
+
+Next, continue to the [Quick start](quick-start.md).
