@@ -1,0 +1,8 @@
+---
+import DefaultPageTitle from '@astrojs/starlight/components/PageTitle.astro';
+
+const { description } = Astro.locals.starlightRoute.entry.data;
+---
+
+<DefaultPageTitle />
+{description && <p class="akari-page-description">{description}</p>}
