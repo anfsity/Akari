@@ -632,23 +632,17 @@ elif command == 'busctl':
             time.sleep(0.01)
         sys.exit(1)
 elif command == 'swaymsg':
-    if not (root / 'transition-prepared').exists():
-        sys.exit('Transition must be prepared before Sway exits')
     (root / 'sway-exited').touch()
-elif command == 'akari-splash':
-    assert sys.argv[1:] == ['clear']
-    (root / 'transition-prepared').touch()
 ''')
         boundary.chmod(0o755)
         # An absolute interpreter keeps the python3 fixture from recursively
         # invoking itself through /usr/bin/env.
         boundary.write_text(boundary.read_text().replace(
             '#!/usr/bin/env python3', f'#!{sys.executable}'))
-        for name in ['python3', 'busctl', 'swaymsg', 'akari-splash']:
+        for name in ['python3', 'busctl', 'swaymsg']:
             (binary / name).symlink_to(boundary)
         self.environment = {**os.environ, 'PATH': f'{binary}:{os.environ["PATH"]}',
                             'AKARI_RELEASE': str(self.root), 'AKARI_APP': 'fixture',
-                            'AKARI_SPLASH_BIN': str(binary / 'akari-splash'),
                             'AKARI_LOG_DIR': str(self.root), 'FIXTURE': str(self.root)}
 
     def run_greeter(self, **environment):
@@ -660,7 +654,6 @@ elif command == 'akari-splash':
         result = self.run_greeter()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.root / 'sway-exited').exists())
-        self.assertTrue((self.root / 'transition-prepared').exists())
         self.assertIn('Frontend exited: 0', (self.root / 'lifecycle.log').read_text())
 
     def test_launch_pins_release_and_publishes_readable_real_login_logs(self):

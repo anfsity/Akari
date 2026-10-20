@@ -23,6 +23,11 @@ class SplashWorkflowTest(unittest.TestCase):
         self.renderer.write_text(f'''#!{sys.executable}
 import os, pathlib, signal, sys, time
 root = pathlib.Path(os.environ['FIXTURE'])
+if sys.argv[1:] == ['clear']:
+    if (root / 'compositor.pid').exists():
+        assert (root / 'compositor-released').exists()
+    (root / 'terminal-cleared').touch()
+    sys.exit(0)
 assert sys.argv[1:] == ['kms', '--snapshot', str(root / 'splash.png')]
 assert int(os.environ['AKARI_SPLASH_PARENT_PID']) == os.getppid()
 (root / 'splash.png').touch()
@@ -65,6 +70,7 @@ if pidfile.exists():
                 self.assertIn(f'event=splash_finished status={status}',
                               (self.root / 'lifecycle.log').read_text())
                 self.assertTrue((self.root / 'compositor').exists())
+                self.assertTrue((self.root / 'terminal-cleared').exists())
 
     def test_private_bus_and_backend_are_ready_before_the_animation(self):
         backend = self.root / 'backend'
@@ -122,6 +128,7 @@ if not (root / 'backend-started').exists():
                     process.send_signal(termination)
                     self.assertEqual(process.wait(timeout=5), expected)
                     self.assertTrue((self.root / 'released').exists())
+                    self.assertTrue((self.root / 'terminal-cleared').exists())
                     self.assertFalse((self.root / 'compositor').exists())
                     with self.assertRaises(ProcessLookupError):
                         os.kill(pid, 0)
@@ -129,6 +136,36 @@ if not (root / 'backend-started').exists():
                     if process.poll() is None:
                         process.kill()
                         process.wait()
+
+    def test_termination_reaps_compositor_before_clearing_terminal(self):
+        compositor = self.root / 'compositor.py'
+        compositor.write_text('''import os, pathlib, signal, sys, time
+root = pathlib.Path(os.environ['FIXTURE'])
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+(root / 'compositor.pid').write_text(str(os.getpid()))
+try:
+    time.sleep(30)
+finally:
+    (root / 'compositor-released').touch()
+''')
+        process = subprocess.Popen(
+            ['bash', str(REPOSITORY / 'scripts/splash.sh'), sys.executable, str(compositor)],
+            env=self.environment, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            deadline = time.monotonic() + 3
+            while not (self.root / 'compositor.pid').exists() and time.monotonic() < deadline:
+                time.sleep(.01)
+            pid = int((self.root / 'compositor.pid').read_text())
+            process.terminate()
+            self.assertEqual(process.wait(timeout=5), 143)
+            self.assertTrue((self.root / 'compositor-released').exists())
+            self.assertTrue((self.root / 'terminal-cleared').exists())
+            with self.assertRaises(ProcessLookupError):
+                os.kill(pid, 0)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
 
 
 class PrivateBusLifetimeTest(unittest.TestCase):
