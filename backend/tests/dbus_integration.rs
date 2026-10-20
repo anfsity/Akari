@@ -452,7 +452,12 @@ async fn auth_error_without_user_input_does_not_retry() {
         )
         .await;
         assert_eq!(read_request(&mut stream).await["type"], "cancel_session");
-        write_response(&mut stream, serde_json::json!({"type": "success"})).await;
+        write_response(
+            &mut stream,
+            serde_json::json!({"type": "error", "error_type": "error",
+                "description": "unable to send message: Connection refused (os error 111)"}),
+        )
+        .await;
         assert!(
             tokio::time::timeout(Duration::from_millis(300), listener.accept())
                 .await
@@ -498,18 +503,70 @@ async fn wrong_password_prompts_again() {
         .expect("state query should succeed");
     assert_eq!(state.0, "WaitingForInput");
 
+    for _ in 0..2 {
+        proxy
+            .call::<_, _, ()>("Respond", &(attempt_id.clone(), "wrong"))
+            .await
+            .expect("rejected credential should restart the prompt");
+        let state: (String, String) = proxy.call("GetState", &()).await.unwrap();
+        assert_eq!(state.0, "WaitingForInput");
+    }
     proxy
-        .call::<_, _, ()>("Respond", &(attempt_id.clone(), "wrong"))
+        .call::<_, _, ()>("Respond", &(attempt_id, "password"))
         .await
-        .expect("rejected credential should restart the prompt");
-
-    let state: (String, String) = proxy
-        .call("GetState", &())
-        .await
-        .expect("state query should succeed");
-    assert_eq!(state.0, "WaitingForInput");
+        .unwrap();
+    let state: (String, String) = proxy.call("GetState", &()).await.unwrap();
+    assert_eq!(state.0, "Authenticated");
 
     server.finish().await;
+}
+
+#[tokio::test]
+async fn invalid_rejection_cleanup_does_not_retry() {
+    let _guard = lock().lock().await;
+    for unexpected_prompt in [false, true] {
+        let directory = temp_dir("rejection-cleanup");
+        let socket = directory.join("greetd.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let server = spawn_server(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            assert_eq!(read_request(&mut stream).await["type"], "create_session");
+            send_secret_prompt(&mut stream).await;
+            assert_eq!(read_request(&mut stream).await["response"], "wrong");
+            write_response(
+                &mut stream,
+                serde_json::json!({"type": "error", "error_type": "auth_error",
+                    "description": "authentication failed"}),
+            )
+            .await;
+            assert_eq!(read_request(&mut stream).await["type"], "cancel_session");
+            if unexpected_prompt {
+                send_secret_prompt(&mut stream).await;
+            }
+            drop(stream);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(300), listener.accept())
+                    .await
+                    .is_err()
+            );
+        });
+        let _backend = start_backend(&socket);
+        let connection = connect_backend().await;
+        let proxy = make_proxy(&connection).await;
+        let attempt: String = proxy
+            .call("BeginAuthentication", &("alice",))
+            .await
+            .unwrap();
+        wait_for_state(&proxy, "WaitingForInput").await;
+        assert!(
+            proxy
+                .call::<_, _, ()>("Respond", &(attempt, "wrong"))
+                .await
+                .is_err()
+        );
+        wait_for_state(&proxy, "Failed").await;
+        server.finish().await;
+    }
 }
 
 #[tokio::test]
@@ -875,7 +932,7 @@ async fn fake_auth(listener: UnixListener) {
 }
 
 async fn fake_bad_password_then_prompt(listener: UnixListener) {
-    {
+    for cancel_fails in [true, false] {
         let (mut stream, _) = listener.accept().await.expect("backend should connect");
         let create = read_request(&mut stream).await;
         assert_eq!(create["type"], "create_session");
@@ -901,10 +958,17 @@ async fn fake_bad_password_then_prompt(listener: UnixListener) {
             }),
         )
         .await;
-        // Keep greetd's configured session until the explicit cancel request.
-        // Reconnecting alone must not stand in for server-side cleanup.
+        // greetd clears the configuring slot even when the departed PAM
+        // worker makes cancellation return an Error instead of Success.
         assert_eq!(read_request(&mut stream).await["type"], "cancel_session");
-        write_response(&mut stream, serde_json::json!({"type": "success"})).await;
+        let reply = if cancel_fails {
+            serde_json::json!({"type": "error", "error_type": "error",
+                "description": "unable to send message: Connection refused (os error 111)"})
+        } else {
+            serde_json::json!({"type": "success"})
+        };
+        write_response(&mut stream, reply).await;
+        assert_eq!(stream.read(&mut [0]).await.unwrap(), 0);
     }
 
     let (mut stream, _) = listener
@@ -922,6 +986,8 @@ async fn fake_bad_password_then_prompt(listener: UnixListener) {
         }),
     )
     .await;
+    assert_eq!(read_request(&mut stream).await["response"], "password");
+    write_response(&mut stream, serde_json::json!({"type": "success"})).await;
 }
 
 async fn fake_delayed_prompt(listener: UnixListener) {

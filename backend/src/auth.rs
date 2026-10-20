@@ -1014,20 +1014,21 @@ async fn consume_response(
                 description,
             } => {
                 let detail = display_detail(&format!("{error_type}: {description}"));
-                // A rejected PAM conversation remains configured in greetd.
-                // Dropping its socket does not cancel that server-side session;
-                // reset it before retrying or accepting a later explicit begin.
+                // greetd 0.10 retains its configuring slot after PAM failure.
+                // Cancel removes that slot before contacting the dead worker,
+                // so even its Error response completes server-side cleanup.
+                // Transport failures and unexpected prompts remain failures.
                 let result = actor.get_transport().cancel_session(cancellation).await;
                 let cancel_response = handle_transport_result(
                     actor, attempt_id, result, &emitter, snapshots, controls,
                 )
                 .await?;
-                if !matches!(cancel_response, GreetdResponse::Success) {
+                if matches!(cancel_response, GreetdResponse::AuthMessage { .. }) {
                     return Err(fail_transaction(
                         actor,
                         attempt_id,
                         GreetdError::UnexpectedResponse(
-                            "unexpected reply while cancelling rejected authentication".to_owned(),
+                            "unexpected prompt while cancelling rejected authentication".to_owned(),
                         ),
                         &emitter,
                         snapshots,
