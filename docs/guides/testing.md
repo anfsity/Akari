@@ -5,7 +5,7 @@ description: Choose unit, mock integration, compositor, and performance checks.
 
 Akari separates fast repository verification from live compositor, multi-monitor, and hardware login tests.
 
-## 1. Repository verification
+## Repository verification
 
 Run static analysis, Rust checks, and unit/widget test suites across shared packages and themes:
 
@@ -25,7 +25,7 @@ What to focus on when writing tests:
 `test/login_cli_test.dart` also invokes `test/support/login_workflow_test.py` to test deployment, rollback, and recovery in simulated systemd environments without touching your host display manager.
 :::
 
-## 2. Mock D-Bus & UI walkthroughs
+## Mock D-Bus & UI walkthroughs
 
 | Workflow | Command | When to use |
 | --- | --- | --- |
@@ -34,7 +34,7 @@ What to focus on when writing tests:
 | Nested or headless Sway | `fvm dart run tool/akari.dart run sway --display-profile reference` | Test compositor scaling and fixed-resolution screenshots ([guide](display-testing.md)) |
 | Real TTY login | `akari greetd-test ...` | Test actual PAM, DRM/KMS splash, and session launch ([guide](greetd-testing.md)) |
 
-## 3. Native display regressions
+## Native display regressions
 
 Opt-in Python regression suites launch real Flutter windows inside isolated headless Sway compositors. They require `sway`, `swaymsg`, `grim`, and `wtype`.
 
@@ -71,7 +71,7 @@ This verifies mixed DPI scales, pointer focus switching across views, monitor ho
 
 This tests all four combinations of outer and inner scales (`1.0` and `1.6`) and verifies `1920x1080` inner screenshots.
 
-## 4. Performance gates
+## Performance gates
 
 Execute a theme's declared performance gate or timeline trace:
 
@@ -82,7 +82,7 @@ fvm dart run tool/akari.dart trace-perf --theme themes/default
 
 Each theme declares its own runner and thresholds in `pubspec.yaml` (see the [Performance protocol](../reference/theme-package.md#performance-protocol)).
 
-## 5. Diagnose failures
+## Diagnose failures
 
 Every CLI run writes structured logs and reports under `build/tool/runs/<run-id>/`:
 
