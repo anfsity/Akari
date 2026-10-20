@@ -3,74 +3,59 @@ title: Code map
 description: Where to read and change each part of Akari.
 ---
 
-## Repository map
+## Repository structure
 
 | Path | Responsibility |
 | --- | --- |
-| `lib/app/app.dart` | Application lifetime, selected theme, shared feature, and displays |
-| `lib/infrastructure/` | D-Bus gateway and session preference storage |
-| `packages/greeter_ui/` | Greeter business state, typed commands, and scene adapter |
-| `packages/theme_sdk/` | Public theme host, slot types, and theme assembly |
-| `packages/scene_schema/` | Flutter-free scene model, codec, and conditions |
-| `packages/scene/` | Layout, transforms, background renderers, and motion runtime |
-| `packages/scene_codegen/` | Build-time scene JSON to Dart generation |
-| `packages/greeter_components/` | Optional reusable visual component set |
-| `packages/theme_studio/` | Scene authoring, inspector drafts, editor viewport, and scene-owned assets |
-| `themes/` | Independent compiled theme projects and theme-specific tests |
-| `backend/src/` | D-Bus service, authentication, greetd transport, and catalogs |
-| `linux/` | Native Flutter runner and display integration |
-| `tool/` | CLI grammar, project discovery, generated hosts, and execution reports |
-| `scripts/` | Toolchain setup and Linux session/test support |
-| `test/` | Application, CLI, infrastructure, and native workflow tests |
+| `lib/app/app.dart` | Application lifetime, selected theme, shared `GreeterFeature`, and multi-display views |
+| `lib/infrastructure/` | D-Bus gateway (`GreeterDbusGateway`) and session preference storage |
+| `packages/greeter_ui/` | Greeter business state, typed commands, and `GreeterSceneAdapter` |
+| `packages/theme_sdk/` | Public `GreeterHost`, slot types, and `ThemeDefinition` contracts |
+| `packages/scene_schema/` | Flutter-free scene model, JSON codec, validation, and predicate conditions |
+| `packages/scene/` | `SceneRuntime`, `ThemeBundle`, background renderers, and motion lifecycle |
+| `packages/scene_codegen/` | Build-time `*.scene.json` to `*.scene.g.dart` code generator |
+| `packages/greeter_components/` | Optional reusable widget set (`StandardGreeterComponents`) |
+| `packages/theme_studio/` | Visual scene editor, inspector drafts, viewport, and asset importer |
+| `themes/` | Independent compiled theme packages (`default`, `fallback`, `preset1`) and perf suites |
+| `backend/src/` | Rust D-Bus service, authentication actor, `greetd` transport, and session/user catalogs |
+| `linux/` | Native GTK/Flutter runner and multi-monitor window management |
+| `splash/` | Standalone Rust DRM/KMS and windowed startup splash renderer |
+| `tool/` | `akari` CLI grammar, theme host generator, and run report engine |
+| `scripts/` | Toolchain bootstrap, Sway session runner, and login/harness controllers |
+| `test/` | Unit, widget, CLI, and native compositor regression tests |
 
-## Follow a theme build
+## Trace common workflows
 
-Start at `tool/akari.dart`. `tool/src/cli/definition.dart` owns the shared
-command grammar. `tool/src/commands/` owns development workflows and creates a
-`RunPlan` containing steps, artifacts and theme ownership. `tool/src/execution/`
-runs the dependency graph and records logs and reports; each workflow validates
-its own results. `tool/src/theme/project.dart` resolves the package and builder,
-and `tool/src/theme/host.dart` creates the selected host. The scene builder delegates validation to `scene_schema` and emits Dart
-that the theme imports.
+### 1. Theme build & host generation
 
-## Follow a UI update
+1. `tool/akari.dart` parses CLI flags via `tool/src/cli/definition.dart`.
+2. `tool/src/commands/` constructs a `RunPlan` of build/verification steps, executed by `tool/src/execution/`.
+3. `tool/src/theme/project.dart` resolves the theme manifest and builder function; `tool/src/theme/host.dart` generates the Flutter host under `build/tool/hosts/`.
+4. `scene_codegen` validates `*.scene.json` with `scene_schema` and emits `*.scene.g.dart`.
 
-Read `GreeterFeature` and its state/commands under `packages/greeter_ui/lib/feature/`.
-Then read `GreeterSceneAdapter`, `GreeterHost`, and the theme's component factory.
-Slots project business state into visual regions; scene predicates control
-presence. `SceneRuntime` handles layout and motion independently of authentication.
+### 2. UI state update & scene rendering
 
-## Follow authentication
+1. `GreeterFeature` (`packages/greeter_ui/lib/feature/`) updates immutable state and notifies typed region slots.
+2. `GreeterSceneAdapter` projects state into `ScenePredicate` flags and `GreeterHost` listenables.
+3. `SceneRuntime` evaluates `visibleWhen` predicates per node, runs enter/exit motion transitions, and renders theme widgets inside per-node `RepaintBoundary` layers.
 
-Start at `lib/infrastructure/dbus/greeter_dbus_gateway.dart`, then
-`backend/src/service.rs` and `backend/src/greetd.rs`. The service owns serialized
-authentication processing and attempt isolation. The transport owns protocol
-frames. See the [backend guide](backend.md) and [D-Bus contract](../reference/dbus.md).
+### 3. Authentication & session handoff
 
-## Follow a Studio edit
+1. `lib/infrastructure/dbus/greeter_dbus_gateway.dart` calls `io.akari.Greeter1` methods and listens for `Prompt` / `StateChanged` signals.
+2. `backend/src/service.rs` and `backend/src/auth.rs` serialize commands for the active `attempt_id`.
+3. `backend/src/greetd.rs` exchanges framed JSON over `GREETD_SOCK`, and `backend/src/session_launch.rs` forwards the authenticated desktop command through the user's login shell.
 
-`SceneEditor` owns the current document, selection, undo/redo, and conflict-aware
-saving. `NodeInspectorController` owns pending field values; `node_geometry.dart`
-calculates movement and resizing with the runtime's layout and transforms.
-`StudioViewport` owns zoom and pan separately from document history.
-`StudioAssets` resolves the loaded scene's theme package and owns its imports.
-The compiled preview keeps using the selected theme's component factory.
+### 4. Multi-display & Sway sessions
 
-## Follow a display session
+- **Native multi-monitor**: `linux/runner/my_application.cc` creates one fullscreen `FlView` per monitor and reports active window focus through `akari/displays`; `lib/app/app.dart` shares a single `GreeterFeature` and credential controller across all views.
+- **Display profiles & nested Sway**: `scripts/greetd-test/display_profile.py` validates TTY output captures, and `scripts/sway-session.py` runs nested/headless Sway sessions with scale compensation.
 
-`linux/runner/my_application.cc` owns monitor windows and native focus reporting;
-`lib/app/app.dart` owns their shared feature and credential controller.
-`scripts/greetd-test/display_profile.py` validates and resolves login captures.
-`scripts/sway-session.py` owns the nested/headless compositor, effective output
-checks, and screenshots. The [display guide](../guides/display-testing.md)
-connects these paths to manual and native regression workflows.
+### 5. Theme Studio editing
 
-## Public entrypoints
+- `SceneEditor` manages the active document, selection, undo/redo history, and atomic saving.
+- `NodeInspectorController` validates pending inspector drafts; `node_geometry.dart` computes canvas move/resize math across transformed nodes.
+- `StudioViewport` handles pan/zoom outside undo history, while `StudioAssets` imports files into the owning `theme_*` package.
 
-Import `theme_sdk.dart`, `scene.dart`, `scene_schema.dart`, or
-`greeter_components.dart` from their packages. Treat `lib/src/` as implementation
-detail and use the [generated API reference](../reference/api.md) to inspect the
-exposed surface.
+## Public package entrypoints
 
-Studio is still being developed. Its internal notes and future proposals stay
-in the repository and are excluded from the published documentation collection.
+Always import package root libraries (`theme_sdk.dart`, `scene.dart`, `scene_schema.dart`, `greeter_components.dart`). Treat `lib/src/` as private implementation detail. Browse the [API reference](../reference/api.md) for exported symbols.
