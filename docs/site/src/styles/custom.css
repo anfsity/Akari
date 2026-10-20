@@ -167,7 +167,10 @@
 :where([data-has-sidebar]) .sidebar-content [aria-current='page'] {
   color: var(--sl-color-accent-high);
   background: var(--sl-color-accent-low);
-  box-shadow: inset 2px 0 var(--sl-color-accent);
+  background-image: linear-gradient(var(--sl-color-accent), var(--sl-color-accent));
+  background-position: left center;
+  background-size: 2px calc(100% - 0.8rem);
+  background-repeat: no-repeat;
 }
 :where([data-has-sidebar]) starlight-toc nav {
   padding-top: 0.5rem;
