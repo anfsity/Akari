@@ -9,9 +9,10 @@ The previous ASCII animator has been removed.
 
 The production and greetd-test launchers start the private bus and wait for the
 backend before running the pinned release's `akari-splash kms`. `scripts/splash.sh`
-owns that child and waits for its exit before execing Sway, so D-Bus startup does
-not extend the blank interval after the animation. Signals terminate and reap
-the child; launcher death also stops the renderer.
+owns the renderer and compositor, waiting for the renderer to exit before
+starting Sway, so D-Bus startup does not extend the blank interval after the
+animation. Signals terminate and reap both children; launcher death also stops
+the renderer. The launcher retains its controlling VT for cleanup after Sway.
 
 The KMS renderer saves a still in the greeter's log directory. The supplied Sway
 configuration displays it through `swaybg` until the Flutter login screen is
@@ -55,8 +56,9 @@ mode change may still blank the screen. Process exit is the release acknowledgem
 ## Console and log guarantees
 
 Renderer errors go to the existing lifecycle/session logs and allow normal login
-to continue. PTYs cannot enter the KMS path. Before Sway exits, `akari-splash clear`
-erases hidden terminal text and scrollback without acquiring display control.
+to continue. PTYs cannot enter the KMS path. After Sway exits, the VT-owning
+launcher runs `akari-splash clear` to erase hidden terminal text and scrollback
+without acquiring display control.
 The KMS renderer clears these again during its own cleanup, before releasing the
 seat. Launcher, native shell and desktop output retain their existing redirection.
 No detached animation can repaint the console after the desktop takes over.

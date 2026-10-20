@@ -31,7 +31,7 @@ clears the hidden console text and scrollback, restores text mode, closes DRM
 buffers/devices and releases seat control. CLOSEFB retains scanout when the
 kernel and console transition permit; older kernels fall back to RMFB. A driver
 or compositor mode change can still blank the screen. `clear` only erases VT
-text; it is also used before the login compositor exits.
+text; the VT-owning launcher also uses it after the login compositor exits.
 
 For login startup, the private bus and backend reach readiness before the splash
 runs. The launcher saves a still of the splash in the greeter's log directory;
