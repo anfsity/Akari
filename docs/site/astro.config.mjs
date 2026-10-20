@@ -7,7 +7,13 @@ export default defineConfig({
   site: 'https://anfsity.github.io',
   base: '/Akari',
   trailingSlash: 'always',
-  markdown: { processor: unified({ remarkPlugins: [remarkDocs] }) },
+  markdown: {
+    processor: unified({ remarkPlugins: [remarkDocs] }),
+    shikiConfig: {
+      themes: { light: 'github-light', dark: 'github-dark' },
+      defaultColor: false,
+    },
+  },
   integrations: [
     starlight({
       title: 'Akari',
@@ -24,6 +30,7 @@ export default defineConfig({
       components: {
         Head: './src/components/Head.astro',
         Hero: './src/components/Hero.astro',
+        PageTitle: './src/components/PageTitle.astro',
       },
       sidebar: [
         { label: 'Start here', translations: { 'zh-CN': '开始使用' }, items: [

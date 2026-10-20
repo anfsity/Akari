@@ -9,6 +9,218 @@
   --sl-color-accent: #216d5b;
   --sl-color-accent-high: #164638;
 }
+
+/* Keep handbook layout and surfaces independent of the splash page. */
+:root[data-has-sidebar] {
+  --sl-sidebar-width: 17rem;
+  --sl-content-width: 49rem;
+  --sl-color-bg: #111817;
+  --sl-color-bg-nav: #141e1b;
+  --sl-color-bg-sidebar: #141e1b;
+  --sl-color-bg-inline-code: #20312a;
+  --sl-color-hairline: #293730;
+  --sl-color-hairline-light: #293730;
+  --sl-color-hairline-shade: #293730;
+  --akari-doc-surface: #18221e;
+  --akari-doc-muted: #a7b6ae;
+}
+:root[data-has-sidebar][data-theme='light'] {
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #f7f9f7;
+  --sl-color-bg-sidebar: #f7f9f7;
+  --sl-color-bg-inline-code: #edf3ef;
+  --sl-color-hairline: #e1e8e3;
+  --sl-color-hairline-light: #e1e8e3;
+  --sl-color-hairline-shade: #e1e8e3;
+  --akari-doc-surface: #f7f9f7;
+  --akari-doc-muted: #52645b;
+}
+:where([data-has-sidebar]) .content-panel {
+  padding-block: 2rem;
+}
+:where([data-has-sidebar]) h1#_top {
+  margin-top: 0;
+  font-size: clamp(1.9rem, 3vw, 2.65rem);
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+.akari-page-description {
+  max-width: 42rem;
+  margin-top: 0.85rem;
+  color: var(--akari-doc-muted);
+  font-size: 1.05rem;
+  line-height: 1.75;
+  text-wrap: pretty;
+}
+:where([data-has-sidebar]) .sl-markdown-content {
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+:where([data-has-sidebar]) .sl-markdown-content h2 {
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--sl-color-hairline);
+  font-size: clamp(1.45rem, 2vw, 1.8rem);
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+}
+:where([data-has-sidebar]) .sl-markdown-content h3 {
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+:where([data-has-sidebar]) .sl-markdown-content li + li {
+  margin-top: 0.5rem;
+}
+:where([data-has-sidebar]) .sl-markdown-content a {
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+:where([data-has-sidebar]) .sl-markdown-content :not(pre) > code {
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.3rem;
+  padding: 0.1em 0.35em;
+  font-size: 0.85em;
+  box-decoration-break: clone;
+}
+:where([data-has-sidebar]) .sl-markdown-content pre:not(.mermaid) {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.75rem;
+  line-height: 1.75;
+}
+/* Shiki sets each token's theme variables on that token, so resolve them locally. */
+.astro-code,
+.astro-code span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+:root[data-theme='light'] .astro-code,
+:root[data-theme='light'] .astro-code span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+:where([data-has-sidebar]) .sl-markdown-content table {
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.75rem;
+  font-size: 0.925rem;
+  line-height: 1.7;
+}
+:where([data-has-sidebar]) .sl-markdown-content :is(th, td) {
+  padding: 0.85rem 1rem;
+  border-color: var(--sl-color-hairline);
+  vertical-align: top;
+}
+:where([data-has-sidebar]) .sl-markdown-content th {
+  background: var(--akari-doc-surface);
+  white-space: nowrap;
+}
+:where([data-has-sidebar]) .sl-markdown-content td:first-child {
+  min-width: 8rem;
+  overflow-wrap: normal;
+}
+:where([data-has-sidebar]) .sl-markdown-content tr:last-child td {
+  border-bottom: 0;
+}
+:where([data-has-sidebar]) .sl-markdown-content blockquote {
+  padding: 0.8rem 1.2rem;
+  border-inline-start: 3px solid var(--sl-color-accent);
+  border-radius: 0 0.6rem 0.6rem 0;
+  background: var(--akari-doc-surface);
+}
+:where([data-has-sidebar]) .starlight-aside {
+  border-radius: 0.6rem;
+}
+:where([data-has-sidebar]) .sidebar-content {
+  padding-top: 1.5rem;
+}
+:where([data-has-sidebar]) button[data-open-modal] {
+  min-width: 0;
+}
+:where([data-has-sidebar]) .header > .sl-flex:has(> site-search) {
+  min-width: 0;
+}
+:where([data-has-sidebar]) button[data-open-modal] > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:where([data-has-sidebar]) button[data-open-modal] > :is(svg, kbd) {
+  flex-shrink: 0;
+}
+:where([data-has-sidebar]) .sidebar-content .top-level > li + li {
+  margin-top: 1.4rem;
+}
+:where([data-has-sidebar]) .sidebar-content summary .large {
+  font-size: 0.85rem;
+  letter-spacing: 0.025em;
+}
+:where([data-has-sidebar]) .sidebar-content a {
+  margin-block: 0.15rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.4rem;
+}
+:where([data-has-sidebar]) .sidebar-content [aria-current='page'] {
+  color: var(--sl-color-accent-high);
+  background: var(--sl-color-accent-low);
+  box-shadow: inset 2px 0 var(--sl-color-accent);
+}
+:where([data-has-sidebar]) starlight-toc nav {
+  padding-top: 0.5rem;
+}
+:where([data-has-sidebar]) starlight-toc h2 {
+  margin-bottom: 0.85rem;
+  font-size: 0.85rem;
+}
+:where([data-has-sidebar]) starlight-toc a {
+  padding-block: 0.45rem;
+  border-inline-start: 2px solid transparent;
+  border-radius: 0;
+  line-height: 1.55;
+}
+:where([data-has-sidebar]) starlight-toc a[aria-current='true'] {
+  border-inline-start-color: var(--sl-color-accent);
+  font-weight: 600;
+}
+:where([data-has-sidebar]) .pagination-links a {
+  padding: 1.25rem;
+  border-color: var(--sl-color-hairline);
+  border-radius: 0.75rem;
+  background: var(--akari-doc-surface);
+  box-shadow: none;
+}
+:where([data-has-sidebar]) .pagination-links a:hover {
+  border-color: var(--sl-color-accent);
+}
+:where([data-has-sidebar]) .pagination-links .link-title {
+  font-size: 1.15rem;
+  line-height: 1.5;
+}
+:where([data-has-sidebar]) :is(a, button, select, summary):focus-visible {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: 3px;
+}
+@media (min-width: 50rem) {
+  :root[data-has-sidebar] {
+    --sl-content-pad-x: 2.5rem;
+  }
+  :where([data-has-sidebar]) .content-panel:first-child {
+    padding-block: 2.75rem 2rem;
+  }
+}
+@media (max-width: 49.99rem) {
+  :root[data-has-sidebar] {
+    --sl-content-pad-x: 1.25rem;
+  }
+  :where([data-has-sidebar]) .content-panel {
+    padding-block: 1.5rem;
+  }
+  .akari-page-description { font-size: 0.95rem; }
+}
 .mermaid {
   overflow-x: auto;
   padding: 1rem;
