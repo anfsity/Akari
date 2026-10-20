@@ -5,7 +5,7 @@ description: 检查代码、登录交互、多屏显示和主题性能。
 
 Akari 将测试划分为仓库快速校验、模拟 D-Bus 会话、隔离合成器回归以及真实 TTY 登录验证四个层级。
 
-## 1. 仓库快速校验
+## 仓库快速校验
 
 运行静态分析、Rust 后端检查以及共享包与主题的单元/组件测试：
 
@@ -25,7 +25,7 @@ fvm dart run tool/akari.dart verify --theme themes/fallback
 `test/login_cli_test.dart` 还会调用 `test/support/login_workflow_test.py`，在模拟的 systemd 与账户环境中验证部署、回滚与异常恢复，不会修改宿主机的显示管理器。
 :::
 
-## 2. 模拟会话与合成器调试
+## 模拟会话与合成器调试
 
 | 测试方式 | 命令 | 适用场景 |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ fvm dart run tool/akari.dart verify --theme themes/fallback
 
 <a id="native-display-regressions"></a>
 
-## 3. 原生窗口与多屏回归测试
+## 原生窗口与多屏回归测试
 
 以下可选脚本会在隔离的无头 Sway 合成器中启动真实 Flutter 窗口，并将日志与截图输出到临时目录。运行前需安装 `sway`、`swaymsg`、`grim` 和 `wtype`。
 
@@ -73,7 +73,7 @@ python3 test/support/multi_display_workflow_test.py \
 
 该测试会遍历外层与内层缩放为 `1.0` 和 `1.6` 的全部四种组合，并校验输出报告与 `1920x1080` 内层截图尺寸。
 
-## 4. 性能测试
+## 性能测试
 
 运行主题在 `pubspec.yaml` 中声明的性能门槛校验或耗时追踪：
 
@@ -84,7 +84,7 @@ fvm dart run tool/akari.dart trace-perf --theme themes/default
 
 交互步骤、测量指标与通过标准由主题包自行定义（详见[性能约定](../reference/theme-package.md#performance-protocol)）。
 
-## 5. 排查失败命令
+## 排查失败命令
 
 每次 CLI 运行都会在 `build/tool/runs/<run-id>/` 下保存结构化报告、事件流与各步骤的子进程日志：
 
