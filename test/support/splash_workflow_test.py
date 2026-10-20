@@ -1,5 +1,6 @@
 """Check the real VT launcher coordinator without acquiring a display device."""
 
+import json
 import os
 from pathlib import Path
 import signal
@@ -128,6 +129,62 @@ if not (root / 'backend-started').exists():
                     if process.poll() is None:
                         process.kill()
                         process.wait()
+
+
+class PrivateBusLifetimeTest(unittest.TestCase):
+    def test_session_signals_reap_the_private_bus(self):
+        for termination in [None, signal.SIGTERM, signal.SIGHUP, signal.SIGKILL]:
+            with self.subTest(signal=termination), tempfile.TemporaryDirectory(
+                    prefix='akari-bus-test-') as directory:
+                root = Path(directory)
+                client = root / 'client.py'
+                client.write_text('''import json, os, pathlib, subprocess, time
+result = subprocess.check_output([
+    'busctl', '--user', 'call', 'org.freedesktop.DBus', '/org/freedesktop/DBus',
+    'org.freedesktop.DBus', 'GetConnectionUnixProcessID', 's', 'org.freedesktop.DBus'], text=True)
+pathlib.Path(os.environ['FIXTURE']).joinpath('bus.json').write_text(json.dumps({
+    'pid': int(result.split()[1]), 'address': os.environ['DBUS_SESSION_BUS_ADDRESS']}))
+if os.environ['HOLD'] == '1':
+    time.sleep(30)
+''')
+                process = subprocess.Popen(
+                    ['bash', str(REPOSITORY / 'scripts/debug-dbus.sh'), sys.executable, str(client)],
+                    env={**os.environ, 'FIXTURE': directory, 'XDG_RUNTIME_DIR': directory,
+                         'AKARI_LOG_DIR': str(root / 'logs'), 'AKARI_START_BACKEND': '0',
+                         'HOLD': '0' if termination is None else '1'},
+                    start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                try:
+                    deadline = time.monotonic() + 5
+                    while not (root / 'bus.json').exists() and time.monotonic() < deadline:
+                        time.sleep(.01)
+                    bus = json.loads((root / 'bus.json').read_text())
+                    if termination == signal.SIGKILL:
+                        process.kill()
+                    elif termination is not None:
+                        os.killpg(process.pid, termination)
+                    self.assertEqual(process.wait(timeout=5),
+                                     -signal.SIGKILL if termination == signal.SIGKILL else
+                                     0 if termination is None else 128 + termination)
+                    if termination == signal.SIGKILL:
+                        deadline = time.monotonic() + 3
+                        while time.monotonic() < deadline:
+                            result = subprocess.run(
+                                ['busctl', '--address='+bus['address'], '--no-pager', 'list'],
+                                capture_output=True, timeout=2)
+                            if result.returncode != 0:
+                                break
+                            time.sleep(.01)
+                        self.assertNotEqual(result.returncode, 0)
+                    else:
+                        with self.assertRaises(ProcessLookupError):
+                            os.kill(bus['pid'], 0)
+                        self.assertFalse(Path(bus['address'].removeprefix('unix:path=')).parent.exists())
+                finally:
+                    if process.poll() is None:
+                        os.killpg(process.pid, signal.SIGKILL)
+                        process.wait()
+                    if termination == signal.SIGKILL:
+                        os.killpg(process.pid, signal.SIGTERM)
 
 
 if __name__ == '__main__':

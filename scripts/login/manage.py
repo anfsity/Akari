@@ -319,7 +319,7 @@ def validate_installation():
 
 
 def validate_runtime():
-    for command in ['systemctl', 'dbus-run-session', 'busctl', 'swaymsg', 'swaybg',
+    for command in ['systemctl', 'dbus-daemon', 'busctl', 'setpriv', 'swaymsg', 'swaybg',
                     'python3', 'bash', 'useradd', 'nologin']:
         if shutil.which(command) is None:
             raise ValueError(f'Missing required command: {command}')

@@ -29,7 +29,9 @@ fi
 
 check_command cargo
 check_command dbus-run-session
+check_command dbus-daemon
 check_command busctl
+check_command setpriv
 check_command clang
 check_command cmake
 check_command ninja
