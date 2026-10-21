@@ -380,17 +380,19 @@ class _NodeActions extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlineButton(
+                  density: ButtonDensity.dense,
                   onPressed: readOnly ? null : editor.duplicateSelectedNode,
-                  child: const Text('Duplicate').small(),
+                  child: const Text('Duplicate', maxLines: 1).small(),
                 ),
               ),
               const Gap(8),
               Expanded(
                 child: OutlineButton(
+                  density: ButtonDensity.dense,
                   onPressed: !readOnly && editor.canDeleteNode
                       ? editor.deleteSelectedNode
                       : null,
-                  child: const Text('Delete').small(),
+                  child: const Text('Delete', maxLines: 1).small(),
                 ),
               ),
             ],
