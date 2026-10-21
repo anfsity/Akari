@@ -1324,6 +1324,47 @@ void main() {
   });
 
   testWidgets(
+    'fit keeps the scene centered when the window and panels resize',
+    (tester) async {
+      await openStudio(tester);
+      final scene = find.byType(SceneRuntime);
+      final viewport = find.byKey(const ValueKey('studio-viewport'));
+      void checkFit() {
+        final sceneRect = tester.getRect(scene);
+        final viewportRect = tester.getRect(viewport);
+        expect(
+          (sceneRect.center - viewportRect.center).distance,
+          lessThan(1e-6),
+        );
+        expect(sceneRect.width, lessThanOrEqualTo(viewportRect.width + 1e-6));
+        expect(sceneRect.height, lessThanOrEqualTo(viewportRect.height + 1e-6));
+        expect(find.text('Saved'), findsOneWidget);
+      }
+
+      for (final size in [
+        const Size(1100, 900),
+        const Size(1800, 900),
+        const Size(1400, 1200),
+        const Size(1400, 900),
+      ]) {
+        tester.view.physicalSize = size;
+        await tester.pumpAndSettle();
+        checkFit();
+      }
+      final divider = find.byWidgetPredicate(
+        (widget) =>
+            widget is MouseRegion &&
+            widget.cursor == SystemMouseCursors.resizeColumn,
+      );
+      await tester.drag(divider.first, const Offset(100, 0));
+      await tester.pumpAndSettle();
+      checkFit();
+      expect(file.readAsStringSync(), encodeSceneDocument(_document));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'zoom and pan preserve geometry, pointer anchor and handle size',
     (tester) async {
       await openStudio(tester);

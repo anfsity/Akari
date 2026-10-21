@@ -63,7 +63,9 @@ class _StudioViewportState extends State<StudioViewport> {
             viewport.width / widget.referenceSize.width,
             viewport.height / widget.referenceSize.height,
           );
-      if (_scale != null && _scale != scale) {
+      // Only an explicit zoom needs to preserve a scene point. Fit already
+      // centers the resized canvas; anchoring its old scale would add a pan.
+      if (widget.zoom != null && _scale != null && _scale != scale) {
         final anchor = _zoomAnchor ?? viewport.center(Offset.zero);
         final scenePoint =
             (anchor -
