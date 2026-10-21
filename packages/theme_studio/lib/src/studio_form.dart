@@ -111,22 +111,77 @@ class StudioEnumSelect<T extends Enum> extends StatelessWidget {
   String _getLabel(T value) => formatValue?.call(value) ?? value.name;
 
   @override
-  Widget build(BuildContext context) => Select<T>(
-    theme: const SelectTheme(adaptiveOverlay: false),
+  Widget build(BuildContext context) => StudioSelect<T>(
     value: value,
-    onChanged: (value) {
-      if (value != null) onChanged(value);
-    },
-    itemBuilder: (context, value) =>
-        Text(label == null ? _getLabel(value) : '$label: ${_getLabel(value)}'),
-    popup: SelectPopup(
-      items: SelectItemList(
-        children: [
-          for (final value in values)
-            SelectItemButton(value: value, child: Text(_getLabel(value))),
-        ],
+    values: values,
+    onChanged: onChanged,
+    label: label,
+    formatValue: _getLabel,
+  );
+}
+
+/// Linked anchors follow their control without polling the render tree on
+/// every frame while a menu is open, including inside a scrolled settings page.
+class StudioSelect<T> extends StatefulWidget {
+  const StudioSelect({
+    required this.value,
+    required this.values,
+    required this.onChanged,
+    required this.formatValue,
+    this.label,
+    this.placeholder,
+    super.key,
+  });
+
+  final T? value;
+  final Iterable<T> values;
+  final ValueChanged<T> onChanged;
+  final String Function(T) formatValue;
+  final String? label;
+  final Widget? placeholder;
+
+  @override
+  State<StudioSelect<T>> createState() => _StudioSelectState<T>();
+}
+
+class _StudioSelectState<T> extends State<StudioSelect<T>> {
+  final _anchor = Object();
+
+  @override
+  Widget build(BuildContext context) => OverlayAnchor(
+    anchor: _anchor,
+    child: Select<T>(
+      theme: const SelectTheme(adaptiveOverlay: false),
+      overlayConfiguration: PopoverConfiguration(
+        anchor: LinkedAnchor(_anchor),
+        alignment: Alignment.topCenter,
+        widthConstraint: PopoverConstraint.anchorFixedSize,
+        offset: const Offset(0, 4),
       ),
-    ).call,
+      value: widget.value,
+      placeholder: widget.placeholder,
+      onChanged: (value) {
+        if (value != null) widget.onChanged(value);
+      },
+      itemBuilder: (context, value) => Text(
+        widget.label == null
+            ? widget.formatValue(value)
+            : '${widget.label}: ${widget.formatValue(value)}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      popup: SelectPopup(
+        items: SelectItemList(
+          children: [
+            for (final value in widget.values)
+              SelectItemButton(
+                value: value,
+                child: Text(widget.formatValue(value)),
+              ),
+          ],
+        ),
+      ).call,
+    ),
   );
 }
 

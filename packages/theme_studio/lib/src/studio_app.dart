@@ -103,6 +103,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       builder: (context) => StudioSettings(
         document: editor.document,
         preferences: _preferences,
+        assetPaths: _assetPaths,
+        resolveAssetImage: _assets.getImageProvider,
         onApply: (canvas, background, preferences) {
           editor.updateScene(canvas: canvas, background: background);
           setState(() {
