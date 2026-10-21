@@ -27,7 +27,7 @@ class StudioToolbar extends StatelessWidget {
       final session = editor;
       final hasDraft = session?.inspector.hasDraft == true;
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
             const Icon(LucideIcons.panelsTopLeft, size: 20),

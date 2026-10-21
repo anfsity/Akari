@@ -17,28 +17,16 @@ class NodeInspector extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller,
-    builder: (context, _) => ResizablePanel.vertical(
-      key: const ValueKey('inspector-panels'),
-      draggerThickness: 10,
+    builder: (context, _) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ResizablePane(
-          key: const ValueKey('inspector-header-pane'),
-          initialSize: 80,
-          minSize: 80,
-          maxSize: 140,
-          child: _InspectorHeader(node: controller.node),
-        ),
-        ResizablePane.flex(
-          minSize: 200,
+        _InspectorHeader(node: controller.node),
+        const Divider(),
+        Expanded(
           child: _InspectorForm(controller: controller, onApply: onApply),
         ),
-        ResizablePane(
-          key: const ValueKey('inspector-actions-pane'),
-          initialSize: 120,
-          minSize: 120,
-          maxSize: 180,
-          child: _InspectorActions(error: controller.error, onApply: onApply),
-        ),
+        const Divider(),
+        _InspectorActions(error: controller.error, onApply: onApply),
       ],
     ),
   );
@@ -51,7 +39,7 @@ class _InspectorHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -84,8 +72,6 @@ class _InspectorForm extends StatelessWidget {
         _InspectorProperties(controller: controller, onApply: onApply),
         const Divider(),
         const Gap(12),
-        _buildMotionSection(),
-        const Gap(16),
         _InspectorDisclosure(
           title: 'Advanced layout',
           child: Column(
@@ -93,6 +79,8 @@ class _InspectorForm extends StatelessWidget {
               const Gap(12),
               _buildLayeringSection(),
               _buildTransformSection(),
+              const Gap(12),
+              _buildMotionSection(),
             ],
           ),
         ),
@@ -108,19 +96,21 @@ class _InspectorForm extends StatelessWidget {
     ),
   );
 
-  Widget _buildLayoutSection() => StudioFormSection(
-    title: 'Layout',
-    compact: true,
+  Widget _buildLayoutSection() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Align(
-        alignment: Alignment.centerRight,
-        child: StudioEnumSelect(
-          value: controller.layoutUnit,
-          values: StudioLayoutUnit.values,
-          formatValue: (unit) =>
-              unit == StudioLayoutUnit.pixels ? 'Pixels' : 'Percent',
-          onChanged: controller.updateLayoutUnit,
-        ),
+      Row(
+        children: [
+          const Text('Layout').small().semiBold(),
+          const Spacer(),
+          StudioEnumSelect(
+            value: controller.layoutUnit,
+            values: StudioLayoutUnit.values,
+            formatValue: (unit) =>
+                unit == StudioLayoutUnit.pixels ? 'Pixels' : 'Percent',
+            onChanged: controller.updateLayoutUnit,
+          ),
+        ],
       ),
       const Gap(12),
       _buildPair('X', 'Y'),
@@ -332,26 +322,24 @@ class _InspectorActions extends StatelessWidget {
   final VoidCallback onApply;
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (error case final message?) ...[
-            StudioFormError(message),
-            const Gap(12),
-          ],
-          PrimaryButton(
-            onPressed: onApply,
-            child: const Text('Apply to preview'),
+  Widget build(BuildContext context) => Padding(
+    key: const ValueKey('inspector-actions'),
+    padding: const EdgeInsets.all(12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (error case final message?) ...[
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 64),
+            child: SingleChildScrollView(child: StudioFormError(message)),
           ),
           const Gap(8),
-          const Text('Enter or leave a field to apply. Save writes to disk.')
-              .small()
-              .muted(),
         ],
-      ),
+        OutlineButton(
+          onPressed: onApply,
+          child: const Text('Apply to preview'),
+        ),
+      ],
     ),
   );
 }
