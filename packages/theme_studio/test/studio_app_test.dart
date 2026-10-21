@@ -1938,6 +1938,42 @@ void main() {
   });
 
   testWidgets(
+    'save shortcut applies focused inspector drafts and validates them',
+    (tester) async {
+      await openStudio(tester);
+      final source = file.readAsStringSync();
+      Future<void> saveWithKeyboard() async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pumpAndSettle();
+      }
+
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '2560');
+      await saveWithKeyboard();
+      expect(find.textContaining('non-normalized rect'), findsOneWidget);
+      expect(file.readAsStringSync(), source);
+
+      await tester.enterText(find.byKey(const ValueKey('field-Width')), '512');
+      await saveWithKeyboard();
+      expect(
+        decodeSceneDocument(file.readAsStringSync()).nodes.first.rect.width,
+        0.4,
+      );
+      expect(find.text('Saved'), findsOneWidget);
+      expect(tester.testTextInput.hasAnyClients, isTrue);
+
+      file.writeAsStringSync(source);
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
+      await saveWithKeyboard();
+      expect(find.textContaining('The scene changed on disk'), findsOneWidget);
+      expect(file.readAsStringSync(), source);
+      expect(find.text('Unsaved changes'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'invalid edits preserve preview and block save, valid drafts save directly',
     (tester) async {
       await openStudio(tester);

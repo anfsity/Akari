@@ -16,7 +16,6 @@ class StudioCanvas extends StatefulWidget {
     required this.preferences,
     required this.dormant,
     required this.onToggleDormant,
-    required this.onSave,
     this.readOnly = false,
     super.key,
   });
@@ -27,7 +26,6 @@ class StudioCanvas extends StatefulWidget {
   final StudioPreferences preferences;
   final bool dormant;
   final VoidCallback onToggleDormant;
-  final VoidCallback onSave;
 
   @override
   State<StudioCanvas> createState() => _StudioCanvasState();
@@ -92,8 +90,6 @@ class _StudioCanvasState extends State<StudioCanvas> {
         session.redo();
       } else if (key == LogicalKeyboardKey.keyD) {
         session.duplicateSelectedNode();
-      } else if (key == LogicalKeyboardKey.keyS) {
-        widget.onSave();
       } else {
         return KeyEventResult.ignored;
       }

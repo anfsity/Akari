@@ -379,6 +379,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   Widget _buildWorkspace(BuildContext context) {
     final editor = _editor;
     return StudioWorkspace(
+      onSave: _save,
       toolbar: StudioToolbar(
         themeId: _theme.id,
         readOnly: _inspect,
@@ -418,7 +419,6 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         dormant: _dormant,
         readOnly: _inspect,
         onToggleDormant: () => setState(() => _dormant = !_dormant),
-        onSave: _save,
       ),
       inspector: editor == null
           ? const SizedBox()
