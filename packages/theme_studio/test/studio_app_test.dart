@@ -211,7 +211,9 @@ void main() {
         'preset',
       );
       expect(find.text('preset component panel'), findsOneWidget);
-      expect(find.text('preset.txt'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
+      await tester.pumpAndSettle();
+      expect(find.text('preset.txt'), findsWidgets);
       await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
@@ -421,6 +423,47 @@ void main() {
   );
 
   testWidgets(
+    'layer list reveals canvas selection without scrolling on edits',
+    (tester) async {
+      file.writeAsStringSync(
+        encodeSceneDocument(
+          _document.copyWith(
+            nodes: [
+              for (var index = 0; index < 30; index++)
+                _document.nodes.first.copyWith(id: 'node-$index'),
+            ],
+          ),
+        ),
+      );
+      await openStudio(tester);
+      expect(
+        find.byKey(const ValueKey('layer-node-0')).hitTestable(),
+        findsOneWidget,
+      );
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      editor.selectNode('node-29');
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('layer-node-29')).hitTestable(),
+        findsOneWidget,
+      );
+      final list = find.byKey(const ValueKey('layer-list'));
+      await tester.drag(list, const Offset(0, -180));
+      await tester.pumpAndSettle();
+      final scroll = tester.widget<ListView>(list).controller!;
+      final offset = scroll.offset;
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
+      await tester.tap(find.text('Apply to preview'));
+      await tester.pumpAndSettle();
+      expect(scroll.offset, offset);
+      expect(editor.selectedNode.rect.x, 0.2);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'workspace and sidebar boundaries resize without replacing editor state',
     (tester) async {
       await openStudio(tester);
@@ -443,10 +486,8 @@ void main() {
       );
       final left = pane('sidebar-pane');
       final right = pane('inspector-pane');
-      final scenes = pane('scenes-pane');
-      final assets = pane('assets-pane');
       expect(columns, findsNWidgets(2));
-      expect(rows, findsNWidgets(4));
+      expect(rows, findsNWidgets(2));
       final leftWidth = tester.getSize(left).width;
       await tester.drag(columns.first, const Offset(70, 0));
       await tester.pumpAndSettle();
@@ -455,17 +496,9 @@ void main() {
       await tester.drag(columns.last, const Offset(-70, 0));
       await tester.pumpAndSettle();
       expect(tester.getSize(right).width, greaterThan(rightWidth));
-      final sceneHeight = tester.getSize(scenes).height;
-      await tester.drag(rows.first, const Offset(0, 50));
-      await tester.pumpAndSettle();
-      expect(tester.getSize(scenes).height, greaterThan(sceneHeight));
-      final assetHeight = tester.getSize(assets).height;
-      await tester.drag(rows.at(1), const Offset(0, -50));
-      await tester.pumpAndSettle();
-      expect(tester.getSize(assets).height, greaterThan(assetHeight));
       final header = pane('inspector-header-pane');
       final headerHeight = tester.getSize(header).height;
-      await tester.drag(rows.at(2), const Offset(0, 30));
+      await tester.drag(rows.first, const Offset(0, 30));
       await tester.pumpAndSettle();
       expect(tester.getSize(header).height, greaterThan(headerHeight));
       final actions = pane('inspector-actions-pane');
@@ -991,6 +1024,8 @@ void main() {
     await tester.runAsync(() => _writeImage(source));
     await openStudio(tester);
     picker.selected = _PickedFile(source);
+    await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Import asset'));
     await tester.pumpAndSettle();
     expect(File('${directory.path}/assets/wallpaper.png').existsSync(), isTrue);
@@ -1054,12 +1089,14 @@ void main() {
       await tester.tap(find.text('Load JSON'));
       await tester.pumpAndSettle();
       expect(find.textContaining('FormatException'), findsOneWidget);
-      expect(find.text('wallpaper.png'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
+      await tester.pumpAndSettle();
+      expect(find.text('wallpaper.png'), findsWidgets);
       expect(find.text('local.png'), findsNothing);
       picker.selected = _PickedFile(scene);
       await tester.tap(find.text('Load JSON'));
       await tester.pumpAndSettle();
-      expect(find.text('local.png'), findsOneWidget);
+      expect(find.text('local.png'), findsWidgets);
       expect(find.text('wallpaper.png'), findsNothing);
       var preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
       var renderer =
@@ -1071,6 +1108,8 @@ void main() {
       );
 
       picker.selected = _PickedFile(source);
+      await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Import asset'));
       await tester.pumpAndSettle();
       expect(
@@ -1116,7 +1155,9 @@ void main() {
       await tester.tap(find.text('test.scene.json'));
       await tester.pumpAndSettle();
       expect(find.text('local.png'), findsNothing);
-      expect(find.text('wallpaper.png'), findsOneWidget);
+      expect(find.text('wallpaper.png'), findsWidgets);
+      await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Import asset'));
       await tester.pumpAndSettle();
       expect(
@@ -2050,7 +2091,7 @@ void main() {
     (tester) async {
       await openStudio(tester);
       await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
-      await tester.tap(find.text('Duplicate node'));
+      await tester.tap(find.text('Duplicate'));
       await tester.pumpAndSettle();
       final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
       expect(preview.selectedId, 'panel-copy');
@@ -2093,7 +2134,7 @@ void main() {
       await openStudio(tester);
       final source = file.readAsStringSync();
       await tester.enterText(find.byKey(const ValueKey('field-Width')), '2560');
-      for (final action in ['Duplicate node', 'Delete node']) {
+      for (final action in ['Duplicate', 'Delete']) {
         await tester.tap(find.text(action));
         await tester.pumpAndSettle();
         final preview = tester.widget<StudioPreview>(
@@ -2117,7 +2158,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('layer-label')));
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const ValueKey('field-X')), '768');
-      await tester.tap(find.text('Delete node'));
+      await tester.tap(find.text('Delete'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('layer-label')), findsNothing);
       expect(
@@ -2126,9 +2167,7 @@ void main() {
       );
       expect(
         tester
-            .widget<OutlineButton>(
-              find.widgetWithText(OutlineButton, 'Delete node'),
-            )
+            .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Delete'))
             .onPressed,
         isNull,
       );

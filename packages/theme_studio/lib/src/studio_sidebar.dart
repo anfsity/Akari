@@ -1,14 +1,16 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import 'scene_editor.dart';
 
-class StudioSidebar extends StatelessWidget {
+class StudioSidebar extends StatefulWidget {
   const StudioSidebar({
     required this.scenePaths,
     required this.assetPaths,
+    required this.resolveAssetImage,
     required this.editor,
     required this.loadingFile,
     required this.onLoadJson,
@@ -22,6 +24,7 @@ class StudioSidebar extends StatelessWidget {
   final bool readOnly;
   final List<String> scenePaths;
   final List<String> assetPaths;
+  final ImageProvider Function(String) resolveAssetImage;
   final SceneEditor? editor;
   final bool loadingFile;
   final VoidCallback onLoadJson;
@@ -30,219 +33,326 @@ class StudioSidebar extends StatelessWidget {
   final ValueChanged<String> onApplyBackground;
 
   @override
+  State<StudioSidebar> createState() => _StudioSidebarState();
+}
+
+class _StudioSidebarState extends State<StudioSidebar> {
+  bool _showAssets = false;
+
+  @override
   Widget build(BuildContext context) {
-    final session = editor;
+    final editor = widget.editor;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: ResizablePanel.vertical(
-            key: const ValueKey('sidebar-panels'),
-            draggerThickness: 10,
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
             children: [
-              ResizablePane.flex(
-                key: const ValueKey('scenes-pane'),
-                initialFlex: 0.3,
-                minSize: 128,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _SidebarHeading('SCENES'),
-                    Expanded(
-                      child: _SceneList(
-                        paths: scenePaths,
-                        selectedPath: editor?.file.path,
-                        loadingFile: loadingFile,
-                        onLoadJson: onLoadJson,
-                        onSwitchScene: onSwitchScene,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ResizablePane.flex(
-                key: const ValueKey('layers-pane'),
-                initialFlex: 0.4,
-                minSize: 100,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _SidebarHeading('LAYERS'),
-                    if (session != null)
-                      Expanded(child: _LayerList(editor: session)),
-                  ],
-                ),
-              ),
-              ResizablePane.flex(
-                key: const ValueKey('assets-pane'),
-                initialFlex: 0.3,
-                minSize: 128,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _SidebarHeading('ASSETS'),
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: OutlineButton(
-                        onPressed: loadingFile || readOnly
-                            ? null
-                            : onImportAsset,
-                        child: const Text('Import asset'),
-                      ),
-                    ),
-                    Expanded(
-                      child: _AssetList(
-                        paths: assetPaths,
-                        onApplyBackground: session == null || readOnly
-                            ? null
-                            : onApplyBackground,
-                      ),
-                    ),
-                  ],
-                ),
+              const Text('Scenes').small().muted(),
+              const Spacer(),
+              GhostButton(
+                onPressed: widget.loadingFile ? null : widget.onLoadJson,
+                density: ButtonDensity.compact,
+                child: const Text('Load JSON').small(),
               ),
             ],
           ),
         ),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 90),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            children: [
+              for (final path in widget.scenePaths)
+                Button(
+                  key: ValueKey('scene-$path'),
+                  style: editor?.file.path == path
+                      ? const ButtonStyle.secondary()
+                      : const ButtonStyle.ghost(),
+                  onPressed: () => widget.onSwitchScene(path),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      File(path).uri.pathSegments.last,
+                      overflow: TextOverflow.ellipsis,
+                    ).small(),
+                  ),
+                ),
+            ],
+          ),
+        ),
         const Divider(),
-        if (session != null) _NodeActions(editor: session, readOnly: readOnly),
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: Row(
+            children: [
+              for (final assets in [false, true])
+                Expanded(
+                  child: Button(
+                    key: ValueKey(assets ? 'sidebar-assets' : 'sidebar-layers'),
+                    style: _showAssets == assets
+                        ? const ButtonStyle.secondary()
+                        : const ButtonStyle.ghost(),
+                    onPressed: () => setState(() => _showAssets = assets),
+                    child: Text(assets ? 'Assets' : 'Layers'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _showAssets
+              ? _AssetList(
+                  paths: widget.assetPaths,
+                  resolveImage: widget.resolveAssetImage,
+                  loading: widget.loadingFile,
+                  onImport: widget.readOnly ? null : widget.onImportAsset,
+                  onApplyBackground: editor == null || widget.readOnly
+                      ? null
+                      : widget.onApplyBackground,
+                )
+              : editor == null
+              ? const SizedBox()
+              : _LayerList(key: ObjectKey(editor), editor: editor),
+        ),
+        if (!_showAssets && editor != null) ...[
+          const Divider(),
+          _NodeActions(editor: editor, readOnly: widget.readOnly),
+        ],
       ],
     );
   }
 }
 
-class _SidebarHeading extends StatelessWidget {
-  const _SidebarHeading(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(16),
-    child: Text(title).small().muted(),
-  );
-}
-
-class _SceneList extends StatelessWidget {
-  const _SceneList({
+class _AssetList extends StatefulWidget {
+  const _AssetList({
     required this.paths,
-    required this.selectedPath,
-    required this.loadingFile,
-    required this.onLoadJson,
-    required this.onSwitchScene,
+    required this.resolveImage,
+    required this.loading,
+    required this.onImport,
+    required this.onApplyBackground,
   });
 
   final List<String> paths;
-  final String? selectedPath;
-  final bool loadingFile;
-  final VoidCallback onLoadJson;
-  final ValueChanged<String> onSwitchScene;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: OutlineButton(
-          onPressed: loadingFile ? null : onLoadJson,
-          child: const Text('Load JSON'),
-        ),
-      ),
-      const Gap(8),
-      Expanded(
-        child: ListView.builder(
-          itemCount: paths.length,
-          itemBuilder: (context, index) {
-            final path = paths[index];
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Button(
-                key: ValueKey('scene-$path'),
-                style: selectedPath == path
-                    ? const ButtonStyle.secondary()
-                    : const ButtonStyle.ghost(),
-                onPressed: () => onSwitchScene(path),
-                child: Text(
-                  File(path).uri.pathSegments.last,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    ],
-  );
-}
-
-class _AssetList extends StatelessWidget {
-  const _AssetList({required this.paths, required this.onApplyBackground});
-
-  final List<String> paths;
+  final ImageProvider Function(String) resolveImage;
+  final bool loading;
+  final VoidCallback? onImport;
   final ValueChanged<String>? onApplyBackground;
 
   @override
+  State<_AssetList> createState() => _AssetListState();
+}
+
+class _AssetListState extends State<_AssetList> {
+  String? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.paths.firstOrNull;
+  }
+
+  @override
+  void didUpdateWidget(_AssetList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final added = widget.paths.where((path) => !oldWidget.paths.contains(path));
+    _selected =
+        added.firstOrNull ??
+        (widget.paths.contains(_selected)
+            ? _selected
+            : widget.paths.firstOrNull);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final applyBackground = onApplyBackground;
-    return ListView.builder(
-      itemCount: paths.length,
-      itemBuilder: (context, index) {
-        final asset = paths[index];
-        return Row(
-          children: [
-            Expanded(
-              child: GhostButton(
-                onPressed: () => Clipboard.setData(ClipboardData(text: asset)),
-                child: Text(
-                  asset.split('/').last,
-                  overflow: TextOverflow.ellipsis,
+    final selected = _selected;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: OutlineButton(
+            onPressed: widget.loading ? null : widget.onImport,
+            child: const Text('Import asset'),
+          ),
+        ),
+        Expanded(
+          child: widget.paths.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: const Text('Import images and files for this theme.')
+                      .small()
+                      .muted(),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  itemCount: widget.paths.length,
+                  itemBuilder: (context, index) {
+                    final asset = widget.paths[index];
+                    return Button(
+                      style: asset == selected
+                          ? const ButtonStyle.secondary()
+                          : const ButtonStyle.ghost(),
+                      onPressed: () => setState(() => _selected = asset),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image(
+                              image: widget.resolveImage(asset),
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const SizedBox(
+                                    width: 40,
+                                    height: 40,
+                                    child: Icon(LucideIcons.file, size: 20),
+                                  ),
+                            ),
+                          ),
+                          const Gap(10),
+                          Expanded(
+                            child: Text(
+                              asset.split('/').last,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ).small(),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              ),
+        ),
+        if (selected != null) ...[
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  selected.split('/').last,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ).small().muted(),
+                const Gap(8),
+                OutlineButton(
+                  onPressed: () =>
+                      Clipboard.setData(ClipboardData(text: selected)),
+                  child: const Text('Copy path'),
+                ),
+                const Gap(8),
+                PrimaryButton(
+                  onPressed: widget.onApplyBackground == null
+                      ? null
+                      : () => widget.onApplyBackground!(selected),
+                  child: const Text('Use image'),
+                ),
+              ],
             ),
-            if (applyBackground != null)
-              GhostButton(
-                onPressed: () => applyBackground(asset),
-                child: const Text('Use image'),
-              ),
-          ],
-        );
-      },
+          ),
+        ],
+      ],
     );
   }
 }
 
-class _LayerList extends StatelessWidget {
-  const _LayerList({required this.editor});
+/// Fixed-height rows let canvas selection reveal a layer even when its row
+/// has not been built. Only a changed selection moves the user's scroll view.
+class _LayerList extends StatefulWidget {
+  const _LayerList({required this.editor, super.key});
 
   final SceneEditor editor;
 
   @override
+  State<_LayerList> createState() => _LayerListState();
+}
+
+class _LayerListState extends State<_LayerList> {
+  static const _rowHeight = 48.0;
+  final _scroll = ScrollController();
+  late String _selectedId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedId = widget.editor.selectedId;
+    widget.editor.addListener(_revealChangedSelection);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revealSelection());
+  }
+
+  void _revealChangedSelection() {
+    if (_selectedId == widget.editor.selectedId) return;
+    _selectedId = widget.editor.selectedId;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revealSelection());
+  }
+
+  void _revealSelection() {
+    if (!mounted || !_scroll.hasClients) return;
+    final nodes = widget.editor.document.paintOrder.reversed.toList();
+    final top = nodes.indexWhere((node) => node.id == _selectedId) * _rowHeight;
+    final bottom = top + _rowHeight;
+    final position = _scroll.position;
+    if (top < position.pixels) {
+      _scroll.jumpTo(top);
+    } else if (bottom > position.pixels + position.viewportDimension) {
+      _scroll.jumpTo(
+        math.min(bottom - position.viewportDimension, position.maxScrollExtent),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.editor.removeListener(_revealChangedSelection);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: editor,
+    listenable: widget.editor,
     builder: (context, _) {
-      final nodes = editor.document.paintOrder.reversed.toList();
+      final nodes = widget.editor.document.paintOrder.reversed.toList();
       return ListView.builder(
+        key: const ValueKey('layer-list'),
+        controller: _scroll,
+        itemExtent: _rowHeight,
         itemCount: nodes.length,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         itemBuilder: (context, index) {
           final node = nodes[index];
+          final selected = node.id == widget.editor.selectedId;
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            padding: const EdgeInsets.symmetric(vertical: 2),
             child: Button(
               key: ValueKey('layer-${node.id}'),
-              style: node.id == editor.selectedId
+              style: selected
                   ? const ButtonStyle.secondary()
                   : const ButtonStyle.ghost(),
-              onPressed: () => editor.selectNode(node.id),
-              child: SizedBox(
-                width: double.infinity,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(node.id, overflow: TextOverflow.ellipsis),
-                    Text(node.componentId).small().muted(),
-                  ],
-                ),
+              onPressed: () => widget.editor.selectNode(node.id),
+              child: Row(
+                children: [
+                  Icon(
+                    LucideIcons.layers,
+                    size: 14,
+                    color: selected
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.mutedForeground,
+                  ),
+                  const Gap(8),
+                  Expanded(
+                    child: Text(
+                      node.id,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ).small(),
+                  ),
+                ],
               ),
             ),
           );
@@ -266,16 +376,24 @@ class _NodeActions extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          OutlineButton(
-            onPressed: readOnly ? null : editor.duplicateSelectedNode,
-            child: const Text('Duplicate node'),
-          ),
-          const Gap(8),
-          OutlineButton(
-            onPressed: !readOnly && editor.canDeleteNode
-                ? editor.deleteSelectedNode
-                : null,
-            child: const Text('Delete node'),
+          Row(
+            children: [
+              Expanded(
+                child: OutlineButton(
+                  onPressed: readOnly ? null : editor.duplicateSelectedNode,
+                  child: const Text('Duplicate').small(),
+                ),
+              ),
+              const Gap(8),
+              Expanded(
+                child: OutlineButton(
+                  onPressed: !readOnly && editor.canDeleteNode
+                      ? editor.deleteSelectedNode
+                      : null,
+                  child: const Text('Delete').small(),
+                ),
+              ),
+            ],
           ),
           if (!editor.canDeleteNode) ...[
             const Gap(8),

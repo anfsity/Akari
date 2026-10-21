@@ -401,6 +401,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
             child: StudioSidebar(
               scenePaths: _scenePaths,
               assetPaths: _assetPaths,
+              resolveAssetImage: _assets.getImageProvider,
               editor: editor,
               loadingFile: _loadingFile,
               readOnly: _inspect,
