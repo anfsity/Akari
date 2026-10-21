@@ -883,41 +883,173 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('settings presets and background drafts apply as one undo step', (
+    tester,
+  ) async {
+    await openStudio(tester);
+    final source = file.readAsStringSync();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('canvas-resolution-preset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Full HD · 1920 × 1080').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('swap-canvas-dimensions')));
+    await tester.tap(find.byKey(const ValueKey('settings-nav-background')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('setting-Background color')),
+      '#123456',
+    );
+    await tester.tap(find.byKey(const ValueKey('settings-nav-canvas')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('setting-Canvas width')))
+          .controller!
+          .text,
+      '1080',
+    );
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('setting-Canvas height')),
+          )
+          .controller!
+          .text,
+      '1920',
+    );
+    await tester.tap(find.text('Apply settings'));
+    await tester.pumpAndSettle();
+    final editor = tester
+        .widget<StudioCanvas>(find.byType(StudioCanvas))
+        .editor!;
+    expect(editor.document.canvas.referenceWidth, 1080);
+    expect(editor.document.canvas.referenceHeight, 1920);
+    expect(editor.document.background.color, 0xff123456);
+    expect(file.readAsStringSync(), source);
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(encodeSceneDocument(editor.document), source);
+    expect(editor.canUndo, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'settings reveal invalid categories and preserve drafts while correcting them',
+    (tester) async {
+      await openStudio(tester);
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('setting-Canvas width')),
+        '0',
+      );
+      await tester.tap(find.byKey(const ValueKey('settings-nav-appearance')));
+      await tester.tap(find.text('Apply settings'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('between 1 and 16384'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('setting-Canvas width')),
+        '1600',
+      );
+      await tester.tap(find.byKey(const ValueKey('settings-nav-background')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('setting-Background color')),
+        'invalid',
+      );
+      await tester.tap(find.byKey(const ValueKey('settings-nav-appearance')));
+      await tester.tap(find.text('Apply settings'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('setting-Background color')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Color must use'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('setting-Background color')),
+        '#abcdef',
+      );
+      await tester.tap(find.byKey(const ValueKey('settings-nav-grid')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('setting-Grid size (pixels)')),
+        '0',
+      );
+      await tester.tap(find.byKey(const ValueKey('settings-nav-canvas')));
+      await tester.tap(find.text('Apply settings'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Grid size must be'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const ValueKey('grid-preset-32')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('grid-preset-32')));
+      await tester.tap(find.text('Apply settings'));
+      await tester.pumpAndSettle();
+      final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(preview.document.canvas.referenceWidth, 1600);
+      expect(preview.document.background.color, 0xffabcdef);
+      expect(preview.preferences.gridSize, 32);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'settings reset editor defaults without changing the scene and fit small windows',
+    (tester) async {
+      await openStudio(tester);
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('settings-nav-appearance')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('palette-violet')));
+      await tester.ensureVisible(find.text('Reset appearance'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Reset appearance'));
+      await tester.tap(find.byKey(const ValueKey('settings-nav-grid')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Show grid'));
+      await tester.tap(find.text('Snap to grid'));
+      await tester.tap(find.byKey(const ValueKey('grid-preset-48')));
+      await tester.ensureVisible(find.text('Reset grid'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Reset grid'));
+      tester.view.physicalSize = const Size(600, 540);
+      await tester.pumpAndSettle();
+      final dialog = tester.getRect(
+        find.byKey(const ValueKey('studio-settings')),
+      );
+      expect(dialog.left, greaterThanOrEqualTo(0));
+      expect(dialog.right, lessThanOrEqualTo(600));
+      expect(dialog.bottom, lessThanOrEqualTo(540));
+      expect(find.text('Apply settings').hitTestable(), findsOneWidget);
+      await tester.tap(find.text('Apply settings'));
+      await tester.pumpAndSettle();
+      final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(preview.preferences.palette, StudioPalette.zinc);
+      expect(preview.preferences.themeMode, ThemeMode.system);
+      expect(preview.preferences.showGrid, isFalse);
+      expect(preview.preferences.snapToGrid, isFalse);
+      expect(preview.preferences.gridSize, 24);
+      expect(encodeSceneDocument(preview.document), file.readAsStringSync());
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     'appearance, grid and snapping apply and persist across remounts',
     (tester) async {
       await openStudio(tester);
       await tester.tap(find.text('Settings'));
       await tester.pumpAndSettle();
-      final settingsScroll = find
-          .descendant(
-            of: find.byKey(const ValueKey('settings-list')),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
-        find.text('Appearance: Follow system'),
-        150,
-        scrollable: settingsScroll,
-      );
+      await tester.tap(find.byKey(const ValueKey('settings-nav-appearance')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Appearance: Follow system'));
       await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text('Light').last);
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('Color theme: Zinc'),
-        100,
-        scrollable: settingsScroll,
-      );
-      await tester.tap(find.text('Color theme: Zinc'));
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.text('Violet').last);
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('setting-Grid size (pixels)')),
-        100,
-        scrollable: settingsScroll,
-      );
+      await tester.tap(find.byKey(const ValueKey('palette-violet')));
+      await tester.tap(find.byKey(const ValueKey('settings-nav-grid')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Show grid'));
       await tester.tap(find.text('Snap to grid'));

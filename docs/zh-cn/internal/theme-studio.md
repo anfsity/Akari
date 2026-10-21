@@ -23,8 +23,8 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 
 ## 场景编辑流程
 
-1. **选择主题与场景**：在顶部从 **THEME** 选择主题、从 **SCENES** 选择场景，或点击 **Load JSON** 打开磁盘上的任意 `*.scene.json`。
-2. **选中节点**：在画布上点击节点，或在左侧 **Layers** 列表中选择（包含当前预览状态下隐藏的节点，按从前到后排序）。
+1. **选择主题与场景**：在顶部从 **THEME** 选择主题、从 **Scenes** 选择场景，或点击 **Load JSON** 打开磁盘上的任意 `*.scene.json`。
+2. **选中节点**：在画布上点击节点，或在左侧 **Layers** 标签页中选择（包含当前预览状态下隐藏的节点，按从前到后排序）。画布选择会自动滚动到对应图层；**Assets** 独占一个完整高度的标签页，显示资源缩略图与选中文件的操作。
 3. **修改布局与属性**：在右侧检查器中调整位置/尺寸（支持参考像素或百分比）、深度（`z`）、绘制顺序（`renderOrder`）、焦点顺序（`focusOrder`）、几何变换、动效（`motion`）或组件属性（`properties`）。
 4. **应用到预览**：按 `Enter`、移出输入框或点击 **Apply to preview** 即可校验并应用修改。若输入无效，检查器会提示错误并保留上一次有效画面。
 5. **撤销与保存**：使用 **Undo** / **Redo**（`Ctrl+Z` / `Ctrl+Shift+Z`）回退历史，点击 **Save scene**（`Ctrl+S`）以原子方式写入场景 JSON。
@@ -72,14 +72,18 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 
 - **预设与外部项目**：Studio 会一并编译 `themes/` 下的所有内置主题与 `--theme` 指定的主题。在 **THEME** 中切换主题（或加载已注册主题的 JSON）会同步切换组件工厂、Tokens、背景渲染器与资源列表。
 - **检查生成代码（Inspect code）**：将右侧面板切到 **Inspect code**，即可按当前选中节点（**Selection**）或完整场景（**Scene**）查看并复制校验后的 **JSON** 或生成的 **Dart** 代码。
-- **设置（Settings）**：可编辑画布参考宽高、`fit`、`useSafeArea`、背景配置（`kind`、`asset`、`color`、`blurSigma`、`scrimOpacity`），以及编辑器外观（浅色/深色/跟随系统与 shadcn 主题色）和网格吸附间距（`4..512` 像素）。
+- **设置（Settings）**：按 **Canvas**、**Background**、**Appearance**、**Grid & snapping** 分类，切换分类时保留草稿；校验失败会打开需要修正的分类。
+  - **Canvas** 提供 HD、Full HD、QHD、4K UHD、竖屏预设、自定义宽高、交换宽高、`fit` 和 `useSafeArea`。
+  - **Background** 提供图片/颜色预览、主题资源选择、十六进制颜色输入、模糊与遮罩透明度。
+  - **Appearance** 可预览浅色/深色/跟随系统及主题色；**Grid & snapping** 提供常用间距预设及 `4..512` 像素自定义间距。两个编辑器分类均可恢复默认值。
+  - **Apply settings** 一次应用所有分类。画布/背景修改合并为一步撤销，需 **Save scene** 写入磁盘；编辑器偏好在应用时独立保存。**Cancel** 丢弃对话框草稿。
 
 <a id="importing-assets"></a>
 
 ## 导入资源（Importing assets）
 
-- **Import asset**：将文件复制到当前场景所属主题包的 `assets/` 目录，自动登记到 `pubspec.yaml`，并将 `packages/<theme>/assets/...` 引用路径复制到剪贴板。
-- **Use image**：校验导入图片可正常解码后，将其设为场景背景（需点击 **Save scene** 写入磁盘）。
+- **Import asset**（位于 **Assets** 标签页）：将文件复制到当前场景所属主题包的 `assets/` 目录，自动登记到 `pubspec.yaml`，并将 `packages/<theme>/assets/...` 引用路径复制到剪贴板。
+- **Use image**：先选中资源缩略图，再使用列表下方的操作。校验导入图片可正常解码后，将其设为场景背景（需点击 **Save scene** 写入磁盘）。
 - **外部 JSON 的资源归属**：通过 **Load JSON** 打开文件时，Studio 会向上查找最近的 `theme_*` 包目录作为资源归属包。若打开的是尚未编译的外部主题包，请使用 `--theme /path/to/theme_other` 重启 Studio 以编译其自定义组件与资源。
 
 ## 常见问题排查

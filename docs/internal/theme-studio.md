@@ -23,8 +23,8 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 
 ## Editing workflow
 
-1. **Choose a theme and scene**: Select a compiled theme in **THEME** and a scene in **SCENES**, or click **Load JSON** to open any `*.scene.json` file from disk.
-2. **Select a node**: Click a node on the canvas or in the **Layers** list (ordered front-to-back, including nodes hidden in the current preview state).
+1. **Choose a theme and scene**: Select a compiled theme in **THEME** and a scene in **Scenes**, or click **Load JSON** to open any `*.scene.json` file from disk.
+2. **Select a node**: Click a node on the canvas or in the **Layers** tab (ordered front-to-back, including nodes hidden in the current preview state). Canvas selection automatically reveals its layer; **Assets** has its own full-height tab with thumbnails and actions for the selected file.
 3. **Edit layout & properties**: Update position/size (in reference pixels or percentages), depth (`z`), `renderOrder`, `focusOrder`, transforms, `motion`, or component `properties` in the right-hand inspector.
 4. **Apply & preview**: Press `Enter`, leave a field, or click **Apply to preview** to validate and apply edits. Invalid inputs display an error and keep the last valid scene.
 5. **Save or undo**: Use **Undo** / **Redo** (`Ctrl+Z` / `Ctrl+Shift+Z`) for history and **Save scene** (`Ctrl+S`) to write changes atomically to the scene JSON.
@@ -72,12 +72,16 @@ Switch preview states with **State: Login / Dormant**, adjust zoom with **− / 
 
 - **Presets & projects**: Studio compiles all packages under `themes/` alongside `--theme`. Switching **THEME** (or loading a scene from a registered theme package) switches the component factory, tokens, background renderers, and assets together.
 - **Inspect code**: Switch the right panel from **Design** to **Inspect code** to view and copy validated **JSON** or generated **Dart** for the **Selection** or the entire **Scene**.
-- **Settings**: Configure canvas reference resolution, `fit`, `useSafeArea`, background settings (`kind`, `asset`, `color`, `blurSigma`, `scrimOpacity`), editor appearance (Light / Dark / System + shadcn color presets), and grid snapping (`4..512` px).
+- **Settings**: The dialog separates **Canvas**, **Background**, **Appearance**, and **Grid & snapping**. Drafts stay intact while switching categories; validation opens the category that needs correction.
+  - **Canvas** offers HD, Full HD, QHD, 4K UHD, and portrait presets, custom dimensions, a dimension swap action, `fit`, and `useSafeArea`.
+  - **Background** includes an image/color preview, a theme asset chooser, a hexadecimal color field, blur, and scrim opacity.
+  - **Appearance** previews Light / Dark / System and the available color palettes. **Grid & snapping** offers common spacing presets and custom `4..512` px spacing. Each editor category can be reset to its defaults.
+  - **Apply settings** applies all categories together. Canvas/background changes form one undo step and need **Save scene** to persist. Editor preferences are stored independently when applied; **Cancel** discards the dialog's drafts.
 
 ## Importing assets
 
-- **Import asset**: Copies a file into the owning theme's `assets/` directory, registers it in `pubspec.yaml`, and copies its `packages/<theme>/assets/...` path to the clipboard.
-- **Use image**: Validates that an imported image decodes cleanly and sets it as the scene background (requires **Save scene** to persist to JSON).
+- **Import asset** (in **Assets**): Copies a file into the owning theme's `assets/` directory, registers it in `pubspec.yaml`, and copies its `packages/<theme>/assets/...` path to the clipboard.
+- **Use image**: Select an asset thumbnail, then use the action below the list. Validates that an imported image decodes cleanly and sets it as the scene background (requires **Save scene** to persist to JSON).
 - **Package resolution**: When opening a scene via **Load JSON**, Studio locates the nearest `theme_*` package boundary to own asset imports. For an unregistered external theme, restart Studio with `--theme /path/to/theme_other` to compile its custom widgets and bundle assets.
 
 ## Troubleshooting
