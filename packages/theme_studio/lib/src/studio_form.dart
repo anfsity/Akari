@@ -108,15 +108,13 @@ class StudioEnumSelect<T extends Enum> extends StatelessWidget {
   final String? label;
   final String Function(T)? formatValue;
 
-  String _getLabel(T value) => formatValue?.call(value) ?? value.name;
-
   @override
   Widget build(BuildContext context) => StudioSelect<T>(
     value: value,
     values: values,
     onChanged: onChanged,
     label: label,
-    formatValue: _getLabel,
+    formatValue: (value) => formatValue?.call(value) ?? value.name,
   );
 }
 
