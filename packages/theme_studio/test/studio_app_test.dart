@@ -385,42 +385,36 @@ void main() {
     },
   );
 
-  testWidgets(
-    'preview header preserves original alignment and surface styling',
-    (tester) async {
-      await openStudio(tester);
-      for (final width in [1100.0, 1400.0, 1800.0]) {
-        tester.view.physicalSize = Size(width, 900);
-        await tester.pumpAndSettle();
-        for (final state in ['Login', 'Dormant']) {
-          final canvas = find.byType(StudioCanvas);
-          final canvasRect = tester.getRect(canvas);
-          final title = find.text('Preview');
-          final button = find.widgetWithText(OutlineButton, 'State: $state');
-          expect(title, findsOneWidget);
-          final titleRect = tester.getRect(title);
-          final buttonRect = tester.getRect(button);
-          expect(titleRect.left, canvasRect.left + 16);
-          expect(buttonRect.right, canvasRect.right - 16);
-          expect(buttonRect.top, canvasRect.top + 16);
-          expect(titleRect.center.dy, buttonRect.center.dy);
-          final surface = tester.widget<ColoredBox>(
-            find
-                .descendant(of: canvas, matching: find.byType(ColoredBox))
-                .first,
-          );
-          expect(
-            surface.color,
-            Theme.of(tester.element(canvas)).colorScheme.muted
-                .withValues(alpha: 0.3),
-          );
-          await tester.tap(button);
-          await tester.pumpAndSettle();
-        }
+  testWidgets('canvas toolbar stays compact and wraps within narrow panels', (
+    tester,
+  ) async {
+    await openStudio(tester);
+    for (final width in [1100.0, 1400.0, 1800.0]) {
+      tester.view.physicalSize = Size(width, 900);
+      await tester.pumpAndSettle();
+      final canvasRect = tester.getRect(find.byType(StudioCanvas));
+      final toolbar = tester.getRect(
+        find.byKey(const ValueKey('canvas-toolbar')),
+      );
+      expect(toolbar.width, canvasRect.width);
+      expect(toolbar.height, lessThan(150));
+      for (final name in [
+        'tool-move',
+        'tool-scale',
+        'canvas-hand',
+        'zoom-fit',
+      ]) {
+        final rect = tester.getRect(find.byKey(ValueKey(name)));
+        expect(rect.left, greaterThanOrEqualTo(canvasRect.left));
+        expect(rect.right, lessThanOrEqualTo(canvasRect.right));
       }
+      await tester.tap(find.text('State: Login'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('State: Dormant'));
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-    },
-  );
+    }
+  });
 
   testWidgets(
     'layer list reveals canvas selection without scrolling on edits',
@@ -476,18 +470,12 @@ void main() {
             widget is MouseRegion &&
             widget.cursor == SystemMouseCursors.resizeColumn,
       );
-      final rows = find.byWidgetPredicate(
-        (widget) =>
-            widget is MouseRegion &&
-            widget.cursor == SystemMouseCursors.resizeRow,
-      );
       Finder pane(String name) => find.byWidgetPredicate(
         (widget) => widget is ResizablePane && widget.key == ValueKey(name),
       );
       final left = pane('sidebar-pane');
       final right = pane('inspector-pane');
       expect(columns, findsNWidgets(2));
-      expect(rows, findsNWidgets(2));
       final leftWidth = tester.getSize(left).width;
       await tester.drag(columns.first, const Offset(70, 0));
       await tester.pumpAndSettle();
@@ -496,16 +484,6 @@ void main() {
       await tester.drag(columns.last, const Offset(-70, 0));
       await tester.pumpAndSettle();
       expect(tester.getSize(right).width, greaterThan(rightWidth));
-      final header = pane('inspector-header-pane');
-      final headerHeight = tester.getSize(header).height;
-      await tester.drag(rows.first, const Offset(0, 30));
-      await tester.pumpAndSettle();
-      expect(tester.getSize(header).height, greaterThan(headerHeight));
-      final actions = pane('inspector-actions-pane');
-      final actionsHeight = tester.getSize(actions).height;
-      await tester.drag(rows.last, const Offset(0, -40));
-      await tester.pumpAndSettle();
-      expect(tester.getSize(actions).height, greaterThan(actionsHeight));
       final resized = tester.getSize(left);
       await tester.tap(find.text('State: Login'));
       await tester.pumpAndSettle();
@@ -533,7 +511,7 @@ void main() {
   );
 
   testWidgets(
-    'inspector keeps long names and errors within resizable sections',
+    'compact inspector keeps long errors scrollable and actions accessible',
     (tester) async {
       final longId = List.filled(30, 'long-node-name').join('-');
       file.writeAsStringSync(
@@ -549,20 +527,9 @@ void main() {
           .controller;
       inspector.showError(List.filled(50, 'Invalid property value.').join(' '));
       await tester.pumpAndSettle();
-      final actionPane = find.byWidgetPredicate(
-        (widget) =>
-            widget is ResizablePane &&
-            widget.key == const ValueKey('inspector-actions-pane'),
-      );
-      final scroll = find.descendant(
-        of: actionPane,
-        matching: find.byType(Scrollable),
-      );
-      await tester.scrollUntilVisible(
-        find.text('Apply to preview'),
-        100,
-        scrollable: scroll,
-      );
+      final actions = find.byKey(const ValueKey('inspector-actions'));
+      expect(tester.getSize(actions).height, lessThan(160));
+      expect(find.text('Apply to preview').hitTestable(), findsOneWidget);
       await tester.tap(find.text('Apply to preview'));
       await tester.pumpAndSettle();
       expect(inspector.node.id, longId);

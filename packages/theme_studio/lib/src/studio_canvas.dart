@@ -159,16 +159,21 @@ class _StudioCanvasState extends State<StudioCanvas> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _PreviewHeader(
-                dormant: widget.dormant,
-                onToggleDormant: widget.onToggleDormant,
-              ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                key: const ValueKey('canvas-toolbar'),
+                padding: const EdgeInsets.all(12),
                 child: Wrap(
-                  spacing: 8,
+                  spacing: 4,
                   runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
+                    OutlineButton(
+                      onPressed: widget.onToggleDormant,
+                      child: Text(
+                        widget.dormant ? 'State: Dormant' : 'State: Login',
+                      ).small(),
+                    ),
+                    const SizedBox(width: 4),
                     if (!widget.readOnly)
                       for (final tool in StudioCanvasTool.values)
                         Tooltip(
@@ -177,8 +182,8 @@ class _StudioCanvasState extends State<StudioCanvas> {
                           child: Button(
                             key: ValueKey('tool-${tool.name}'),
                             style: !_handTool && tool == _tool
-                                ? const ButtonStyle.primary()
-                                : const ButtonStyle.outline(),
+                                ? const ButtonStyle.primaryIcon()
+                                : const ButtonStyle.outlineIcon(),
                             onPressed: () => _selectTool(tool),
                             child: Semantics(
                               label: tool.label,
@@ -199,8 +204,8 @@ class _StudioCanvasState extends State<StudioCanvas> {
                       child: Button(
                         key: const ValueKey('canvas-hand'),
                         style: _handTool
-                            ? const ButtonStyle.primary()
-                            : const ButtonStyle.outline(),
+                            ? const ButtonStyle.primaryIcon()
+                            : const ButtonStyle.outlineIcon(),
                         onPressed: () => setState(() => _handTool = !_handTool),
                         child: Semantics(
                           label: 'Hand',
@@ -216,8 +221,8 @@ class _StudioCanvasState extends State<StudioCanvas> {
                         child: Button(
                           key: const ValueKey('lock-aspect-ratio'),
                           style: _lockAspectRatio
-                              ? const ButtonStyle.primary()
-                              : const ButtonStyle.outline(),
+                              ? const ButtonStyle.primaryIcon()
+                              : const ButtonStyle.outlineIcon(),
                           onPressed: () => setState(
                             () => _lockAspectRatio = !_lockAspectRatio,
                           ),
@@ -236,6 +241,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        const Gap(8),
                         OutlineButton(
                           key: const ValueKey('zoom-out'),
                           onPressed: session == null
@@ -287,8 +293,8 @@ class _StudioCanvasState extends State<StudioCanvas> {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+                    horizontal: 16,
+                    vertical: 8,
                   ),
                   child: session == null
                       ? const Center(child: Text('Unable to open scene'))
@@ -321,53 +327,42 @@ class _StudioCanvasState extends State<StudioCanvas> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  height: 40,
-                  child: Center(
-                    child: Text(
-                      session == null
-                          ? 'Choose a valid scene document.'
-                          : '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}  ·  ${widget.readOnly
-                                ? 'Select a layer to inspect code'
-                                : _handTool || _spacePan
-                                ? 'Drag to pan'
-                                : _tool == StudioCanvasTool.move
-                                ? 'Drag to move · Handles resize · Shift locks ratio'
-                                : _tool.hint}  ·  Ctrl+wheel zooms · Space pans',
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ).small().muted(),
-                  ),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                child: Row(
+                  children: [
+                    if (session != null)
+                      Text(
+                        '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}',
+                      ).small().muted(),
+                    const Gap(16),
+                    Expanded(
+                      child: Text(
+                        session == null
+                            ? 'Choose a valid scene document.'
+                            : widget.readOnly
+                            ? 'Select a layer to inspect code'
+                            : _handTool || _spacePan
+                            ? 'Drag to pan'
+                            : _tool.hint,
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ).small().muted(),
+                    ),
+                    const Gap(8),
+                    Tooltip(
+                      tooltip: (_) => const Text(
+                        'Ctrl+wheel to zoom · Space+drag to pan · Shift+1 to fit',
+                      ),
+                      child: const Icon(LucideIcons.circleHelp, size: 14),
+                    ),
+                  ],
                 ),
               ),
             ],
           );
         },
       ),
-    ),
-  );
-}
-
-class _PreviewHeader extends StatelessWidget {
-  const _PreviewHeader({required this.dormant, required this.onToggleDormant});
-
-  final bool dormant;
-  final VoidCallback onToggleDormant;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(16),
-    child: Row(
-      children: [
-        const Text('Preview').semiBold(),
-        const Spacer(),
-        OutlineButton(
-          onPressed: onToggleDormant,
-          child: Text(dormant ? 'State: Dormant' : 'State: Login'),
-        ),
-      ],
     ),
   );
 }
