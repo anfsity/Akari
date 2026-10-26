@@ -1,9 +1,9 @@
 ---
 title: Standalone greetd testing
-description: Build and install the real-login harness, capture displays, inspect logs, and restore SDDM.
+description: Build and install the real-login harness, capture displays, inspect logs, and recover safely.
 ---
 
-The standalone test harness in `scripts/greetd-test/` installs into `/opt/akari-test`. It runs the production backend against real `greetd` and `systemd-logind` while keeping your boot display manager on SDDM and arming automatic recovery timers.
+The standalone test harness in `scripts/greetd-test/` installs into `/opt/akari-test`. It runs the production backend against real `greetd` and `systemd-logind` while keeping your existing display manager configuration intact and arming automatic recovery timers.
 
 :::caution
 Because the harness uses the production backend, power actions (`Suspend`, `Reboot`, `PowerOff`) execute on the real host. Use `akari run` for mock authentication and mock power during ordinary desktop development.
@@ -116,7 +116,7 @@ Ensure no previous test or recovery timer is active, then build and install the 
 akari greetd-test install
 
 # Or select another theme project
-akari greetd-test install --theme themes/preset1
+akari greetd-test install --theme themes/fallback
 ```
 
 `install` compiles the theme and production backend in release mode (`--jobs 4`), backs up previous `/opt/akari-test/` artifacts, and saves your active Sway or Hyprland monitor order to `/opt/akari-test/display-layout.json`.
@@ -133,16 +133,16 @@ akari greetd-test install --theme themes/preset1
    Optional flags:
    - `--scale NUMBER`: Override the login output scale (default `1`).
    - `--log-dir /var/tmp/my-akari-test`: Custom world-traversable log root.
-   - `--dry-run`: Print the execution plan without stopping SDDM.
+   - `--dry-run`: Print the execution plan without stopping the active display manager.
 
-`start` arms recovery before stopping SDDM. SDDM is restored automatically when:
+`start` arms recovery before stopping the active display manager. Your prior display manager is restored automatically when:
 - Setup fails during preflight,
 - `akari-test.service` exits (`ExecStopPost`), or
 - The 10-minute fallback recovery timer fires.
 
-### 3. Restore SDDM manually
+### 3. Restore display manager manually
 
-To end a test and return to SDDM from `tty3`:
+To end a test and return to your prior display manager from `tty3`:
 
 ```sh
 akari greetd-test restore
@@ -190,7 +190,7 @@ With `grim` installed on the host, you can capture per-monitor screenshots direc
 | `Print` | Immediately saves a PNG for each active output |
 | `Shift+Print` | Waits 3 seconds before capturing (useful for opening account/session menus) |
 
-Screenshots and `capture.json` metadata are saved under `greeter/session-*/screenshots/<timestamp>-*/` and remain readable after SDDM restoration:
+Screenshots and `capture.json` metadata are saved under `greeter/session-*/screenshots/<timestamp>-*/` and remain readable after returning to your desktop:
 
 ```sh
 akari greetd-test logs --run current --file screenshot

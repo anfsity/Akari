@@ -13,7 +13,7 @@ Run these commands from the repository root after [environment setup](../getting
 | Shared login state and focus across physical monitors | `akari run` (fullscreen default) |
 | Reproduce standalone TTY scaling inside a Wayland desktop | `akari run sway` |
 | Capture repeatable fixed-resolution screenshots without a desktop | `akari run sway --sway-backend headless` |
-| Verify hardware modes, DRM/KMS splash, PAM, and SDDM recovery | [Standalone greetd testing](greetd-testing.md) |
+| Verify hardware modes, DRM/KMS splash, PAM, and display manager recovery | [Standalone greetd testing](greetd-testing.md) |
 
 :::note
 `run` and `run sway` use the Rust mock backend over a private D-Bus session by default. Sway workflows require `python3`, `sway`, `swaymsg`, and `grim`.
