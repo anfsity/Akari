@@ -9,6 +9,7 @@ class ThemeTokens {
     required this.minHitTarget,
     required this.surfaceColor,
     required this.surfaceVariantColor,
+    this.disableAnimations = false,
   });
 
   final ThemeData materialTheme;
@@ -21,6 +22,10 @@ class ThemeTokens {
 
   /// Curve used by scene motion presets.
   final Curve standardCurve;
+
+  /// A theme's no-motion preset also reaches custom widgets through MediaQuery.
+  /// System reduced-motion preferences always take precedence.
+  final bool disableAnimations;
 
   /// Minimum touch target enforced for interactive scene nodes.
   final double minHitTarget;

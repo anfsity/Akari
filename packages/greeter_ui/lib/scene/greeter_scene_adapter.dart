@@ -86,13 +86,31 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     _startListeningToFeature(widget.feature);
     _wakeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 350),
+      duration: Duration.zero,
       value: widget.feature.dormantSlots.value ? 0 : 1,
     );
     _scene = _createScene();
     // Key handling must not depend on the focus chain: the credential field
     // is disabled between attempts, which drops focus to the root scope.
     FocusManager.instance.addEarlyKeyEventHandler(_handleKeyEvent);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateWakeDuration();
+  }
+
+  void _updateWakeDuration() {
+    final disableAnimations =
+        widget.theme.tokens.disableAnimations ||
+        MediaQuery.disableAnimationsOf(context);
+    _wakeController.duration = disableAnimations
+        ? Duration.zero
+        : widget.theme.tokens.mediumMotion;
+    if (disableAnimations) {
+      _wakeController.value = widget.feature.dormantSlots.value ? 0 : 1;
+    }
   }
 
   @override
@@ -110,6 +128,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       _wakeController.value = widget.feature.dormantSlots.value ? 0 : 1;
     }
     if (featureChanged || widget.theme != oldWidget.theme) {
+      _updateWakeDuration();
       _activeScenePredicates.value = _activePredicates();
       _scene = _createScene();
     }

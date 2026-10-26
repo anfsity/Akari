@@ -6,6 +6,51 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scene/scene.dart';
 
 void main() {
+  testWidgets(
+    'theme no-motion policy reaches custom components and preserves their state',
+    (tester) async {
+      final document = _document(
+        nodes: const [
+          SceneNode(
+            id: 'custom',
+            componentId: 'custom',
+            rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+          ),
+        ],
+      );
+      final controller = TextEditingController(text: 'retained');
+      addTearDown(controller.dispose);
+      bool? reduced;
+      Future<void> render(bool disabled) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SceneRuntime(
+              document: document,
+              theme: ThemeBundle(tokens: _tokens(disableAnimations: disabled)),
+              nodeBuilder: (context, node) {
+                reduced = MediaQuery.disableAnimationsOf(context);
+                return TextField(
+                  key: const ValueKey('custom-input'),
+                  controller: controller,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await render(false);
+      final state = tester.state(find.byKey(const ValueKey('custom-input')));
+      expect(reduced, isFalse);
+      await render(true);
+      expect(reduced, isTrue);
+      expect(
+        tester.state(find.byKey(const ValueKey('custom-input'))),
+        same(state),
+      );
+      expect(controller.text, 'retained');
+    },
+  );
+
   for (final preset in [SceneMotionPreset.none, SceneMotionPreset.fade]) {
     testWidgets('prewarmed state survives presence changes with $preset', (
       tester,
@@ -638,7 +683,7 @@ SceneNodeBuilder _countPrewarmedNodeBuilds(void Function(SceneNode) onBuild) {
   };
 }
 
-ThemeTokens _tokens() {
+ThemeTokens _tokens({bool disableAnimations = false}) {
   return ThemeTokens(
     materialTheme: ThemeData.dark(),
     panelRadius: 12,
@@ -647,5 +692,6 @@ ThemeTokens _tokens() {
     minHitTarget: 44,
     surfaceColor: Colors.black,
     surfaceVariantColor: Colors.black,
+    disableAnimations: disableAnimations,
   );
 }

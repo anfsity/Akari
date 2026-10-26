@@ -57,18 +57,25 @@ class SceneRuntime extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = Size(constraints.maxWidth, constraints.maxHeight);
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            _buildBackground(context),
-            for (final node in document.paintOrder)
-              _buildNode(context, size, node),
-          ],
-        );
-      },
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        disableAnimations:
+            theme.tokens.disableAnimations ||
+            MediaQuery.disableAnimationsOf(context),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final size = Size(constraints.maxWidth, constraints.maxHeight);
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              _buildBackground(context),
+              for (final node in document.paintOrder)
+                _buildNode(context, size, node),
+            ],
+          );
+        },
+      ),
     );
   }
 
