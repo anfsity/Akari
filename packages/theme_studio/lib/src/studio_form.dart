@@ -71,21 +71,19 @@ class StudioFormSection extends StatelessWidget {
   const StudioFormSection({
     required this.title,
     required this.children,
-    this.compact = false,
     this.headerSpacing = 12,
     super.key,
   });
 
   final String title;
   final List<Widget> children;
-  final bool compact;
   final double headerSpacing;
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      if (compact) Text(title).small().semiBold() else Text(title).semiBold(),
+      Text(title).small().semiBold(),
       Gap(headerSpacing),
       ...children,
     ],

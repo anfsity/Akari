@@ -294,12 +294,12 @@ void main() {
       final original = file.readAsStringSync();
       await tester.tap(find.text('Inspect code'));
       await tester.pumpAndSettle();
-      String source() => tester
+      String getSource() => tester
           .widget<SelectableText>(
             find.byKey(const ValueKey('inspect-code-source')),
           )
           .data!;
-      expect(jsonDecode(source())['id'], 'panel');
+      expect(jsonDecode(getSource())['id'], 'panel');
       expect(find.byKey(const ValueKey('resize-right')), findsNothing);
       await tester.drag(
         find.byKey(const ValueKey('preview-panel')),
@@ -319,10 +319,10 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('layer-label')));
       await tester.pumpAndSettle();
-      expect(jsonDecode(source())['id'], 'label');
+      expect(jsonDecode(getSource())['id'], 'label');
       await tester.tap(find.text('Dart'));
       await tester.pumpAndSettle();
-      expect(source(), contains("id: 'label'"));
+      expect(getSource(), contains("id: 'label'"));
       String? copied;
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
@@ -341,13 +341,13 @@ void main() {
       );
       await tester.tap(find.text('Copy code'));
       await tester.pumpAndSettle();
-      expect(copied, source());
+      expect(copied, getSource());
       await tester.tap(find.text('Scene'));
       await tester.pumpAndSettle();
-      expect(source(), contains('SceneDocument get testSceneDocument'));
+      expect(getSource(), contains('SceneDocument get testSceneDocument'));
       await tester.tap(find.text('JSON'));
       await tester.pumpAndSettle();
-      expect(source(), original);
+      expect(getSource(), original);
       await tester.tap(find.text('Design'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('field-X')), findsOneWidget);
@@ -470,11 +470,11 @@ void main() {
             widget is MouseRegion &&
             widget.cursor == SystemMouseCursors.resizeColumn,
       );
-      Finder pane(String name) => find.byWidgetPredicate(
+      Finder findPane(String name) => find.byWidgetPredicate(
         (widget) => widget is ResizablePane && widget.key == ValueKey(name),
       );
-      final left = pane('sidebar-pane');
-      final right = pane('inspector-pane');
+      final left = findPane('sidebar-pane');
+      final right = findPane('inspector-pane');
       expect(columns, findsNWidgets(2));
       final leftWidth = tester.getSize(left).width;
       await tester.drag(columns.first, const Offset(70, 0));
@@ -1369,9 +1369,7 @@ void main() {
           .widget<NodeInspector>(find.byType(NodeInspector))
           .controller;
       final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
-      final form = find.byWidgetPredicate(
-        (widget) => widget.runtimeType.toString() == '_InspectorForm',
-      );
+      final form = find.byKey(const ValueKey('node-inspector-form'));
       final formWidget = tester.widget(form);
       final widthController = inspector.getField('Width');
       var inspectorNotifications = 0;

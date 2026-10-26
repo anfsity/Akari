@@ -62,6 +62,7 @@ class _InspectorForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
+    key: const ValueKey('node-inspector-form'),
     padding: const EdgeInsets.all(16),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -121,13 +122,11 @@ class _InspectorForm extends StatelessWidget {
 
   Widget _buildLayeringSection() => StudioFormSection(
     title: 'Layering',
-    compact: true,
     children: [_buildField('Depth'), _buildPair('Paint order', 'Focus order')],
   );
 
   Widget _buildTransformSection() => StudioFormSection(
     title: 'Transform',
-    compact: true,
     children: [
       _buildPair('Translate X', 'Translate Y'),
       _buildPair('Scale X', 'Scale Y'),
@@ -148,7 +147,6 @@ class _InspectorForm extends StatelessWidget {
 
   Widget _buildMotionSection() => StudioFormSection(
     title: 'Motion',
-    compact: true,
     headerSpacing: 8,
     children: [
       StudioEnumSelect(
@@ -229,7 +227,6 @@ class _InspectorProperties extends StatelessWidget {
       }
       return StudioFormSection(
         title: 'Component properties',
-        compact: true,
         children: [
           if (properties.isEmpty)
             const Text('This component has no configured properties.')
