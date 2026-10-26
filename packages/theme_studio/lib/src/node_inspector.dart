@@ -285,6 +285,14 @@ class _PropertyRowsState extends State<_PropertyRows> {
   }
 
   void _updateFields() {
+    final active = widget.properties.keys.toSet();
+    _fields.removeWhere((key, controller) {
+      if (!active.contains(key)) {
+        controller.dispose();
+        return true;
+      }
+      return false;
+    });
     for (final entry in widget.properties.entries) {
       final field = _fields.putIfAbsent(entry.key, TextEditingController.new);
       if (field.text != entry.value) field.text = entry.value;

@@ -17,14 +17,7 @@ typedef _SceneRevision = ({
 /// saving refuses to replace a file modified outside this session.
 class SceneEditor extends ChangeNotifier {
   SceneEditor(this.file) {
-    _source = file.readAsStringSync();
-    final document = decodeSceneDocument(_source);
-    _revision = (
-      document: document,
-      encoded: encodeSceneDocument(document),
-      selectedId: document.nodes.first.id,
-    );
-    _savedDocument = _revision.encoded;
+    _loadFromDisk(initial: true);
     inspector = NodeInspectorController(selectedNode, document.canvas);
   }
 
@@ -37,6 +30,7 @@ class SceneEditor extends ChangeNotifier {
   final _redo = <_SceneRevision>[];
 
   SceneDocument get document => _revision.document;
+  String get encodedDocument => _revision.encoded;
   String get selectedId => _revision.selectedId;
   SceneNode get selectedNode =>
       document.nodes.firstWhere((node) => node.id == selectedId);
@@ -59,7 +53,9 @@ class SceneEditor extends ChangeNotifier {
 
   bool selectNode(String id) {
     if (!applyDraft()) return false;
-    document.nodes.firstWhere((node) => node.id == id);
+    if (!document.nodes.any((node) => node.id == id)) {
+      throw ArgumentError.value(id, 'id');
+    }
     if (selectedId == id) return true;
     _applyRevision((
       document: document,
@@ -116,9 +112,9 @@ class SceneEditor extends ChangeNotifier {
   void _updateDocument(SceneDocument document, {required String selectedId}) {
     // The codec is the same boundary used by code generation. Invalid edits
     // never replace the last working preview or create an undo entry.
-    final updated = decodeSceneDocument(encodeSceneDocument(document));
-    final encoded = encodeSceneDocument(updated);
+    final encoded = encodeSceneDocument(document);
     if (encoded == _revision.encoded) return;
+    final updated = decodeSceneDocument(encoded);
     _undo.add(_revision);
     _redo.clear();
     _applyRevision((
@@ -171,21 +167,27 @@ class SceneEditor extends ChangeNotifier {
     return true;
   }
 
-  void reload() {
+  void reload() => _loadFromDisk();
+
+  void _loadFromDisk({bool initial = false}) {
     final source = file.readAsStringSync();
     final document = decodeSceneDocument(source);
     _source = source;
     final revision = (
       document: document,
       encoded: encodeSceneDocument(document),
-      selectedId: document.nodes.any((node) => node.id == selectedId)
+      selectedId: !initial && document.nodes.any((node) => node.id == selectedId)
           ? selectedId
           : document.nodes.first.id,
     );
     _savedDocument = revision.encoded;
     _undo.clear();
     _redo.clear();
-    _applyRevision(revision);
+    if (initial) {
+      _revision = revision;
+    } else {
+      _applyRevision(revision);
+    }
   }
 
   @override

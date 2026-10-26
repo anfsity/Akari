@@ -450,16 +450,12 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                 ),
                 const Divider(),
                 Expanded(
-                  child: IndexedStack(
-                    index: _inspect ? 1 : 0,
-                    children: [
-                      NodeInspector(
-                        controller: editor.inspector,
-                        onApply: editor.applyDraft,
-                      ),
-                      CodeInspector(key: ObjectKey(editor), editor: editor),
-                    ],
-                  ),
+                  child: _inspect
+                      ? CodeInspector(key: ObjectKey(editor), editor: editor)
+                      : NodeInspector(
+                          controller: editor.inspector,
+                          onApply: editor.applyDraft,
+                        ),
                 ),
               ],
             ),
