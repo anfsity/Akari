@@ -559,6 +559,57 @@ void main() {
   );
 
   testWidgets(
+    'panel tabs have centered labels and usable targets at sidebar limits',
+    (tester) async {
+      await openStudio(tester);
+      final source = file.readAsStringSync();
+      final columns = find.byWidgetPredicate(
+        (widget) =>
+            widget is MouseRegion &&
+            widget.cursor == SystemMouseCursors.resizeColumn,
+      );
+      for (final delta in [-2000.0, 2000.0]) {
+        await tester.drag(columns.first, Offset(delta, 0));
+        await tester.pumpAndSettle();
+        for (final label in [
+          'Layers',
+          'Add',
+          'Assets',
+          'Design',
+          'Inspect code',
+        ]) {
+          final tab = find.ancestor(
+            of: find.text(label),
+            matching: find.byType(TabItem),
+          );
+          final bounds = tester.getRect(tab);
+          final text = tester.getRect(find.text(label));
+          expect(bounds.height, greaterThanOrEqualTo(32));
+          expect(text.center.dx, closeTo(bounds.center.dx, 0.1));
+          expect(text.left, greaterThan(bounds.left));
+          expect(text.right, lessThan(bounds.right));
+        }
+        await tester.tap(find.byKey(const ValueKey('sidebar-components')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('layer-list')), findsNothing);
+        await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
+        await tester.pumpAndSettle();
+        expect(find.text('Import asset'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('sidebar-layers')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('layer-list')), findsOneWidget);
+        expect(
+          tester.getSize(find.byKey(const ValueKey('layer-panel'))).height,
+          lessThanOrEqualTo(36),
+        );
+        expect(tester.takeException(), isNull);
+      }
+      expect(file.readAsStringSync(), source);
+      expect(find.text('Saved'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'workspace and sidebar boundaries resize without replacing editor state',
     (tester) async {
       await openStudio(tester);
