@@ -28,10 +28,10 @@ cp -R themes/fallback themes/ocean
 
 ## 2. 实时预览与迭代
 
-以窗口模式启动主题并开启热重载：
+以窗口模式启动主题并开启热重载（可直接使用 `akari` 启动器或 `fvm dart run tool/akari.dart`）：
 
 ```sh
-AKARI_WINDOW_MODE=windowed fvm dart run tool/akari.dart run --theme themes/ocean
+AKARI_WINDOW_MODE=windowed akari run --theme themes/ocean
 ```
 
 - **调整布局与显示条件**：编辑 `lib/ocean.scene.json`。保存时 CLI 会自动重新生成 Dart 代码并热重载。如果 JSON 格式有误，窗口会保留上一次有效画面，修正并再次保存即可恢复。
@@ -70,8 +70,8 @@ AKARI_WINDOW_MODE=windowed fvm dart run tool/akari.dart run --theme themes/ocean
 2. 通过 `--theme` 传入外部目录路径：
 
    ```sh
-   fvm dart run tool/akari.dart preview --theme /path/to/ocean
-   fvm dart run tool/akari.dart build --theme /path/to/ocean
+   akari preview --theme /path/to/ocean
+   akari build --theme /path/to/ocean
    ```
 
 :::tip

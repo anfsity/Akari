@@ -118,16 +118,16 @@ fail. This presence rule does not validate an entire authentication flow.
 
 ```sh
 # Build the default theme for production (release mode)
-fvm dart run tool/akari.dart build
+akari build
 
 # Build an external theme package
-fvm dart run tool/akari.dart build --theme /path/to/my_theme --mode release
+akari build --theme /path/to/my_theme --mode release
 
 # Run automated UI walkthroughs in one window
-fvm dart run tool/akari.dart preview --theme themes/default
+akari preview --theme themes/default
 
 # Inspect the execution plan without building
-fvm dart run tool/akari.dart preview --theme /path/to/my_theme --dry-run
+akari preview --theme /path/to/my_theme --dry-run
 ```
 
 How the CLI builds and runs a theme:
@@ -163,8 +163,8 @@ perf:
 ### Execution contract
 
 ```sh
-fvm dart run tool/akari.dart verify-perf --theme /path/to/theme -- --custom-option value
-fvm dart run tool/akari.dart trace-perf --theme /path/to/theme
+akari verify-perf --theme /path/to/theme -- --custom-option value
+akari trace-perf --theme /path/to/theme
 ```
 
 - **Working directory & SDK**: Commands run in the theme directory without a shell. Leading `dart` or `flutter` executables automatically resolve to the repository's configured SDK.
