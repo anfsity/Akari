@@ -111,16 +111,16 @@ Studio 禁止移除已存在的必需插槽；通过 `findMissingRequiredSlots(d
 
 ```sh
 # 以生产模式构建默认主题
-fvm dart run tool/akari.dart build
+akari build
 
 # 构建外部独立主题包
-fvm dart run tool/akari.dart build --theme /path/to/my_theme --mode release
+akari build --theme /path/to/my_theme --mode release
 
 # 在单窗口中自动演示登录 UI 流程
-fvm dart run tool/akari.dart preview --theme themes/default
+akari preview --theme themes/default
 
 # 仅输出执行计划，不生成文件
-fvm dart run tool/akari.dart preview --theme /path/to/my_theme --dry-run
+akari preview --theme /path/to/my_theme --dry-run
 ```
 
 CLI 构建与运行主题的流程：
@@ -158,12 +158,12 @@ perf:
 ### 执行协议
 
 ```sh
-fvm dart run tool/akari.dart verify-perf --theme /path/to/theme -- --custom-option value
-fvm dart run tool/akari.dart trace-perf --theme /path/to/theme
+akari verify-perf --theme /path/to/theme -- --custom-option value
+akari trace-perf --theme /path/to/theme
 ```
 
 - **工作目录与 SDK**：命令在主题项目根目录直接执行（不经过 shell）。以 `dart` 或 `flutter` 开头的命令自动使用仓库配置的 SDK。
-- **透传参数**：`--` 之后的所有参数会原样转发给主题性能脚本。
+- **参数原样转发**：`--` 之后的所有参数会原样转发给主题性能脚本。
 - **输出目录**：CLI 通过环境变量 `AKARI_PERF_OUTPUT_DIR` 传入已创建的绝对输出目录。
 - **结果清单（`result.json`）**：退出码 `0` 表示通过，且必须在 `AKARI_PERF_OUTPUT_DIR` 下生成合法的 `result.json`：
 

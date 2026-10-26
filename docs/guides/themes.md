@@ -28,10 +28,10 @@ The builder function name derives from the `pubspec.yaml` package name (`theme_o
 
 ## 2. Run and iterate
 
-Launch your new theme in a desktop window with hot reload enabled:
+Launch your new theme in a desktop window with hot reload enabled (using the `akari` launcher or `fvm dart run tool/akari.dart`):
 
 ```sh
-AKARI_WINDOW_MODE=windowed fvm dart run tool/akari.dart run --theme themes/ocean
+AKARI_WINDOW_MODE=windowed akari run --theme themes/ocean
 ```
 
 - **Edit layout & visibility**: Modify `lib/ocean.scene.json`. On save, the CLI regenerates `ocean.scene.g.dart` and reloads the scene. If generation fails, the running window keeps the last valid scene until you fix the JSON.
@@ -70,8 +70,8 @@ A theme package can live outside the Akari repository:
 2. Pass the external directory path to `--theme`:
 
    ```sh
-   fvm dart run tool/akari.dart preview --theme /path/to/ocean
-   fvm dart run tool/akari.dart build --theme /path/to/ocean
+   akari preview --theme /path/to/ocean
+   akari build --theme /path/to/ocean
    ```
 
 :::tip
