@@ -78,7 +78,7 @@ pub enum GreetdResponse {
 /// Selects the real greetd socket or the deterministic local mock.
 #[derive(Debug)]
 pub enum GreetdTransport {
-    #[cfg_attr(feature = "mock", allow(dead_code))]
+    #[cfg(not(feature = "mock"))]
     Real(GreetdClient),
     #[cfg(feature = "mock")]
     Mock(MockGreetdClientApi),
@@ -108,13 +108,10 @@ impl GreetdTransport {
         cancellation: &CancellationToken,
     ) -> Result<GreetdResponse, GreetdError> {
         match self {
-            Self::Real(client) => {
-                GreetdClientApi::create_session(client, username, cancellation).await
-            }
+            #[cfg(not(feature = "mock"))]
+            Self::Real(client) => client.create_session(username, cancellation).await,
             #[cfg(feature = "mock")]
-            Self::Mock(client) => {
-                GreetdClientApi::create_session(client, username, cancellation).await
-            }
+            Self::Mock(client) => client.create_session(username, cancellation).await,
         }
     }
 
@@ -128,12 +125,17 @@ impl GreetdTransport {
         cancellation: &CancellationToken,
     ) -> Result<GreetdResponse, GreetdError> {
         match self {
+            #[cfg(not(feature = "mock"))]
             Self::Real(client) => {
-                GreetdClientApi::post_auth_message_response(client, response, cancellation).await
+                client
+                    .post_auth_message_response(response, cancellation)
+                    .await
             }
             #[cfg(feature = "mock")]
             Self::Mock(client) => {
-                GreetdClientApi::post_auth_message_response(client, response, cancellation).await
+                client
+                    .post_auth_message_response(response, cancellation)
+                    .await
             }
         }
     }
@@ -146,13 +148,10 @@ impl GreetdTransport {
         cancellation: &CancellationToken,
     ) -> Result<GreetdResponse, GreetdError> {
         match self {
-            Self::Real(client) => {
-                GreetdClientApi::start_session(client, cmd, env, cancellation).await
-            }
+            #[cfg(not(feature = "mock"))]
+            Self::Real(client) => client.start_session(cmd, env, cancellation).await,
             #[cfg(feature = "mock")]
-            Self::Mock(client) => {
-                GreetdClientApi::start_session(client, cmd, env, cancellation).await
-            }
+            Self::Mock(client) => client.start_session(cmd, env, cancellation).await,
         }
     }
 
@@ -162,9 +161,10 @@ impl GreetdTransport {
         cancellation: &CancellationToken,
     ) -> Result<GreetdResponse, GreetdError> {
         match self {
-            Self::Real(client) => GreetdClientApi::cancel_session(client, cancellation).await,
+            #[cfg(not(feature = "mock"))]
+            Self::Real(client) => client.cancel_session(cancellation).await,
             #[cfg(feature = "mock")]
-            Self::Mock(client) => GreetdClientApi::cancel_session(client, cancellation).await,
+            Self::Mock(client) => client.cancel_session(cancellation).await,
         }
     }
 }
@@ -198,8 +198,9 @@ struct CancelSessionRequest {
     kind: &'static str,
 }
 
-/// Methods shared by the real greetd client and the generated mock client.
-#[cfg_attr(feature = "mock", mockall::automock)]
+/// Signature used to generate the mock greetd transport in `mock` builds.
+#[cfg(feature = "mock")]
+#[mockall::automock]
 pub(crate) trait GreetdClientApi {
     async fn create_session(
         &mut self,
@@ -249,6 +250,7 @@ impl GreetdClient {
     ) -> Result<Self, GreetdError> {
         let path = path.as_ref().to_owned();
         let stream = tokio::select! {
+            biased;
             _ = cancellation.cancelled() => return Err(GreetdError::Cancelled),
             result = timeout(REQUEST_TIMEOUT, UnixStream::connect(path)) => {
                 result.map_err(|_| GreetdError::Timeout)?.map_err(GreetdError::Connect)?
@@ -343,16 +345,14 @@ impl GreetdClient {
         T: Serialize,
     {
         let payload = Zeroizing::new(serde_json::to_vec(request).map_err(GreetdError::Encode)?);
-        let frame = encode_frame(payload.as_slice(), GreetdError::RequestTooLarge)?;
+        let frame = encode_frame(payload.as_slice())?;
         tokio::select! {
+            biased;
             _ = cancellation.cancelled() => return Err(GreetdError::Cancelled),
-            result = timeout(REQUEST_TIMEOUT, self.stream.write_all(&frame)) => {
-                result.map_err(|_| GreetdError::Timeout)?.map_err(GreetdError::Io)?;
-            }
-        }
-        tokio::select! {
-            _ = cancellation.cancelled() => return Err(GreetdError::Cancelled),
-            result = timeout(REQUEST_TIMEOUT, self.stream.flush()) => {
+            result = timeout(REQUEST_TIMEOUT, async {
+                self.stream.write_all(&frame).await?;
+                self.stream.flush().await
+            }) => {
                 result.map_err(|_| GreetdError::Timeout)?.map_err(GreetdError::Io)?;
             }
         }
@@ -400,50 +400,13 @@ fn encode_command(arguments: &[String]) -> String {
         .join(" ")
 }
 
-impl GreetdClientApi for GreetdClient {
-    async fn create_session(
-        &mut self,
-        username: &str,
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError> {
-        GreetdClient::create_session(self, username, cancellation).await
-    }
-
-    #[allow(clippy::needless_lifetimes)]
-    async fn post_auth_message_response<'a>(
-        &mut self,
-        response: Option<&'a str>,
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError> {
-        GreetdClient::post_auth_message_response(self, response, cancellation).await
-    }
-
-    async fn start_session(
-        &mut self,
-        cmd: &[String],
-        env: &[String],
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError> {
-        GreetdClient::start_session(self, cmd, env, cancellation).await
-    }
-
-    async fn cancel_session(
-        &mut self,
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError> {
-        GreetdClient::cancel_session(self, cancellation).await
-    }
-}
-
-/// Adds greetd's native-endian length prefix to a JSON payload.
-///
-/// The caller supplies the request-specific oversize error so request and
-/// response validation can report the correct direction of failure.
-fn encode_frame(payload: &[u8], too_large: GreetdError) -> Result<Zeroizing<Vec<u8>>, GreetdError> {
+/// Adds greetd's native-endian length prefix to a request JSON payload.
+fn encode_frame(payload: &[u8]) -> Result<Zeroizing<Vec<u8>>, GreetdError> {
+    const _: () = assert!(MAX_FRAME_SIZE <= u32::MAX as usize);
     if payload.len() > MAX_FRAME_SIZE {
-        return Err(too_large);
+        return Err(GreetdError::RequestTooLarge);
     }
-    let length = u32::try_from(payload.len()).map_err(|_| GreetdError::RequestTooLarge)?;
+    let length = payload.len() as u32;
     let mut frame = Zeroizing::new(Vec::with_capacity(4 + payload.len()));
     frame.extend_from_slice(&length.to_ne_bytes());
     frame.extend_from_slice(payload);
@@ -546,6 +509,7 @@ async fn read_exact(
     cancellation: &CancellationToken,
 ) -> Result<(), GreetdError> {
     tokio::select! {
+        biased;
         _ = cancellation.cancelled() => Err(GreetdError::Cancelled),
         result = stream.read_exact(buffer) => match result {
             Ok(_) => Ok(()),
@@ -623,7 +587,7 @@ mod tests {
             "username": "alice"
         }))
         .unwrap();
-        let frame = encode_frame(&payload, super::GreetdError::RequestTooLarge).unwrap();
+        let frame = encode_frame(&payload).unwrap();
         assert_eq!(
             u32::from_ne_bytes(frame[..4].try_into().unwrap()) as usize,
             payload.len()
@@ -648,7 +612,7 @@ mod tests {
         let payload = vec![0_u8; MAX_FRAME_SIZE + 1];
 
         assert!(matches!(
-            encode_frame(&payload, GreetdError::RequestTooLarge),
+            encode_frame(&payload),
             Err(GreetdError::RequestTooLarge)
         ));
     }
@@ -1093,7 +1057,7 @@ mod tests {
 
     async fn write_response(stream: &mut tokio::net::UnixStream, response: Value) {
         let payload = serde_json::to_vec(&response).unwrap();
-        let frame = encode_frame(&payload, super::GreetdError::RequestTooLarge).unwrap();
+        let frame = encode_frame(&payload).unwrap();
         stream.write_all(&frame).await.unwrap();
         stream.flush().await.unwrap();
     }
