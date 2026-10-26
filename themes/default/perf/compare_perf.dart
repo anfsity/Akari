@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'frame_metrics.dart';
@@ -12,11 +11,11 @@ const _maximumActionResponseBuildMs = 5.0;
 
 Future<void> main(List<String> arguments) async {
   final options = _parseArguments(arguments);
-  final baseline = await _readReport(options['baseline']!);
-  final candidate = await _readReport(options['candidate']!);
+  final baseline = await readPerfReport(options['baseline']!);
+  final candidate = await readPerfReport(options['candidate']!);
 
   final failures = <String>[];
-  final measurementCycles = _readNumber(candidate, 'measurement_cycles');
+  final measurementCycles = findOptionalNumber(candidate, 'measurement_cycles');
   if (measurementCycles == null ||
       measurementCycles < _minimumMeasurementCycles) {
     failures.add(
@@ -24,12 +23,12 @@ Future<void> main(List<String> arguments) async {
     );
   }
 
-  final sampleCount = _readNumber(candidate, 'sample_count');
+  final sampleCount = findOptionalNumber(candidate, 'sample_count');
   if (sampleCount == null || sampleCount < 1) {
     failures.add('candidate has no interaction frame samples');
   }
 
-  final overBudgetFrameCount = _readNumber(
+  final overBudgetFrameCount = findOptionalNumber(
     candidate,
     'total_over_budget_frame_count',
   );
@@ -46,7 +45,7 @@ Future<void> main(List<String> arguments) async {
           failures.add('cycle ${index + 1} has invalid frame budget data');
           continue;
         }
-        final cycleRatio = _readNumber(cycle, 'total_over_budget_frame_ratio');
+        final cycleRatio = findOptionalNumber(cycle, 'total_over_budget_frame_ratio');
         if (cycleRatio == null) {
           failures.add('cycle ${index + 1} is missing frame budget data');
         } else if (cycleRatio > _maximumOverBudgetCycleRatio) {
@@ -63,7 +62,7 @@ Future<void> main(List<String> arguments) async {
         failures.add(
           '$cyclesOverLimit of ${cycles.length} cycles had more than '
           '${(_maximumOverBudgetCycleRatio * 100).round()}% of interaction '
-          'frames over the ${_readNumber(candidate, 'frame_budget_ms')?.toStringAsFixed(2) ?? 'unknown'} ms budget',
+          'frames over the ${findOptionalNumber(candidate, 'frame_budget_ms')?.toStringAsFixed(2) ?? 'unknown'} ms budget',
         );
       }
       stdout.writeln(
@@ -81,8 +80,8 @@ Future<void> main(List<String> arguments) async {
     failures.add('candidate is missing total over-budget frame count');
   }
 
-  final frameBudget = _readNumber(candidate, 'frame_budget_ms');
-  final p95TotalSpan = _readNumber(candidate, 'p95_total_span_ms');
+  final frameBudget = findOptionalNumber(candidate, 'frame_budget_ms');
+  final p95TotalSpan = findOptionalNumber(candidate, 'p95_total_span_ms');
   if (frameBudget == null || frameBudget == 0 || p95TotalSpan == null) {
     failures.add('candidate is missing frame budget or total span data');
   } else if (p95TotalSpan > frameBudget * 2) {
@@ -92,7 +91,7 @@ Future<void> main(List<String> arguments) async {
     );
   }
 
-  final staticBackgroundFrames = _readNumber(
+  final staticBackgroundFrames = findOptionalNumber(
     candidate,
     'static_background_scheduled_frames',
   );
@@ -112,13 +111,13 @@ Future<void> main(List<String> arguments) async {
         failures.add('$phaseName is missing frame data');
         continue;
       }
-      final phaseSamples = _readNumber(phase, 'sample_count');
+      final phaseSamples = findOptionalNumber(phase, 'sample_count');
       if (phaseSamples == null || phaseSamples < _minimumSamplesPerPhase) {
         failures.add(
           '$phaseName has fewer than $_minimumSamplesPerPhase matched frames',
         );
       } else if (frameBudget != null && frameBudget > 0) {
-        final phaseP95TotalSpan = _readNumber(phase, 'p95_total_span_ms');
+        final phaseP95TotalSpan = findOptionalNumber(phase, 'p95_total_span_ms');
         if (phaseP95TotalSpan == null) {
           failures.add('$phaseName is missing p95 total span data');
         } else if (phaseP95TotalSpan > frameBudget * 2) {
@@ -146,7 +145,7 @@ Future<void> main(List<String> arguments) async {
         failures.add('$phaseName is missing action response frame data');
         continue;
       }
-      final actionFrameCount = _readNumber(phase, 'sample_count');
+      final actionFrameCount = findOptionalNumber(phase, 'sample_count');
       if (actionFrameCount == null ||
           measurementCycles == null ||
           actionFrameCount < measurementCycles) {
@@ -155,7 +154,7 @@ Future<void> main(List<String> arguments) async {
         );
         continue;
       }
-      final maxBuildMs = _readNumber(phase, 'max_build_ms');
+      final maxBuildMs = findOptionalNumber(phase, 'max_build_ms');
       if (maxBuildMs == null) {
         failures.add('$phaseName is missing action response build timing');
       } else if (maxBuildMs >= _maximumActionResponseBuildMs) {
@@ -169,7 +168,7 @@ Future<void> main(List<String> arguments) async {
     _printActionResponseSummary(actionResponseFrames);
   }
 
-  final observedFrameCount = _readNumber(candidate, 'observed_frame_count');
+  final observedFrameCount = findOptionalNumber(candidate, 'observed_frame_count');
   final phaseMatch = candidate['phase_match'];
   if (observedFrameCount == null ||
       observedFrameCount < 1 ||
@@ -179,7 +178,7 @@ Future<void> main(List<String> arguments) async {
     if (phaseMatch['matching_method'] != 'frame_number') {
       failures.add('candidate does not use exact frame-number matching');
     }
-    final unmatchedFrameCount = _readNumber(
+    final unmatchedFrameCount = findOptionalNumber(
       phaseMatch,
       'unmatched_frame_count',
     );
@@ -199,8 +198,8 @@ Future<void> main(List<String> arguments) async {
     'p50_build_ms',
     'p50_raster_ms',
   ]) {
-    final baselineValue = _readNumber(baseline, key);
-    final candidateValue = _readNumber(candidate, key);
+    final baselineValue = findOptionalNumber(baseline, key);
+    final candidateValue = findOptionalNumber(candidate, key);
     if (baselineValue == null || baselineValue <= 0) {
       failures.add('baseline is missing a positive $key');
       continue;
@@ -229,21 +228,21 @@ Future<void> main(List<String> arguments) async {
   );
   stdout.writeln(
     'Interaction p50/p95/max ms: '
-    'build ${_readNumber(candidate, 'p50_build_ms') ?? 0}/'
-    '${_readNumber(candidate, 'p95_build_ms') ?? 0}/'
-    '${_readNumber(candidate, 'max_build_ms') ?? 0}; '
-    'raster ${_readNumber(candidate, 'p50_raster_ms') ?? 0}/'
-    '${_readNumber(candidate, 'p95_raster_ms') ?? 0}/'
-    '${_readNumber(candidate, 'max_raster_ms') ?? 0}; '
-    'vsync overhead p95 ${_readNumber(candidate, 'p95_vsync_overhead_ms') ?? 0}; '
-    'total span ${_readNumber(candidate, 'p95_total_span_ms') ?? 0}/'
-    '${_readNumber(candidate, 'max_total_span_ms') ?? 0}',
+    'build ${findOptionalNumber(candidate, 'p50_build_ms') ?? 0}/'
+    '${findOptionalNumber(candidate, 'p95_build_ms') ?? 0}/'
+    '${findOptionalNumber(candidate, 'max_build_ms') ?? 0}; '
+    'raster ${findOptionalNumber(candidate, 'p50_raster_ms') ?? 0}/'
+    '${findOptionalNumber(candidate, 'p95_raster_ms') ?? 0}/'
+    '${findOptionalNumber(candidate, 'max_raster_ms') ?? 0}; '
+    'vsync overhead p95 ${findOptionalNumber(candidate, 'p95_vsync_overhead_ms') ?? 0}; '
+    'total span ${findOptionalNumber(candidate, 'p95_total_span_ms') ?? 0}/'
+    '${findOptionalNumber(candidate, 'max_total_span_ms') ?? 0}',
   );
   stdout.writeln(
     'Interaction frames over 16.67 ms build/raster/total: '
-    '${_readNumber(candidate, 'build_over_budget_frame_count') ?? 0}/'
-    '${_readNumber(candidate, 'raster_over_budget_frame_count') ?? 0}/'
-    '${_readNumber(candidate, 'total_over_budget_frame_count') ?? 0}',
+    '${findOptionalNumber(candidate, 'build_over_budget_frame_count') ?? 0}/'
+    '${findOptionalNumber(candidate, 'raster_over_budget_frame_count') ?? 0}/'
+    '${findOptionalNumber(candidate, 'total_over_budget_frame_count') ?? 0}',
   );
   if (failures.isNotEmpty) {
     stderr.writeln('Performance gate failed:');
@@ -265,8 +264,8 @@ void _printActionResponseSummary(Map<String, dynamic> phases) {
       continue;
     }
     stdout.writeln(
-      '  $phase: n=${_readNumber(metrics, 'sample_count') ?? 0}, '
-      'max=${_readNumber(metrics, 'max_build_ms') ?? 0} ms',
+      '  $phase: n=${findOptionalNumber(metrics, 'sample_count') ?? 0}, '
+      'max=${findOptionalNumber(metrics, 'max_build_ms') ?? 0} ms',
     );
   }
 }
@@ -275,10 +274,10 @@ void _printPhaseSummary(Map<String, dynamic> phases) {
   final entries = phases.entries.toList()
     ..sort((left, right) {
       final leftSpan = left.value is Map<String, dynamic>
-          ? _readNumber(left.value, 'p95_total_span_ms') ?? 0
+          ? findOptionalNumber(left.value, 'p95_total_span_ms') ?? 0
           : 0;
       final rightSpan = right.value is Map<String, dynamic>
-          ? _readNumber(right.value, 'p95_total_span_ms') ?? 0
+          ? findOptionalNumber(right.value, 'p95_total_span_ms') ?? 0
           : 0;
       return rightSpan.compareTo(leftSpan);
     });
@@ -290,27 +289,19 @@ void _printPhaseSummary(Map<String, dynamic> phases) {
       continue;
     }
     stdout.writeln(
-      '  ${entry.key}: n=${_readNumber(metrics, 'sample_count') ?? 0}, '
-      'build=${_readNumber(metrics, 'p95_build_ms') ?? 0} ms '
-      '(max ${_readNumber(metrics, 'max_build_ms') ?? 0}), '
-      'raster=${_readNumber(metrics, 'p95_raster_ms') ?? 0} ms '
-      '(max ${_readNumber(metrics, 'max_raster_ms') ?? 0}), '
-      'vsync=${_readNumber(metrics, 'p95_vsync_overhead_ms') ?? 0} ms, '
-      'span=${_readNumber(metrics, 'p95_total_span_ms') ?? 0} ms, '
+      '  ${entry.key}: n=${findOptionalNumber(metrics, 'sample_count') ?? 0}, '
+      'build=${findOptionalNumber(metrics, 'p95_build_ms') ?? 0} ms '
+      '(max ${findOptionalNumber(metrics, 'max_build_ms') ?? 0}), '
+      'raster=${findOptionalNumber(metrics, 'p95_raster_ms') ?? 0} ms '
+      '(max ${findOptionalNumber(metrics, 'max_raster_ms') ?? 0}), '
+      'vsync=${findOptionalNumber(metrics, 'p95_vsync_overhead_ms') ?? 0} ms, '
+      'span=${findOptionalNumber(metrics, 'p95_total_span_ms') ?? 0} ms, '
       'over-budget build/raster/total='
-      '${_readNumber(metrics, 'build_over_budget_frame_count') ?? 0}/'
-      '${_readNumber(metrics, 'raster_over_budget_frame_count') ?? 0}/'
-      '${_readNumber(metrics, 'total_over_budget_frame_count') ?? 0}',
+      '${findOptionalNumber(metrics, 'build_over_budget_frame_count') ?? 0}/'
+      '${findOptionalNumber(metrics, 'raster_over_budget_frame_count') ?? 0}/'
+      '${findOptionalNumber(metrics, 'total_over_budget_frame_count') ?? 0}',
     );
   }
-}
-
-num? _readNumber(Map<String, dynamic> report, String key) {
-  final value = report[key];
-  if (value is! num || !value.isFinite || value < 0) {
-    return null;
-  }
-  return value;
 }
 
 Map<String, String> _parseArguments(List<String> arguments) {
@@ -342,12 +333,4 @@ Map<String, String> _parseArguments(List<String> arguments) {
     throw ArgumentError('Unexpected option --${unexpected.first}.');
   }
   return options;
-}
-
-Future<Map<String, dynamic>> _readReport(String path) async {
-  final decoded = jsonDecode(await File(path).readAsString());
-  if (decoded is! Map<String, dynamic>) {
-    throw FormatException('$path must contain a JSON object.');
-  }
-  return decoded;
 }

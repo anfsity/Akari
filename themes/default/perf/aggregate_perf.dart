@@ -5,10 +5,10 @@ import 'frame_metrics.dart';
 
 Future<void> main(List<String> arguments) async {
   final options = _parseArguments(arguments);
-  final reports = await Future.wait(options.inputs.map(_readReport));
-  final frameBudget = _readNumber(reports.first, 'frame_budget_ms');
+  final reports = await Future.wait(options.inputs.map(readPerfReport));
+  final frameBudget = readRequiredNumber(reports.first, 'frame_budget_ms');
   if (reports.any(
-    (report) => _readNumber(report, 'frame_budget_ms') != frameBudget,
+    (report) => readRequiredNumber(report, 'frame_budget_ms') != frameBudget,
   )) {
     throw const FormatException('All reports must use the same frame budget.');
   }
@@ -81,7 +81,7 @@ Future<void> main(List<String> arguments) async {
           sampleCount,
     });
 
-    observedFrameCount += _readNumber(report, 'observed_frame_count').toInt();
+    observedFrameCount += readRequiredNumber(report, 'observed_frame_count').toInt();
     final match = report['phase_match'];
     if (match is! Map<String, dynamic>) {
       throw const FormatException('A report is missing frame match data.');
@@ -91,8 +91,8 @@ Future<void> main(List<String> arguments) async {
         'A report does not use exact frame-number matching.',
       );
     }
-    unmatchedFrameCount += _readNumber(match, 'unmatched_frame_count').toInt();
-    final staticFrames = _readNumber(
+    unmatchedFrameCount += readRequiredNumber(match, 'unmatched_frame_count').toInt();
+    final staticFrames = readRequiredNumber(
       report,
       'static_background_scheduled_frames',
     );
@@ -152,33 +152,17 @@ List<FrameMetricSample> _readFrameSamples(
     for (final sample in value)
       if (sample is Map<String, dynamic>)
         {
-          'build_ms': _readNumber(sample, 'build_ms').toDouble(),
-          'raster_ms': _readNumber(sample, 'raster_ms').toDouble(),
-          'vsync_overhead_ms': _readNumber(
+          'build_ms': readRequiredNumber(sample, 'build_ms').toDouble(),
+          'raster_ms': readRequiredNumber(sample, 'raster_ms').toDouble(),
+          'vsync_overhead_ms': readRequiredNumber(
             sample,
             'vsync_overhead_ms',
           ).toDouble(),
-          'total_span_ms': _readNumber(sample, 'total_span_ms').toDouble(),
+          'total_span_ms': readRequiredNumber(sample, 'total_span_ms').toDouble(),
         }
       else
         throw FormatException('$label contains an invalid frame sample.'),
   ];
-}
-
-num _readNumber(Map<String, dynamic> report, String key) {
-  final value = report[key];
-  if (value is! num || !value.isFinite || value < 0) {
-    throw FormatException('Report field $key must be a non-negative number.');
-  }
-  return value;
-}
-
-Future<Map<String, dynamic>> _readReport(String path) async {
-  final decoded = jsonDecode(await File(path).readAsString());
-  if (decoded is! Map<String, dynamic>) {
-    throw FormatException('$path must contain a JSON object.');
-  }
-  return decoded;
 }
 
 ({List<String> inputs, String output}) _parseArguments(List<String> arguments) {

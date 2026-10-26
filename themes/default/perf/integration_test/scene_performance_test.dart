@@ -113,9 +113,6 @@ void main() {
       expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
     }
 
-    Future<void> captureWake() =>
-        capturePhase('wake', () => tester.tapAt(const Offset(10, 10)));
-
     Future<void> tracePhase(String name, Future<void> Function() action) async {
       developer.Timeline.startSync(name);
       try {
@@ -135,6 +132,9 @@ void main() {
       return tracePhase('AKARI_PERF.$name', action);
     }
 
+    Future<void> runPhase(String phase, Future<void> Function() action) =>
+        captureNamedPhase(phase, () => capturePhase(phase, action));
+
     Future<void> captureJourney() async {
       await captureNamedPhase('startup', captureStartup);
       final sceneSize = tester.getSize(find.byType(MyApp));
@@ -142,60 +142,42 @@ void main() {
       await mouse.addPointer(location: sceneSize.center(Offset.zero));
       addTearDown(mouse.removePointer);
       await tester.pumpAndSettle(_frameInterval);
-      await captureNamedPhase(
+      await runPhase(
         'background_motion',
-        () => capturePhase(
-          'background_motion',
-          () => mouse.moveTo(
-            Offset(sceneSize.width * 0.65, sceneSize.height * 0.2),
-          ),
+        () => mouse.moveTo(
+          Offset(sceneSize.width * 0.65, sceneSize.height * 0.2),
         ),
       );
-      await captureNamedPhase('wake', captureWake);
-      await captureNamedPhase(
+      await runPhase('wake', () => tester.tapAt(const Offset(10, 10)));
+      await runPhase(
         'account_picker_open',
-        () => capturePhase(
-          'account_picker_open',
-          () => tester.tap(find.byTooltip('Choose account')),
-        ),
+        () => tester.tap(find.byTooltip('Choose account')),
       );
-      await captureNamedPhase(
+      await runPhase(
         'account_select',
-        () => capturePhase(
-          'account_select',
-          () => tester.tap(find.text('Alice')),
-        ),
+        () => tester.tap(find.text('Alice')),
       );
-      await captureNamedPhase(
+      await runPhase(
         'session_picker_open',
-        () => capturePhase(
-          'session_picker_open',
-          () => tester.tap(find.byTooltip('Choose a session')),
-        ),
+        () => tester.tap(find.byTooltip('Choose a session')),
       );
-      await captureNamedPhase(
+      await runPhase(
         'session_select',
-        () =>
-            capturePhase('session_select', () => tester.tap(find.text('Sway'))),
+        () => tester.tap(find.text('Sway')),
       );
-      await captureNamedPhase(
+      await runPhase(
         'credential_entry',
-        () => capturePhase(
-          'credential_entry',
-          () => tester.enterText(find.byType(TextField), 'secret'),
-        ),
+        () => tester.enterText(find.byType(TextField), 'secret'),
       );
-      await captureNamedPhase(
+      await runPhase(
         'credential_submit',
-        () => capturePhase(
-          'credential_submit',
-          () => tester.tap(find.byIcon(Icons.arrow_forward)),
-        ),
+        () => tester.tap(find.byIcon(Icons.arrow_forward)),
       );
     }
 
     SchedulerBinding.instance.addPersistentFrameCallback(onFrame);
     SchedulerBinding.instance.addTimingsCallback(onTimings);
+    addTearDown(() => SchedulerBinding.instance.removeTimingsCallback(onTimings));
 
     if (_captureTimelineDiagnostics) {
       // Widget/layout/paint instrumentation adds overhead. Enable it only for
@@ -225,7 +207,6 @@ void main() {
     final staticBackgroundFrames =
         (phaseTimings['settled_idle']?.length ?? 0) - settledIdleFrames;
 
-    SchedulerBinding.instance.removeTimingsCallback(onTimings);
     captureFramePhases = false;
     phaseAtFrameStart.clear();
 

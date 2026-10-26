@@ -23,12 +23,18 @@ void main() {
     var collecting = true;
     void onFrame(Duration _) {
       if (collecting) {
-        framePhases[PlatformDispatcher.instance.frameData.frameNumber] = phase;
+        final frameNumber = PlatformDispatcher.instance.frameData.frameNumber;
+        if (frameNumber >= 0) {
+          framePhases[frameNumber] = phase;
+        }
       }
     }
 
     void onTimings(List<FrameTiming> timings) {
       for (final timing in timings) {
+        if (timing.frameNumber < 0) {
+          continue;
+        }
         final captured = framePhases.remove(timing.frameNumber);
         if (captured != null && captured != 'warmup') {
           phases.putIfAbsent(captured, () => []).add(timing);
@@ -182,6 +188,9 @@ void main() {
 
 Map<String, num> _getSummary(List<FrameTiming> timings) {
   double percentile(Iterable<Duration> values) {
+    if (values.isEmpty) {
+      return 0.0;
+    }
     final sorted = values.map((d) => d.inMicroseconds / 1000).toList()..sort();
     return sorted[((sorted.length - 1) * .95).round()];
   }
@@ -202,8 +211,9 @@ Map<String, num> _getSummary(List<FrameTiming> timings) {
     'build_p95_ms': percentile(timings.map((t) => t.buildDuration)),
     'raster_p95_ms': percentile(timings.map((t) => t.rasterDuration)),
     'total_p95_ms': percentile(timings.map((t) => t.totalSpan)),
-    'over_budget_fraction':
-        timings.where((t) => t.totalSpan.inMicroseconds > 16667).length /
-        timings.length,
+    'over_budget_fraction': timings.isEmpty
+        ? 0.0
+        : timings.where((t) => t.totalSpan.inMicroseconds > 16667).length /
+            timings.length,
   };
 }

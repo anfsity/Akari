@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 typedef FrameMetricSample = Map<String, double>;
 
 const measuredInteractionPhases = [
@@ -17,6 +20,52 @@ const reportedPhases = [
   'settled_idle',
 ];
 
+double calculatePercentile(List<double> values, double percentile) {
+  if (values.isEmpty) {
+    return 0.0;
+  }
+  final sorted = values.toList()..sort();
+  final index = ((sorted.length - 1) * percentile).round();
+  return sorted[index];
+}
+
+double calculateMaximum(Iterable<double> values) {
+  if (values.isEmpty) {
+    return 0.0;
+  }
+  return values.reduce((left, right) => left > right ? left : right);
+}
+
+Future<Map<String, dynamic>> readPerfReport(String path) async {
+  final file = File(path);
+  if (!file.existsSync()) {
+    throw ArgumentError('Report not found: $path');
+  }
+  final decoded = jsonDecode(await file.readAsString());
+  if (decoded is! Map<String, dynamic>) {
+    throw FormatException('Report at $path is not a JSON object.');
+  }
+  return decoded;
+}
+
+num readRequiredNumber(Map<String, dynamic> map, String key) {
+  final value = findOptionalNumber(map, key);
+  if (value == null) {
+    throw FormatException(
+      'Report field $key must be a finite, non-negative number.',
+    );
+  }
+  return value;
+}
+
+num? findOptionalNumber(Map<String, dynamic> map, String key) {
+  final value = map[key];
+  if (value is! num || !value.isFinite || value < 0) {
+    return null;
+  }
+  return value;
+}
+
 /// Summarizes raw frames using rounded indices into sorted samples, without
 /// interpolating timings. Empty input emits zero metrics alongside a zero sample
 /// count; the gate must check that count rather than interpret zeros as success.
@@ -25,27 +74,13 @@ Map<String, Object?> summarizeFrameSamples(
   required double frameBudgetMs,
 }) {
   final samples = frames.toList();
-  double percentile(String key, double percentile) {
-    final values = samples.map((sample) => sample[key]!).toList()..sort();
-    if (values.isEmpty) {
-      return 0;
-    }
-    final index = ((values.length - 1) * percentile).round();
-    return values[index];
-  }
+  double percentile(String key, double p) =>
+      calculatePercentile(samples.map((s) => s[key]!).toList(), p);
 
-  double maximum(String key) {
-    if (samples.isEmpty) {
-      return 0;
-    }
-    return samples
-        .map((sample) => sample[key]!)
-        .reduce((left, right) => left > right ? left : right);
-  }
+  double maximum(String key) => calculateMaximum(samples.map((s) => s[key]!));
 
-  int countOverBudget(String key) {
-    return samples.where((sample) => sample[key]! > frameBudgetMs).length;
-  }
+  int countOverBudget(String key) =>
+      samples.where((sample) => sample[key]! > frameBudgetMs).length;
 
   return {
     'sample_count': samples.length,
