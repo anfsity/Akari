@@ -1,11 +1,8 @@
-# User session environment contract
+# User session environment architecture
 
-> [!NOTE]
-> **Status**: Login-shell forwarding, `argv` preservation, locale diagnostics, and user session logging are implemented. PAM/VT login and desktop service readiness still require real-login validation.
+A desktop launched through Akari inherits the user's login environment, and services activated by `systemd --user` or D-Bus receive the required display and session variables before starting.
 
-## 1. Problem & design goals
-
-A desktop launched through Akari must inherit the user's login environment, and services activated by `systemd --user` or D-Bus must receive the required display/session variables before starting.
+## 1. Architecture goals
 
 ## 2. Startup order & ownership
 

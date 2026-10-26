@@ -1,7 +1,6 @@
-# Theme Studio Refactor Architecture
+# Theme Studio Architecture
 
-> [!NOTE]
-> **Status**: Architecture proposal describing the target platform relationship between Theme Studio, the Flutter greeter, and the Rust backend. For the active D-Bus wire specification, see the [D-Bus contract](../reference/dbus.md).
+Akari combines a compile-time Flutter greeter platform with **Theme Studio**, a live visual editor and diagnostics host. Both consume the same `GreeterHost` contract and `SceneRuntime`. For the wire specification, see the [D-Bus contract](../reference/dbus.md).
 
 ## 1. Product shape & end-to-end topology
 
