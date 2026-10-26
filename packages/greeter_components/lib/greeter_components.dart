@@ -5,6 +5,9 @@
 /// packages do not require it or prescribe its component identifiers.
 library;
 
-export 'components/greeter_components.dart' show StandardGreeterComponents;
 export 'components/account_components.dart' show AccountPortrait;
-export 'components/authentication_components.dart' show CredentialField;
+export 'components/authentication_components.dart'
+    show CredentialField, PrimaryAction;
+export 'components/greeter_components.dart' show StandardGreeterComponents;
+export 'components/system_components.dart'
+    show MinuteClockBuilder, PowerActions, formatClockTime;
