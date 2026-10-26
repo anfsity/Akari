@@ -18,7 +18,7 @@
 
 ---
 
-**Akari** stands for **A**uthentication **K**it for **A**rtistic, **R**esponsive **I**nterfaces.
+**Akari** stands for **A**uthentication **K**it for **A**rtistic, **R**adiant **I**nterfaces.
 
 Build your login screen with custom Flutter components, backgrounds, and animations. The Rust backend handles authentication through `greetd` and `PAM`, keeping theme development focused entirely on presentation.
 
