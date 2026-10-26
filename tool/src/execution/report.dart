@@ -31,7 +31,7 @@ class RunReport {
   final String? reportPath;
   final Map<String, Object?>? displayProfile;
   final SecretRedactor redactor;
-  late final IOSink _events;
+  IOSink? _events;
   Future<void> _eventWrites = Future<void>.value();
 
   String get directoryPath => getAbsolutePath(repoRoot, runDirectory);
@@ -110,8 +110,10 @@ class RunReport {
   Future<void> recordEvent(String name, Map<String, Object?> fields) {
     // Parallel steps share one stream. Serialize each append and flush so
     // independent completions cannot interleave JSON records.
+    final events = _events;
+    if (events == null) return Future<void>.value();
     _eventWrites = _eventWrites.then((_) async {
-      _events.writeln(
+      events.writeln(
         jsonEncode({
           'timestamp': DateTime.now().toUtc().toIso8601String(),
           'run_id': _runId,
@@ -119,7 +121,7 @@ class RunReport {
           ...fields,
         }),
       );
-      await _events.flush();
+      await events.flush();
     });
     return _eventWrites;
   }
@@ -166,6 +168,6 @@ class RunReport {
 
   Future<void> close() async {
     await _eventWrites;
-    await _events.close();
+    await _events?.close();
   }
 }

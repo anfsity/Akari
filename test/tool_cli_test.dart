@@ -883,6 +883,7 @@ perf:
         expect(steps.map((step) => step['id']), [
           'theme.pub_get',
           'scenes.generate_theme_ocean',
+          'theme.perf.prepare_output',
           command == 'verify-perf' ? 'theme.perf.verify' : 'theme.perf.trace',
         ]);
         final perf = steps.last;

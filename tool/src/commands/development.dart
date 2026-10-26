@@ -82,13 +82,12 @@ Future<int> runDevelopmentCommand(
       selectedThemeOnly: options.themePath != null,
     ),
     DevelopmentCommand.verifyPerf ||
-    DevelopmentCommand.tracePerf => await preparePerformanceRun(
+    DevelopmentCommand.tracePerf => createPerformancePlan(
       command == DevelopmentCommand.verifyPerf ? 'verify' : 'trace',
       repoRoot,
       runDirectory,
       themes.single,
       options.themeArguments,
-      dryRun: options.dryRun,
     ),
     DevelopmentCommand.generateScenes => RunPlan(
       command: 'generate-scenes',
@@ -145,7 +144,7 @@ Future<int> runPlan(
     try {
       final result = await runSteps(plan.steps, report);
       final completion =
-          await plan.collectResult?.call(result) ?? const RunCompletion();
+          await plan.getCompletion?.call(result) ?? const RunCompletion();
       return await report.finish(result, completion);
     } finally {
       await report.close();

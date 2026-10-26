@@ -230,7 +230,14 @@ class ThemeSession {
     if (_appId == null) {
       _process.kill();
     } else {
-      await _sendRequest('app.stop', {'appId': _appId});
+      try {
+        await _sendRequest('app.stop', {'appId': _appId}).timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => {'error': 'timed out'},
+        );
+      } catch (_) {
+        _process.kill();
+      }
     }
   }
 
