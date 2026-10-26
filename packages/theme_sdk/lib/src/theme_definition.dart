@@ -7,6 +7,7 @@ import 'palette_extractor.dart';
 import 'theme_components.dart';
 import 'theme_customization.dart';
 import 'theme_layout.dart';
+import 'theme_presets.dart';
 
 /// Studio supplies its authored document; the production host omits it to use
 /// the package's generated scene. Both paths must resolve the same choices.
@@ -24,6 +25,7 @@ class ThemeDefinition {
     required this.bundle,
     required this.components,
     this.componentCatalog = const ThemeComponentCatalog(),
+    this.presetCatalog = const ThemePresetCatalog(),
     this.layout,
   });
 
@@ -32,6 +34,7 @@ class ThemeDefinition {
   final ThemeBundle bundle;
   final GreeterThemeComponentsFactory components;
   final ThemeComponentCatalog componentCatalog;
+  final ThemePresetCatalog presetCatalog;
   final ThemeLayoutDefinition? layout;
 
   ThemeTokens get tokens => bundle.tokens;
@@ -95,6 +98,7 @@ class ThemeDefinition {
       bundle: bundle ?? this.bundle,
       components: components,
       componentCatalog: componentCatalog,
+      presetCatalog: presetCatalog,
       layout: layout,
     );
   }

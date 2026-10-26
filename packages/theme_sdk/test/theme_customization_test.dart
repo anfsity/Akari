@@ -23,6 +23,7 @@ const _catalog = ThemeComponentCatalog(
     ),
   },
 );
+const _presets = ThemePresetCatalog(properties: [_style]);
 
 SceneDocument _getDocument(Map<String, String> properties) => SceneDocument(
   id: 'test',
@@ -40,6 +41,25 @@ SceneDocument _getDocument(Map<String, String> properties) => SceneDocument(
 );
 
 void main() {
+  test('theme preset choices validate and preserve author defaults and private values', () {
+    final document = _getDocument({});
+    _presets.validateDocument(document);
+    expect(document.themeProperties, isEmpty);
+    expect(_style.getValue(document.themeProperties), _Style.regular);
+    final updated = document.copyWith(
+      themeProperties: {'variant': 'large', 'private': 'keep'},
+    );
+    final encoded = encodeSceneDocument(updated);
+    _presets.validateDocument(updated);
+    expect(encodeSceneDocument(updated), encoded);
+    expect(
+      () => _presets.validateDocument(
+        document.copyWith(themeProperties: {'variant': 'Large'}),
+      ),
+      throwsFormatException,
+    );
+  });
+
   test(
     'omitted properties use runtime defaults without rewriting the scene',
     () {
@@ -82,6 +102,7 @@ void main() {
       id: 'test',
       document: _getDocument({}),
       componentCatalog: _catalog,
+      presetCatalog: _presets,
       layout: const ThemeLayoutDefinition(
         sceneId: 'test',
         label: 'Test',
@@ -101,6 +122,7 @@ void main() {
       ),
     );
     expect(theme.copyWith(id: 'copy').componentCatalog, same(_catalog));
+    expect(theme.copyWith(id: 'copy').presetCatalog, same(_presets));
     expect(theme.copyWith(id: 'copy').layout, same(theme.layout));
   });
 }
