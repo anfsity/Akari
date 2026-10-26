@@ -18,6 +18,16 @@ const _caption = SceneNode(
 const _layout = ThemeLayoutDefinition(
   sceneId: 'login',
   label: 'Centered',
+  presets: {
+    'left': ThemeLayoutPreset(label: 'Left column'),
+    'right': ThemeLayoutPreset(
+      label: 'Right column',
+      rects: {
+        'credential': SceneRect(x: 0.6, y: 0.5, width: 0.3, height: 0.1),
+        'caption': SceneRect(x: 0.6, y: 0.2, width: 0.3, height: 0.1),
+      },
+    ),
+  },
   slots: [
     ThemeLayoutSlot(
       label: 'Credential',
@@ -36,6 +46,77 @@ const _document = SceneDocument(
 );
 
 void main() {
+  test(
+    'layout composition preserves content and restores required controls',
+    () {
+      final original = _document.copyWith(
+        themeProperties: {'palette': 'rose', 'private': 'keep'},
+        nodes: [
+          _caption.copyWith(
+            properties: {'text': 'Edited'},
+            transform: const SceneTransform(rotationZ: 15),
+          ),
+          _caption.copyWith(id: 'custom'),
+        ],
+      );
+      final encoded = encodeSceneDocument(original);
+      final document = _layout.getDocumentWithPreset(original, 'right');
+      _layout.validateDocument(document);
+      expect(document.themeProperties, {
+        'palette': 'rose',
+        'private': 'keep',
+        'layout': 'right',
+      });
+      expect(document.nodes.map((node) => node.id), [
+        'caption',
+        'custom',
+        'credential',
+      ]);
+      expect(document.nodes.first.properties, {'text': 'Edited'});
+      expect(document.nodes.first.rect.x, 0.6);
+      expect(document.nodes.first.transform.isDefault, isTrue);
+      expect(document.nodes[1].rect.x, _caption.rect.x);
+      expect(document.nodes.last.rect.x, 0.6);
+      expect(document.nodes.last.interactive, isTrue);
+      expect(_layout.findMissingRequiredSlots(document), isEmpty);
+      expect(encodeSceneDocument(original), encoded);
+      final left = _layout.getDocumentWithPreset(document, 'left');
+      expect(left.nodes.first.rect.x, _caption.rect.x);
+      expect(left.nodes.last.rect.x, _credential.rect.x);
+    },
+  );
+
+  test('insertion templates follow the selected preset without reviving optional nodes', () {
+    final document = _layout.getDocumentWithPreset(
+      _document.copyWith(nodes: [_credential]),
+      'right',
+    );
+    expect(document.nodes, hasLength(1));
+    expect(_layout.getPresetId(document), 'right');
+    expect(
+      _layout.findSlot('caption', document: document)!.defaultNode.rect.x,
+      0.6,
+    );
+    expect(_layout.findSlot('caption')!.defaultNode.rect.x, 0.1);
+    expect(
+      () => _layout.getDocumentWithPreset(document, 'unknown'),
+      throwsArgumentError,
+    );
+    expect(
+      () => _layout.validateDocument(
+        document.copyWith(themeProperties: {'layout': 'unknown'}),
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => _layout.getDocumentWithPreset(
+        document.copyWith(id: 'other'),
+        'right',
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test('slot templates do not override authored geometry or properties', () {
     final document = _document.copyWith(
       nodes: [
