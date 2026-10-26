@@ -118,7 +118,7 @@ async fn read_user(
     };
 
     let proxy = AccountsServiceUserProxy::builder(connection)
-        .path(path.as_str())
+        .path(path.as_ref())
         .map_err(map_err)?
         .cache_properties(CacheProperties::Yes)
         .build()
@@ -131,7 +131,7 @@ async fn read_user(
     let shell = proxy.shell().await.map_err(map_err)?;
     let system_account = proxy.system_account().await.map_err(map_err)?;
 
-    Ok(make_user_entry(
+    Ok(find_user_entry(
         username,
         real_name,
         icon_file,
@@ -148,7 +148,7 @@ struct UserObjectError {
     source: Box<zbus::Error>,
 }
 
-fn make_user_entry(
+fn find_user_entry(
     username: String,
     real_name: String,
     icon_file: String,
@@ -174,24 +174,23 @@ fn make_user_entry(
 }
 
 fn is_login_shell(shell: &str) -> bool {
-    if shell.is_empty() {
-        return false;
-    }
-    let shell_name = std::path::Path::new(shell)
+    let Some(shell_name) = std::path::Path::new(shell)
         .file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or_default();
+    else {
+        return false;
+    };
     !matches!(shell_name, "false" | "nologin")
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{UserEntry, is_login_shell, make_user_entry};
+    use super::{UserEntry, find_user_entry, is_login_shell};
 
     #[test]
     fn filters_system_accounts() {
         assert!(
-            make_user_entry(
+            find_user_entry(
                 "daemon".to_owned(),
                 "Daemon".to_owned(),
                 String::new(),
@@ -201,7 +200,7 @@ mod tests {
             .is_none()
         );
         assert!(
-            make_user_entry(
+            find_user_entry(
                 "service".to_owned(),
                 "Service".to_owned(),
                 String::new(),
@@ -213,11 +212,13 @@ mod tests {
         assert!(is_login_shell("/bin/bash"));
         assert!(!is_login_shell("/bin/false"));
         assert!(!is_login_shell(""));
+        assert!(!is_login_shell("/"));
+        assert!(!is_login_shell(".."));
     }
 
     #[test]
     fn preserves_user_metadata() {
-        let user = make_user_entry(
+        let user = find_user_entry(
             "alice".to_owned(),
             " Alice Example ".to_owned(),
             "/var/lib/AccountsService/icons/alice".to_owned(),
