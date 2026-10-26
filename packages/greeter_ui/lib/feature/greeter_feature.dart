@@ -414,12 +414,7 @@ class GreeterFeature {
       return;
     }
     _replace(
-      _state.copyWith(
-        selectedSession: session,
-        clearCatalogError: true,
-        clearAuthError: true,
-        clearPromptError: true,
-      ),
+      _state.copyWith(selectedSession: session, clearCatalogError: true),
     );
     unawaited(_sessionStore.saveSelectedSessionId(session.id));
     _beginAuthenticationIfReady();
@@ -452,13 +447,14 @@ class GreeterFeature {
       if (attemptId != _attemptId) {
         return;
       }
-      _showSessionError(
-        _getGreeterError(
-          error,
-          fallbackKind: GreeterErrorKind.session,
-          recovery: GreeterRecovery.selectSession,
+      _replace(
+        _state.copyWith(
+          authMode: AuthMode.sessionSelection,
+          catalogMode: CatalogMode.ready,
+          clearCatalogError: true,
         ),
       );
+      _effects.add(ShowNoticeEffect(_getErrorMessage(error), isError: true));
     } finally {
       _sessionStartInFlight = false;
     }
@@ -582,6 +578,9 @@ class GreeterFeature {
   void _applyBackendState(BackendAuthState state, String detail) {
     final failed = state == BackendAuthState.failed;
     final clearPrompt = failed || state == BackendAuthState.authenticated;
+    final preserveAuthMode =
+        state == BackendAuthState.waitingForInput ||
+        state == BackendAuthState.unknown;
     if (failed) {
       _attemptId = null;
     }
@@ -594,8 +593,11 @@ class GreeterFeature {
       BackendAuthState.submittingResponse ||
       BackendAuthState.resolvingSession ||
       BackendAuthState.startingSession ||
-      BackendAuthState.authenticated ||
       BackendAuthState.cancelling => AuthMode.submitting,
+      BackendAuthState.authenticated =>
+        _state.selectedSession == null
+            ? AuthMode.sessionSelection
+            : AuthMode.submitting,
       BackendAuthState.handingOff => AuthMode.handingOff,
       BackendAuthState.failed => AuthMode.error,
       BackendAuthState.idle => AuthMode.userSelection,
@@ -614,22 +616,14 @@ class GreeterFeature {
                 recovery: GreeterRecovery.retryAuthentication,
               )
             : null,
-        clearAuthError: !failed,
+        clearAuthError: !failed && !preserveAuthMode,
         clearPromptError: clearPrompt,
         clearPrompt: clearPrompt,
       ),
     );
-    if (state == BackendAuthState.authenticated) {
-      if (_state.selectedSession == null) {
-        _replace(
-          _state.copyWith(
-            authMode: AuthMode.sessionSelection,
-            clearAuthError: true,
-          ),
-        );
-      } else {
-        unawaited(_startSelectedSession());
-      }
+    if (state == BackendAuthState.authenticated &&
+        _state.selectedSession != null) {
+      unawaited(_startSelectedSession());
     }
   }
 
@@ -655,7 +649,7 @@ class GreeterFeature {
       final selectedSession = _getSelectedSession(sessions, storedSessionId);
       _replace(
         _state.copyWith(
-          catalogMode: CatalogMode.ready,
+          catalogMode: sessions.isEmpty ? CatalogMode.empty : CatalogMode.ready,
           sessions: sessions,
           selectedSession: selectedSession,
           clearSelectedSession: selectedSession == null,
@@ -741,17 +735,6 @@ class GreeterFeature {
     );
   }
 
-  void _showSessionError(GreeterError error) {
-    _replace(
-      _state.copyWith(
-        authMode: AuthMode.sessionSelection,
-        catalogMode: CatalogMode.ready,
-        clearCatalogError: true,
-      ),
-    );
-    _effects.add(ShowNoticeEffect(error.message, isError: true));
-  }
-
   void _replace(GreeterState next) {
     if (_disposed) {
       return;
@@ -771,17 +754,20 @@ class GreeterFeature {
     _dormantSlots.value = next.dormant;
   }
 
+  String _getErrorMessage(Object error) {
+    return error is GreeterGatewayException
+        ? error.message
+        : 'The greeter service is unavailable.';
+  }
+
   GreeterError _getGreeterError(
     Object error, {
     required GreeterErrorKind fallbackKind,
     required GreeterRecovery recovery,
   }) {
-    if (error is GreeterGatewayException) {
-      return (kind: error.kind, message: error.message, recovery: recovery);
-    }
     return (
-      kind: fallbackKind,
-      message: 'The greeter service is unavailable.',
+      kind: error is GreeterGatewayException ? error.kind : fallbackKind,
+      message: _getErrorMessage(error),
       recovery: recovery,
     );
   }

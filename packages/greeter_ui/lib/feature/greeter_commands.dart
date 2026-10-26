@@ -67,13 +67,12 @@ class SleepGreeterCommand extends GreeterCommand {
 }
 
 /// Maps a recovery offered by the feature to the command that performs it.
-GreeterCommand recoveryCommand(GreeterRecovery recovery) {
+GreeterCommand getRecoveryCommand(GreeterRecovery recovery) {
   return switch (recovery) {
     GreeterRecovery.retryPrompt => const RetryPromptCommand(),
     GreeterRecovery.reconnectService => const ReconnectServiceCommand(),
-    GreeterRecovery.selectUser ||
-    GreeterRecovery.selectSession => const CancelAuthenticationCommand(),
-    GreeterRecovery.retryAuthentication ||
-    GreeterRecovery.retrySessionCatalog => const RetryAuthenticationCommand(),
+    GreeterRecovery.selectUser => const CancelAuthenticationCommand(),
+    GreeterRecovery.retryAuthentication => const RetryAuthenticationCommand(),
+    GreeterRecovery.retrySessionCatalog => const RetrySessionCatalogCommand(),
   };
 }

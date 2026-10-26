@@ -685,6 +685,90 @@ void main() {
       feature.dispose();
     },
   );
+
+  test('selecting a session preserves authentication error recovery and prompt rejection', () async {
+    final gateway = _FakeGreeterGateway()
+      ..sessionsFuture = Future.value(const [
+        (id: 'wayland:sway', name: 'Sway'),
+        (id: 'wayland:hyprland', name: 'Hyprland'),
+      ]);
+    final feature = await _createPromptedFeature(gateway);
+    addTearDown(feature.dispose);
+
+    await feature.dispatch(const RespondToPromptCommand(''));
+    expect(feature.state.authMode, AuthMode.error);
+    expect(feature.state.authError?.recovery, GreeterRecovery.retryPrompt);
+
+    await feature.dispatch(
+      const SelectSessionCommand((id: 'wayland:hyprland', name: 'Hyprland')),
+    );
+    expect(feature.state.selectedSession?.id, 'wayland:hyprland');
+    expect(feature.state.authMode, AuthMode.error);
+    expect(feature.state.authError?.recovery, GreeterRecovery.retryPrompt);
+
+    await feature.dispatch(
+      getRecoveryCommand(feature.state.authError!.recovery),
+    );
+    expect(feature.state.authMode, AuthMode.prompting);
+
+    gateway.emit(
+      BackendPromptReceived(
+        attemptId: gateway.attemptId!,
+        kind: PromptKind.error,
+        text: 'Authentication failed',
+      ),
+    );
+    await _flushEvents();
+    await feature.dispatch(
+      const SelectSessionCommand((id: 'wayland:sway', name: 'Sway')),
+    );
+    expect(feature.state.promptError, 'Authentication failed');
+  });
+
+  test(
+    'WaitingForInput signal preserves a local input error and its recovery',
+    () async {
+      final gateway = _FakeGreeterGateway();
+      final feature = await _createPromptedFeature(gateway);
+      addTearDown(feature.dispose);
+
+      await feature.dispatch(const RespondToPromptCommand(''));
+      expect(feature.state.authMode, AuthMode.error);
+      expect(feature.state.authError?.recovery, GreeterRecovery.retryPrompt);
+
+      gateway.emit(
+        BackendStateChanged(
+          attemptId: gateway.attemptId!,
+          state: BackendAuthState.waitingForInput,
+          detail: '',
+        ),
+      );
+      await _flushEvents();
+
+      expect(feature.state.authMode, AuthMode.error);
+      expect(feature.state.authError?.recovery, GreeterRecovery.retryPrompt);
+    },
+  );
+
+  test('empty session catalog enters CatalogMode.empty', () async {
+    final gateway = _FakeGreeterGateway()
+      ..sessionsFuture = Future.value(const []);
+    final feature = GreeterFeature(gateway: gateway);
+    addTearDown(feature.dispose);
+
+    await feature.initialize();
+    await _flushEvents();
+
+    expect(feature.state.catalogMode, CatalogMode.empty);
+    expect(feature.state.selectedSession, isNull);
+  });
+
+  test('maps session catalog recovery to RetrySessionCatalogCommand', () {
+    expect(
+      getRecoveryCommand(GreeterRecovery.retrySessionCatalog),
+      isA<RetrySessionCatalogCommand>(),
+    );
+  });
 }
 
 Future<GreeterFeature> _createPromptedFeature(
