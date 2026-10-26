@@ -33,6 +33,45 @@ my_theme/
 存放在仓库外部的主题项目，需将 `pubspec.yaml` 中的 SDK 路径依赖指向本地 Akari 仓库对应目录。
 :::
 
+## 声明组件的可编辑属性
+
+主题通过可选的 `ThemeDefinition.componentCatalog` 开放可视化编辑能力。
+属性声明由主题包维护；Studio 不会从节点当前的 JSON 猜测支持的属性，也不规定全局组件名称。
+
+```dart
+enum HeadingStyle { regular, large }
+
+const headingStyle = ThemeChoiceProperty(
+  name: 'variant',
+  label: 'Text style',
+  defaultValue: HeadingStyle.regular,
+  choices: {HeadingStyle.regular: 'Regular', HeadingStyle.large: 'Large'},
+);
+const headingText = ThemeTextProperty(
+  name: 'text',
+  label: 'Text',
+  defaultValue: 'Welcome',
+);
+const catalog = ThemeComponentCatalog(
+  components: {
+    'heading': ThemeComponentDefinition(
+      label: 'Heading',
+      properties: [headingText, headingStyle],
+    ),
+  },
+);
+```
+
+构造主题时传入 `componentCatalog: catalog`。组件通过
+`headingStyle.getValue(node.properties)` 和 `headingText.getValue(node.properties)`
+读取配置，让运行时与编辑器共享默认值和可选项。枚举选项以枚举名称保存，与界面标签无关；
+作者应保持名称稳定，并将默认值包含在 `choices` 中。文本沿用场景的非空字符串约定。
+
+主题应在载入场景的边界调用 `catalog.validateDocument(document)`，然后再进行渲染。
+Studio 在接收场景和编辑结果时使用同一校验。缺失属性使用声明的默认值，不会因此改写 JSON；
+无效选项会抛出包含节点和属性名称的 `FormatException`。
+未声明的组件和属性原样保留。该声明不改变场景格式、认证流程或组件工厂。
+
 ## 构建与预览机制
 
 ```sh
