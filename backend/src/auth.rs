@@ -463,14 +463,17 @@ async fn run_actor(
         let Some(command) = command else {
             break;
         };
+        let initial_attempt_id = match &command {
+            AuthCommand::Begin { .. } => None,
+            _ => command
+                .get_attempt_id()
+                .or_else(|| actor.auth.active_attempt_id()),
+        };
         let span = tracing::info_span!(
             "authentication",
             operation = command.get_operation(),
             caller = command.get_caller().unwrap_or("runtime"),
-            attempt_id = command
-                .get_attempt_id()
-                .or_else(|| actor.auth.active_attempt_id())
-                .unwrap_or(""),
+            attempt_id = initial_attempt_id,
             initial_state = actor.auth.state().as_str(),
         );
         async {

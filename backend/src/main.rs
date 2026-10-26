@@ -107,6 +107,7 @@ fn init_tracing() -> AppResult<()> {
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_target(false)
+        .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stdout()))
         .try_init()?;
     Ok(())
 }
