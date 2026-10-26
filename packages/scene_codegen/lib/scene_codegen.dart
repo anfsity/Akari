@@ -11,7 +11,7 @@ String generateSceneFromDocument(SceneDocument document) {
 // Generated from ${document.id}.scene.json.
 import 'package:scene/scene.dart';
 
-SceneDocument get ${_getVariableName(document.id)} => SceneDocument(
+SceneDocument get ${getSceneDocumentVariableName(document.id)} => SceneDocument(
   id: ${_encodeDartString(document.id)},
   version: ${document.version},
   themeProperties: <String, String>{
@@ -88,7 +88,8 @@ String _encodeConditionLiteral(SceneCondition condition) {
   };
 }
 
-String _getVariableName(String id) {
+/// Stable getter name shared by generated scenes and synthesized entrypoints.
+String getSceneDocumentVariableName(String id) {
   final parts = id.split(RegExp(r'[^A-Za-z0-9]+'))
     ..removeWhere((part) => part.isEmpty);
   if (parts.isEmpty) {
@@ -98,7 +99,9 @@ String _getVariableName(String id) {
   final rest = parts
       .skip(1)
       .map((part) => '${part[0].toUpperCase()}${part.substring(1)}');
-  return '${first[0].toLowerCase()}${first.substring(1)}${rest.join()}SceneDocument';
+  final name =
+      '${first[0].toLowerCase()}${first.substring(1)}${rest.join()}SceneDocument';
+  return RegExp(r'^[0-9]').hasMatch(name) ? 'scene$name' : name;
 }
 
 String _encodeDartString(String value) {

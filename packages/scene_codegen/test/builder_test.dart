@@ -13,7 +13,7 @@ void main() {
     };
     final generated = generateScene(
       jsonEncode({
-        'id': 'test',
+        'id': '123 test',
         'version': 2,
         'themeProperties': properties,
         'canvas': {'fit': 'contain'},
@@ -40,7 +40,7 @@ void main() {
     await script.writeAsString('''
 ${generated.replaceAll('package:scene/scene.dart', 'package:scene_schema/scene_schema.dart')}
 void main() {
-  print(encodeSceneDocument(testSceneDocument));
+  print(encodeSceneDocument(${getSceneDocumentVariableName('123 test')}));
 }
 ''');
     final result = await Process.run(Platform.resolvedExecutable, [
