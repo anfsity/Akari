@@ -49,6 +49,10 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 
 ### 主题级预设
 
+**Compose → Layout preset** 可切换 Terrace 分屏与居中列式布局。切换时按预设重排位置和尺寸，
+保留组件属性、已关闭的可选组件和自定义节点，并在同一步撤销中补齐缺失的必需控件。
+之后打开组件开关时，使用当前布局的位置。
+
 **Compose → Theme presets** 展示主题声明的全局选项。Terrace 提供壁纸取色、Ocean、
 Rose、Violet 四种配色；通透下划线、磨砂胶囊、实色三种控件材质；Terrace 入场、
 轻柔淡入、无动效三种动效。修改即时生效，支持场景撤销、重做和保存。

@@ -81,6 +81,18 @@ const _editableCatalog = ThemeComponentCatalog(
 const _assemblyLayout = ThemeLayoutDefinition(
   sceneId: 'test',
   label: 'Test composition',
+  presets: {
+    'left': ThemeLayoutPreset(label: 'Left column'),
+    'right': ThemeLayoutPreset(
+      label: 'Right column',
+      rects: {
+        'panel': SceneRect(x: 0.5, y: 0.1, width: 0.3, height: 0.4),
+        'badge': SceneRect(x: 0.6, y: 0.05, width: 0.3, height: 0.1),
+        'action': SceneRect(x: 0.78, y: 0.5, width: 0.1, height: 0.1),
+        'status': SceneRect(x: 0.6, y: 0.7, width: 0.4, height: 0.1),
+      },
+    ),
+  },
   slots: [
     ThemeLayoutSlot(
       label: 'Login panel',
@@ -881,6 +893,60 @@ void main() {
       0.2,
     );
   });
+
+  testWidgets(
+    'layout selector composes, repairs, saves and restores insertion defaults',
+    (tester) async {
+      ThemeDefinition buildLayouts({Color? seed, SceneDocument? document}) =>
+          _buildTheme(seed: seed, document: document, layout: _assemblyLayout);
+      await openStudio(tester, themeBuilder: buildLayouts);
+      final selector = find.byKey(const ValueKey('layout-preset'));
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Right column').last);
+      await tester.pumpAndSettle();
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      expect(editor.document.themeProperties['layout'], 'right');
+      expect(editor.document.nodes.first.rect.x, 0.5);
+      expect(editor.missingRequiredSlots, isEmpty);
+      expect(editor.document.nodes.any((node) => node.id == 'badge'), isFalse);
+      final badge = find.byKey(const ValueKey('slot-badge'));
+      await tester.ensureVisible(badge);
+      await tester.pumpAndSettle();
+      await tester.tap(badge);
+      await tester.pumpAndSettle();
+      expect(editor.selectedNode.rect.x, 0.6);
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(editor.document.nodes, hasLength(2));
+      expect(editor.document.themeProperties, isEmpty);
+      await tester.tap(find.text('Redo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      await openStudio(tester, themeBuilder: buildLayouts);
+      expect(find.text('Right column'), findsOneWidget);
+      await tester.tap(find.text('Inspect code'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<Select<String>>(
+              find.descendant(
+                of: selector,
+                matching: find.byType(Select<String>),
+              ),
+            )
+            .enabled,
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'assembly adds preset nodes, previews states and persists across reopening',

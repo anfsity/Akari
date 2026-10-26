@@ -55,6 +55,17 @@ const _action = SceneNode(
 const _layout = ThemeLayoutDefinition(
   sceneId: 'test',
   label: 'Test layout',
+  presets: {
+    'left': ThemeLayoutPreset(label: 'Left column'),
+    'right': ThemeLayoutPreset(
+      label: 'Right column',
+      rects: {
+        'panel': SceneRect(x: 0.5, y: 0.1, width: 0.45, height: 0.5),
+        'caption': SceneRect(x: 0.55, y: 0.05, width: 0.4, height: 0.1),
+        'action': SceneRect(x: 0.88, y: 0.5, width: 0.1, height: 0.1),
+      },
+    ),
+  },
   slots: [
     ThemeLayoutSlot(
       label: 'Login panel',
@@ -189,6 +200,37 @@ void main() {
       ),
     );
     expect(editor.reload, throwsFormatException);
+    expect(editor.encodedDocument, saved);
+  });
+
+  test('layout presets preserve edits, repair required slots and insert at the current preset', () {
+    editor.updateAuthoring(componentCatalog: _catalog, layout: _layout);
+    editor.updateLayoutSlot('caption', isPresent: true);
+    editor.inspector.updateProperty('text', 'Edited');
+    editor.applyDraft();
+    final original = editor.encodedDocument;
+    editor.updateLayoutPreset('right');
+    expect(editor.document.themeProperties, {'layout': 'right'});
+    expect(editor.selectedId, 'caption');
+    expect(editor.selectedNode.properties['text'], 'Edited');
+    expect(editor.selectedNode.rect.x, 0.55);
+    expect(editor.missingRequiredSlots, isEmpty);
+    editor.undo();
+    expect(editor.encodedDocument, original);
+    editor.redo();
+    editor.updateLayoutSlot('caption', isPresent: false);
+    editor.updateLayoutSlot('caption', isPresent: true);
+    expect(editor.selectedNode.rect.x, 0.55);
+    expect(editor.selectedNode.properties['text'], 'Welcome');
+    editor.save();
+    editor.dispose();
+    editor = SceneEditor(file, componentCatalog: _catalog, layout: _layout);
+    expect(editor.document.themeProperties, {'layout': 'right'});
+    final saved = editor.encodedDocument;
+    expect(() => editor.updateLayoutPreset('unknown'), throwsArgumentError);
+    expect(editor.encodedDocument, saved);
+    editor.inspector.getField('Width').text = '-1';
+    editor.updateLayoutPreset('left');
     expect(editor.encodedDocument, saved);
   });
 
