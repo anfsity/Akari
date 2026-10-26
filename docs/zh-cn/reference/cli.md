@@ -38,16 +38,16 @@ description: 查命令、选项、显示配置和运行报告。
 
 ### 通用选项与约定
 
-- **报告与演练选项**：`build`、`preview`、`run*`、`verify`、`generate-scenes` 与 `*-perf` 均支持 `--format text|json`、`--report PATH` 和 `--dry-run`。
+- **报告与试运行选项**：`build`、`preview`、`run*`、`verify`、`generate-scenes` 与 `*-perf` 均支持 `--format text|json`、`--report PATH` 和 `--dry-run`（仅打印执行计划而不做实际修改）。
 - **短选项**：`-t`（`--theme`）、`-m`（`--mode`）、`-j`（`--jobs`）。同一次调用中同一参数请勿混用长短选项。
-- **透传参数**：`perf`、`trace`、`script run` 和 `docs verify` 会将 `--` 之后的参数原样转发给底层命令。
+- **参数原样转发**：`perf`、`trace`、`script run` 和 `docs verify` 会将 `--` 之后的所有参数直接转发给底层执行工具。
 - **Theme Studio 说明**：`akari run studio` 固定使用 debug 模式且不启动后端（不接受 `--mode` 或 `--backend`）。操作说明见仓库内的 [Theme Studio 文档](https://github.com/anfsity/Akari/blob/main/docs/zh-cn/internal/theme-studio.md)。
 
 <a id="production-login-installation"></a>
 
 ## 安装正式登录环境
 
-在已安装 `systemd`、`/usr/bin/greetd`、`/usr/bin/sway`、`python3`、`swaymsg`、`swaybg`、`dbus-daemon`、`busctl`、`setpriv` 和 `accountsservice` 的 Linux 主机上，以普通用户部署开机登录环境：
+在已安装对应依赖的 Linux 主机上部署开机登录环境（以普通用户执行编译，在写入系统目录时按需请求 sudo 权限）：
 
 ```sh
 akari install --theme themes/default --jobs 4
