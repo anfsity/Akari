@@ -4,6 +4,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import 'terrace_menus.dart';
 import 'terrace_visuals.dart';
+import 'theme_customization.dart';
 
 const _contentScale = 1.3;
 
@@ -21,8 +22,10 @@ class TerraceComponents implements GreeterThemeComponents {
     final component = switch (node.componentId) {
       'terraceClock' => const _TerraceClock(),
       'terraceLabel' => _TerraceLabel(
-        text: node.properties['text']!,
-        large: node.properties['variant'] == 'large',
+        text: terraceLabelText.getValue(node.properties),
+        large:
+            terraceLabelVariant.getValue(node.properties) ==
+            TerraceLabelVariant.large,
       ),
       'terraceAccount' => SceneRegion<AccountPickerSlots>(
         valueListenable: theme.host.accountPickerSlots,

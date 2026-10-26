@@ -5,11 +5,14 @@ import 'package:theme_sdk/theme_sdk.dart' show ThemeDefinition;
 import 'default.scene.g.dart';
 import 'terrace_components.dart';
 import 'terrace_visuals.dart';
+import 'theme_customization.dart';
 
 /// Seed used before extraction runs and when the wallpaper cannot be sampled.
 const _fallbackSeed = Color(0xff83cddd);
 const _fontFamily = 'packages/theme_default/SpaceGrotesk';
 ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
+  final scene = document ?? defaultSceneDocument;
+  terraceComponentCatalog.validateDocument(scene);
   final colorScheme = ColorScheme.fromSeed(
     seedColor: seed ?? _fallbackSeed,
     brightness: Brightness.dark,
@@ -71,7 +74,8 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
   );
   return ThemeDefinition(
     id: 'default',
-    document: document ?? defaultSceneDocument,
+    document: scene,
+    componentCatalog: terraceComponentCatalog,
     bundle: ThemeBundle(
       tokens: tokens,
       backgrounds: const {
