@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'frame_metrics.dart';
+
 Future<void> main(List<String> arguments) async {
   final input = _parseArguments(arguments);
   final decoded = jsonDecode(await File(input).readAsString());
@@ -174,17 +176,11 @@ List<_TimelineEvent> _readDartEvents(List traceEvents) {
   return completeEvents;
 }
 
-double _percentile(List<_TimelineEvent> events, double percentile) {
-  final durations = events.map((event) => event.durationMs).toList()..sort();
-  final index = ((durations.length - 1) * percentile).round();
-  return durations[index];
-}
+double _percentile(List<_TimelineEvent> events, double percentile) =>
+    calculatePercentile(events.map((e) => e.durationMs).toList(), percentile);
 
-double _maximum(List<_TimelineEvent> events) {
-  return events
-      .map((event) => event.durationMs)
-      .reduce((left, right) => left > right ? left : right);
-}
+double _maximum(List<_TimelineEvent> events) =>
+    calculateMaximum(events.map((e) => e.durationMs));
 
 String _parseArguments(List<String> arguments) {
   if (arguments.length != 2 || arguments.first != '--input') {
