@@ -54,10 +54,7 @@
       },
       "renderOrder": 20,
       "focusOrder": 30,
-      "interactive": true,
-      "properties": {
-        "variant": "icon-row"
-      }
+      "interactive": true
     },
     {
       "id": "glass_panel",
@@ -71,9 +68,6 @@
       "renderOrder": 30,
       "visibleWhen": {
         "not": "isDormant"
-      },
-      "properties": {
-        "variant": "solid-panel"
       }
     },
     {
@@ -90,10 +84,7 @@
       "visibleWhen": {
         "not": "isDormant"
       },
-      "interactive": true,
-      "properties": {
-        "variant": "circle"
-      }
+      "interactive": true
     },
     {
       "id": "account_name",
@@ -107,9 +98,6 @@
       "renderOrder": 40,
       "visibleWhen": {
         "not": "isDormant"
-      },
-      "properties": {
-        "variant": "center"
       }
     },
     {
@@ -126,10 +114,7 @@
       "visibleWhen": {
         "not": "isDormant"
       },
-      "interactive": true,
-      "properties": {
-        "variant": "pill"
-      }
+      "interactive": true
     },
     {
       "id": "credential_field",
@@ -145,10 +130,7 @@
       "visibleWhen": {
         "not": "isDormant"
       },
-      "interactive": true,
-      "properties": {
-        "variant": "outline"
-      }
+      "interactive": true
     },
     {
       "id": "primary_action",
@@ -162,17 +144,22 @@
       "renderOrder": 40,
       "focusOrder": 50,
       "visibleWhen": {
-        "any": [
-          "isAuthPrompting",
-          "isAuthSubmitting",
-          "isSessionSelection",
-          "isAuthError"
+        "all": [
+          {
+            "not": "isDormant"
+          },
+          {
+            "any": [
+              "isAuthPrompting",
+              "isAuthSubmitting",
+              "isSessionSelection",
+              "isAuthError",
+              "isServiceUnavailable"
+            ]
+          }
         ]
       },
-      "interactive": true,
-      "properties": {
-        "variant": "round-arrow"
-      }
+      "interactive": true
     },
     {
       "id": "status",
@@ -183,10 +170,7 @@
         "width": 0.26,
         "height": 0.03
       },
-      "renderOrder": 40,
-      "properties": {
-        "variant": "inline"
-      }
+      "renderOrder": 40
     }
   ]
 }

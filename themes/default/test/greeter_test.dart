@@ -46,20 +46,10 @@ void main() {
   testWidgets('a wide account image fills the circular account marker', (
     tester,
   ) async {
-    final feature = GreeterFeature(
+    await _mountGreeter(
+      tester,
       gateway: _SingleUserGateway(
         iconPath: File('assets/(71187447)Hello world.png').absolute.path,
-      ),
-    );
-    addTearDown(feature.dispose);
-    await feature.initialize();
-    final theme = buildDefaultTheme();
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: theme.materialTheme,
-        home: Scaffold(
-          body: GreeterSceneAdapter(feature: feature, theme: theme),
-        ),
       ),
     );
     await tester.runAsync(() async {
@@ -101,19 +91,9 @@ void main() {
   testWidgets(
     'selected account uses the backend portrait and initial fallback',
     (tester) async {
-      final feature = GreeterFeature(
+      await _mountGreeter(
+        tester,
         gateway: _SingleUserGateway(iconPath: '/missing/avatar.png'),
-      );
-      addTearDown(feature.dispose);
-      await feature.initialize();
-      final theme = buildDefaultTheme();
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: theme.materialTheme,
-          home: Scaffold(
-            body: GreeterSceneAdapter(feature: feature, theme: theme),
-          ),
-        ),
       );
       await tester.pumpAndSettle();
       await _wake(tester);
@@ -250,18 +230,7 @@ void main() {
   testWidgets('wake can reverse mid-transition without losing the prompt', (
     tester,
   ) async {
-    final feature = GreeterFeature(gateway: _SingleUserGateway());
-    addTearDown(feature.dispose);
-    await feature.initialize();
-    final theme = buildDefaultTheme();
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: theme.materialTheme,
-        home: Scaffold(
-          body: GreeterSceneAdapter(feature: feature, theme: theme),
-        ),
-      ),
-    );
+    final feature = await _mountGreeter(tester);
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
     await tester.pump(const Duration(milliseconds: 120));
@@ -279,20 +248,9 @@ void main() {
   testWidgets('reduced motion keeps the scene static on pointer movement', (
     tester,
   ) async {
-    final theme = buildDefaultTheme();
-    final feature = GreeterFeature(gateway: _SingleUserGateway());
-    addTearDown(feature.dispose);
-    await feature.initialize();
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: theme.materialTheme,
-        home: MediaQuery(
-          data: const MediaQueryData(disableAnimations: true),
-          child: Scaffold(
-            body: GreeterSceneAdapter(feature: feature, theme: theme),
-          ),
-        ),
-      ),
+    await _mountGreeter(
+      tester,
+      mediaQueryData: const MediaQueryData(disableAnimations: true),
     );
     await tester.pumpAndSettle();
     await _wake(tester);
@@ -410,18 +368,7 @@ void main() {
     'escape and wake keep one prompt without submitting credentials',
     (tester) async {
       final gateway = _SingleUserGateway();
-      final feature = GreeterFeature(gateway: gateway);
-      addTearDown(feature.dispose);
-      await feature.initialize();
-      final theme = buildDefaultTheme();
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: theme.materialTheme,
-          home: Scaffold(
-            body: GreeterSceneAdapter(feature: feature, theme: theme),
-          ),
-        ),
-      );
+      final feature = await _mountGreeter(tester, gateway: gateway);
       await tester.pumpAndSettle();
       await _wake(tester);
       final arrow = find.byIcon(Icons.arrow_forward).hitTestable();
@@ -496,18 +443,7 @@ void main() {
   });
 
   testWidgets('types the waking key into the password field', (tester) async {
-    final feature = GreeterFeature(gateway: _SingleUserGateway());
-    await feature.initialize();
-    final theme = buildDefaultTheme();
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: theme.materialTheme,
-        home: Scaffold(
-          body: GreeterSceneAdapter(feature: feature, theme: theme),
-        ),
-      ),
-    );
+    await _mountGreeter(tester);
     await tester.pumpAndSettle();
 
     await tester.sendKeyEvent(LogicalKeyboardKey.keyH);
@@ -517,25 +453,12 @@ void main() {
     expect(field.enabled, isTrue);
     expect(field.focusNode?.hasFocus, isTrue);
     expect(field.controller?.text, 'h');
-
-    feature.dispose();
   });
 
   testWidgets('keeps a typed credential obscured while the field exits', (
     tester,
   ) async {
-    final feature = GreeterFeature(gateway: _SingleUserGateway());
-    await feature.initialize();
-    final theme = buildDefaultTheme();
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: theme.materialTheme,
-        home: Scaffold(
-          body: GreeterSceneAdapter(feature: feature, theme: theme),
-        ),
-      ),
-    );
+    await _mountGreeter(tester);
     await tester.pumpAndSettle();
 
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
@@ -552,23 +475,10 @@ void main() {
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.obscureText, isTrue);
     expect(field.controller?.text, isEmpty);
-
-    feature.dispose();
   });
 
   testWidgets('escape works from the retry error state', (tester) async {
-    final feature = GreeterFeature(gateway: _SingleUserGateway());
-    await feature.initialize();
-    final theme = buildDefaultTheme();
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: theme.materialTheme,
-        home: Scaffold(
-          body: GreeterSceneAdapter(feature: feature, theme: theme),
-        ),
-      ),
-    );
+    final feature = await _mountGreeter(tester);
     await tester.pumpAndSettle();
 
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
@@ -581,22 +491,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(feature.state.dormant, isTrue);
-    feature.dispose();
   });
 
   testWidgets('escape works when no control holds focus', (tester) async {
-    final feature = GreeterFeature(gateway: _SingleUserGateway());
-    await feature.initialize();
-    final theme = buildDefaultTheme();
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: theme.materialTheme,
-        home: Scaffold(
-          body: GreeterSceneAdapter(feature: feature, theme: theme),
-        ),
-      ),
-    );
+    final feature = await _mountGreeter(tester);
     await tester.pumpAndSettle();
 
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
@@ -612,24 +510,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(feature.state.dormant, isTrue);
-    feature.dispose();
   });
 
   testWidgets('typing recovers into the prompt from the error state', (
     tester,
   ) async {
-    final feature = GreeterFeature(gateway: _SingleUserGateway());
-    await feature.initialize();
-    final theme = buildDefaultTheme();
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: theme.materialTheme,
-        home: Scaffold(
-          body: GreeterSceneAdapter(feature: feature, theme: theme),
-        ),
-      ),
-    );
+    final feature = await _mountGreeter(tester);
     await tester.pumpAndSettle();
 
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
@@ -644,7 +530,6 @@ void main() {
     expect(feature.state.authMode, AuthMode.prompting);
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.controller?.text, 'a');
-    feature.dispose();
   });
 
   testWidgets('submits a response and starts the selected session', (
@@ -738,6 +623,31 @@ void main() {
 Future<void> _wake(WidgetTester tester) async {
   await tester.sendKeyEvent(LogicalKeyboardKey.space);
   await tester.pumpAndSettle();
+}
+
+Future<GreeterFeature> _mountGreeter(
+  WidgetTester tester, {
+  GreeterGateway? gateway,
+  ThemeDefinition? theme,
+  MediaQueryData? mediaQueryData,
+}) async {
+  final feature = GreeterFeature(gateway: gateway ?? _SingleUserGateway());
+  addTearDown(feature.dispose);
+  await feature.initialize();
+  final activeTheme = theme ?? buildDefaultTheme();
+  Widget body = Scaffold(
+    body: GreeterSceneAdapter(feature: feature, theme: activeTheme),
+  );
+  if (mediaQueryData != null) {
+    body = MediaQuery(data: mediaQueryData, child: body);
+  }
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: activeTheme.materialTheme,
+      home: body,
+    ),
+  );
+  return feature;
 }
 
 /// A one-account backend so the greeter starts with every default set.

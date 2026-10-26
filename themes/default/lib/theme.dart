@@ -15,7 +15,6 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
     brightness: Brightness.dark,
   );
   final surface = const Color(0xff25465e);
-  final surfaceVariant = colorScheme.surfaceContainerHighest;
   final text = colorScheme.onSurface;
   final tokens = ThemeTokens(
     materialTheme: ThemeData(
@@ -61,19 +60,6 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
         ),
         isDense: true,
       ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
-          minimumSize: const Size(44, 44),
-        ),
-      ),
-      iconButtonTheme: IconButtonThemeData(
-        style: IconButton.styleFrom(
-          foregroundColor: colorScheme.onSurfaceVariant,
-          minimumSize: const Size(44, 44),
-        ),
-      ),
       visualDensity: VisualDensity.standard,
     ),
     panelRadius: 20,
@@ -81,7 +67,7 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
     standardCurve: Curves.linear,
     minHitTarget: 44,
     surfaceColor: surface,
-    surfaceVariantColor: surfaceVariant,
+    surfaceVariantColor: colorScheme.surfaceContainerHighest,
   );
   return ThemeDefinition(
     id: 'default',
