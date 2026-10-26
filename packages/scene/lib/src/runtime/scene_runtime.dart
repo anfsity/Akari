@@ -74,7 +74,7 @@ class SceneRuntime extends StatelessWidget {
 
   Widget _buildBackground(BuildContext context) {
     final renderer =
-        theme.backgroundRenderer(document.background.kind) ??
+        theme.backgrounds[document.background.kind] ??
         const SolidBackgroundRenderer();
     final blur = backgroundBlurSigma;
     if (blur == null) {
@@ -98,8 +98,7 @@ class SceneRuntime extends StatelessWidget {
     final visible =
         visibleWhen == null ||
         evaluateSceneCondition(visibleWhen, activePredicates);
-    final reducedMotion =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final reducedMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
     final safeArea = document.canvas.useSafeArea
         ? MediaQuery.paddingOf(context)
@@ -111,14 +110,15 @@ class SceneRuntime extends StatelessWidget {
           : activePredicatesListenable,
       visibleWhen: visibleWhen,
       prewarmHiddenNodes: prewarmHiddenNodes,
-      motionBuilder: theme.motionBuilder(node.motion),
+      motionBuilder: theme.motions[node.motion],
       spec: (
         preset: node.motion,
         duration: reducedMotion ? Duration.zero : theme.tokens.mediumMotion,
         curve: theme.tokens.standardCurve,
         reducedMotion: reducedMotion,
       ),
-      builder: (context) => nodeBuilder(context, node),
+      node: node,
+      nodeBuilder: nodeBuilder,
     );
 
     final rect = sceneNodeRect(
@@ -140,6 +140,7 @@ class SceneRuntime extends StatelessWidget {
     // Keep the subtree mounted when a live edit leaves or returns to identity.
     // Adding/removing this wrapper would reset component state and active drags.
     return Positioned(
+      key: _SceneNodeKey(node.id),
       left: rect.left,
       top: rect.top,
       width: rect.width,
@@ -150,6 +151,19 @@ class SceneRuntime extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SceneNodeKey extends LocalKey {
+  const _SceneNodeKey(this.nodeId);
+
+  final String nodeId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _SceneNodeKey && other.nodeId == nodeId;
+
+  @override
+  int get hashCode => nodeId.hashCode;
 }
 
 /// Owns one node's presence lifecycle.
@@ -165,7 +179,8 @@ class _SceneNodeHost extends StatefulWidget {
     required this.prewarmHiddenNodes,
     required this.motionBuilder,
     required this.spec,
-    required this.builder,
+    required this.node,
+    required this.nodeBuilder,
   });
 
   final bool visible;
@@ -174,7 +189,8 @@ class _SceneNodeHost extends StatefulWidget {
   final bool prewarmHiddenNodes;
   final SceneMotionBuilder? motionBuilder;
   final SceneMotionSpec spec;
-  final WidgetBuilder builder;
+  final SceneNode node;
+  final SceneNodeBuilder nodeBuilder;
 
   @override
   State<_SceneNodeHost> createState() => _SceneNodeHostState();
@@ -218,7 +234,8 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
   @override
   void didUpdateWidget(_SceneNodeHost oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.builder != oldWidget.builder) {
+    if (widget.nodeBuilder != oldWidget.nodeBuilder ||
+        !identical(widget.node, oldWidget.node)) {
       _prewarmedChild = null;
     }
     if (widget.activePredicatesListenable !=
@@ -340,11 +357,11 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
 
   Widget _buildChild(BuildContext context) {
     if (!widget.prewarmHiddenNodes) {
-      return widget.builder(context);
+      return widget.nodeBuilder(context, widget.node);
     }
     // Cache the widget configuration across presence changes. Its own slot
     // listeners still rebuild content; builder or inherited dependency changes
     // invalidate this cache in the lifecycle hooks above.
-    return _prewarmedChild ??= widget.builder(context);
+    return _prewarmedChild ??= widget.nodeBuilder(context, widget.node);
   }
 }

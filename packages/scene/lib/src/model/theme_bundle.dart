@@ -21,10 +21,6 @@ class ThemeBundle {
   final Map<SceneBackgroundKind, BackgroundRenderer> backgrounds;
   final Map<SceneMotionPreset, SceneMotionBuilder> motions;
 
-  BackgroundRenderer? backgroundRenderer(SceneBackgroundKind kind) {
-    return backgrounds[kind];
-  }
-
   ThemeBundle copyWith({
     ThemeTokens? tokens,
     Map<SceneBackgroundKind, BackgroundRenderer>? backgrounds,
@@ -35,10 +31,6 @@ class ThemeBundle {
       backgrounds: backgrounds ?? this.backgrounds,
       motions: motions ?? this.motions,
     );
-  }
-
-  SceneMotionBuilder? motionBuilder(SceneMotionPreset preset) {
-    return motions[preset];
   }
 
   ThemeData get materialTheme => tokens.materialTheme;
