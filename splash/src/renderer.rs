@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use ab_glyph::{Font, FontVec, PxScale, ScaleFont, VariableFont, point};
 use tiny_skia::{Color, FilterQuality, Paint, PathBuilder, Pixmap, PixmapPaint, Transform};
 
@@ -13,7 +15,7 @@ pub struct Renderer {
 pub struct Scene {
     background: Pixmap,
     avatar: Pixmap,
-    pub pixels: Pixmap,
+    pixels: Pixmap,
     scale: f32,
     avatar_y: f32,
     dots_x: f32,
@@ -55,7 +57,7 @@ impl Renderer {
         );
         let center = width as f32 / 2.0;
         let avatar_y = height as f32 / 2.0 - 189.0 * scale;
-        draw_text(
+        draw_centered_text(
             &mut background,
             &self.font,
             "akari",
@@ -66,17 +68,17 @@ impl Renderer {
         );
         let text = "Getting your desktop ready";
         let text_width = get_text_width(&self.font, text, 12.0 * scale, scale);
-        let status_width = text_width + 27.0 * scale;
+        let status_left = center - (text_width + 27.0 * scale) / 2.0;
         draw_text(
             &mut background,
             &self.font,
             text,
-            point(center - 13.5 * scale, avatar_y + 355.0 * scale),
+            point(status_left, avatar_y + 355.0 * scale),
             12.0 * scale,
             scale,
             muted,
         );
-        draw_text(
+        draw_centered_text(
             &mut background,
             &self.font,
             "HANKUI AKARI",
@@ -92,7 +94,7 @@ impl Renderer {
             pixels,
             scale,
             avatar_y,
-            dots_x: center - status_width / 2.0 + text_width + 11.5 * scale,
+            dots_x: status_left + text_width + 11.5 * scale,
             dots_y: avatar_y + 350.5 * scale,
         })
     }
@@ -148,14 +150,42 @@ impl Scene {
         }
     }
 
+    pub fn has_size(&self, width: u32, height: u32) -> bool {
+        self.pixels.width() == width && self.pixels.height() == height
+    }
+
+    pub fn save_png(&self, path: impl AsRef<Path>) -> Result {
+        self.pixels.save_png(path)?;
+        Ok(())
+    }
+
     pub fn copy_xrgb(&self, target: &mut [u32]) {
         for (pixel, rgba) in target.iter_mut().zip(self.pixels.data().as_chunks::<4>().0) {
             *pixel = get_xrgb_pixel(rgba);
         }
     }
+
+    pub fn copy_xrgb_strided(&self, target: &mut [u8], pitch: usize) {
+        let row_bytes = self.pixels.width() as usize * 4;
+        for (source, target_row) in self
+            .pixels
+            .data()
+            .chunks_exact(row_bytes)
+            .zip(target.chunks_mut(pitch))
+        {
+            for (rgba, pixel) in source
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(target_row.as_chunks_mut::<4>().0)
+            {
+                pixel.copy_from_slice(&get_xrgb_pixel(rgba).to_le_bytes());
+            }
+        }
+    }
 }
 
-pub fn get_xrgb_pixel(rgba: &[u8; 4]) -> u32 {
+fn get_xrgb_pixel(rgba: &[u8; 4]) -> u32 {
     (u32::from(rgba[0]) << 16) | (u32::from(rgba[1]) << 8) | u32::from(rgba[2])
 }
 
@@ -167,6 +197,27 @@ fn get_text_width(font: &FontVec, text: &str, size: f32, spacing: f32) -> f32 {
         - spacing
 }
 
+fn draw_centered_text(
+    pixels: &mut Pixmap,
+    font: &FontVec,
+    text: &str,
+    center: ab_glyph::Point,
+    size: f32,
+    spacing: f32,
+    color: [u8; 3],
+) {
+    let width = get_text_width(font, text, size, spacing);
+    draw_text(
+        pixels,
+        font,
+        text,
+        point(center.x - width / 2.0, center.y),
+        size,
+        spacing,
+        color,
+    );
+}
+
 fn draw_text(
     pixels: &mut Pixmap,
     font: &FontVec,
@@ -176,7 +227,7 @@ fn draw_text(
     spacing: f32,
     color: [u8; 3],
 ) {
-    let mut x = position.x - get_text_width(font, text, size, spacing) / 2.0;
+    let mut x = position.x;
     let scaled = font.as_scaled(PxScale::from(size));
     let width = pixels.width() as i32;
     let height = pixels.height() as i32;
@@ -212,6 +263,7 @@ mod tests {
         let renderer = Renderer::load().unwrap();
         for (width, height) in [(1280, 720), (720, 1280), (320, 200)] {
             let mut scene = renderer.create_scene(width, height, false).unwrap();
+            assert!(scene.has_size(width, height));
             scene.draw(0.0);
             let first = scene.pixels.data().to_vec();
             let mut xrgb = vec![0; (width * height) as usize];
@@ -219,6 +271,20 @@ mod tests {
             assert_eq!(xrgb[0], 0xfaf7f2);
             assert!(first.as_chunks::<4>().0.iter().all(|pixel| pixel[3] == 255));
             assert!(xrgb.iter().any(|pixel| *pixel != 0xfaf7f2));
+
+            let pitch = width as usize * 4 + 16;
+            let mut strided = vec![0xff; pitch * height as usize];
+            scene.copy_xrgb_strided(&mut strided, pitch);
+            assert_eq!(
+                u32::from_le_bytes(strided[..4].try_into().unwrap()),
+                xrgb[0]
+            );
+            assert!(
+                strided[width as usize * 4..pitch]
+                    .iter()
+                    .all(|&b| b == 0xff)
+            );
+
             scene.draw(1.0);
             assert_ne!(scene.pixels.data(), first);
         }

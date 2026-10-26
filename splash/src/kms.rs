@@ -25,7 +25,7 @@ use libseat::{Device, Seat, SeatEvent, SeatRef};
 
 use crate::{
     Options, Result,
-    renderer::{Renderer, Scene, get_xrgb_pixel},
+    renderer::{Renderer, Scene},
     timing::Presentation,
 };
 
@@ -54,8 +54,7 @@ fn open_terminal() -> io::Result<File> {
 struct Terminal(File);
 
 impl Terminal {
-    fn enter_graphics() -> Result<Self> {
-        let mut terminal = open_terminal()?;
+    fn enter_graphics(mut terminal: File) -> Result<Self> {
         terminal.write_all(CLEAR)?;
         if unsafe { libc::ioctl(terminal.as_raw_fd(), KDSETMODE, KD_GRAPHICS) } < 0 {
             return Err(io::Error::last_os_error().into());
@@ -79,7 +78,7 @@ impl Drop for Terminal {
 enum Activation {
     Waiting,
     Enabled,
-    Released,
+    Disabled,
 }
 
 /// A disable notification is terminal for this short-lived renderer. All
@@ -106,10 +105,10 @@ struct Session {
 }
 
 impl Session {
-    fn open() -> Result<Self> {
+    fn open() -> Result<(Self, File)> {
         // Reject PTYs before contacting the seat manager. Preview must never
         // acquire DRM devices or change the active desktop's terminal mode.
-        open_terminal()?;
+        let terminal = open_terminal()?;
         let display = Rc::new(RefCell::new(Display {
             terminal: None,
             cards: Vec::new(),
@@ -123,31 +122,34 @@ impl Session {
             }
             SeatEvent::Enable => {}
             SeatEvent::Disable => {
-                state.set(Activation::Released);
+                state.set(Activation::Disabled);
                 devices.borrow_mut().close(seat);
                 if let Err(error) = seat.disable() {
                     eprintln!("event=splash_disable_failed error={error}");
                 }
             }
         })?;
-        Ok(Self {
-            seat,
-            display,
-            activation,
-        })
+        Ok((
+            Self {
+                seat,
+                display,
+                activation,
+            },
+            terminal,
+        ))
     }
 }
 
 impl Drop for Session {
     fn drop(&mut self) {
         self.display.borrow_mut().close(&mut self.seat);
-        self.activation.set(Activation::Released);
+        self.activation.set(Activation::Disabled);
         // Seat::drop releases session control before the process exits.
     }
 }
 
 pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> Result {
-    let mut session = Session::open()?;
+    let (mut session, terminal) = Session::open()?;
     let activation_deadline = Instant::now() + Duration::from_secs(3);
     while session.activation.get() == Activation::Waiting && !stop.load(Ordering::Relaxed) {
         if Instant::now() >= activation_deadline {
@@ -158,7 +160,7 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
     if session.activation.get() != Activation::Enabled || stop.load(Ordering::Relaxed) {
         return Ok(());
     }
-    session.display.borrow_mut().terminal = Some(Terminal::enter_graphics()?);
+    session.display.borrow_mut().terminal = Some(Terminal::enter_graphics(terminal)?);
     for path in get_card_paths()? {
         session.seat.dispatch(0)?;
         if session.activation.get() != Activation::Enabled {
@@ -166,22 +168,17 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
         }
         match session.seat.open_device(&path) {
             Ok(device) => {
-                let mut display = session.display.borrow_mut();
-                display.cards.push(Card {
+                let mut card = Card {
                     device: CardDevice {
                         fd: unsafe { OwnedFd::from_raw_fd(device.as_fd().as_raw_fd()) },
                         seat_device: device,
                     },
                     outputs: Vec::new(),
-                });
-                if let Err(error) = display
-                    .cards
-                    .last_mut()
-                    .unwrap()
-                    .create_outputs(&renderer, options.dark)
-                {
+                };
+                if let Err(error) = card.create_outputs(&renderer, options.dark) {
                     eprintln!("event=splash_card_unavailable path={path:?} error={error}");
                 }
+                session.display.borrow_mut().cards.push(card);
             }
             Err(error) => eprintln!("event=splash_card_unavailable path={path:?} error={error}"),
         }
@@ -354,22 +351,7 @@ impl Card {
             let pitch = output.buffer.pitch() as usize;
             {
                 let mut mapping = card.map_dumb_buffer(&mut output.buffer)?;
-                for (source, target) in output
-                    .scene
-                    .pixels
-                    .data()
-                    .chunks_exact(output.scene.pixels.width() as usize * 4)
-                    .zip(mapping.chunks_mut(pitch))
-                {
-                    for (rgba, pixel) in source
-                        .as_chunks::<4>()
-                        .0
-                        .iter()
-                        .zip(target.as_chunks_mut::<4>().0)
-                    {
-                        pixel.copy_from_slice(&get_xrgb_pixel(rgba).to_le_bytes());
-                    }
-                }
+                output.scene.copy_xrgb_strided(&mut mapping, pitch);
             }
             // Shadow framebuffers need damage notification to upload CPU
             // writes. Native scanout drivers can report this as unsupported.
@@ -405,7 +387,7 @@ impl Card {
                 );
             }
             if let Some(path) = snapshot.take() {
-                output.scene.pixels.save_png(path)?;
+                output.scene.save_png(path)?;
             }
         }
         Ok(())
