@@ -101,7 +101,7 @@ void main() {
   });
 }
 
-class _ScanGateway extends DemoGreeterGateway {
+class _ScanGateway implements GreeterGateway {
   final _scanEvents = StreamController<GreeterEvent>.broadcast();
   List<UserSummary> users = const [
     UserSummary(id: 'alice', displayName: 'Alice'),
@@ -115,7 +115,16 @@ class _ScanGateway extends DemoGreeterGateway {
   Stream<GreeterEvent> get events => _scanEvents.stream;
 
   @override
-  Future<List<UserSummary>> listUsers() async => users;
+  Future<BackendStateSnapshot> getState() async =>
+      const BackendStateSnapshot(state: BackendAuthState.idle, detail: '');
+
+  @override
+  Future<List<UserSummary>> getUsers() async => users;
+
+  @override
+  Future<List<SessionSummary>> getSessions() async => const [
+    (id: 'wayland:sway', name: 'Sway'),
+  ];
 
   @override
   Future<String> beginAuthentication(String username) async {
@@ -164,8 +173,8 @@ class _ScanGateway extends DemoGreeterGateway {
   }
 
   @override
-  Future<void> close() async {
-    await _scanEvents.close();
-    await super.close();
-  }
+  Future<void> requestPowerAction(PowerAction action) async {}
+
+  @override
+  Future<void> close() => _scanEvents.close();
 }

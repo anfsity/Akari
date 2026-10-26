@@ -1,6 +1,6 @@
 /// Persists the session the user selected last.
 abstract interface class SessionStore {
-  Future<String?> readSelectedSessionId();
+  Future<String?> findSelectedSessionId();
 
   Future<void> saveSelectedSessionId(String sessionId);
 }
@@ -10,7 +10,7 @@ class NoopSessionStore implements SessionStore {
   const NoopSessionStore();
 
   @override
-  Future<String?> readSelectedSessionId() async => null;
+  Future<String?> findSelectedSessionId() async => null;
 
   @override
   Future<void> saveSelectedSessionId(String sessionId) async {}

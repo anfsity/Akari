@@ -89,7 +89,6 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   final FocusNode _credentialFocusNode = FocusNode();
   final List<String> _typeahead = <String>[];
   late StreamSubscription<FeatureEffect> _effectSubscription;
-  late Listenable _featureSlotChanges;
   late final AnimationController _wakeController;
   late Widget _scene;
   late final ValueNotifier<Set<ScenePredicate>> _activeScenePredicates;
@@ -138,18 +137,12 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     _effectSubscription = feature.effects.listen(
       (effect) => _handleEffect(feature, effect),
     );
-    _featureSlotChanges = Listenable.merge([
-      feature.serviceSlots,
-      feature.authPromptSlots,
-      feature.accountPickerSlots,
-      feature.sessionPickerSlots,
-      feature.powerSlots,
-    ])..addListener(_handleSceneSlotsChanged);
+    feature.slotChanges.addListener(_handleSceneSlotsChanged);
     feature.dormantSlots.addListener(_handleDormantChanged);
   }
 
   void _stopListeningToFeature(GreeterFeature feature) {
-    _featureSlotChanges.removeListener(_handleSceneSlotsChanged);
+    feature.slotChanges.removeListener(_handleSceneSlotsChanged);
     feature.dormantSlots.removeListener(_handleDormantChanged);
     unawaited(_effectSubscription.cancel());
   }
@@ -410,11 +403,9 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
         _credentialController.clear();
         _typeahead.clear();
         _credentialFocusNode.unfocus();
-      case RequestFocusEffect(:final field):
-        if (field == 'credential') {
-          _flushTypeaheadAndFocus();
-        }
-      case ShowNoticeEffect(:final message, :final isError):
+      case FocusCredentialEffect():
+        _flushTypeaheadAndFocus();
+      case ShowErrorNoticeEffect(:final message):
         // Slot listeners may emit effects during a widget update. Defer the
         // messenger mutation until build completes, then recheck its owner.
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -427,14 +418,14 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
           messenger.showSnackBar(
             SnackBar(
               content: Text(message),
-              backgroundColor: isError
-                  ? Theme.of(context).colorScheme.error
-                  : null,
+              backgroundColor: Theme.of(context).colorScheme.error,
             ),
           );
         });
       case ExitAfterHandoffEffect():
-        unawaited(SystemNavigator.pop());
+        if (widget.isActive) {
+          unawaited(SystemNavigator.pop());
+        }
     }
   }
 }

@@ -12,8 +12,8 @@ const _interfaceName = 'io.akari.Greeter1';
 /// This class owns transport values and signal subscriptions only. It maps
 /// them into typed frontend events before they reach Feature.
 class DBusGreeterGateway implements GreeterGateway {
-  DBusGreeterGateway({DBusClient? client})
-    : _client = client ?? DBusClient.session(),
+  DBusGreeterGateway()
+    : _client = DBusClient.session(),
       _events = StreamController<GreeterEvent>.broadcast() {
     _object = DBusRemoteObject(
       _client,
@@ -61,7 +61,7 @@ class DBusGreeterGateway implements GreeterGateway {
   }
 
   @override
-  Future<List<UserSummary>> listUsers() async {
+  Future<List<UserSummary>> getUsers() async {
     final response = await _call(
       'ListUsers',
       replySignature: DBusSignature('a(sss)'),
@@ -77,7 +77,7 @@ class DBusGreeterGateway implements GreeterGateway {
   }
 
   @override
-  Future<List<SessionSummary>> listSessions() async {
+  Future<List<SessionSummary>> getSessions() async {
     final response = await _call(
       'ListSessions',
       errorKind: GreeterErrorKind.session,
@@ -130,7 +130,7 @@ class DBusGreeterGateway implements GreeterGateway {
   }
 
   @override
-  Future<void> powerAction(PowerAction action) async {
+  Future<void> requestPowerAction(PowerAction action) async {
     await _call(
       'PowerAction',
       errorKind: GreeterErrorKind.power,
@@ -233,7 +233,7 @@ class DBusGreeterGateway implements GreeterGateway {
     if (error is DBusErrorException && error.message.isNotEmpty) {
       return error.message;
     }
-    return 'The greeter service is unavailable.';
+    return serviceUnavailableMessage;
   }
 
   @override

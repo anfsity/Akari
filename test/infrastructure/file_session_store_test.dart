@@ -17,16 +17,16 @@ void main() {
   });
 
   test('returns null when nothing was stored', () async {
-    expect(await store.readSelectedSessionId(), isNull);
+    expect(await store.findSelectedSessionId(), isNull);
   });
 
   test('round-trips the selected session id', () async {
     await store.saveSelectedSessionId('wayland:hyprland');
-    expect(await store.readSelectedSessionId(), 'wayland:hyprland');
+    expect(await store.findSelectedSessionId(), 'wayland:hyprland');
   });
 
   test('returns null for malformed content', () async {
     await File('${directory.path}/greeter.json').writeAsString('not json');
-    expect(await store.readSelectedSessionId(), isNull);
+    expect(await store.findSelectedSessionId(), isNull);
   });
 }

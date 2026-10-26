@@ -30,6 +30,8 @@ enum BackendAuthState {
   unknown,
 }
 
+const Object _unset = Object();
+
 /// Immutable frontend snapshot, separate from the backend protocol phase.
 ///
 /// Service, catalog, authentication, and power errors remain independent so
@@ -101,31 +103,22 @@ class GreeterState {
   /// it. Service errors force it awake so the failure stays visible.
   final bool dormant;
 
-  /// Null arguments preserve existing values; `clear*` flags explicitly remove
-  /// nullable values. This distinguishes an omitted update from clearing a
-  /// prompt, selection, or error during a transition.
+  /// Omitted arguments preserve existing values; passing `null` explicitly
+  /// clears nullable fields such as prompts, selections, or errors.
   GreeterState copyWith({
     ServiceMode? serviceMode,
     CatalogMode? catalogMode,
     AuthMode? authMode,
     List<UserSummary>? users,
     List<SessionSummary>? sessions,
-    UserSummary? selectedUser,
-    bool clearSelectedUser = false,
-    SessionSummary? selectedSession,
-    bool clearSelectedSession = false,
-    PromptState? prompt,
-    bool clearPrompt = false,
-    String? promptError,
-    bool clearPromptError = false,
-    GreeterError? serviceError,
-    bool clearServiceError = false,
-    GreeterError? authError,
-    bool clearAuthError = false,
-    GreeterError? catalogError,
-    bool clearCatalogError = false,
-    GreeterError? powerError,
-    bool clearPowerError = false,
+    Object? selectedUser = _unset,
+    Object? selectedSession = _unset,
+    Object? prompt = _unset,
+    Object? promptError = _unset,
+    Object? serviceError = _unset,
+    Object? authError = _unset,
+    Object? catalogError = _unset,
+    Object? powerError = _unset,
     PowerMode? powerMode,
     BackendAuthState? backendAuthState,
     bool? dormant,
@@ -136,22 +129,28 @@ class GreeterState {
       authMode: authMode ?? this.authMode,
       users: users ?? this.users,
       sessions: sessions ?? this.sessions,
-      selectedUser: clearSelectedUser
-          ? null
-          : selectedUser ?? this.selectedUser,
-      selectedSession: clearSelectedSession
-          ? null
-          : selectedSession ?? this.selectedSession,
-      prompt: clearPrompt ? null : prompt ?? this.prompt,
-      promptError: clearPromptError ? null : promptError ?? this.promptError,
-      serviceError: clearServiceError
-          ? null
-          : serviceError ?? this.serviceError,
-      authError: clearAuthError ? null : authError ?? this.authError,
-      catalogError: clearCatalogError
-          ? null
-          : catalogError ?? this.catalogError,
-      powerError: clearPowerError ? null : powerError ?? this.powerError,
+      selectedUser: identical(selectedUser, _unset)
+          ? this.selectedUser
+          : selectedUser as UserSummary?,
+      selectedSession: identical(selectedSession, _unset)
+          ? this.selectedSession
+          : selectedSession as SessionSummary?,
+      prompt: identical(prompt, _unset) ? this.prompt : prompt as PromptState?,
+      promptError: identical(promptError, _unset)
+          ? this.promptError
+          : promptError as String?,
+      serviceError: identical(serviceError, _unset)
+          ? this.serviceError
+          : serviceError as GreeterError?,
+      authError: identical(authError, _unset)
+          ? this.authError
+          : authError as GreeterError?,
+      catalogError: identical(catalogError, _unset)
+          ? this.catalogError
+          : catalogError as GreeterError?,
+      powerError: identical(powerError, _unset)
+          ? this.powerError
+          : powerError as GreeterError?,
       powerMode: powerMode ?? this.powerMode,
       backendAuthState: backendAuthState ?? this.backendAuthState,
       dormant: dormant ?? this.dormant,

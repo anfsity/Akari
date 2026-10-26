@@ -14,8 +14,8 @@ void main() {
 
       try {
         final state = await gateway.getState();
-        final users = await gateway.listUsers();
-        final sessions = await gateway.listSessions();
+        final users = await gateway.getUsers();
+        final sessions = await gateway.getSessions();
         final promptFuture = gateway.events
             .where(
               (event) =>

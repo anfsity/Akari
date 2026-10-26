@@ -5,21 +5,18 @@ sealed class FeatureEffect {
   const FeatureEffect();
 }
 
-class RequestFocusEffect extends FeatureEffect {
-  const RequestFocusEffect(this.field);
-
-  final String field;
+class FocusCredentialEffect extends FeatureEffect {
+  const FocusCredentialEffect();
 }
 
 class ClearCredentialEffect extends FeatureEffect {
   const ClearCredentialEffect();
 }
 
-class ShowNoticeEffect extends FeatureEffect {
-  const ShowNoticeEffect(this.message, {this.isError = false});
+class ShowErrorNoticeEffect extends FeatureEffect {
+  const ShowErrorNoticeEffect(this.message);
 
   final String message;
-  final bool isError;
 }
 
 class ExitAfterHandoffEffect extends FeatureEffect {
