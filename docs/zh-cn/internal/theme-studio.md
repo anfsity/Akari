@@ -1,6 +1,9 @@
 # Theme Studio
 
-Theme Studio 是面向 Akari 编译主题的 Linux 可视化场景编辑器。编辑器界面基于 `shadcn_flutter` 构建，画布预览则通过 `SceneRuntime` 实时渲染所选主题自身的组件、样式参数（Tokens）与资源。
+> [!NOTE]
+> Theme Studio 目前仍处于活跃开发阶段，部分功能、交互与扩展接口仍在快速演进中。
+
+Theme Studio 是面向 Akari 编译主题的可视化场景编辑器。编辑器界面基于 `shadcn_flutter` 构建，画布预览通过 `SceneRuntime` 实时渲染所选主题的自有组件、样式配置（Tokens）与资源。
 
 ## 启动 Studio
 
@@ -31,24 +34,18 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 
 ### 组件定制
 
-主题可以通过 [`componentCatalog`](../reference/theme-package.md#声明组件的可编辑属性)
-声明可编辑属性。Studio 会使用作者提供的组件名称、属性名称、文本输入框和选项菜单，
-并展示场景 JSON 尚未填写的属性默认值。仅查看默认值不会产生修改或将其写入文件。
+主题可以通过 [`componentCatalog`](../reference/theme-package.md#声明组件的可编辑属性) 声明可编辑属性。Studio 会展示作者定义的组件标签、属性名称、输入框与选项菜单，并直接呈现场景 JSON 中未指定时的默认值。仅查看默认值不会修改文件或产生未保存的草稿。
 
 默认主题目前开放：
 
-| 组件 | 控件 |
+| 组件 | 可编辑控件 |
 | --- | --- |
 | 标题与说明（`terraceLabel`） | **Text** 文本、**Text style: Regular / Large** 文字样式 |
 | 日期与时间（`dateTime`） | **Display: Date / Time** 显示内容 |
 
-选项选择后立即应用；文本在按 Enter、移出输入框或点击 **Apply to preview** 时应用。
-两者均沿用撤销、重做和 **Save scene** 保存流程。无效选项（包括在 **Advanced properties**
-中输入的值）无法替换有效预览或进入历史记录；可以通过选项菜单修复 JSON 草稿中的无效值。
+选项修改后立即在画布生效；文本修改在按 `Enter`、失去焦点或点击 **Apply to preview** 时生效。两者均完全支持撤销重做（`Ctrl+Z` / `Ctrl+Shift+Z`）与快捷键保存（`Ctrl+S`）。若输入了未声明的无效选项（例如在高级属性中手动修改），该值无法替换当前工作预览或写入历史记录；此时可通过选项菜单重新选取有效值来修复草稿。
 
-已声明组件的其他属性仍可在 **Advanced properties** 中查看和修改，编辑可视化控件时会原样保留。
-未声明组件沿用原有的字符串属性编辑方式。切换主题会同步切换属性声明。
-热重载保留草稿和历史；若修改后的声明与当前场景或历史不兼容，Studio 会保留先前主题并显示刷新错误。
+已声明组件的其他未声明属性仍可在 **Advanced properties** 中查看和编辑，修改可视化控件时会原样保留这些额外字段。未声明组件则沿用原有的原始属性编辑方式。切换主题会自动同步对应的属性声明定义。保存代码触发热重载时会保留当前草稿与撤销历史；若代码修改破坏了当前场景或历史状态，Studio 会保留先前主题并展示错误提示。
 
 ### 坐标单位换算
 
