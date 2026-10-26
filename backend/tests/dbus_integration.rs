@@ -20,7 +20,7 @@ use zbus::Proxy;
 
 #[tokio::test]
 async fn auth_roundtrip() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
@@ -28,14 +28,7 @@ async fn auth_roundtrip() {
     let backend = start_backend(&socket);
 
     let connection = connect_backend().await;
-    let proxy = Proxy::new(
-        &connection,
-        "io.akari.Greeter",
-        "/io/akari/Greeter",
-        "io.akari.Greeter1",
-    )
-    .await
-    .expect("backend proxy should be available");
+    let proxy = create_proxy(&connection).await;
 
     #[cfg(feature = "mock-power")]
     assert_mock_power(&proxy).await;
@@ -76,16 +69,16 @@ async fn auth_roundtrip() {
 
 #[tokio::test]
 async fn other_callers_cannot_control_or_replace_an_attempt() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
     let server = spawn_server(fake_auth(listener));
     let _backend = start_backend(&socket);
     let owner_connection = connect_backend().await;
-    let owner = make_proxy(&owner_connection).await;
+    let owner = create_proxy(&owner_connection).await;
     let other_connection = zbus::Connection::session().await.unwrap();
-    let other = make_proxy(&other_connection).await;
+    let other = create_proxy(&other_connection).await;
     let attempt: String = owner
         .call("BeginAuthentication", &("alice",))
         .await
@@ -129,14 +122,14 @@ async fn other_callers_cannot_control_or_replace_an_attempt() {
 
 #[tokio::test]
 async fn same_caller_can_replace_an_attempt() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("replacement");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
     let server = spawn_server(fake_replacement(listener));
     let _backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
     let first: String = proxy
         .call("BeginAuthentication", &("alice",))
         .await
@@ -158,22 +151,22 @@ async fn same_caller_can_replace_an_attempt() {
 
 #[tokio::test]
 async fn owner_disconnect_releases_attempt_for_another_client() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("owner-disconnect");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
     let server = spawn_server(fake_replacement(listener));
     let _backend = start_backend(&socket);
     let owner = connect_backend().await;
-    let _: String = make_proxy(&owner)
+    let _: String = create_proxy(&owner)
         .await
         .call("BeginAuthentication", &("alice",))
         .await
         .unwrap();
-    wait_for_state(&make_proxy(&owner).await, "WaitingForInput").await;
+    wait_for_state(&create_proxy(&owner).await, "WaitingForInput").await;
     owner.close().await.unwrap();
     let other = zbus::Connection::session().await.unwrap();
-    let proxy = make_proxy(&other).await;
+    let proxy = create_proxy(&other).await;
     wait_for_state(&proxy, "Idle").await;
     let attempt: String = proxy.call("BeginAuthentication", &("bob",)).await.unwrap();
     wait_for_state(&proxy, "WaitingForInput").await;
@@ -183,7 +176,7 @@ async fn owner_disconnect_releases_attempt_for_another_client() {
 
 #[tokio::test]
 async fn owner_disconnect_interrupts_pending_greetd_io() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("disconnect-io");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
@@ -203,7 +196,7 @@ async fn owner_disconnect_interrupts_pending_greetd_io() {
     let owner = connect_backend().await;
     let begin_connection = owner.clone();
     let begin = tokio::spawn(async move {
-        make_proxy(&begin_connection)
+        create_proxy(&begin_connection)
             .await
             .call::<_, _, String>("BeginAuthentication", &("alice",))
             .await
@@ -216,12 +209,12 @@ async fn owner_disconnect_interrupts_pending_greetd_io() {
     owner.close().await.unwrap();
     server.finish().await;
     let observer = zbus::Connection::session().await.unwrap();
-    wait_for_state(&make_proxy(&observer).await, "Idle").await;
+    wait_for_state(&create_proxy(&observer).await, "Idle").await;
 }
 
 #[tokio::test]
 async fn cancel_interrupts_io_with_a_full_command_queue() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("queued-cancel");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
@@ -240,7 +233,7 @@ async fn cancel_interrupts_io_with_a_full_command_queue() {
     });
     let _backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
     let attempt: String = proxy
         .call("BeginAuthentication", &("alice",))
         .await
@@ -250,7 +243,7 @@ async fn cancel_interrupts_io_with_a_full_command_queue() {
         let connection = connection.clone();
         let attempt = attempt.clone();
         responses.spawn(async move {
-            make_proxy(&connection)
+            create_proxy(&connection)
                 .await
                 .call::<_, _, ()>("Respond", &(attempt, "queued-secret"))
                 .await
@@ -300,12 +293,12 @@ async fn greeter_bus_disconnect_cleans_authentication_and_exits() {
         .await
         .unwrap();
     wait_for_backend(&connection).await;
-    let _: String = make_proxy(&connection)
+    let _: String = create_proxy(&connection)
         .await
         .call("BeginAuthentication", &("alice",))
         .await
         .unwrap();
-    wait_for_state(&make_proxy(&connection).await, "WaitingForInput").await;
+    wait_for_state(&create_proxy(&connection).await, "WaitingForInput").await;
     bus.stop();
     server.finish().await;
     assert!(!backend.wait_for_exit().await.success());
@@ -339,7 +332,7 @@ async fn start_accounts_service(address: &str) -> zbus::Connection {
 
 #[tokio::test]
 async fn user_catalog_recovers_after_system_bus_restart() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("accounts-recovery");
     let socket = directory.join("greetd.sock");
     let bus_path = directory.join("system-bus.sock");
@@ -349,7 +342,7 @@ async fn user_catalog_recovers_after_system_bus_restart() {
     command.env("DBUS_SYSTEM_BUS_ADDRESS", &system_bus.address);
     let _backend = start_backend_command(&socket, command);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
     let users: Vec<(String, String, String)> = proxy.call("ListUsers", &()).await.unwrap();
     assert!(users.is_empty());
     system_bus.stop();
@@ -390,12 +383,12 @@ async fn startup_failure_is_logged_with_its_cause() {
 
 #[tokio::test]
 async fn greetd_connection_failure_retains_source_in_logs() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("connect-failure");
     let socket = directory.join("missing-greetd.sock");
     let backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
     let result = proxy
         .call::<_, _, String>("BeginAuthentication", &("alice",))
         .await;
@@ -409,12 +402,12 @@ async fn greetd_connection_failure_retains_source_in_logs() {
 
 #[tokio::test]
 async fn blank_username_is_rejected() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let _backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
 
     let result: zbus::Result<String> = proxy.call("BeginAuthentication", &("   ",)).await;
 
@@ -423,7 +416,7 @@ async fn blank_username_is_rejected() {
 
 #[tokio::test]
 async fn auth_error_without_user_input_does_not_retry() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("no-input-retry");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
@@ -467,7 +460,7 @@ async fn auth_error_without_user_input_does_not_retry() {
     });
     let _backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
     let result = tokio::time::timeout(
         Duration::from_secs(2),
         proxy.call::<_, _, String>("BeginAuthentication", &("alice",)),
@@ -483,14 +476,14 @@ async fn auth_error_without_user_input_does_not_retry() {
 
 #[tokio::test]
 async fn wrong_password_prompts_again() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = spawn_server(fake_bad_password_then_prompt(listener));
     let _backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
 
     let attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -523,7 +516,7 @@ async fn wrong_password_prompts_again() {
 
 #[tokio::test]
 async fn invalid_rejection_cleanup_does_not_retry() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     for unexpected_prompt in [false, true] {
         let directory = temp_dir("rejection-cleanup");
         let socket = directory.join("greetd.sock");
@@ -552,7 +545,7 @@ async fn invalid_rejection_cleanup_does_not_retry() {
         });
         let _backend = start_backend(&socket);
         let connection = connect_backend().await;
-        let proxy = make_proxy(&connection).await;
+        let proxy = create_proxy(&connection).await;
         let attempt: String = proxy
             .call("BeginAuthentication", &("alice",))
             .await
@@ -571,14 +564,14 @@ async fn invalid_rejection_cleanup_does_not_retry() {
 
 #[tokio::test]
 async fn stale_attempt() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = spawn_server(fake_auth(listener));
     let _backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
 
     let _attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -591,36 +584,40 @@ async fn stale_attempt() {
 }
 
 #[tokio::test]
-async fn respond_early() {
-    let _guard = lock().lock().await;
+async fn respond_without_prompt_is_rejected() {
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
-    let server = spawn_server(fake_delayed_prompt(listener));
+    let server = spawn_server(async move {
+        let (mut stream, _) = listener.accept().await.expect("backend should connect");
+        let create = read_request(&mut stream).await;
+        assert_eq!(create["type"], "create_session");
+        write_response(&mut stream, serde_json::json!({ "type": "success" })).await;
+    });
     let _backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
 
-    let begin_connection = zbus::Connection::session().await.unwrap();
-    let owner = begin_connection.clone();
-    let begin = tokio::spawn(async move {
-        let attempt_proxy = make_proxy(&begin_connection).await;
-        attempt_proxy
-            .call::<_, _, String>("BeginAuthentication", &("alice",))
-            .await
-    });
-    sleep(Duration::from_millis(20)).await;
-    let result: zbus::Result<()> = proxy.call("Respond", &("attempt-stale", "password")).await;
+    let attempt: String = proxy
+        .call("BeginAuthentication", &("alice",))
+        .await
+        .expect("begin authentication should succeed");
+    wait_for_state(&proxy, "Authenticated").await;
+    let result: zbus::Result<()> = proxy.call("Respond", &(attempt, "password")).await;
 
-    assert!(result.is_err());
-    let _ = begin.await.unwrap();
+    let error = result.expect_err("Respond must fail when no prompt is waiting");
+    assert!(
+        error
+            .to_string()
+            .contains("operation is not valid in state Authenticated")
+    );
     server.finish().await;
-    drop(owner);
 }
 
 #[tokio::test]
 async fn facial_authentication_progress_and_password_fallback() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     for password_fallback in [false, true] {
         let directory = temp_dir("face-auth");
         let socket = directory.join("greetd.sock");
@@ -666,7 +663,7 @@ async fn facial_authentication_progress_and_password_fallback() {
         });
         let mut backend = start_backend_for_sessions(&socket, &sessions);
         let connection = connect_backend().await;
-        let proxy = make_proxy(&connection).await;
+        let proxy = create_proxy(&connection).await;
         let mut prompts = proxy.receive_signal("Prompt").await.unwrap();
         let attempt: String = tokio::time::timeout(
             Duration::from_secs(2),
@@ -705,14 +702,14 @@ async fn facial_authentication_progress_and_password_fallback() {
 
 #[tokio::test]
 async fn bad_session() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = spawn_server(fake_auth(listener));
     let _backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
 
     let attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -735,14 +732,14 @@ async fn bad_session() {
 
 #[tokio::test]
 async fn cancel_to_idle() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = spawn_server(fake_cancel(listener));
     let _backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
 
     let attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -759,14 +756,14 @@ async fn cancel_to_idle() {
 
 #[tokio::test]
 async fn sigterm_cancels_authentication_and_exits() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
     let server = spawn_server(fake_cancel(listener));
     let mut backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
     let _: String = proxy
         .call("BeginAuthentication", &("alice",))
         .await
@@ -785,12 +782,12 @@ async fn sigterm_cancels_authentication_and_exits() {
 
 #[tokio::test]
 async fn bad_power_action() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let _backend = start_backend(&socket);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
 
     let result: zbus::Result<()> = proxy.call("PowerAction", &("Shutdown",)).await;
 
@@ -799,7 +796,7 @@ async fn bad_power_action() {
 
 #[tokio::test]
 async fn start_session() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let session_root = temp_dir("sessions");
@@ -808,7 +805,7 @@ async fn start_session() {
     let server = spawn_server(fake_start(listener, false));
     let mut backend = start_backend_for_sessions(&socket, &session_root);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
 
     let attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -829,7 +826,7 @@ async fn start_session() {
 
 #[tokio::test]
 async fn start_session_fails() {
-    let _guard = lock().lock().await;
+    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let session_root = temp_dir("sessions-fail");
@@ -838,7 +835,7 @@ async fn start_session_fails() {
     let server = spawn_server(fake_start(listener, true));
     let _backend = start_backend_for_sessions(&socket, &session_root);
     let connection = connect_backend().await;
-    let proxy = make_proxy(&connection).await;
+    let proxy = create_proxy(&connection).await;
 
     let attempt_id: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -902,15 +899,7 @@ async fn fake_auth(listener: UnixListener) {
 
     let create = read_request(&mut stream).await;
     assert_eq!(create["type"], "create_session");
-    write_response(
-        &mut stream,
-        serde_json::json!({
-            "type": "auth_message",
-            "auth_message_type": "secret",
-            "auth_message": "Password: "
-        }),
-    )
-    .await;
+    send_secret_prompt(&mut stream).await;
 
     let password = read_request(&mut stream).await;
     assert_eq!(password["type"], "post_auth_message_response");
@@ -936,15 +925,7 @@ async fn fake_bad_password_then_prompt(listener: UnixListener) {
         let (mut stream, _) = listener.accept().await.expect("backend should connect");
         let create = read_request(&mut stream).await;
         assert_eq!(create["type"], "create_session");
-        write_response(
-            &mut stream,
-            serde_json::json!({
-                "type": "auth_message",
-                "auth_message_type": "secret",
-                "auth_message": "Password: "
-            }),
-        )
-        .await;
+        send_secret_prompt(&mut stream).await;
 
         let password = read_request(&mut stream).await;
         assert_eq!(password["type"], "post_auth_message_response");
@@ -977,48 +958,16 @@ async fn fake_bad_password_then_prompt(listener: UnixListener) {
         .expect("backend should reconnect after a rejected credential");
     let create = read_request(&mut stream).await;
     assert_eq!(create["type"], "create_session");
-    write_response(
-        &mut stream,
-        serde_json::json!({
-            "type": "auth_message",
-            "auth_message_type": "secret",
-            "auth_message": "Password: "
-        }),
-    )
-    .await;
+    send_secret_prompt(&mut stream).await;
     assert_eq!(read_request(&mut stream).await["response"], "password");
     write_response(&mut stream, serde_json::json!({"type": "success"})).await;
-}
-
-async fn fake_delayed_prompt(listener: UnixListener) {
-    let (mut stream, _) = listener.accept().await.expect("backend should connect");
-    let create = read_request(&mut stream).await;
-    assert_eq!(create["type"], "create_session");
-    sleep(Duration::from_millis(100)).await;
-    write_response(
-        &mut stream,
-        serde_json::json!({
-            "type": "auth_message",
-            "auth_message_type": "secret",
-            "auth_message": "Password: "
-        }),
-    )
-    .await;
 }
 
 async fn fake_cancel(listener: UnixListener) {
     let (mut stream, _) = listener.accept().await.expect("backend should connect");
     let create = read_request(&mut stream).await;
     assert_eq!(create["type"], "create_session");
-    write_response(
-        &mut stream,
-        serde_json::json!({
-            "type": "auth_message",
-            "auth_message_type": "secret",
-            "auth_message": "Password: "
-        }),
-    )
-    .await;
+    send_secret_prompt(&mut stream).await;
 
     let cancel = read_request(&mut stream).await;
     assert_eq!(cancel["type"], "cancel_session");
@@ -1028,15 +977,7 @@ async fn fake_cancel(listener: UnixListener) {
 async fn fake_start(listener: UnixListener, fail_start: bool) {
     let (mut stream, _) = listener.accept().await.expect("backend should connect");
     let _ = read_request(&mut stream).await;
-    write_response(
-        &mut stream,
-        serde_json::json!({
-            "type": "auth_message",
-            "auth_message_type": "secret",
-            "auth_message": "Password: "
-        }),
-    )
-    .await;
+    send_secret_prompt(&mut stream).await;
     let _ = read_request(&mut stream).await;
     write_response(
         &mut stream,
@@ -1113,7 +1054,7 @@ async fn connect_backend() -> zbus::Connection {
 }
 
 async fn wait_for_backend(connection: &zbus::Connection) {
-    let proxy = make_proxy(connection).await;
+    let proxy = create_proxy(connection).await;
     tokio::time::timeout(Duration::from_secs(3), async {
         loop {
             if proxy
@@ -1130,7 +1071,7 @@ async fn wait_for_backend(connection: &zbus::Connection) {
     .expect("backend did not appear on D-Bus");
 }
 
-async fn make_proxy(connection: &zbus::Connection) -> zbus::Proxy<'_> {
+async fn create_proxy(connection: &zbus::Connection) -> zbus::Proxy<'_> {
     Proxy::new(
         connection,
         "io.akari.Greeter",
@@ -1141,8 +1082,11 @@ async fn make_proxy(connection: &zbus::Connection) -> zbus::Proxy<'_> {
     .expect("backend proxy should be available")
 }
 
-fn lock() -> &'static tokio::sync::Mutex<()> {
-    TEST_LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
+async fn lock_test_bus() -> tokio::sync::MutexGuard<'static, ()> {
+    TEST_LOCK
+        .get_or_init(|| tokio::sync::Mutex::new(()))
+        .lock()
+        .await
 }
 
 struct BusProcess {
