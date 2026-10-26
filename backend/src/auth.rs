@@ -22,7 +22,7 @@ use crate::{
     greetd::{GreetdError, GreetdResponse, GreetdTransport},
     session_catalog::SessionEntry,
     session_launch::get_session_launch,
-    state::{AuthState, AuthStateMachine, BeginAuthenticationError, StateEvent},
+    state::{AuthState, AuthStateMachine, StateEvent},
 };
 
 const CANCEL_TIMEOUT: Duration = Duration::from_secs(1);
@@ -276,8 +276,8 @@ impl AuthSnapshot {
     fn from_auth(auth: &AuthStateMachine, attempt_id: &str) -> Self {
         Self {
             attempt_id: attempt_id.to_owned(),
-            state: auth.state().as_str().to_owned(),
-            detail: auth.detail().to_owned(),
+            state: auth.get_state().as_str().to_owned(),
+            detail: auth.get_detail().to_owned(),
         }
     }
 }
@@ -467,14 +467,14 @@ async fn run_actor(
             AuthCommand::Begin { .. } => None,
             _ => command
                 .get_attempt_id()
-                .or_else(|| actor.auth.active_attempt_id()),
+                .or_else(|| actor.auth.find_active_attempt_id()),
         };
         let span = tracing::info_span!(
             "authentication",
             operation = command.get_operation(),
             caller = command.get_caller().unwrap_or("runtime"),
             attempt_id = initial_attempt_id,
-            initial_state = actor.auth.state().as_str(),
+            initial_state = actor.auth.get_state().as_str(),
         );
         async {
             tracing::debug!("processing authentication operation");
@@ -667,7 +667,7 @@ async fn create_attempt(
     let attempt_id = actor
         .auth
         .begin_authentication(username)
-        .map_err(map_begin_error)?;
+        .map_err(|error| fdo::Error::Failed(error.to_string()))?;
     tracing::Span::current().record("attempt_id", &attempt_id);
     actor.attempt = Some(AttemptResources {
         caller: caller.clone(),
@@ -676,7 +676,7 @@ async fn create_attempt(
         transport: None,
         user_response_submitted: false,
     });
-    tracing::info!(%attempt_id, %caller, state = actor.auth.state().as_str(), "authentication started");
+    tracing::info!(%attempt_id, %caller, state = actor.auth.get_state().as_str(), "authentication started");
     publish_state(&actor.auth, &attempt_id, snapshots);
     let _ = controls.send(Some(AttemptControl {
         caller: caller.clone(),
@@ -893,7 +893,7 @@ async fn handle_start_session(
     )
     .await;
 
-    tracing::info!(%attempt_id, session_id = %session.session_id, source = %session.source.display(), state = actor.auth.state().as_str(), "starting desktop session");
+    tracing::info!(%attempt_id, session_id = %session.session_id, source = %session.source.display(), state = actor.auth.get_state().as_str(), "starting desktop session");
     let response = actor
         .get_transport()
         .start_session(&command, &environment, &cancellation)
@@ -921,7 +921,7 @@ async fn handle_start_session(
             error_type,
             description,
         } => {
-            tracing::error!(%attempt_id, %error_type, state = actor.auth.state().as_str(), "desktop session start failed");
+            tracing::error!(%attempt_id, %error_type, state = actor.auth.get_state().as_str(), "desktop session start failed");
             let detail = display_detail(&format!("{error_type}: {description}"));
             actor
                 .auth
@@ -999,7 +999,7 @@ async fn consume_response(
         }
         match response {
             GreetdResponse::Success => {
-                tracing::info!(%attempt_id, state = actor.auth.state().as_str(), "authentication succeeded");
+                tracing::info!(%attempt_id, state = actor.auth.get_state().as_str(), "authentication succeeded");
                 actor
                     .auth
                     .transition(StateEvent::AuthenticationSucceeded)
@@ -1044,10 +1044,10 @@ async fn consume_response(
                 // restart on rejection; otherwise PAM failures can loop and
                 // consume login attempts without anyone submitting a response.
                 if error_type == "auth_error" && actor.get_attempt().user_response_submitted {
-                    tracing::info!(%attempt_id, %error_type, state = actor.auth.state().as_str(), "credential rejected; retrying authentication");
+                    tracing::info!(%attempt_id, %error_type, state = actor.auth.get_state().as_str(), "credential rejected; retrying authentication");
                     let username = actor
                         .auth
-                        .active_username()
+                        .find_active_username()
                         .expect("active authentication owns a username")
                         .to_owned();
                     actor
@@ -1093,7 +1093,7 @@ async fn consume_response(
                     continue;
                 }
 
-                tracing::warn!(%attempt_id, %error_type, state = actor.auth.state().as_str(), "authentication rejected by greetd");
+                tracing::warn!(%attempt_id, %error_type, state = actor.auth.get_state().as_str(), "authentication rejected by greetd");
                 actor
                     .auth
                     .transition(StateEvent::AuthenticationFailed {
@@ -1232,23 +1232,23 @@ async fn cancel_current(
             .as_ref()
             .is_none_or(|attempt| attempt.caller != expected_caller)
     {
-        if allow_after_cleanup && actor.auth.state() == AuthState::Idle {
+        if allow_after_cleanup && actor.auth.get_state() == AuthState::Idle {
             return Ok(());
         }
         return Err(fdo::Error::AccessDenied(
             "authentication belongs to another D-Bus caller".to_owned(),
         ));
     }
-    if !actor.auth.state().is_active() {
+    if !actor.auth.get_state().is_active() {
         return Ok(());
     }
 
     let attempt_id = actor
         .auth
-        .active_attempt_id()
+        .find_active_attempt_id()
         .expect("active authentication owns an attempt ID")
         .to_owned();
-    tracing::info!(%attempt_id, state = actor.auth.state().as_str(), "cancelling authentication");
+    tracing::info!(%attempt_id, state = actor.auth.get_state().as_str(), "cancelling authentication");
     actor
         .auth
         .transition(StateEvent::CancelRequested)
@@ -1316,7 +1316,7 @@ async fn cancel_current(
             ))
         }
         Err(error) => {
-            tracing::warn!(%attempt_id, error = ?error, state = actor.auth.state().as_str(), "greetd cancellation failed; transport closed");
+            tracing::warn!(%attempt_id, error = ?error, state = actor.auth.get_state().as_str(), "greetd cancellation failed; transport closed");
             Err(fdo::Error::Failed(format!(
                 "could not cancel greetd session: {error}"
             )))
@@ -1338,7 +1338,7 @@ async fn finish_cancellation(
         actor.auth.is_current_attempt(attempt_id),
         "actor cancels its current attempt"
     );
-    tracing::info!(%attempt_id, state = actor.auth.state().as_str(), "cancelling authentication");
+    tracing::info!(%attempt_id, state = actor.auth.get_state().as_str(), "cancelling authentication");
     actor
         .auth
         .transition(StateEvent::CancelRequested)
@@ -1365,7 +1365,7 @@ async fn fail_transaction(
     snapshots: &watch::Sender<AuthSnapshot>,
     controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Error {
-    tracing::error!(%attempt_id, error = ?error, state = actor.auth.state().as_str(), "authentication transaction failed");
+    tracing::error!(%attempt_id, error = ?error, state = actor.auth.get_state().as_str(), "authentication transaction failed");
     let detail = display_detail(&error.to_string());
     assert!(
         actor.auth.is_current_attempt(attempt_id),
@@ -1397,7 +1397,7 @@ fn publish_state(
     attempt_id: &str,
     snapshots: &watch::Sender<AuthSnapshot>,
 ) {
-    tracing::info!(%attempt_id, state = auth.state().as_str(), "authentication state changed");
+    tracing::info!(%attempt_id, state = auth.get_state().as_str(), "authentication state changed");
     let _ = snapshots.send(AuthSnapshot::from_auth(auth, attempt_id));
 }
 
@@ -1541,7 +1541,7 @@ fn validate_cancel_target(
     if let Some(expected_attempt) = expected_attempt
         && !auth.is_current_attempt(expected_attempt)
     {
-        if allow_after_cleanup && auth.state() == AuthState::Idle {
+        if allow_after_cleanup && auth.get_state() == AuthState::Idle {
             return Ok(());
         }
         return Err(fdo::Error::Failed("stale or unknown attempt id".to_owned()));
@@ -1550,12 +1550,12 @@ fn validate_cancel_target(
 }
 
 fn require_state(auth: &AuthStateMachine, expected: AuthState) -> fdo::Result<()> {
-    if auth.state() == expected {
+    if auth.get_state() == expected {
         Ok(())
     } else {
         Err(fdo::Error::Failed(format!(
             "operation is not valid in state {}",
-            auth.state().as_str()
+            auth.get_state().as_str()
         )))
     }
 }
@@ -1572,15 +1572,6 @@ fn display_detail(detail: &str) -> String {
 
 fn cancelled_error() -> fdo::Error {
     fdo::Error::Failed("authentication attempt was cancelled".to_owned())
-}
-
-fn map_begin_error(error: BeginAuthenticationError) -> fdo::Error {
-    let detail = error.to_string();
-    match error {
-        BeginAuthenticationError::EmptyUsername => fdo::Error::InvalidArgs(detail),
-        BeginAuthenticationError::InvalidState(_)
-        | BeginAuthenticationError::AttemptIdExhausted => fdo::Error::Failed(detail),
-    }
 }
 
 #[cfg(test)]
@@ -1605,7 +1596,7 @@ mod tests {
     fn disconnect_cancel_stops_at_cleanup() {
         let (auth, attempt_id) = cancelled_attempt();
 
-        assert_eq!(auth.state(), AuthState::Idle);
+        assert_eq!(auth.get_state(), AuthState::Idle);
         assert!(validate_cancel_target(&auth, Some(&attempt_id), false).is_err());
     }
 
@@ -1692,7 +1683,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(actor.auth.state(), AuthState::Idle);
+        assert_eq!(actor.auth.get_state(), AuthState::Idle);
     }
 
     #[tokio::test]
