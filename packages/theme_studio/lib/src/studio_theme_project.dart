@@ -28,6 +28,7 @@ class StudioThemeProject {
     final editor = SceneEditor(
       File(path),
       componentCatalog: declarations.componentCatalog,
+      presetCatalog: declarations.presetCatalog,
       layout: declarations.layout,
     );
     try {

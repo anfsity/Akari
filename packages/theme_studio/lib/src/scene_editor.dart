@@ -19,6 +19,7 @@ class SceneEditor extends ChangeNotifier {
   SceneEditor(
     this.file, {
     this._componentCatalog = const ThemeComponentCatalog(),
+    this._presetCatalog = const ThemePresetCatalog(),
     ThemeLayoutDefinition? layout,
   }) : _declaredLayout = layout {
     _loadFromDisk(initial: true);
@@ -27,6 +28,7 @@ class SceneEditor extends ChangeNotifier {
 
   final File file;
   ThemeComponentCatalog _componentCatalog;
+  ThemePresetCatalog _presetCatalog;
   ThemeLayoutDefinition? _declaredLayout;
   late final NodeInspectorController inspector;
   late String _source;
@@ -47,6 +49,7 @@ class SceneEditor extends ChangeNotifier {
   bool get canDuplicateNode => layout?.findSlot(selectedId) == null;
   String? get deletionBlockReason => getDeletionBlockReason(selectedId);
   ThemeComponentCatalog get componentCatalog => _componentCatalog;
+  ThemePresetCatalog get presetCatalog => _presetCatalog;
   ThemeLayoutDefinition? get layout =>
       _declaredLayout?.sceneId == document.id ? _declaredLayout : null;
   List<ThemeLayoutSlot> get missingRequiredSlots =>
@@ -55,8 +58,10 @@ class SceneEditor extends ChangeNotifier {
   void updateAuthoring({
     required ThemeComponentCatalog componentCatalog,
     required ThemeLayoutDefinition? layout,
+    ThemePresetCatalog presetCatalog = const ThemePresetCatalog(),
   }) {
     if (identical(componentCatalog, _componentCatalog) &&
+        identical(presetCatalog, _presetCatalog) &&
         identical(layout, _declaredLayout)) {
       return;
     }
@@ -64,11 +69,26 @@ class SceneEditor extends ChangeNotifier {
     // accept history before replacing this session's catalog and layout.
     for (final revision in [_revision, ..._undo, ..._redo]) {
       componentCatalog.validateDocument(revision.document);
+      presetCatalog.validateDocument(revision.document);
       layout?.validateDocument(revision.document);
     }
     _componentCatalog = componentCatalog;
+    _presetCatalog = presetCatalog;
     _declaredLayout = layout;
     notifyListeners();
+  }
+
+  void updateThemeProperty(String name, String value) {
+    if (!applyDraft()) return;
+    if (!_presetCatalog.properties.any((property) => property.name == name)) {
+      throw ArgumentError.value(name, 'name', 'Undeclared theme preset');
+    }
+    _updateDocument(
+      document.copyWith(
+        themeProperties: {...document.themeProperties, name: value},
+      ),
+      selectedId: selectedId,
+    );
   }
 
   String? getDeletionBlockReason(String nodeId) {
@@ -195,6 +215,7 @@ class SceneEditor extends ChangeNotifier {
     if (encoded == _revision.encoded) return;
     final updated = decodeSceneDocument(encoded);
     _componentCatalog.validateDocument(updated);
+    _presetCatalog.validateDocument(updated);
     _declaredLayout?.validateDocument(updated);
     _undo.add(_revision);
     _redo.clear();
@@ -254,6 +275,7 @@ class SceneEditor extends ChangeNotifier {
     final source = file.readAsStringSync();
     final document = decodeSceneDocument(source);
     _componentCatalog.validateDocument(document);
+    _presetCatalog.validateDocument(document);
     _declaredLayout?.validateDocument(document);
     _source = source;
     final revision = (

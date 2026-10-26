@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show mapEquals;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -54,6 +55,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   bool _confirmReload = false;
   int _seedRevision = 0;
   String? _lastBackgroundAsset;
+  Map<String, String> _lastThemeProperties = const {};
+  ui.Color? _themeSeed;
 
   @override
   void initState() {
@@ -121,6 +124,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   void _updateTheme(ThemeDefinition theme) {
     _editor?.updateAuthoring(
       componentCatalog: theme.componentCatalog,
+      presetCatalog: theme.presetCatalog,
       layout: theme.layout,
     );
     _theme = theme.copyWith(
@@ -144,6 +148,10 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   void _onEditorChanged() {
     final editor = _editor;
     if (editor == null) return;
+    if (!mapEquals(_lastThemeProperties, editor.document.themeProperties)) {
+      _lastThemeProperties = editor.document.themeProperties;
+      setState(() => _refreshTheme(seed: _themeSeed));
+    }
     final currentAsset = _getEffectiveBackgroundAsset(
       editor.document.background,
     );
@@ -157,6 +165,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     _editor?.removeListener(_onEditorChanged);
     _editor?.dispose();
     _editor = editor..addListener(_onEditorChanged);
+    _lastThemeProperties = editor.document.themeProperties;
+    _themeSeed = null;
     _lastBackgroundAsset = _getEffectiveBackgroundAsset(
       editor.document.background,
     );
@@ -183,7 +193,10 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       }
     }
     if (!mounted || revision != _seedRevision) return;
-    setState(() => _refreshTheme(seed: seed));
+    setState(() {
+      _themeSeed = seed;
+      _refreshTheme(seed: seed);
+    });
   }
 
   void _refreshTheme({Color? seed}) {

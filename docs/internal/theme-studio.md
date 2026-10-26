@@ -59,6 +59,16 @@ editing declarations. Hot reload preserves drafts and history; if a changed
 declaration invalidates the current scene or history, Studio keeps the previous
 theme and reports the refresh error.
 
+### Theme presets
+
+**Compose → Theme presets** displays the theme's declared global choices.
+Terrace offers wallpaper-derived, Ocean, Rose, and Violet palettes; airy underline,
+frosted capsule, and solid control materials; and Terrace entrance, quiet fade,
+and no-animation motion. Changes apply immediately and use scene undo/redo and
+save. They are stored in `themeProperties` and resolved by the same theme builder
+used in production. **Inspect code** disables these selectors, including keyboard
+interaction. Themes may expose presets without declaring layout slots.
+
 ### Adding and removing layout components
 
 The left sidebar's **Compose** tab opens by default for scenes with a declared layout.
