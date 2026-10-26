@@ -39,6 +39,14 @@ Current schema version is `2`. The decoder still accepts version `1` and normali
 - A scene must contain at least one node.
 - Node `id` values must be unique within the document, and `component` identifiers must be non-empty.
 
+## Theme preset selections
+
+The optional root `themeProperties` object stores string values interpreted by
+the theme, such as `{"palette": "nord", "motion": "gentle"}`. The theme declares
+which settings and choices it supports. These values are preserved by scene
+editing and compiled into generated Dart alongside the nodes; they are not
+Studio appearance preferences. An omitted object uses the theme's defaults.
+
 ## Canvas
 
 | Field | Type / Values | Default | Description |
