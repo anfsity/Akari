@@ -65,7 +65,6 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     );
     _assets = _compiledAssets;
     _updateTheme(_project.themeBuilder());
-    _assetPaths = _assets.getAssets();
     _scenePaths = [..._project.scenePaths];
     _path = _scenePaths.first;
     _openScene(_path);
@@ -112,6 +111,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
             _error = null;
           });
           unawaited(_savePreferences(preferences));
+          unawaited(_loadSeed());
         },
       ),
     );
@@ -132,8 +132,23 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   Future<void> _loadSeed() async {
     final theme = _theme;
-    final seed = await theme.findBackgroundSeed();
-    if (!mounted || !identical(theme, _theme) || seed == null) return;
+    final asset = _editor?.document.background.asset ??
+        theme.document.background.asset;
+    Color? seed;
+    if (asset != null) {
+      final file = _assets.findFile(asset);
+      if (file != null && file.existsSync()) {
+        try {
+          final bytes = await file.readAsBytes();
+          seed = await extractSeedFromBytes(bytes);
+        } on Object {
+          seed = null;
+        }
+      } else {
+        seed = await theme.findBackgroundSeed();
+      }
+    }
+    if (!mounted || !identical(theme, _theme)) return;
     setState(() => _updateTheme(_project.themeBuilder(seed: seed)));
   }
 
@@ -157,6 +172,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       if (!_scenePaths.contains(path)) _scenePaths.add(path);
       _error = null;
       _confirmReload = false;
+      unawaited(_loadSeed());
     } on Object catch (error) {
       _error = '$error';
     }
@@ -301,10 +317,12 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     final editor = _editor;
     if (editor == null || !editor.applyDraft()) return;
     try {
-      final provider = _assets.getImageProvider(asset) as FileImage;
-      final codec = await ui.instantiateImageCodec(
-        await provider.file.readAsBytes(),
-      );
+      final file = _assets.findFile(asset);
+      if (file == null) {
+        throw FormatException('Asset "$asset" is not a local theme file.');
+      }
+      final bytes = await file.readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes);
       codec.dispose();
       if (!mounted || !identical(editor, _editor)) return;
       editor.updateScene(
@@ -313,6 +331,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
           asset: asset,
         ),
       );
+      unawaited(_loadSeed());
       setState(() => _error = null);
     } on Object catch (error) {
       if (mounted) setState(() => _error = 'Cannot use image: $error');

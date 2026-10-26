@@ -121,16 +121,20 @@ class StudioAssets {
     }).toList()..sort();
   }
 
-  ImageProvider getImageProvider(String asset) {
+  File? findFile(String asset) {
     final prefix = 'packages/$packageName/';
     if (asset.startsWith(prefix)) {
-      return FileImage(
-        File('${directory.path}/${asset.substring(prefix.length)}'),
-      );
+      return File('${directory.path}/${asset.substring(prefix.length)}');
     }
     if (asset.startsWith('assets/')) {
-      return FileImage(File('${directory.path}/$asset'));
+      return File('${directory.path}/$asset');
     }
+    return null;
+  }
+
+  ImageProvider getImageProvider(String asset) {
+    final file = findFile(asset);
+    if (file != null) return FileImage(file);
     return AssetImage(asset);
   }
 }

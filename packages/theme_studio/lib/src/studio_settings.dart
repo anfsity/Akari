@@ -149,24 +149,27 @@ class _StudioSettingsState extends State<StudioSettings> {
   void _apply() {
     // Parsing errors belong to the category being read. Codec errors returned
     // by the editor name canvas/background; bring that category into view too.
-    var errorSection = _SettingsSection.canvas;
+    _SettingsSection? currentStep;
     try {
+      currentStep = _SettingsSection.canvas;
       final canvas = _getCanvas();
-      errorSection = _SettingsSection.background;
+      currentStep = _SettingsSection.background;
       final background = _getBackground();
-      errorSection = _SettingsSection.grid;
+      currentStep = _SettingsSection.grid;
       final preferences = _getPreferences();
-      errorSection = _SettingsSection.canvas;
+      currentStep = null;
       widget.onApply(canvas, background, preferences);
       Navigator.of(context).pop();
     } on FormatException catch (error) {
       final message = error.message.toLowerCase();
+      final targetSection = currentStep ??
+          (message.contains('background')
+              ? _SettingsSection.background
+              : message.contains('canvas')
+                  ? _SettingsSection.canvas
+                  : _section);
       setState(() {
-        _section = message.contains('background')
-            ? _SettingsSection.background
-            : message.contains('canvas')
-            ? _SettingsSection.canvas
-            : errorSection;
+        _section = targetSection;
         _error = error.message;
         _errorSection = _section;
       });
@@ -327,24 +330,22 @@ class _StudioSettingsState extends State<StudioSettings> {
   }
 
   Widget _buildNavigation({required bool horizontal}) {
-    final buttons = [
-      for (final section in _SettingsSection.values)
-        Button(
-          key: ValueKey('settings-nav-${section.name}'),
-          style: _section == section
-              ? const ButtonStyle.secondary()
-              : const ButtonStyle.ghost(),
-          onPressed: () => setState(() => _section = section),
-          child: Row(
-            mainAxisSize: horizontal ? MainAxisSize.min : MainAxisSize.max,
-            children: [
-              Icon(section.icon, size: 16),
-              const Gap(10),
-              Text(section.label).small(),
-            ],
-          ),
-        ),
-    ];
+    Widget buildButton(_SettingsSection section) => Button(
+      key: ValueKey('settings-nav-${section.name}'),
+      style: _section == section
+          ? const ButtonStyle.secondary()
+          : const ButtonStyle.ghost(),
+      onPressed: () => setState(() => _section = section),
+      child: Row(
+        mainAxisSize: horizontal ? MainAxisSize.min : MainAxisSize.max,
+        children: [
+          Icon(section.icon, size: 16),
+          const Gap(10),
+          Text(section.label).small(),
+        ],
+      ),
+    );
+
     return ColoredBox(
       color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.25),
       child: Padding(
@@ -352,7 +353,9 @@ class _StudioSettingsState extends State<StudioSettings> {
         child: horizontal
             ? SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                child: Row(children: buttons),
+                child: Row(
+                  children: _SettingsSection.values.map(buildButton).toList(),
+                ),
               )
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -361,13 +364,15 @@ class _StudioSettingsState extends State<StudioSettings> {
                     padding: EdgeInsets.fromLTRB(12, 8, 0, 8),
                     child: Text('SCENE'),
                   ).small().muted(),
-                  ...buttons.take(2),
+                  for (final section in _SettingsSection.values.where((s) => s.isSceneSetting))
+                    buildButton(section),
                   const Gap(24),
                   const Padding(
                     padding: EdgeInsets.fromLTRB(12, 0, 0, 8),
                     child: Text('EDITOR'),
                   ).small().muted(),
-                  ...buttons.skip(2),
+                  for (final section in _SettingsSection.values.where((s) => !s.isSceneSetting))
+                    buildButton(section),
                 ],
               ),
       ),
@@ -383,19 +388,23 @@ class _StudioSettingsState extends State<StudioSettings> {
         'Layout values in pixels use this size. Node positions remain proportional when you change it.',
       ).small().muted(),
       const Gap(16),
-      StudioSelect<_CanvasPreset>(
-        key: const ValueKey('canvas-resolution-preset'),
-        value: _findPreset(),
-        placeholder: const Text('Custom resolution'),
-        onChanged: (preset) {
-          setState(() {
+      ListenableBuilder(
+        listenable: Listenable.merge([
+          _fields['Canvas width']!,
+          _fields['Canvas height']!,
+        ]),
+        builder: (context, _) => StudioSelect<_CanvasPreset>(
+          key: const ValueKey('canvas-resolution-preset'),
+          value: _findPreset(),
+          placeholder: const Text('Custom resolution'),
+          onChanged: (preset) {
             _fields['Canvas width']!.text = '${preset.width}';
             _fields['Canvas height']!.text = '${preset.height}';
-          });
-        },
-        values: _CanvasPreset.values,
-        formatValue: (preset) =>
-            '${preset.label} · ${preset.width} × ${preset.height}',
+          },
+          values: _CanvasPreset.values,
+          formatValue: (preset) =>
+              '${preset.label} · ${preset.width} × ${preset.height}',
+        ),
       ),
       const Gap(16),
       StudioFieldRow(
@@ -444,94 +453,105 @@ class _StudioSettingsState extends State<StudioSettings> {
     ],
   );
 
-  Widget _buildBackgroundSection() {
-    final asset = _fields['Background asset']!.text.trim();
-    final color = _getBackgroundColor();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        StudioEnumSelect(
-          label: 'Background',
-          value: _background,
-          // Preserve a custom renderer already selected by the scene.
-          values: {
-            SceneBackgroundKind.solid,
-            SceneBackgroundKind.image,
-            widget.document.background.kind,
-          },
-          onChanged: (value) => setState(() => _background = value),
-        ),
-        const Gap(16),
-        Container(
-          height: 132,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: color ?? Theme.of(context).colorScheme.muted,
-            border: Border.all(color: Theme.of(context).colorScheme.border),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: _background == SceneBackgroundKind.image && asset.isNotEmpty
-              ? Image(
-                  image: ResizeImage.resizeIfNeeded(
-                    960,
-                    null,
-                    widget.resolveAssetImage(asset),
-                  ),
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Center(
-                    child: const Text(
-                      'Image unavailable. Check the asset path.',
+  Widget _buildBackgroundSection() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      StudioEnumSelect(
+        label: 'Background',
+        value: _background,
+        // Preserve a custom renderer already selected by the scene.
+        values: {
+          SceneBackgroundKind.solid,
+          SceneBackgroundKind.image,
+          widget.document.background.kind,
+        },
+        onChanged: (value) => setState(() => _background = value),
+      ),
+      const Gap(16),
+      ListenableBuilder(
+        listenable: Listenable.merge([
+          _fields['Background color']!,
+          _fields['Background asset']!,
+        ]),
+        builder: (context, _) {
+          final asset = _fields['Background asset']!.text.trim();
+          final color = _getBackgroundColor();
+          return Container(
+            height: 132,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: color ?? Theme.of(context).colorScheme.muted,
+              border: Border.all(color: Theme.of(context).colorScheme.border),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: _background == SceneBackgroundKind.image && asset.isNotEmpty
+                ? Image(
+                    image: ResizeImage.resizeIfNeeded(
+                      960,
+                      null,
+                      widget.resolveAssetImage(asset),
+                    ),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Center(
+                      child: const Text(
+                        'Image unavailable. Check the asset path.',
+                      ).small(),
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      _background == SceneBackgroundKind.solid
+                          ? 'Solid color'
+                          : 'Theme background',
+                      style: TextStyle(
+                        color: color != null && color.computeLuminance() < 0.4
+                            ? Colors.white
+                            : Colors.black,
+                      ),
                     ).small(),
                   ),
-                )
-              : Center(
-                  child: Text(
-                    _background == SceneBackgroundKind.solid
-                        ? 'Solid color'
-                        : 'Theme background',
-                    style: TextStyle(
-                      color: color != null && color.computeLuminance() < 0.4
-                          ? Colors.white
-                          : Colors.black,
-                    ),
-                  ).small(),
-                ),
-        ),
-        const Gap(16),
-        if (_background == SceneBackgroundKind.image) ...[
-          if (widget.assetPaths.isNotEmpty) ...[
-            StudioSelect<String>(
-              key: const ValueKey('background-asset-select'),
-              value: asset.isEmpty ? null : asset,
-              placeholder: const Text('Choose a theme asset'),
-              onChanged: (value) =>
-                  setState(() => _fields['Background asset']!.text = value),
-              values: {...widget.assetPaths, if (asset.isNotEmpty) asset},
-              formatValue: (value) => value.split('/').last,
-            ),
-            const Gap(12),
-          ],
-          _buildField('Background asset'),
-          const Text(
-            'Use a registered theme asset, or import an image from the Assets tab.',
-          ).small().muted(),
-          const Gap(16),
+          );
+        },
+      ),
+      const Gap(16),
+      if (_background == SceneBackgroundKind.image) ...[
+        if (widget.assetPaths.isNotEmpty) ...[
+          ListenableBuilder(
+            listenable: _fields['Background asset']!,
+            builder: (context, _) {
+              final asset = _fields['Background asset']!.text.trim();
+              return StudioSelect<String>(
+                key: const ValueKey('background-asset-select'),
+                value: asset.isEmpty ? null : asset,
+                placeholder: const Text('Choose a theme asset'),
+                onChanged: (value) => _fields['Background asset']!.text = value,
+                values: {...widget.assetPaths, if (asset.isNotEmpty) asset},
+                formatValue: (value) => value.split('/').last,
+              );
+            },
+          ),
+          const Gap(12),
         ],
-        _buildField('Background color'),
-        const Text('Hex color: #RRGGBB or #AARRGGBB.').small().muted(),
-        const Gap(20),
-        const Divider(),
-        const Gap(20),
-        StudioFieldRow(
-          left: _buildField('Background blur'),
-          right: _buildField('Scrim opacity'),
-        ),
+        _buildField('Background asset'),
         const Text(
-          'Blur softens the background. Scrim opacity adds a dark overlay from 0 (clear) to 1 (black).',
+          'Use a registered theme asset, or import an image from the Assets tab.',
         ).small().muted(),
+        const Gap(16),
       ],
-    );
-  }
+      _buildField('Background color'),
+      const Text('Hex color: #RRGGBB or #AARRGGBB.').small().muted(),
+      const Gap(20),
+      const Divider(),
+      const Gap(20),
+      StudioFieldRow(
+        left: _buildField('Background blur'),
+        right: _buildField('Scrim opacity'),
+      ),
+      const Text(
+        'Blur softens the background. Scrim opacity adds a dark overlay from 0 (clear) to 1 (black).',
+      ).small().muted(),
+    ],
+  );
 
   Widget _buildAppearanceSection() {
     final brightness = switch (_themeMode) {
@@ -686,21 +706,23 @@ class _StudioSettingsState extends State<StudioSettings> {
       ).small().muted(),
       const Gap(24),
       _buildField('Grid size (pixels)'),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final size in [8, 16, 24, 32, 48, 64])
-            Button(
-              key: ValueKey('grid-preset-$size'),
-              style: _fields['Grid size (pixels)']!.text == '$size'
-                  ? const ButtonStyle.secondary()
-                  : const ButtonStyle.outline(),
-              onPressed: () =>
-                  setState(() => _fields['Grid size (pixels)']!.text = '$size'),
-              child: Text('$size').small(),
-            ),
-        ],
+      ListenableBuilder(
+        listenable: _fields['Grid size (pixels)']!,
+        builder: (context, _) => Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final size in [8, 16, 24, 32, 48, 64])
+              Button(
+                key: ValueKey('grid-preset-$size'),
+                style: _fields['Grid size (pixels)']!.text == '$size'
+                    ? const ButtonStyle.secondary()
+                    : const ButtonStyle.outline(),
+                onPressed: () => _fields['Grid size (pixels)']!.text = '$size',
+                child: Text('$size').small(),
+              ),
+          ],
+        ),
       ),
       const Gap(12),
       const Text(
@@ -728,6 +750,5 @@ class _StudioSettingsState extends State<StudioSettings> {
     label: label,
     inputKey: ValueKey('setting-$label'),
     controller: _fields[label]!,
-    onChanged: (_) => setState(() {}),
   );
 }

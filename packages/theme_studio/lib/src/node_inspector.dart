@@ -134,8 +134,7 @@ class _InspectorForm extends StatelessWidget {
       OutlineButton(
         key: const ValueKey('reset-node-scale'),
         onPressed: () {
-          controller.getField('Scale X').text = '1.0';
-          controller.getField('Scale Y').text = '1.0';
+          controller.resetScale();
           onApply();
         },
         child: const Text('Reset scale'),
