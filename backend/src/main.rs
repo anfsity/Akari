@@ -2,6 +2,7 @@
 //! A stopped actor cannot leave a live service answering stale snapshots;
 //! runtime observes task completion as well as signals, bus loss, and handoff.
 
+mod auth;
 mod greetd;
 mod service;
 mod session_catalog;

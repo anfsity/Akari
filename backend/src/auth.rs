@@ -32,7 +32,7 @@ type CommandSender = mpsc::Sender<AuthCommand>;
 
 /// Handle used by D-Bus methods to communicate with the single authentication owner.
 #[derive(Clone, Debug)]
-pub(super) struct AuthActorHandle {
+pub(crate) struct AuthActorHandle {
     commands: CommandSender,
     snapshot: watch::Receiver<AuthSnapshot>,
     control: watch::Receiver<Option<AttemptControl>>,
@@ -40,7 +40,7 @@ pub(super) struct AuthActorHandle {
 
 impl AuthActorHandle {
     /// Starts the actor and returns the D-Bus-facing command and snapshot handle.
-    pub(super) fn spawn() -> (Self, AuthActorTask) {
+    pub(crate) fn spawn() -> (Self, AuthActorTask) {
         let (commands, receiver) = mpsc::channel(COMMAND_BUFFER);
         let (snapshot_sender, snapshot) = watch::channel(AuthSnapshot::idle());
         let (control_sender, control) = watch::channel(None);
@@ -64,7 +64,7 @@ impl AuthActorHandle {
     }
 
     /// Returns the latest state without waiting for greetd I/O.
-    pub(super) fn get_state(&self) -> fdo::Result<(String, String)> {
+    pub(crate) fn get_state(&self) -> fdo::Result<(String, String)> {
         if self.commands.is_closed() {
             return Err(fdo::Error::Failed(
                 "authentication actor is unavailable".to_owned(),
@@ -79,7 +79,7 @@ impl AuthActorHandle {
     /// The token is cancelled before the command is queued so an in-flight
     /// transport operation observes cancellation while the actor preserves
     /// the ordering of state cleanup.
-    pub(super) fn interrupt_current(&self, expected_attempt: Option<&str>, caller: &str) -> bool {
+    pub(crate) fn interrupt_current(&self, expected_attempt: Option<&str>, caller: &str) -> bool {
         let control = self.control.borrow().clone();
         if let Some(control) = control
             && control.caller == caller
@@ -92,7 +92,7 @@ impl AuthActorHandle {
     }
 
     /// Replaces the current attempt and starts a new greetd transaction.
-    pub(super) async fn begin(
+    pub(crate) async fn begin(
         &self,
         caller: String,
         username: String,
@@ -109,7 +109,7 @@ impl AuthActorHandle {
     }
 
     /// Submits a UI response to the actor for the active prompt.
-    pub(super) async fn respond(
+    pub(crate) async fn respond(
         &self,
         caller: String,
         attempt_id: String,
@@ -127,7 +127,7 @@ impl AuthActorHandle {
     }
 
     /// Requests cancellation of one specific authentication attempt.
-    pub(super) async fn cancel(
+    pub(crate) async fn cancel(
         &self,
         caller: String,
         attempt_id: String,
@@ -145,7 +145,7 @@ impl AuthActorHandle {
     }
 
     /// Moves an authenticated attempt into backend-owned session resolution.
-    pub(super) async fn resolve_session(
+    pub(crate) async fn resolve_session(
         &self,
         caller: String,
         attempt_id: String,
@@ -161,7 +161,7 @@ impl AuthActorHandle {
     }
 
     /// Reports that the selected session disappeared during catalog lookup.
-    pub(super) async fn session_unavailable(
+    pub(crate) async fn session_unavailable(
         &self,
         caller: String,
         attempt_id: String,
@@ -179,7 +179,7 @@ impl AuthActorHandle {
     }
 
     /// Reports a session-catalog failure while retaining actor ownership of state.
-    pub(super) async fn session_resolution_failed(
+    pub(crate) async fn session_resolution_failed(
         &self,
         caller: String,
         attempt_id: String,
@@ -197,7 +197,7 @@ impl AuthActorHandle {
     }
 
     /// Starts the backend-validated session through the active greetd transport.
-    pub(super) async fn start_session(
+    pub(crate) async fn start_session(
         &self,
         caller: String,
         attempt_id: String,
