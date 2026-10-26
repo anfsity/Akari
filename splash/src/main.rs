@@ -7,10 +7,14 @@ use std::{env, error::Error, path::PathBuf, sync::Arc, sync::atomic::AtomicBool,
 
 type Result<T = ()> = std::result::Result<T, Box<dyn Error>>;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Target {
     Window,
     Kms,
+}
+
+enum Command {
+    Present(Options),
     Clear,
 }
 
@@ -41,7 +45,13 @@ fn run() -> Result {
         );
         return Ok(());
     }
-    let options = Options::parse(arguments, env::var("AKARI_SPLASH_DURATION").ok())?;
+    match Command::parse(arguments, env::var("AKARI_SPLASH_DURATION").ok())? {
+        Command::Clear => kms::clear_terminal(),
+        Command::Present(options) => present_splash(options),
+    }
+}
+
+fn present_splash(options: Options) -> Result {
     let stop = Arc::new(AtomicBool::new(false));
     for signal in [libc::SIGTERM, libc::SIGINT, libc::SIGHUP, libc::SIGQUIT] {
         signal_hook::flag::register(signal, Arc::clone(&stop))?;
@@ -59,33 +69,27 @@ fn run() -> Result {
     if unsafe { libc::getppid() } != parent {
         return Ok(());
     }
+    let renderer = renderer::Renderer::load()?;
     match options.target {
-        Target::Window => window::run(options, renderer::Renderer::load()?, stop),
-        Target::Kms => kms::run(options, renderer::Renderer::load()?, stop),
-        Target::Clear => kms::clear_terminal(),
+        Target::Window => window::run(options, renderer, stop),
+        Target::Kms => kms::run(options, renderer, stop),
     }
 }
 
-impl Options {
+impl Command {
     fn parse(arguments: Vec<String>, environment_duration: Option<String>) -> Result<Self> {
         let mut arguments = arguments.into_iter();
         let target = match arguments.next().as_deref() {
             Some("window") => Target::Window,
             Some("kms") => Target::Kms,
-            Some("clear") => Target::Clear,
+            Some("clear") => {
+                if arguments.len() != 0 {
+                    return Err("clear does not accept options".into());
+                }
+                return Ok(Self::Clear);
+            }
             _ => return Err("expected window, kms or clear (see --help)".into()),
         };
-        if matches!(target, Target::Clear) {
-            if arguments.len() != 0 {
-                return Err("clear does not accept options".into());
-            }
-            return Ok(Self {
-                target,
-                duration: Some(Duration::ZERO),
-                dark: false,
-                snapshot: None,
-            });
-        }
         let mut duration = None;
         let mut hold = false;
         let mut dark = true;
@@ -100,7 +104,7 @@ impl Options {
                 _ => return Err(format!("unknown option: {argument}").into()),
             }
         }
-        if hold && (!matches!(target, Target::Window) || duration.is_some()) {
+        if hold && (target != Target::Window || duration.is_some()) {
             return Err("--hold is only valid for window without --duration".into());
         }
         let duration = if hold {
@@ -114,12 +118,12 @@ impl Options {
                     .map_err(|_| "duration must be a finite, non-negative number of seconds")?,
             )
         };
-        Ok(Self {
+        Ok(Self::Present(Options {
             target,
             duration,
             dark,
             snapshot,
-        })
+        }))
     }
 }
 
@@ -127,11 +131,30 @@ impl Options {
 mod tests {
     use super::*;
 
+    fn parse_present(
+        arguments: Vec<String>,
+        environment_duration: Option<String>,
+    ) -> Result<Options> {
+        match Command::parse(arguments, environment_duration)? {
+            Command::Present(options) => Ok(options),
+            Command::Clear => Err("expected presentation command".into()),
+        }
+    }
+
+    #[test]
+    fn parses_clear_without_presentation_options() {
+        assert!(matches!(
+            Command::parse(vec!["clear".into()], Some("invalid".into())).unwrap(),
+            Command::Clear
+        ));
+        assert!(Command::parse(vec!["clear".into(), "--dark".into()], None).is_err());
+    }
+
     #[test]
     fn validates_duration_at_the_process_boundary() {
         for value in ["-1", "NaN", "inf", "1e300", "invalid"] {
             assert!(
-                Options::parse(
+                parse_present(
                     vec!["window".into(), "--duration".into(), value.into()],
                     None
                 )
@@ -139,7 +162,7 @@ mod tests {
             );
         }
         for value in ["0", "1.2", "3"] {
-            let options = Options::parse(
+            let options = parse_present(
                 vec!["window".into(), "--duration".into(), value.into()],
                 None,
             )
@@ -150,11 +173,11 @@ mod tests {
             );
         }
         assert_eq!(
-            Options::parse(vec!["kms".into()], None).unwrap().duration,
+            parse_present(vec!["kms".into()], None).unwrap().duration,
             Some(Duration::from_secs(3))
         );
         assert_eq!(
-            Options::parse(vec!["kms".into()], Some("3".into()))
+            parse_present(vec!["kms".into()], Some("3".into()))
                 .unwrap()
                 .duration,
             Some(Duration::from_secs(3))
@@ -164,7 +187,7 @@ mod tests {
     #[test]
     fn hold_is_window_only_and_overrides_environment_duration() {
         assert!(
-            Options::parse(vec!["window".into(), "--hold".into()], Some("3".into()))
+            parse_present(vec!["window".into(), "--hold".into()], Some("3".into()))
                 .unwrap()
                 .duration
                 .is_none()
@@ -174,7 +197,7 @@ mod tests {
             vec!["window", "--hold", "--duration", "0"],
         ] {
             assert!(
-                Options::parse(arguments.into_iter().map(String::from).collect(), None).is_err()
+                parse_present(arguments.into_iter().map(String::from).collect(), None).is_err()
             );
         }
     }
@@ -182,9 +205,9 @@ mod tests {
     #[test]
     fn defaults_to_dark_with_an_explicit_light_override() {
         for target in ["window", "kms"] {
-            assert!(Options::parse(vec![target.into()], None).unwrap().dark);
+            assert!(parse_present(vec![target.into()], None).unwrap().dark);
             assert!(
-                !Options::parse(vec![target.into(), "--light".into()], None)
+                !parse_present(vec![target.into(), "--light".into()], None)
                     .unwrap()
                     .dark
             );
