@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:greeter_components/greeter_components.dart';
 import 'package:theme_sdk/theme_sdk.dart';
@@ -11,10 +13,11 @@ const _contentScale = 1.3;
 /// Scene-specific presentation, borrowing the standard authentication controls
 /// so prompt, recovery and session semantics retain one authoritative path.
 class TerraceComponents implements GreeterThemeComponents {
-  TerraceComponents(this.theme)
+  TerraceComponents(this.theme, {required this.material})
     : _controls = StandardGreeterComponents(theme, textAlign: TextAlign.start);
 
   final GreeterThemeContext theme;
+  final TerraceMaterial material;
   final StandardGreeterComponents _controls;
 
   @override
@@ -44,15 +47,24 @@ class TerraceComponents implements GreeterThemeComponents {
       ),
       'credentialField' => SceneRegion<AuthPromptSlots>(
         valueListenable: theme.host.authPromptSlots,
-        builder: (context, auth) => TerraceCredentialFeedback(
-          auth: auth,
-          child: CredentialField(
+        builder: (context, auth) {
+          Widget field = CredentialField(
             auth: auth,
             controller: theme.host.credentialController,
             focusNode: theme.host.credentialFocusNode,
             textAlign: _controls.textAlign,
-          ),
-        ),
+          );
+          if (material == TerraceMaterial.frosted) {
+            field = ClipRRect(
+              borderRadius: BorderRadius.circular(theme.tokens.panelRadius),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: field,
+              ),
+            );
+          }
+          return TerraceCredentialFeedback(auth: auth, child: field);
+        },
       ),
       'primaryAction' => ListenableBuilder(
         listenable: Listenable.merge([
