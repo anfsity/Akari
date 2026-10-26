@@ -111,6 +111,21 @@ def write_json_atomic(path, value, mode=0o600):
         Path(temporary).unlink(missing_ok=True)
 
 
+def create_login_profile_document(raw, directory, snapshot, test_run):
+    return {
+        'schema_version': 1,
+        'source': {
+            'kind': 'login', 'backend': 'drm',
+            'run': str(Path(test_run).resolve()),
+            'session': str(directory.resolve()),
+            'captured_at': datetime.now(timezone.utc).isoformat(),
+            'snapshot': str(snapshot.resolve()),
+            'snapshot_sha256': hashlib.sha256(raw).hexdigest(),
+        },
+        'outputs': get_outputs(json.loads(raw)),
+    }
+
+
 def capture_outputs():
     directory = Path(os.environ['AKARI_LOG_DIR'])
     raw = subprocess.check_output(['swaymsg', '-r', '-t', 'get_outputs'])
@@ -118,18 +133,8 @@ def capture_outputs():
     # Publish raw diagnostics first; the profile is the completion marker.
     snapshot.write_bytes(raw)
     if os.environ.get('AKARI_DISPLAY_SOURCE') == 'greetd-login':
-        profile = {
-            'schema_version': 1,
-            'source': {
-                'kind': 'login', 'backend': 'drm',
-                'run': str(Path(os.environ['AKARI_TEST_RUN']).resolve()),
-                'session': str(directory.resolve()),
-                'captured_at': datetime.now(timezone.utc).isoformat(),
-                'snapshot': str(snapshot.resolve()),
-                'snapshot_sha256': hashlib.sha256(raw).hexdigest(),
-            },
-            'outputs': get_outputs(json.loads(raw)),
-        }
+        profile = create_login_profile_document(
+            raw, directory, snapshot, os.environ['AKARI_TEST_RUN'])
         validate_profile(profile)
         write_json_atomic(directory / 'display-profile.json', profile, mode=0o644)
 

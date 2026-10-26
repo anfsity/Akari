@@ -14,6 +14,53 @@ void main() {
   });
   tearDown(() => root.delete(recursive: true));
 
+  for (final cached in [false, true]) {
+    test('artifact paths preserve files and links (cached: $cached)', () async {
+      final executable = File('${root.path}/build/backend');
+      final link = Link('${root.path}/build/out/backend');
+      if (cached) {
+        await executable.parent.create(recursive: true);
+        await executable.writeAsString('cached');
+        await link.parent.create(recursive: true);
+        await link.create('../backend');
+      }
+
+      final code = await runPlan(
+        RunPlan(
+          command: 'build',
+          artifactPaths: const {
+            'backend_executable': 'build/backend',
+            'backend_link': 'build/out/backend',
+          },
+          steps: [
+            RunStep(
+              id: 'build.backend',
+              command: const ['build-backend'],
+              action: () async {
+                expect(await executable.exists(), cached);
+                expect(await link.exists(), cached);
+                await executable.parent.create(recursive: true);
+                await executable.writeAsString('built');
+                if (!cached) {
+                  await link.parent.create(recursive: true);
+                  await link.create('../backend');
+                }
+              },
+            ),
+          ],
+        ),
+        repoRoot: root,
+        runDirectory: 'run',
+        format: RunOutputFormat.json,
+      );
+
+      expect(code, 0);
+      expect(await executable.readAsString(), 'built');
+      expect(await File(link.path).readAsString(), 'built');
+      expect(await link.target(), '../backend');
+    });
+  }
+
   test(
     'artifact labels do not impose another command success contract',
     () async {

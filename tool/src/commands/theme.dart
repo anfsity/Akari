@@ -100,8 +100,8 @@ RunPlan createThemeRunPlan(
     command: target.commandName,
     themes: themes,
     displayProfile: displayProfile,
-    collectResult: sway
-        ? (result) => collectDisplayResult(
+    getCompletion: sway
+        ? (result) => getDisplayCompletion(
             File(getAbsolutePath(repoRoot, displayReport)),
             result,
           )
@@ -201,7 +201,7 @@ RunPlan createPreviewPlan(
       'executable': getLinuxExecutablePath(host, BuildMode.debug),
       'preview_result': resultPath,
     },
-    collectResult: (result) => collectPreviewResult(
+    getCompletion: (result) => getPreviewCompletion(
       File(getAbsolutePath(repoRoot, resultPath)),
       scenarios,
       result,
@@ -239,7 +239,7 @@ RunPlan createPreviewPlan(
   );
 }
 
-Future<RunCompletion> collectPreviewResult(
+Future<RunCompletion> getPreviewCompletion(
   File manifest,
   List<String> scenarios,
   RunResult result,
@@ -269,6 +269,8 @@ Future<RunCompletion> collectPreviewResult(
     );
   }
 }
+
+const collectPreviewResult = getPreviewCompletion;
 
 RunPlan createSplashRunPlan(
   Directory repoRoot, {

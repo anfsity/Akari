@@ -48,6 +48,12 @@ def get_sway_reply(environment, *arguments):
         ['swaymsg', '-r', *arguments], env=environment, timeout=5))
 
 
+def record_sway_outputs(directory, environment):
+    raw = get_sway_reply(environment, '-t', 'get_outputs')
+    write_json_atomic(directory / 'outputs.json', raw, mode=0o644)
+    return raw, get_outputs(raw)
+
+
 def get_hyprland_targets(environment, pid, target, actual):
     monitors = {monitor['id']: monitor for monitor in json.loads(subprocess.check_output(
         ['hyprctl', '-j', 'monitors'], env=environment, timeout=5))}
@@ -274,13 +280,11 @@ def start_session(directory, backend, command):
             time.sleep(.2)
         if interrupted:
             return interrupted
-        raw = get_sway_reply(environment, '-t', 'get_outputs')
-        current = get_outputs(raw)
+        raw, current = record_sway_outputs(directory, environment)
         expected = (get_hyprland_targets(parent_environment, sway.pid, target, current)
                     if hyprland else target)
         if expected is None:
             raise RuntimeError('Owned Hyprland output windows disappeared.')
-        write_json_atomic(directory / 'outputs.json', raw, mode=0o644)
         update_report(expected, current, 'theme-exit')
         return app.returncode
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
@@ -298,7 +302,7 @@ def start_session(directory, backend, command):
                 log.close()
         for signum, handler in handlers.items():
             signal.signal(signum, handler)
-        shutil.rmtree(runtime)
+        shutil.rmtree(runtime, ignore_errors=True)
         write_json_atomic(report_path, report, mode=0o644)
 
 

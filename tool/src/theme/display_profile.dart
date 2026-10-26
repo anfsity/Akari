@@ -45,7 +45,7 @@ class DisplayProfileFailure implements Exception {
   final int exitCode;
 }
 
-Future<RunCompletion> collectDisplayResult(File file, RunResult result) async {
+Future<RunCompletion> getDisplayCompletion(File file, RunResult result) async {
   if (!await file.exists()) {
     return RunCompletion(
       error: result.isPassed
@@ -66,3 +66,5 @@ Future<RunCompletion> collectDisplayResult(File file, RunResult result) async {
     return RunCompletion(error: 'Could not read Sway display report: $error');
   }
 }
+
+const collectDisplayResult = getDisplayCompletion;

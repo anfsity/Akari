@@ -82,14 +82,13 @@ Future<Map<String, String>> getThemePerfArtifacts(File manifest) async {
   return paths;
 }
 
-Future<RunPlan> preparePerformanceRun(
+RunPlan createPerformancePlan(
   String operation,
   Directory repoRoot,
   String runDirectory,
   ThemePackage theme,
-  List<String> themeArguments, {
-  required bool dryRun,
-}) async {
+  List<String> themeArguments,
+) {
   final entrypoint = getThemePerfCommand(theme, operation);
   final executable = switch (entrypoint.first) {
     'dart' => getDartCommand(repoRoot),
@@ -97,9 +96,7 @@ Future<RunPlan> preparePerformanceRun(
     final executable => [executable],
   };
   final output = '$runDirectory/perf';
-  if (!dryRun) {
-    await Directory(getAbsolutePath(repoRoot, output)).create(recursive: true);
-  }
+  final outputDirectory = Directory(getAbsolutePath(repoRoot, output));
   return RunPlan(
     command: operation == 'verify' ? 'verify-perf' : 'trace-perf',
     themes: [theme],
@@ -107,7 +104,7 @@ Future<RunPlan> preparePerformanceRun(
       'performance_output': output,
       'performance_result': '$output/result.json',
     },
-    collectResult: (result) => collectPerformanceResult(
+    getCompletion: (result) => getPerformanceCompletion(
       repoRoot,
       File(getAbsolutePath(repoRoot, '$output/result.json')),
       result,
@@ -120,18 +117,21 @@ Future<RunPlan> preparePerformanceRun(
       ),
       ...createSceneGenerationSteps(repoRoot, [theme]),
       RunStep(
+        id: 'theme.perf.prepare_output',
+        command: ['mkdir', '-p', outputDirectory.path],
+        action: () => outputDirectory.create(recursive: true),
+      ),
+      RunStep(
         id: 'theme.perf.$operation',
         command: [...executable, ...entrypoint.skip(1), ...themeArguments],
         workingDirectory: theme.directory.path,
-        environment: {
-          'AKARI_PERF_OUTPUT_DIR': getAbsolutePath(repoRoot, output),
-        },
+        environment: {'AKARI_PERF_OUTPUT_DIR': outputDirectory.path},
       ),
     ],
   );
 }
 
-Future<RunCompletion> collectPerformanceResult(
+Future<RunCompletion> getPerformanceCompletion(
   Directory repoRoot,
   File manifest,
   RunResult result,
@@ -157,3 +157,5 @@ Future<RunCompletion> collectPerformanceResult(
     return RunCompletion(error: '$error', failureExitCode: failureExitCode);
   }
 }
+
+const collectPerformanceResult = getPerformanceCompletion;

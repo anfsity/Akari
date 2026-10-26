@@ -10,14 +10,16 @@ class RunPlan {
     required this.steps,
     this.artifactPaths = const {},
     this.themes = const [],
-    this.collectResult,
+    Future<RunCompletion> Function(RunResult)? getCompletion,
+    Future<RunCompletion> Function(RunResult)? collectResult,
     this.displayProfile,
-  });
+  }) : getCompletion = getCompletion ?? collectResult;
 
   final String command;
   final List<RunStep> steps;
   final Map<String, String> artifactPaths;
   final List<ThemePackage> themes;
-  final Future<RunCompletion> Function(RunResult)? collectResult;
+  final Future<RunCompletion> Function(RunResult)? getCompletion;
+  Future<RunCompletion> Function(RunResult)? get collectResult => getCompletion;
   final Map<String, Object?>? displayProfile;
 }

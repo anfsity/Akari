@@ -100,7 +100,7 @@ def get_keyring_install_command(provider):
                      'install the keyring PAM package manually and rerun akari install.')
 
 
-def select_keyrings(provider):
+def find_installed_keyring_selection(provider):
     if provider == 'none':
         return []
     installed = get_installed_keyrings()
@@ -108,6 +108,20 @@ def select_keyrings(provider):
         return installed
     if provider in installed:
         return [provider]
+    return None
+
+
+def install_keyring_provider(provider):
+    subprocess.run(get_keyring_install_command(provider), check=True)
+    if provider not in get_installed_keyrings():
+        raise ValueError(f'Package installation did not provide {KEYRINGS[provider][1]}; '
+                         'PAM configuration was not changed.')
+
+
+def ensure_keyrings(provider):
+    selected = find_installed_keyring_selection(provider)
+    if selected is not None:
+        return selected
     # Never infer package-install consent from a pipe or unattended invocation.
     if not sys.stdin.isatty():
         if provider != 'auto':
@@ -122,15 +136,17 @@ def select_keyrings(provider):
             if choice in ['', 'n', 'no']:
                 return []
             if choice in ['g', 'gnome', 'k', 'kwallet']:
-                provider = 'gnome' if choice in ['g', 'gnome'] else 'kwallet'
+                target = 'gnome' if choice in ['g', 'gnome'] else 'kwallet'
                 break
     elif input(f'{KEYRINGS[provider][0]} PAM module is missing. Install it? [y/N] ').strip().lower() not in ['y', 'yes']:
         return []
-    subprocess.run(get_keyring_install_command(provider), check=True)
-    if provider not in get_installed_keyrings():
-        raise ValueError(f'Package installation did not provide {KEYRINGS[provider][1]}; '
-                         'PAM configuration was not changed.')
-    return [provider]
+    else:
+        target = provider
+    install_keyring_provider(target)
+    return [target]
+
+
+select_keyrings = ensure_keyrings
 
 
 def get_pam_without_keyring(configuration):
@@ -425,10 +441,14 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
             UNIT.unlink(missing_ok=True)
         for target in created_configs:
             target.unlink(missing_ok=True)
-        shutil.rmtree(release)
+        shutil.rmtree(release, ignore_errors=True)
         if not managed:
-            shutil.rmtree(INSTALLATION)
-            CONFIGURATION.rmdir()
+            shutil.rmtree(INSTALLATION, ignore_errors=True)
+            if CONFIGURATION.exists():
+                try:
+                    CONFIGURATION.rmdir()
+                except OSError:
+                    pass
         run_systemctl('daemon-reload')
         raise
     print(f'Installed release: {release}')
