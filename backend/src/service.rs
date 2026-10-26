@@ -135,7 +135,7 @@ impl GreeterService {
         let caller = get_caller(&header)?;
         let emitter = emitter.into_owned();
         self.auth
-            .resolve_session(caller.clone(), attempt_id.clone(), emitter.clone())
+            .begin_session_resolution(caller.clone(), attempt_id.clone(), emitter.clone())
             .await?;
 
         let sessions = self.sessions.clone();
@@ -145,14 +145,14 @@ impl GreeterService {
             Ok(Ok(None)) => {
                 let detail = format!("session {session_id} is unavailable");
                 self.auth
-                    .session_unavailable(caller, attempt_id, detail.clone(), emitter)
+                    .report_session_unavailable(caller, attempt_id, detail.clone(), emitter)
                     .await?;
                 return Err(fdo::Error::InvalidArgs(detail));
             }
             Ok(Err(error)) => {
                 tracing::error!(%attempt_id, %caller, operation = "ResolveSession", error = ?error, "session catalog lookup failed");
                 self.auth
-                    .session_resolution_failed(caller, attempt_id, error.to_string(), emitter)
+                    .fail_session_resolution(caller, attempt_id, error.to_string(), emitter)
                     .await?;
                 return Err(map_session_error(error));
             }
@@ -160,7 +160,7 @@ impl GreeterService {
                 tracing::error!(%attempt_id, %caller, operation = "ResolveSession", error = ?error, "session catalog task failed");
                 let detail = format!("session catalog task failed: {error}");
                 self.auth
-                    .session_resolution_failed(caller, attempt_id, detail.clone(), emitter)
+                    .fail_session_resolution(caller, attempt_id, detail.clone(), emitter)
                     .await?;
                 return Err(fdo::Error::Failed(detail));
             }
