@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:scene_schema/scene_schema.dart';
 
 import 'motion.dart';
 
@@ -13,9 +12,6 @@ class FadeMotionBuilder extends SceneMotionBuilder {
     Animation<double> progress,
     Widget child,
   ) {
-    if (spec.reducedMotion || spec.preset == SceneMotionPreset.none) {
-      return child;
-    }
     return FadeTransition(opacity: progress, child: child);
   }
 }
@@ -30,9 +26,6 @@ class FadeSlideMotionBuilder extends SceneMotionBuilder {
     Animation<double> progress,
     Widget child,
   ) {
-    if (spec.reducedMotion || spec.preset == SceneMotionPreset.none) {
-      return child;
-    }
     return AnimatedBuilder(
       animation: progress,
       builder: (context, child) => Opacity(
@@ -57,9 +50,6 @@ class FadeScaleMotionBuilder extends SceneMotionBuilder {
     Animation<double> progress,
     Widget child,
   ) {
-    if (spec.reducedMotion || spec.preset == SceneMotionPreset.none) {
-      return child;
-    }
     return FadeTransition(
       opacity: progress,
       child: ScaleTransition(
@@ -83,9 +73,6 @@ class HoverLiftMotionBuilder extends SceneMotionBuilder {
     Animation<double> progress,
     Widget child,
   ) {
-    if (spec.reducedMotion) {
-      return child;
-    }
     return _HoverLift(spec: spec, child: child);
   }
 }
@@ -103,9 +90,6 @@ class FocusGlowMotionBuilder extends SceneMotionBuilder {
     Animation<double> progress,
     Widget child,
   ) {
-    if (spec.reducedMotion) {
-      return child;
-    }
     return DecoratedBox(
       decoration: BoxDecoration(
         boxShadow: [

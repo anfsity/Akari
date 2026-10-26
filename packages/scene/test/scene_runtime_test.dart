@@ -464,7 +464,61 @@ void main() {
     await tester.pump();
     expect(buildCount, 1);
 
+    buildCount = 0;
+    final stableBuilder = _countPrewarmedNodeBuilds((_) => buildCount++);
+    Widget buildStableHost(Set<ScenePredicate> active) {
+      return MaterialApp(
+        home: Scaffold(
+          body: SceneRuntime(
+            document: document,
+            theme: theme,
+            activePredicates: active,
+            activePredicatesListenable: predicates,
+            prewarmHiddenNodes: true,
+            nodeBuilder: stableBuilder,
+          ),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(buildStableHost(const {}));
+    expect(buildCount, 1);
+    await tester.pumpWidget(buildStableHost(const {ScenePredicate.isDormant}));
+    expect(buildCount, 1);
+
     predicates.dispose();
+  });
+
+  testWidgets('preserves mounted node state when renderOrder changes', (
+    tester,
+  ) async {
+    const first = SceneNode(
+      id: 'first',
+      componentId: 'decoration',
+      rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
+      renderOrder: 10,
+    );
+    const second = SceneNode(
+      id: 'second',
+      componentId: 'decoration',
+      rect: SceneRect(x: 0.4, y: 0.1, width: 0.2, height: 0.2),
+      renderOrder: 20,
+    );
+    await tester.pumpWidget(_runtime(_document(nodes: const [first, second])));
+    final firstElement = tester.element(find.byKey(const ValueKey('first')));
+    final secondElement = tester.element(find.byKey(const ValueKey('second')));
+
+    await tester.pumpWidget(
+      _runtime(_document(nodes: [first.copyWith(renderOrder: 30), second])),
+    );
+    expect(
+      tester.element(find.byKey(const ValueKey('first'))),
+      same(firstElement),
+    );
+    expect(
+      tester.element(find.byKey(const ValueKey('second'))),
+      same(secondElement),
+    );
   });
 
   testWidgets('keeps a node mounted through its exit transition', (
@@ -575,6 +629,13 @@ class _RecordingBackgroundRenderer extends BackgroundRenderer {
     this.background = background;
     return const SizedBox.shrink();
   }
+}
+
+SceneNodeBuilder _countPrewarmedNodeBuilds(void Function(SceneNode) onBuild) {
+  return (context, node) {
+    onBuild(node);
+    return Text(node.id);
+  };
 }
 
 ThemeTokens _tokens() {

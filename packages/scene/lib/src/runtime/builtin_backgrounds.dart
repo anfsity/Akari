@@ -11,11 +11,11 @@ import 'background_renderer.dart';
 /// in its bundle can supply a file-based resolver instead.
 typedef SceneImageProviderResolver = ImageProvider Function(String asset);
 
-ImageProvider _assetImageProvider(String asset) => AssetImage(asset);
+ImageProvider _getAssetImageProvider(String asset) => AssetImage(asset);
 
 class ImageBackgroundRenderer extends BackgroundRenderer {
   const ImageBackgroundRenderer({
-    this.resolveImage = _assetImageProvider,
+    this.resolveImage = _getAssetImageProvider,
     this.alignment = Alignment.center,
     this.filterQuality = FilterQuality.high,
   });
@@ -31,7 +31,7 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
   Widget build(BuildContext context, SceneBackground background) {
     final asset = background.asset;
     if (asset == null) {
-      return SolidBackgroundRenderer().build(context, background);
+      return const SolidBackgroundRenderer().build(context, background);
     }
 
     Widget image = Image(
@@ -41,7 +41,7 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
       filterQuality: filterQuality,
       gaplessPlayback: true,
       errorBuilder: (context, error, stackTrace) {
-        return SolidBackgroundRenderer().build(context, background);
+        return const SolidBackgroundRenderer().build(context, background);
       },
     );
     if (background.blurSigma > 0) {
