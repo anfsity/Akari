@@ -9,20 +9,23 @@ import 'package:theme_sdk/theme_sdk.dart'
         AccountPickerSlots,
         AuthMode,
         AuthPromptSlots,
-        CatalogMode,
         GreeterHost,
-        PowerMode,
         PowerSlots,
         ServiceMode,
         ServiceSlots,
         SessionPickerSlots,
-        ThemeDefinition;
+        SessionSummary,
+        ThemeDefinition,
+        UserSummary,
+        getActiveScenePredicates;
 
 import '../feature/greeter_commands.dart';
 import '../feature/greeter_effect.dart';
 import '../feature/greeter_feature.dart';
 
-/// Maps the current greeter slots onto the scene predicate vocabulary.
+export 'package:theme_sdk/theme_sdk.dart' show getActiveScenePredicates;
+
+/// Alias for backward compatibility with external callers.
 Set<ScenePredicate> activeScenePredicates({
   required ServiceSlots service,
   required AuthPromptSlots auth,
@@ -30,33 +33,14 @@ Set<ScenePredicate> activeScenePredicates({
   required SessionPickerSlots session,
   required PowerSlots power,
   required bool dormant,
-}) {
-  return <ScenePredicate>{
-    if (dormant) ScenePredicate.isDormant,
-    switch (service.mode) {
-      ServiceMode.starting => ScenePredicate.isServiceStarting,
-      ServiceMode.ready => ScenePredicate.isServiceReady,
-      ServiceMode.unavailable => ScenePredicate.isServiceUnavailable,
-    },
-    switch (auth.mode) {
-      AuthMode.userSelection => ScenePredicate.isUserSelection,
-      AuthMode.prompting => ScenePredicate.isAuthPrompting,
-      AuthMode.submitting => ScenePredicate.isAuthSubmitting,
-      AuthMode.sessionSelection => ScenePredicate.isSessionSelection,
-      AuthMode.handingOff => ScenePredicate.isHandingOff,
-      AuthMode.error => ScenePredicate.isAuthError,
-    },
-    if (account.selected != null) ScenePredicate.hasSelectedUser,
-    switch (session.mode) {
-      CatalogMode.empty => ScenePredicate.isSessionEmpty,
-      CatalogMode.loading => ScenePredicate.isSessionLoading,
-      CatalogMode.ready => ScenePredicate.isSessionReady,
-      CatalogMode.failed => ScenePredicate.isSessionFailed,
-    },
-    if (power.mode == PowerMode.executing) ScenePredicate.isPowerExecuting,
-    if (power.error != null) ScenePredicate.hasPowerError,
-  };
-}
+}) => getActiveScenePredicates(
+  service: service,
+  auth: auth,
+  account: account,
+  session: session,
+  power: power,
+  dormant: dormant,
+);
 
 /// UI lifetime boundary between feature state and compiled theme components.
 ///
@@ -99,7 +83,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     _credentialController =
         widget.credentialController ?? TextEditingController();
     _activeScenePredicates = ValueNotifier(_activePredicates());
-    _listenToFeature(widget.feature);
+    _startListeningToFeature(widget.feature);
     _wakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),
@@ -121,10 +105,8 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     final featureChanged = !identical(widget.feature, oldWidget.feature);
     if (featureChanged) {
       _stopListeningToFeature(oldWidget.feature);
-      _listenToFeature(widget.feature);
-      _credentialController.clear();
-      _typeahead.clear();
-      _credentialFocusNode.unfocus();
+      _startListeningToFeature(widget.feature);
+      _resetCredentialInput();
       _wakeController.value = widget.feature.dormantSlots.value ? 0 : 1;
     }
     if (featureChanged || widget.theme != oldWidget.theme) {
@@ -133,7 +115,13 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     }
   }
 
-  void _listenToFeature(GreeterFeature feature) {
+  void _resetCredentialInput() {
+    _credentialController.clear();
+    _typeahead.clear();
+    _credentialFocusNode.unfocus();
+  }
+
+  void _startListeningToFeature(GreeterFeature feature) {
     _effectSubscription = feature.effects.listen(
       (effect) => _handleEffect(feature, effect),
     );
@@ -157,8 +145,8 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
         powerSlots: widget.feature.powerSlots,
         credentialController: _credentialController,
         credentialFocusNode: _credentialFocusNode,
-        onSelectUser: (user) => _dispatch(SelectUserCommand(user)),
-        onSelectSession: (session) => _dispatch(SelectSessionCommand(session)),
+        onSelectUser: _selectUser,
+        onSelectSession: _selectSession,
         onRequestPowerAction: (action) =>
             _dispatch(RequestPowerActionCommand(action)),
         onRetry: (recovery) => _dispatch(getRecoveryCommand(recovery)),
@@ -225,9 +213,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     if (widget.feature.dormantSlots.value) {
       // Authentication stays alive while hidden, but local credential text
       // must not remain in the field when the greeter returns to its background.
-      _credentialController.clear();
-      _typeahead.clear();
-      _credentialFocusNode.unfocus();
+      _resetCredentialInput();
       _wakeController.reverse();
     } else {
       _wakeController.forward();
@@ -284,6 +270,9 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   /// until a prompt can accept it. A rejected response keeps the same attempt,
   /// so typing resumes it instead of waiting for the retry action.
   bool _capturesTypeahead() {
+    if (widget.feature.serviceSlots.value.mode != ServiceMode.ready) {
+      return false;
+    }
     final auth = widget.feature.authPromptSlots.value;
     return auth.mode == AuthMode.prompting ||
         auth.mode == AuthMode.userSelection ||
@@ -299,16 +288,29 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       case AuthMode.prompting:
         _flushTypeaheadAndFocus();
       case AuthMode.error:
-        final error = auth.error;
-        if (error != null) {
-          _dispatch(getRecoveryCommand(error.recovery));
-        }
+        _dispatch(getRecoveryCommand(auth.error!.recovery));
       case AuthMode.userSelection:
       case AuthMode.submitting:
       case AuthMode.sessionSelection:
       case AuthMode.handingOff:
         break;
     }
+  }
+
+  String? _findTypeaheadCharacter(KeyEvent event) {
+    final character = event.character;
+    if (character == null || character.length != 1) {
+      return null;
+    }
+    final codeUnit = character.codeUnitAt(0);
+    // Typeahead accepts printable ASCII only (0x21 '!' to 0x7e '~'). Space
+    // (0x20) is excluded to avoid unintentional wake-to-credential leakage
+    // since Space is also the primary wake shortcut. Input methods and
+    // composed text belong to the native TextField once focused.
+    if (codeUnit < 0x21 || codeUnit > 0x7e) {
+      return null;
+    }
+    return character;
   }
 
   bool _bufferKey(KeyEvent event) {
@@ -318,14 +320,8 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       }
       return true;
     }
-    final character = event.character;
-    if (character == null || character.length != 1) {
-      return false;
-    }
-    final codeUnit = character.codeUnitAt(0);
-    // Typeahead accepts printable ASCII only. Input methods and composed text
-    // belong to the native TextField once focused, not to this key-event buffer.
-    if (codeUnit < 0x21 || codeUnit > 0x7e) {
+    final character = _findTypeaheadCharacter(event);
+    if (character == null) {
       return false;
     }
     _typeahead.add(character);
@@ -338,11 +334,13 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     }
     _flushTypeahead();
     _credentialFocusNode.canRequestFocus = true;
+    // An active ExcludeFocus higher in the tree (such as during wake animation
+    // or when dialogs are pushed) can cause canRequestFocus to return false
+    // immediately despite setting it. In that case, defer focus to post-frame.
     if (_credentialFocusNode.canRequestFocus) {
       _credentialFocusNode.requestFocus();
       return;
     }
-    // A waking node can still inherit ExcludeFocus until its next build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && widget.isActive) {
         _credentialFocusNode.requestFocus();
@@ -381,16 +379,20 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     _dispatch(RespondToPromptCommand(response));
   }
 
+  void _selectUser(UserSummary user) {
+    if (user.id != widget.feature.accountPickerSlots.value.selected?.id) {
+      _resetCredentialInput();
+    }
+    _typeahead.clear();
+    unawaited(widget.feature.dispatch(SelectUserCommand(user)));
+  }
+
+  void _selectSession(SessionSummary session) {
+    _typeahead.clear();
+    unawaited(widget.feature.dispatch(SelectSessionCommand(session)));
+  }
+
   void _dispatch(GreeterCommand command) {
-    if (command is SelectUserCommand &&
-        command.user.id !=
-            widget.feature.accountPickerSlots.value.selected?.id) {
-      _credentialController.clear();
-      _credentialFocusNode.unfocus();
-    }
-    if (command is SelectUserCommand || command is SelectSessionCommand) {
-      _typeahead.clear();
-    }
     unawaited(widget.feature.dispatch(command));
   }
 
@@ -400,9 +402,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     }
     switch (effect) {
       case ClearCredentialEffect():
-        _credentialController.clear();
-        _typeahead.clear();
-        _credentialFocusNode.unfocus();
+        _resetCredentialInput();
       case FocusCredentialEffect():
         _flushTypeaheadAndFocus();
       case ShowErrorNoticeEffect(:final message):

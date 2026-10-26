@@ -5,8 +5,47 @@ import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
 import 'package:scene/scene.dart';
 
 void main() {
+  test('activeScenePredicates delegates to getActiveScenePredicates', () {
+    const slots = (
+      service: (mode: ServiceMode.ready, error: null),
+      auth: (
+        mode: AuthMode.prompting,
+        selectedUser: null,
+        prompt: null,
+        error: null,
+        promptError: null,
+      ),
+      power: (mode: PowerMode.idle, error: null),
+    );
+    final account = AccountPickerSlots(users: const [], selected: null);
+    final session = SessionPickerSlots(
+      mode: CatalogMode.empty,
+      sessions: const [],
+      selected: null,
+      error: null,
+    );
+
+    final a = activeScenePredicates(
+      service: slots.service,
+      auth: slots.auth,
+      account: account,
+      session: session,
+      power: slots.power,
+      dormant: true,
+    );
+    final b = getActiveScenePredicates(
+      service: slots.service,
+      auth: slots.auth,
+      account: account,
+      session: session,
+      power: slots.power,
+      dormant: true,
+    );
+    expect(a, equals(b));
+  });
+
   test('maps dormant service, auth, session, and power state', () {
-    final predicates = activeScenePredicates(
+    final predicates = getActiveScenePredicates(
       service: (mode: ServiceMode.ready, error: null),
       auth: (
         mode: AuthMode.prompting,
