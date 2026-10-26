@@ -10,4 +10,10 @@ export 'components/authentication_components.dart'
     show CredentialField, PrimaryAction;
 export 'components/greeter_components.dart' show StandardGreeterComponents;
 export 'components/system_components.dart'
-    show MinuteClockBuilder, PowerActions, formatClockTime;
+    show
+        ClockVariant,
+        MinuteClockBuilder,
+        PowerActions,
+        clockVariant,
+        dateTimeComponent,
+        formatClockTime;

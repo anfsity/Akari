@@ -3,6 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
+enum ClockVariant { date, time }
+
+const clockVariant = ThemeChoiceProperty(
+  name: 'variant',
+  label: 'Display',
+  defaultValue: ClockVariant.date,
+  choices: {ClockVariant.date: 'Date', ClockVariant.time: 'Time'},
+);
+
+const dateTimeComponent = ThemeComponentDefinition(
+  label: 'Date and time',
+  properties: [clockVariant],
+);
+
 String formatClockTime(DateTime time) {
   return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
 }

@@ -24,7 +24,9 @@ class StandardGreeterComponents implements GreeterThemeComponents {
   Widget build(BuildContext context, SceneNode node) {
     final host = theme.host;
     return switch (node.componentId) {
-      'dateTime' => ThemeClock(isTime: node.properties['variant'] == 'time'),
+      'dateTime' => ThemeClock(
+        isTime: clockVariant.getValue(node.properties) == ClockVariant.time,
+      ),
       'powerActions' => SceneRegion<PowerSlots>(
         valueListenable: host.powerSlots,
         builder: (context, power) =>
