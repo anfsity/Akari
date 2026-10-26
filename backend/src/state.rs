@@ -53,23 +53,16 @@ impl AuthState {
     }
 
     pub const fn is_active(self) -> bool {
-        matches!(
-            self,
+        match self {
             Self::CreatingSession
-                | Self::PromptPending
-                | Self::WaitingForInput
-                | Self::SubmittingResponse
-                | Self::Authenticated
-                | Self::ResolvingSession
-                | Self::StartingSession
-        )
-    }
-
-    pub const fn invalidates_attempt(self) -> bool {
-        matches!(
-            self,
-            Self::Cancelling | Self::Idle | Self::HandingOff | Self::Failed
-        )
+            | Self::PromptPending
+            | Self::WaitingForInput
+            | Self::SubmittingResponse
+            | Self::Authenticated
+            | Self::ResolvingSession
+            | Self::StartingSession => true,
+            Self::Idle | Self::HandingOff | Self::Cancelling | Self::Failed => false,
+        }
     }
 }
 
@@ -79,7 +72,7 @@ impl AuthState {
 /// before they are converted into these state-machine events.
 #[derive(Debug)]
 pub enum StateEvent {
-    /// Starts a new authentication transaction from [`AuthState::Idle`].
+    /// Starts a new authentication transaction from [`AuthState::Idle`] or [`AuthState::Failed`].
     BeginAuthentication,
     /// Indicates that greetd returned an authentication message.
     AuthMessage,
@@ -109,8 +102,6 @@ pub enum StateEvent {
     CancelRequested,
     /// Completes cancellation and returns the machine to [`AuthState::Idle`].
     CancellationFinished,
-    /// Clears a recoverable failure before starting another transaction.
-    Reset,
     /// Converts a transport or protocol failure into [`AuthState::Failed`].
     ProtocolFailure { detail: String },
 }
@@ -118,8 +109,6 @@ pub enum StateEvent {
 /// Errors that can prevent a new authentication transaction from starting.
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum BeginAuthenticationError {
-    #[error("username must not be empty")]
-    EmptyUsername,
     #[error("authentication cannot begin in state {0:?}")]
     InvalidState(AuthState),
     #[error("attempt id sequence is exhausted")]
@@ -127,7 +116,7 @@ pub enum BeginAuthenticationError {
 }
 
 impl StateEvent {
-    const fn name(&self) -> &'static str {
+    const fn get_name(&self) -> &'static str {
         match self {
             Self::BeginAuthentication => "BeginAuthentication",
             Self::AuthMessage => "AuthMessage",
@@ -144,7 +133,6 @@ impl StateEvent {
             Self::SessionStartFailed { .. } => "SessionStartFailed",
             Self::CancelRequested => "CancelRequested",
             Self::CancellationFinished => "CancellationFinished",
-            Self::Reset => "Reset",
             Self::ProtocolFailure { .. } => "ProtocolFailure",
         }
     }
@@ -180,25 +168,25 @@ struct ActiveAttempt {
 }
 
 impl AuthStateMachine {
-    pub fn state(&self) -> AuthState {
+    pub fn get_state(&self) -> AuthState {
         self.state
     }
 
-    pub fn detail(&self) -> &str {
+    pub fn get_detail(&self) -> &str {
         &self.detail
     }
 
-    pub fn active_attempt_id(&self) -> Option<&str> {
+    pub fn find_active_attempt_id(&self) -> Option<&str> {
         self.active_attempt
             .as_ref()
             .map(|attempt| attempt.id.as_str())
     }
 
     pub fn is_current_attempt(&self, attempt_id: &str) -> bool {
-        self.active_attempt_id() == Some(attempt_id)
+        self.find_active_attempt_id() == Some(attempt_id)
     }
 
-    pub fn active_username(&self) -> Option<&str> {
+    pub fn find_active_username(&self) -> Option<&str> {
         self.active_attempt
             .as_ref()
             .map(|attempt| attempt.username.as_str())
@@ -206,23 +194,27 @@ impl AuthStateMachine {
 
     /// Starts authentication for `username` and returns its new monotonic attempt ID.
     ///
-    /// An active transaction is cancelled before it is replaced. A failed
-    /// transaction is reset automatically, while a handoff already in progress
-    /// cannot be replaced. Whitespace-only usernames are rejected before any
-    /// existing transaction is changed.
+    /// Callers must validate `username` and finish cancelling any active attempt
+    /// before starting a replacement transaction. A failed transaction can start
+    /// a new attempt directly, while a handoff already in progress cannot be
+    /// replaced.
     ///
     /// # Errors
     ///
-    /// Returns [`BeginAuthenticationError::EmptyUsername`] for blank input,
-    /// [`BeginAuthenticationError::InvalidState`] during handoff, or
-    /// [`BeginAuthenticationError::AttemptIdExhausted`] if the counter cannot
-    /// be incremented.
+    /// Returns [`BeginAuthenticationError::InvalidState`] when an attempt or
+    /// handoff is still active, or [`BeginAuthenticationError::AttemptIdExhausted`]
+    /// if the counter cannot be incremented.
     pub fn begin_authentication(
         &mut self,
         username: String,
     ) -> Result<String, BeginAuthenticationError> {
-        if username.trim().is_empty() {
-            return Err(BeginAuthenticationError::EmptyUsername);
+        debug_assert!(
+            !username.trim().is_empty(),
+            "caller validates non-blank username"
+        );
+
+        if !matches!(self.state, AuthState::Idle | AuthState::Failed) {
+            return Err(BeginAuthenticationError::InvalidState(self.state));
         }
 
         let next_attempt_number = self
@@ -230,37 +222,8 @@ impl AuthStateMachine {
             .checked_add(1)
             .ok_or(BeginAuthenticationError::AttemptIdExhausted)?;
 
-        match self.state {
-            AuthState::Idle => {}
-            AuthState::Failed => {
-                self.transition(StateEvent::Reset)
-                    .expect("Failed must accept Reset");
-            }
-            AuthState::Cancelling => {
-                self.transition(StateEvent::CancellationFinished)
-                    .expect("Cancelling must accept CancellationFinished");
-            }
-            AuthState::CreatingSession
-            | AuthState::PromptPending
-            | AuthState::WaitingForInput
-            | AuthState::SubmittingResponse
-            | AuthState::Authenticated
-            | AuthState::ResolvingSession
-            | AuthState::StartingSession => {
-                self.transition(StateEvent::CancelRequested)
-                    .expect("active states must accept CancelRequested");
-                self.transition(StateEvent::CancellationFinished)
-                    .expect("Cancelling must accept CancellationFinished");
-            }
-            AuthState::HandingOff => {
-                return Err(BeginAuthenticationError::InvalidState(
-                    AuthState::HandingOff,
-                ));
-            }
-        }
-
         self.transition(StateEvent::BeginAuthentication)
-            .expect("Idle must accept BeginAuthentication");
+            .expect("Idle or Failed must accept BeginAuthentication");
 
         let attempt_id = format!("attempt-{next_attempt_number:016x}");
         self.next_attempt_number = next_attempt_number;
@@ -282,10 +245,10 @@ impl AuthStateMachine {
         use StateEvent::*;
 
         let current = self.state;
-        let event_name = event.name();
+        let event_name = event.get_name();
 
         let (next_state, new_detail) = match (current, event) {
-            (Idle, BeginAuthentication) => (CreatingSession, None),
+            (Idle | Failed, BeginAuthentication) => (CreatingSession, None),
 
             (CreatingSession | SubmittingResponse, AuthMessage) => (PromptPending, None),
             (PromptPending, PromptNeedsInput) => (WaitingForInput, None),
@@ -311,7 +274,6 @@ impl AuthStateMachine {
 
             (s, CancelRequested) if s.is_active() => (Cancelling, None),
             (Cancelling, CancellationFinished) => (Idle, None),
-            (Failed, Reset) => (Idle, Some(std::mem::take(&mut self.detail))),
             (s, ProtocolFailure { detail }) if s.is_active() => (Failed, Some(detail)),
 
             _ => {
@@ -324,7 +286,7 @@ impl AuthStateMachine {
 
         self.state = next_state;
         self.detail = new_detail.unwrap_or_default();
-        if next_state.invalidates_attempt() {
+        if !next_state.is_active() {
             self.active_attempt = None;
         }
 
@@ -342,8 +304,8 @@ mod tests {
     fn default_is_idle() {
         let machine = AuthStateMachine::default();
 
-        assert_eq!(machine.state(), AuthState::Idle);
-        assert_eq!(machine.detail(), "");
+        assert_eq!(machine.get_state(), AuthState::Idle);
+        assert_eq!(machine.get_detail(), "");
     }
 
     #[test]
@@ -380,7 +342,6 @@ mod tests {
         ];
         for state in active {
             assert!(state.is_active(), "{state:?} should be active");
-            assert!(!state.invalidates_attempt());
         }
 
         for state in [
@@ -389,7 +350,7 @@ mod tests {
             AuthState::Cancelling,
             AuthState::Failed,
         ] {
-            assert!(state.invalidates_attempt(), "{state:?} should invalidate");
+            assert!(!state.is_active(), "{state:?} should be inactive");
         }
     }
 
@@ -402,8 +363,8 @@ mod tests {
                 detail: "protocol failure".to_owned(),
             })
             .unwrap();
-        assert_eq!(machine.state(), AuthState::Failed);
-        assert_eq!(machine.detail(), "protocol failure");
+        assert_eq!(machine.get_state(), AuthState::Failed);
+        assert_eq!(machine.get_detail(), "protocol failure");
     }
 
     #[test]
@@ -423,8 +384,8 @@ mod tests {
             machine.transition(event).unwrap();
         }
 
-        assert_eq!(machine.state(), AuthState::HandingOff);
-        assert_eq!(machine.detail(), "");
+        assert_eq!(machine.get_state(), AuthState::HandingOff);
+        assert_eq!(machine.get_detail(), "");
     }
 
     #[test]
@@ -435,23 +396,25 @@ mod tests {
         machine.transition(StateEvent::AuthMessage).unwrap();
         machine.transition(StateEvent::PromptAutoResponse).unwrap();
 
-        assert_eq!(machine.state(), AuthState::SubmittingResponse);
+        assert_eq!(machine.get_state(), AuthState::SubmittingResponse);
     }
 
     #[test]
-    fn reset_retains_failure_detail() {
+    fn failed_state_accepts_new_authentication() {
         let mut machine = AuthStateMachine::default();
 
-        machine.transition(StateEvent::BeginAuthentication).unwrap();
+        machine.begin_authentication("alice".to_owned()).unwrap();
         machine
             .transition(StateEvent::AuthenticationFailed {
                 detail: "authentication failed".to_owned(),
             })
             .unwrap();
-        machine.transition(StateEvent::Reset).unwrap();
+        let next_id = machine.begin_authentication("bob".to_owned()).unwrap();
 
-        assert_eq!(machine.state(), AuthState::Idle);
-        assert_eq!(machine.detail(), "authentication failed");
+        assert_eq!(machine.get_state(), AuthState::CreatingSession);
+        assert_eq!(machine.get_detail(), "");
+        assert!(machine.is_current_attempt(&next_id));
+        assert_eq!(machine.find_active_username(), Some("bob"));
     }
 
     #[test]
@@ -469,8 +432,8 @@ mod tests {
                 event: "ResponseSubmitted",
             }
         );
-        assert_eq!(machine.state(), AuthState::Idle);
-        assert_eq!(machine.detail(), "");
+        assert_eq!(machine.get_state(), AuthState::Idle);
+        assert_eq!(machine.get_detail(), "");
     }
 
     #[test]
@@ -484,39 +447,39 @@ mod tests {
             .transition(StateEvent::CancellationFinished)
             .unwrap();
 
-        assert_eq!(machine.state(), AuthState::Idle);
-        assert_eq!(machine.detail(), "");
+        assert_eq!(machine.get_state(), AuthState::Idle);
+        assert_eq!(machine.get_detail(), "");
     }
 
     #[test]
-    fn begin_replaces_attempt() {
+    fn begin_requires_prior_cancellation_and_issues_monotonic_ids() {
         let mut machine = AuthStateMachine::default();
 
         let first_id = machine.begin_authentication("alice".to_owned()).unwrap();
         assert_eq!(first_id, "attempt-0000000000000001");
         assert!(machine.is_current_attempt(&first_id));
-        assert_eq!(machine.active_username(), Some("alice"));
-        assert_eq!(machine.state(), AuthState::CreatingSession);
+        assert_eq!(machine.find_active_username(), Some("alice"));
+        assert_eq!(machine.get_state(), AuthState::CreatingSession);
 
+        assert_eq!(
+            machine.begin_authentication("bob".to_owned()),
+            Err(BeginAuthenticationError::InvalidState(
+                AuthState::CreatingSession
+            ))
+        );
+
+        machine.transition(StateEvent::CancelRequested).unwrap();
+        machine
+            .transition(StateEvent::CancellationFinished)
+            .unwrap();
         let second_id = machine.begin_authentication("bob".to_owned()).unwrap();
 
         assert_eq!(second_id, "attempt-0000000000000002");
         assert_ne!(first_id, second_id);
         assert!(!machine.is_current_attempt(&first_id));
         assert!(machine.is_current_attempt(&second_id));
-        assert_eq!(machine.active_username(), Some("bob"));
-        assert_eq!(machine.state(), AuthState::CreatingSession);
-    }
-
-    #[test]
-    fn blank_username_is_rejected() {
-        let mut machine = AuthStateMachine::default();
-
-        let error = machine.begin_authentication("   ".to_owned()).unwrap_err();
-
-        assert_eq!(error, BeginAuthenticationError::EmptyUsername);
-        assert_eq!(machine.state(), AuthState::Idle);
-        assert_eq!(machine.active_attempt_id(), None);
+        assert_eq!(machine.find_active_username(), Some("bob"));
+        assert_eq!(machine.get_state(), AuthState::CreatingSession);
     }
 
     #[test]
@@ -530,9 +493,9 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(machine.state(), AuthState::Failed);
+        assert_eq!(machine.get_state(), AuthState::Failed);
         assert!(!machine.is_current_attempt(&attempt_id));
-        assert_eq!(machine.active_attempt_id(), None);
+        assert_eq!(machine.find_active_attempt_id(), None);
     }
 
     #[test]
@@ -549,10 +512,10 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(machine.state(), AuthState::CreatingSession);
-        assert_eq!(machine.detail(), "auth_error: authentication failed");
+        assert_eq!(machine.get_state(), AuthState::CreatingSession);
+        assert_eq!(machine.get_detail(), "auth_error: authentication failed");
         assert!(machine.is_current_attempt(&attempt_id));
-        assert_eq!(machine.active_username(), Some("alice"));
+        assert_eq!(machine.find_active_username(), Some("alice"));
     }
 
     #[test]
@@ -567,7 +530,7 @@ mod tests {
                 })
                 .is_err()
         );
-        assert_eq!(machine.state(), AuthState::CreatingSession);
+        assert_eq!(machine.get_state(), AuthState::CreatingSession);
     }
 
     #[test]
@@ -583,8 +546,8 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(machine.state(), AuthState::Authenticated);
-        assert_eq!(machine.detail(), "session is unavailable");
+        assert_eq!(machine.get_state(), AuthState::Authenticated);
+        assert_eq!(machine.get_detail(), "session is unavailable");
     }
 
     #[test]
@@ -598,8 +561,8 @@ mod tests {
                 detail: "socket closed".to_owned(),
             })
             .unwrap();
-        assert_eq!(protocol_failure.state(), AuthState::Failed);
-        assert_eq!(protocol_failure.detail(), "socket closed");
+        assert_eq!(protocol_failure.get_state(), AuthState::Failed);
+        assert_eq!(protocol_failure.get_detail(), "socket closed");
 
         let mut session_failure = authenticated_machine();
         session_failure
@@ -613,9 +576,9 @@ mod tests {
                 detail: "command failed".to_owned(),
             })
             .unwrap();
-        assert_eq!(session_failure.state(), AuthState::Failed);
-        assert_eq!(session_failure.detail(), "command failed");
-        assert_eq!(session_failure.active_attempt_id(), None);
+        assert_eq!(session_failure.get_state(), AuthState::Failed);
+        assert_eq!(session_failure.get_detail(), "command failed");
+        assert_eq!(session_failure.find_active_attempt_id(), None);
     }
 
     #[test]
@@ -646,8 +609,8 @@ mod tests {
             machine.begin_authentication("alice".to_owned()),
             Err(BeginAuthenticationError::AttemptIdExhausted)
         );
-        assert_eq!(machine.state(), AuthState::Idle);
-        assert_eq!(machine.active_attempt_id(), None);
+        assert_eq!(machine.get_state(), AuthState::Idle);
+        assert_eq!(machine.find_active_attempt_id(), None);
     }
 
     #[test]
