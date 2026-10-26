@@ -3,81 +3,107 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
-class ThemeClock extends StatefulWidget {
-  const ThemeClock({required this.isTime, super.key});
-
-  final bool isTime;
-
-  @override
-  State<ThemeClock> createState() => _ThemeClockState();
+String formatClockTime(DateTime time) {
+  return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
 }
 
-class _ThemeClockState extends State<ThemeClock> {
+/// Rebuilds on each wall-clock minute boundary so displayed time never drifts
+/// up to a minute behind the system clock.
+class MinuteClockBuilder extends StatefulWidget {
+  const MinuteClockBuilder({required this.builder, super.key});
+
+  final Widget Function(BuildContext context, DateTime now) builder;
+
+  @override
+  State<MinuteClockBuilder> createState() => _MinuteClockBuilderState();
+}
+
+class _MinuteClockBuilderState extends State<MinuteClockBuilder> {
   late DateTime _now;
-  Timer? _timer;
+  late Timer _timer;
 
   @override
   void initState() {
     super.initState();
     _now = DateTime.now();
-    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) {
-        setState(() => _now = DateTime.now());
+    _startMinuteTimer();
+  }
+
+  void _startMinuteTimer() {
+    final elapsedMs = _now.second * 1000 + _now.millisecond;
+    _timer = Timer(Duration(milliseconds: 60000 - elapsedMs), () {
+      if (!mounted) {
+        return;
       }
+      setState(() => _now = DateTime.now());
+      _startMinuteTimer();
     });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _timer.cancel();
     super.dispose();
   }
 
   @override
+  Widget build(BuildContext context) => widget.builder(context, _now);
+}
+
+class ThemeClock extends StatelessWidget {
+  const ThemeClock({required this.isTime, super.key});
+
+  final bool isTime;
+
+  @override
   Widget build(BuildContext context) {
-    if (widget.isTime) {
-      return Center(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            '${_now.hour.toString().padLeft(2, '0')}:${_now.minute.toString().padLeft(2, '0')}',
-            maxLines: 1,
-            style: _clockStyle(context, 120, FontWeight.w300),
+    return MinuteClockBuilder(
+      builder: (context, now) {
+        if (isTime) {
+          return Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                formatClockTime(now),
+                maxLines: 1,
+                style: _getClockStyle(context, 120, FontWeight.w300),
+              ),
+            ),
+          );
+        }
+        const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
+        ];
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}',
+              maxLines: 1,
+              style: _getClockStyle(context, 20, FontWeight.w500),
+            ),
           ),
-        ),
-      );
-    }
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: Text(
-          '${weekdays[_now.weekday - 1]}, ${months[_now.month - 1]} ${_now.day}',
-          maxLines: 1,
-          style: _clockStyle(context, 20, FontWeight.w500),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
-TextStyle _clockStyle(
+TextStyle _getClockStyle(
   BuildContext context,
   double fontSize,
   FontWeight weight,

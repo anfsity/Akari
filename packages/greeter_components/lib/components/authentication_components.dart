@@ -119,7 +119,9 @@ class _IdentityScanState extends State<_IdentityScan>
       _animation.value = 0;
       return;
     }
-    _animation.repeat();
+    if (!_animation.isAnimating) {
+      _animation.repeat();
+    }
   }
 
   @override
@@ -152,6 +154,28 @@ class _IdentityScanPainter extends CustomPainter {
     required this.animate,
   }) : super(repaint: animation);
 
+  static final Path _framePath = Path()
+    ..moveTo(4, 13)
+    ..lineTo(4, 9)
+    ..quadraticBezierTo(4, 4, 9, 4)
+    ..lineTo(13, 4)
+    ..moveTo(27, 4)
+    ..lineTo(31, 4)
+    ..quadraticBezierTo(36, 4, 36, 9)
+    ..lineTo(36, 13)
+    ..moveTo(36, 27)
+    ..lineTo(36, 31)
+    ..quadraticBezierTo(36, 36, 31, 36)
+    ..lineTo(27, 36)
+    ..moveTo(13, 36)
+    ..lineTo(9, 36)
+    ..quadraticBezierTo(4, 36, 4, 31)
+    ..lineTo(4, 27);
+
+  static final Path _smilePath = Path()
+    ..moveTo(14, 27)
+    ..quadraticBezierTo(20, 31, 26, 27);
+
   final Animation<double> animation;
   final Color color;
   final bool animate;
@@ -167,24 +191,7 @@ class _IdentityScanPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.8
       ..strokeCap = StrokeCap.round;
-    final frame = Path()
-      ..moveTo(4, 13)
-      ..lineTo(4, 9)
-      ..quadraticBezierTo(4, 4, 9, 4)
-      ..lineTo(13, 4)
-      ..moveTo(27, 4)
-      ..lineTo(31, 4)
-      ..quadraticBezierTo(36, 4, 36, 9)
-      ..lineTo(36, 13)
-      ..moveTo(36, 27)
-      ..lineTo(36, 31)
-      ..quadraticBezierTo(36, 36, 31, 36)
-      ..lineTo(27, 36)
-      ..moveTo(13, 36)
-      ..lineTo(9, 36)
-      ..quadraticBezierTo(4, 36, 4, 31)
-      ..lineTo(4, 27);
-    canvas.drawPath(frame, paint);
+    canvas.drawPath(_framePath, paint);
     for (final x in [14.0, 26.0]) {
       canvas.drawLine(Offset(x + gaze, 14), Offset(x + gaze, 17), paint);
     }
@@ -195,12 +202,7 @@ class _IdentityScanPainter extends CustomPainter {
         ..lineTo(18 + gaze, 23),
       paint,
     );
-    canvas.drawPath(
-      Path()
-        ..moveTo(14, 27)
-        ..quadraticBezierTo(20, 31, 26, 27),
-      paint,
-    );
+    canvas.drawPath(_smilePath, paint);
     if (animate) {
       final scanY = 7 + (1 - math.cos(phase)) * 13;
       final scanRect = Rect.fromLTWH(7, scanY - 3, 26, 6);
@@ -235,6 +237,8 @@ class PrimaryAction extends StatelessWidget {
     required this.onRespond,
     required this.onStartSession,
     required this.onRetry,
+    this.filled = true,
+    this.foregroundColor,
     super.key,
   });
 
@@ -243,10 +247,16 @@ class PrimaryAction extends StatelessWidget {
   final VoidCallback onRespond;
   final VoidCallback onStartSession;
   final ValueChanged<GreeterRecovery> onRetry;
+  final bool filled;
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final resolvedForeground =
+        foregroundColor ??
+        (filled ? colorScheme.onPrimary : colorScheme.primary);
+    final background = filled ? colorScheme.primary : Colors.transparent;
     final error = auth.error;
     final action = service.mode == ServiceMode.unavailable
         ? (
@@ -269,7 +279,7 @@ class PrimaryAction extends StatelessWidget {
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: colorScheme.onPrimary,
+                  color: resolvedForeground,
                 ),
               ),
             ),
@@ -294,12 +304,12 @@ class PrimaryAction extends StatelessWidget {
           style: FilledButton.styleFrom(
             shape: const CircleBorder(),
             padding: EdgeInsets.zero,
-            backgroundColor: colorScheme.primary,
-            foregroundColor: colorScheme.onPrimary,
-            disabledBackgroundColor: colorScheme.primary.withValues(alpha: 0.4),
-            disabledForegroundColor: colorScheme.onPrimary.withValues(
-              alpha: 0.5,
-            ),
+            backgroundColor: background,
+            foregroundColor: resolvedForeground,
+            disabledBackgroundColor: filled
+                ? colorScheme.primary.withValues(alpha: 0.4)
+                : Colors.transparent,
+            disabledForegroundColor: resolvedForeground.withValues(alpha: 0.5),
           ),
           child: icon,
         ),

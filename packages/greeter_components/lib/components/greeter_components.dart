@@ -86,10 +86,6 @@ class StandardGreeterComponents implements GreeterThemeComponents {
           textAlign: textAlign,
         ),
       ),
-      'background' ||
-      'accountPicker' ||
-      'secondaryAction' ||
-      'decoration' => const SizedBox.shrink(),
       _ => const SizedBox.shrink(),
     };
   }

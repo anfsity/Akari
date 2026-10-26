@@ -34,13 +34,13 @@ class SessionPicker extends StatelessWidget {
               child: Text(session.error?.message ?? 'Retry sessions'),
             ),
           ),
-          CatalogMode.empty when session.sessions.isEmpty => Center(
+          CatalogMode.empty => Center(
             child: Text(
               'No desktop sessions available.',
               style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.7)),
             ),
           ),
-          CatalogMode.ready || CatalogMode.empty => _SessionMenu(
+          CatalogMode.ready => _SessionMenu(
             session: session,
             onSelect: onSelect,
           ),
