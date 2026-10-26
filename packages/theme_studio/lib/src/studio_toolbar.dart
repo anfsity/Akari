@@ -25,7 +25,10 @@ class StudioToolbar extends StatelessWidget {
     listenable: Listenable.merge([editor, editor?.inspector]),
     builder: (context, _) {
       final session = editor;
-      final hasDraft = session?.inspector.hasDraft == true;
+      final hasDraft = session != null && session.inspector.hasDraft;
+      final canUndo = session != null && session.canUndo;
+      final canRedo = session != null && session.canRedo;
+      final isDirty = session != null && session.isDirty;
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
@@ -44,22 +47,20 @@ class StudioToolbar extends StatelessWidget {
             ),
             const Gap(16),
             Text(
-              hasDraft || session?.isDirty == true
-                  ? 'Unsaved changes'
-                  : 'Saved',
+              hasDraft || isDirty ? 'Unsaved changes' : 'Saved',
             ).small().muted(),
             const Gap(16),
+            // When an inspector field has an uncommitted draft, Undo resets the
+            // draft to the current revision without popping an undo stack entry.
             OutlineButton(
-              onPressed: !readOnly && (hasDraft || session?.canUndo == true)
-                  ? session?.undo
+              onPressed: !readOnly && (hasDraft || canUndo)
+                  ? session.undo
                   : null,
               child: const Text('Undo'),
             ),
             const Gap(8),
             OutlineButton(
-              onPressed: !readOnly && session?.canRedo == true
-                  ? session?.redo
-                  : null,
+              onPressed: !readOnly && canRedo ? session.redo : null,
               child: const Text('Redo'),
             ),
             const Gap(16),

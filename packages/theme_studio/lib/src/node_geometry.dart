@@ -3,6 +3,19 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:scene/scene.dart';
 
+const minStudioZoom = 0.05;
+const maxStudioZoom = 8.0;
+
+double clampStudioZoom(double zoom) => zoom.clamp(minStudioZoom, maxStudioZoom);
+
+double calculateFitZoom({
+  required Size viewportSize,
+  required Size referenceSize,
+}) => math.min(
+  viewportSize.width / referenceSize.width,
+  viewportSize.height / referenceSize.height,
+);
+
 SceneRect calculateMovedRect({
   required SceneRect rect,
   required Size canvasSize,
@@ -37,8 +50,7 @@ enum NodeResizeHandle {
   final MouseCursor cursor;
 }
 
-bool hasResizableProjection(SceneNode node, Size size) {
-  final matrix = sceneNodeTransformMatrix(node.transform, size);
+bool isInvertibleEditingPlane(Matrix4 matrix) {
   // Zero scale and edge-on 3D rotations have no invertible editing plane.
   final determinant =
       matrix.entry(0, 0) *
@@ -52,6 +64,22 @@ bool hasResizableProjection(SceneNode node, Size size) {
               matrix.entry(1, 1) * matrix.entry(3, 0));
   return determinant.abs() > 1e-8;
 }
+
+bool hasResizableProjection(SceneNode node, Size size) =>
+    isInvertibleEditingPlane(sceneNodeTransformMatrix(node.transform, size));
+
+Map<NodeResizeHandle, Offset> calculateHandlePoints({
+  required Rect rect,
+  required Matrix4 matrix,
+}) => {
+  for (final handle in NodeResizeHandle.values)
+    handle:
+        rect.topLeft +
+        MatrixUtils.transformPoint(
+          matrix,
+          handle.alignment.alongSize(rect.size),
+        ),
+};
 
 /// Resize the layout in the node's editing plane, preserving the transformed
 /// opposite edge/corner. A paint transform cannot resize a text container:
@@ -153,8 +181,10 @@ SceneNode calculateResizedNode({
 
   var resized = calculateRect(1);
   if (!resized.isNormalized) {
-    // Stop at the canvas boundary without moving the anchored edge or
-    // changing the aspect ratio. The source rect is already validated.
+    // 3D rotations, perspective projection, and aspect-ratio constraints create
+    // a non-linear relationship between edge delta and normalized canvas bounds.
+    // Binary bisection monotonically finds the maximum reachable fraction within
+    // the [0.0, 1.0] interval without moving the anchored edge.
     var lower = 0.0;
     var upper = 1.0;
     resized = source.rect;

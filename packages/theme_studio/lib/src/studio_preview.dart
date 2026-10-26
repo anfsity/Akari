@@ -79,6 +79,9 @@ class _StudioPreviewState extends State<StudioPreview> {
     DragStartDetails details, {
     NodeResizeHandle? handle,
   }) {
+    // Before dragging begins on the canvas, any pending inspector draft must
+    // be committed synchronously via onStartDrag so the drag starts from the
+    // validated node state rather than uncommitted or stale document values.
     final node = widget.onStartDrag(id);
     if (node == null) return;
     final canvas = _canvas.currentContext?.findRenderObject();
@@ -132,14 +135,25 @@ class _StudioPreviewState extends State<StudioPreview> {
   @override
   void didUpdateWidget(StudioPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.theme, widget.theme)) {
+    if (!identical(oldWidget.theme, widget.theme) ||
+        _hasCanvasChanged(oldWidget.document.canvas, widget.document.canvas)) {
       _updateComponents();
     }
   }
 
+  static bool _hasCanvasChanged(SceneCanvas a, SceneCanvas b) =>
+      a.referenceWidth != b.referenceWidth ||
+      a.referenceHeight != b.referenceHeight ||
+      a.fit != b.fit ||
+      a.useSafeArea != b.useSafeArea;
+
   void _updateComponents() {
     _components = widget.theme.components(
-      GreeterThemeContext(host: _simulation.host, tokens: widget.theme.tokens),
+      GreeterThemeContext(
+        host: _simulation.host,
+        tokens: widget.theme.tokens,
+        canvas: widget.document.canvas,
+      ),
     );
   }
 
@@ -170,7 +184,7 @@ class _StudioPreviewState extends State<StudioPreview> {
     final selected = document.nodes.firstWhere(
       (node) => node.id == widget.selectedId,
     );
-    final predicates = _getPreviewPredicates(widget.dormant);
+    final predicates = _getPreviewPredicates(_simulation, widget.dormant);
     final visible =
         selected.visibleWhen == null ||
         evaluateSceneCondition(selected.visibleWhen!, predicates);
@@ -180,7 +194,7 @@ class _StudioPreviewState extends State<StudioPreview> {
       zoom: widget.zoom,
       resetView: widget.resetView,
       panEnabled: widget.panEnabled,
-      onZoom: (zoom) => widget.onZoom?.call(zoom),
+      onZoom: widget.onZoom ?? (_) {},
       childBuilder: (viewportScale) => CustomPaint(
         foregroundPainter: widget.preferences.showGrid
             ? _GridPainter(widget.preferences.gridSize)
@@ -193,6 +207,7 @@ class _StudioPreviewState extends State<StudioPreview> {
               document: document,
               referenceSize: referenceSize,
               dormant: widget.dormant,
+              activePredicates: predicates,
               nodeBuilder: _buildInteractiveNode,
             ),
             if (visible)
@@ -330,12 +345,14 @@ class _PreviewScene extends StatelessWidget {
     required this.document,
     required this.referenceSize,
     required this.dormant,
+    required this.activePredicates,
     required this.nodeBuilder,
   });
 
   final ThemeDefinition theme;
   final SceneDocument document;
   final bool dormant;
+  final Set<ScenePredicate> activePredicates;
   final SceneNodeBuilder nodeBuilder;
   final Size referenceSize;
 
@@ -352,7 +369,7 @@ class _PreviewScene extends StatelessWidget {
           backgroundBlurSigma: AlwaysStoppedAnimation(
             dormant ? 0 : document.background.blurSigma,
           ),
-          activePredicates: _getPreviewPredicates(dormant),
+          activePredicates: activePredicates,
           nodeBuilder: nodeBuilder,
         ),
       ),
@@ -398,13 +415,18 @@ class _PreviewNode extends StatelessWidget {
   );
 }
 
-Set<ScenePredicate> _getPreviewPredicates(bool dormant) => {
-  ScenePredicate.isServiceReady,
-  ScenePredicate.isAuthPrompting,
-  ScenePredicate.hasSelectedUser,
-  ScenePredicate.isSessionReady,
-  if (dormant) ScenePredicate.isDormant,
-};
+Set<ScenePredicate> _getPreviewPredicates(
+  StudioPreviewHost simulation,
+  bool dormant,
+) =>
+    getActiveScenePredicates(
+      service: simulation.host.serviceSlots.value,
+      auth: simulation.host.authPromptSlots.value,
+      account: simulation.host.accountPickerSlots.value,
+      session: simulation.host.sessionPickerSlots.value,
+      power: simulation.host.powerSlots.value,
+      dormant: dormant,
+    );
 
 /// Selection belongs to the canvas, outside the component's paint transform.
 /// Handles keep their screen size and remain usable on small or scaled nodes.
@@ -440,15 +462,7 @@ class _NodeSelectionOverlay extends StatelessWidget {
       minHitTarget: minHitTarget,
     );
     final matrix = sceneNodeTransformMatrix(node.transform, rect.size);
-    final points = {
-      for (final handle in NodeResizeHandle.values)
-        handle:
-            rect.topLeft +
-            MatrixUtils.transformPoint(
-              matrix,
-              handle.alignment.alongSize(rect.size),
-            ),
-    };
+    final points = calculateHandlePoints(rect: rect, matrix: matrix);
     final hitSize = 20 / viewportScale;
     final handleSize = 8 / viewportScale;
     return Stack(
@@ -460,7 +474,7 @@ class _NodeSelectionOverlay extends StatelessWidget {
             ),
           ),
         ),
-        if (showHandles && hasResizableProjection(node, rect.size))
+        if (showHandles && isInvertibleEditingPlane(matrix))
           for (final entry in points.entries)
             Positioned(
               left: entry.value.dx - hitSize / 2,

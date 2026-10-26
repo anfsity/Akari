@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/services.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
@@ -62,9 +60,12 @@ class _StudioCanvasState extends State<StudioCanvas> {
     final viewport =
         _viewportKey.currentContext!.findRenderObject()! as RenderBox;
     final canvas = widget.editor!.document.canvas;
-    return math.min(
-      viewport.size.width / canvas.referenceWidth,
-      viewport.size.height / canvas.referenceHeight,
+    return calculateFitZoom(
+      viewportSize: viewport.size,
+      referenceSize: Size(
+        canvas.referenceWidth.toDouble(),
+        canvas.referenceHeight.toDouble(),
+      ),
     );
   }
 
@@ -247,8 +248,9 @@ class _StudioCanvasState extends State<StudioCanvas> {
                           onPressed: session == null
                               ? null
                               : () => setState(
-                                  () => _zoom = (_getEffectiveZoom() / 1.25)
-                                      .clamp(0.05, 8.0),
+                                  () => _zoom = clampStudioZoom(
+                                    _getEffectiveZoom() / 1.25,
+                                  ),
                                 ),
                           child: const Icon(LucideIcons.minus, size: 16),
                         ),
@@ -272,8 +274,9 @@ class _StudioCanvasState extends State<StudioCanvas> {
                           onPressed: session == null
                               ? null
                               : () => setState(
-                                  () => _zoom = (_getEffectiveZoom() * 1.25)
-                                      .clamp(0.05, 8.0),
+                                  () => _zoom = clampStudioZoom(
+                                    _getEffectiveZoom() * 1.25,
+                                  ),
                                 ),
                           child: const Icon(LucideIcons.plus, size: 16),
                         ),

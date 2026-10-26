@@ -4,6 +4,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'node_geometry.dart';
+
 /// Owns the editor camera independently of scene geometry. Zooming keeps the
 /// point under the pointer stationary; wheel panning and the hand tool never
 /// become document edits. The child always lays out at reference resolution.
@@ -59,9 +61,9 @@ class _StudioViewportState extends State<StudioViewport> {
       final viewport = constraints.biggest;
       final scale =
           widget.zoom ??
-          math.min(
-            viewport.width / widget.referenceSize.width,
-            viewport.height / widget.referenceSize.height,
+          calculateFitZoom(
+            viewportSize: viewport,
+            referenceSize: widget.referenceSize,
           );
       // Only an explicit zoom needs to preserve a scene point. Fit already
       // centers the resized canvas; anchoring its old scale would add a pan.
@@ -91,10 +93,7 @@ class _StudioViewportState extends State<StudioViewport> {
               if (HardwareKeyboard.instance.isControlPressed) {
                 _zoomAnchor = event.localPosition;
                 widget.onZoom(
-                  (scale * math.exp(-event.scrollDelta.dy / 400)).clamp(
-                    0.05,
-                    8.0,
-                  ),
+                  clampStudioZoom(scale * math.exp(-event.scrollDelta.dy / 400)),
                 );
               } else {
                 setState(() => _pan -= event.scrollDelta);
