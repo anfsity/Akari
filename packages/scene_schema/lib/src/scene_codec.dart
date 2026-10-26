@@ -50,20 +50,15 @@ SceneDocument decodeSceneDocument(String source) {
   if (decoded is! Map<String, dynamic>) {
     throw const FormatException('Scene document root must be a JSON object.');
   }
-  return decodeSceneDocumentMap(decoded);
-}
-
-/// Decodes a scene document from an already-parsed JSON map.
-SceneDocument decodeSceneDocumentMap(Map<String, dynamic> json) {
-  final version = _int(json, 'version');
+  final version = _getInt(decoded, 'version');
   if (version != 1 && version != currentSceneVersion) {
     throw FormatException('Unsupported scene version: $version');
   }
 
   final nodeIds = <String>{};
   final nodes = <SceneNode>[
-    for (final rawNode in _list(json, 'nodes'))
-      _decodeNode(_asMap(rawNode, 'nodes[]'), nodeIds, version),
+    for (final rawNode in _getList(decoded, 'nodes'))
+      _decodeNode(_getMapValue(rawNode, 'nodes[]'), nodeIds, version),
   ];
   if (nodes.isEmpty) {
     throw const FormatException(
@@ -72,17 +67,26 @@ SceneDocument decodeSceneDocumentMap(Map<String, dynamic> json) {
   }
 
   return SceneDocument(
-    id: _string(json, 'id'),
+    id: _getString(decoded, 'id'),
     version: currentSceneVersion,
-    canvas: _decodeCanvas(_map(json, 'canvas')),
-    background: _decodeBackground(_map(json, 'background')),
+    canvas: _decodeCanvas(_getMap(decoded, 'canvas')),
+    background: _decodeBackground(_getMap(decoded, 'background')),
     nodes: nodes,
   );
 }
 
 SceneCanvas _decodeCanvas(Map<String, dynamic> json) {
-  final referenceWidth = _int(json, 'referenceWidth', fallback: 1920);
-  final referenceHeight = _int(json, 'referenceHeight', fallback: 1080);
+  const defaults = SceneCanvas();
+  final referenceWidth = _getInt(
+    json,
+    'referenceWidth',
+    fallback: defaults.referenceWidth,
+  );
+  final referenceHeight = _getInt(
+    json,
+    'referenceHeight',
+    fallback: defaults.referenceHeight,
+  );
   if (referenceWidth < 1 ||
       referenceWidth > 16384 ||
       referenceHeight < 1 ||
@@ -92,8 +96,12 @@ SceneCanvas _decodeCanvas(Map<String, dynamic> json) {
     );
   }
   return SceneCanvas(
-    fit: _enumValue(SceneCanvasFit.values, _string(json, 'fit'), 'canvas.fit'),
-    useSafeArea: _bool(json, 'useSafeArea', fallback: true),
+    fit: _getEnumValue(
+      SceneCanvasFit.values,
+      _getString(json, 'fit'),
+      'canvas.fit',
+    ),
+    useSafeArea: _getBool(json, 'useSafeArea', fallback: defaults.useSafeArea),
     referenceWidth: referenceWidth,
     referenceHeight: referenceHeight,
   );
@@ -103,6 +111,11 @@ SceneCanvas _decodeCanvas(Map<String, dynamic> json) {
 String encodeSceneDocument(SceneDocument document) {
   return const JsonEncoder.withIndent('  ')
       .convert(sceneDocumentToMap(document));
+}
+
+/// Encodes a single scene node into its formatted JSON authoring form.
+String encodeSceneNode(SceneNode node) {
+  return const JsonEncoder.withIndent('  ').convert(_encodeNode(node));
 }
 
 /// Encodes a scene document into a JSON-ready map.
@@ -122,12 +135,13 @@ Map<String, dynamic> sceneDocumentToMap(SceneDocument document) {
 }
 
 SceneBackground _decodeBackground(Map<String, dynamic> json) {
-  final kind = _enumValue(
+  const defaults = SceneBackground(kind: SceneBackgroundKind.solid);
+  final kind = _getEnumValue(
     SceneBackgroundKind.values,
-    _string(json, 'kind'),
+    _getString(json, 'kind'),
     'background.kind',
   );
-  final asset = _nullableString(json, 'asset');
+  final asset = _findString(json, 'asset');
   if (asset != null &&
       (asset.contains('..') ||
           (!asset.startsWith('assets/') &&
@@ -135,21 +149,27 @@ SceneBackground _decodeBackground(Map<String, dynamic> json) {
               kind == SceneBackgroundKind.image))) {
     throw FormatException('Invalid background asset path: $asset');
   }
-  final scrimOpacity = _double(json, 'scrimOpacity', fallback: 0.35);
+  final scrimOpacity = _getDouble(
+    json,
+    'scrimOpacity',
+    fallback: defaults.scrimOpacity,
+  );
   if (scrimOpacity < 0 || scrimOpacity > 1) {
     throw FormatException('background.scrimOpacity must be in [0, 1].');
   }
-  final blurSigma = _double(json, 'blurSigma', fallback: 0);
+  final blurSigma = _getDouble(json, 'blurSigma', fallback: defaults.blurSigma);
   if (blurSigma < 0) {
     throw FormatException('background.blurSigma must be >= 0.');
   }
   return SceneBackground(
     kind: kind,
     asset: asset,
-    color: decodeSceneColor(_string(json, 'color', fallback: '#0d151a')),
+    color: json['color'] == null
+        ? defaults.color
+        : decodeSceneColor(_getString(json, 'color')),
     scrimOpacity: scrimOpacity,
     blurSigma: blurSigma,
-    rendererId: _nullableString(json, 'rendererId'),
+    rendererId: _findString(json, 'rendererId'),
   );
 }
 
@@ -169,42 +189,47 @@ SceneNode _decodeNode(
   Set<String> nodeIds,
   int version,
 ) {
-  final id = _string(json, 'id');
+  final id = _getString(json, 'id');
   if (!nodeIds.add(id)) {
     throw FormatException('Duplicate scene node id: $id');
   }
 
-  final rect = _decodeRect(_map(json, 'rect'), id);
-  final transformJson = _map(json, 'transform', fallback: const {});
+  final rect = _decodeRect(_getMap(json, 'rect'), id);
   final component = _decodeComponent(json, id, version);
   return SceneNode(
     id: id,
     componentId: component.id,
     rect: rect,
-    transform: _decodeTransform(transformJson),
-    z: _int(json, 'z', fallback: 0),
-    renderOrder: _int(json, 'renderOrder', fallback: 0),
-    focusOrder: _int(json, 'focusOrder', fallback: 0),
-    motion: _enumValue(
+    transform: json['transform'] == null
+        ? const SceneTransform()
+        : _decodeTransform(_getMap(json, 'transform')),
+    z: _getInt(json, 'z', fallback: 0),
+    renderOrder: _getInt(json, 'renderOrder', fallback: 0),
+    focusOrder: _getInt(json, 'focusOrder', fallback: 0),
+    motion: _getEnumValue(
       SceneMotionPreset.values,
-      _string(json, 'motion', fallback: 'none'),
+      _getString(json, 'motion', fallback: SceneMotionPreset.none.name),
       'node.motion',
     ),
     visibleWhen: _decodeCondition(json['visibleWhen'], 'node.visibleWhen'),
     interactive: component.interactive,
     properties: <String, String>{
-      for (final entry in _map(json, 'properties', fallback: const {}).entries)
-        entry.key: _asString(entry.value, 'node.properties.${entry.key}'),
+      for (final entry in _getMap(
+        json,
+        'properties',
+        fallback: const {},
+      ).entries)
+        entry.key: _getStringValue(entry.value, 'node.properties.${entry.key}'),
     },
   );
 }
 
 SceneRect _decodeRect(Map<String, dynamic> json, String id) {
   final rect = SceneRect(
-    x: _double(json, 'x'),
-    y: _double(json, 'y'),
-    width: _double(json, 'width'),
-    height: _double(json, 'height'),
+    x: _getDouble(json, 'x'),
+    y: _getDouble(json, 'y'),
+    width: _getDouble(json, 'width'),
+    height: _getDouble(json, 'height'),
   );
   if (!rect.isNormalized) {
     throw FormatException('Node $id has a non-normalized rect.');
@@ -214,17 +239,22 @@ SceneRect _decodeRect(Map<String, dynamic> json, String id) {
 }
 
 SceneTransform _decodeTransform(Map<String, dynamic> json) {
+  const defaults = SceneTransform();
   return SceneTransform(
-    translateX: _double(json, 'translateX', fallback: 0),
-    translateY: _double(json, 'translateY', fallback: 0),
-    scaleX: _double(json, 'scaleX', fallback: 1),
-    scaleY: _double(json, 'scaleY', fallback: 1),
-    rotationX: _double(json, 'rotationX', fallback: 0),
-    rotationY: _double(json, 'rotationY', fallback: 0),
-    rotationZ: _double(json, 'rotationZ', fallback: 0),
-    pivotX: _double(json, 'pivotX', fallback: 0.5),
-    pivotY: _double(json, 'pivotY', fallback: 0.5),
-    perspective: _double(json, 'perspective', fallback: 0),
+    translateX: _getDouble(json, 'translateX', fallback: defaults.translateX),
+    translateY: _getDouble(json, 'translateY', fallback: defaults.translateY),
+    scaleX: _getDouble(json, 'scaleX', fallback: defaults.scaleX),
+    scaleY: _getDouble(json, 'scaleY', fallback: defaults.scaleY),
+    rotationX: _getDouble(json, 'rotationX', fallback: defaults.rotationX),
+    rotationY: _getDouble(json, 'rotationY', fallback: defaults.rotationY),
+    rotationZ: _getDouble(json, 'rotationZ', fallback: defaults.rotationZ),
+    pivotX: _getDouble(json, 'pivotX', fallback: defaults.pivotX),
+    pivotY: _getDouble(json, 'pivotY', fallback: defaults.pivotY),
+    perspective: _getDouble(
+      json,
+      'perspective',
+      fallback: defaults.perspective,
+    ),
   );
 }
 
@@ -236,17 +266,20 @@ SceneTransform _decodeTransform(Map<String, dynamic> json) {
   int version,
 ) {
   final field = version == 1 ? 'kind' : 'component';
-  final id = _string(json, field);
+  final id = _getString(json, field);
   if (id.trim().isEmpty) {
     throw FormatException('Node $nodeId has an empty component id.');
   }
   if (version != 1) {
-    return (id: id, interactive: _bool(json, 'interactive', fallback: false));
+    return (
+      id: id,
+      interactive: _getBool(json, 'interactive', fallback: false),
+    );
   }
   if (!_legacyComponentIds.contains(id)) {
     throw FormatException('Unknown version 1 node kind: $id');
   }
-  final action = _nullableString(json, 'action');
+  final action = _findString(json, 'action');
   if (action != null && !_legacyActionIds.contains(action)) {
     throw FormatException('Unknown version 1 node action: $action');
   }
@@ -266,9 +299,7 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
       'width': node.rect.width,
       'height': node.rect.height,
     },
-    if (!node.transform.isIdentity ||
-        node.transform.pivotX != 0.5 ||
-        node.transform.pivotY != 0.5)
+    if (!node.transform.isDefault)
       'transform': _encodeTransform(node.transform),
     if (node.z != 0) 'z': node.z,
     if (node.renderOrder != 0) 'renderOrder': node.renderOrder,
@@ -302,10 +333,10 @@ SceneCondition? _decodeCondition(Object? value, String field) {
   }
   if (value is String) {
     return ScenePredicateCondition(
-      _enumValue(ScenePredicate.values, value, field),
+      _getEnumValue(ScenePredicate.values, value, field),
     );
   }
-  final map = _asMap(value, field);
+  final map = _getMapValue(value, field);
   if (map.length != 1) {
     throw FormatException('$field must use exactly one of all, any, or not.');
   }
@@ -361,7 +392,7 @@ String encodeSceneColor(int value) {
   return '#$hex';
 }
 
-T _enumValue<T extends Enum>(List<T> values, String name, String field) {
+T _getEnumValue<T extends Enum>(List<T> values, String name, String field) {
   for (final value in values) {
     if (value.name == name) {
       return value;
@@ -370,7 +401,7 @@ T _enumValue<T extends Enum>(List<T> values, String name, String field) {
   throw FormatException('Invalid $field value: $name');
 }
 
-Map<String, dynamic> _map(
+Map<String, dynamic> _getMap(
   Map<String, dynamic> json,
   String key, {
   Map<String, dynamic>? fallback,
@@ -379,10 +410,10 @@ Map<String, dynamic> _map(
   if (value == null && fallback != null) {
     return fallback;
   }
-  return _asMap(value, key);
+  return _getMapValue(value, key);
 }
 
-Map<String, dynamic> _asMap(Object? value, String field) {
+Map<String, dynamic> _getMapValue(Object? value, String field) {
   if (value is Map<String, dynamic>) {
     return value;
   }
@@ -392,7 +423,7 @@ Map<String, dynamic> _asMap(Object? value, String field) {
   throw FormatException('$field must be an object.');
 }
 
-List<dynamic> _list(Map<String, dynamic> json, String key) {
+List<dynamic> _getList(Map<String, dynamic> json, String key) {
   final value = json[key];
   if (value is List) {
     return value;
@@ -400,30 +431,30 @@ List<dynamic> _list(Map<String, dynamic> json, String key) {
   throw FormatException('$key must be a list.');
 }
 
-String _string(Map<String, dynamic> json, String key, {String? fallback}) {
+String _getString(Map<String, dynamic> json, String key, {String? fallback}) {
   final value = json[key];
   if (value == null && fallback != null) {
     return fallback;
   }
-  return _asString(value, key);
+  return _getStringValue(value, key);
 }
 
-String? _nullableString(Map<String, dynamic> json, String key) {
+String? _findString(Map<String, dynamic> json, String key) {
   final value = json[key];
   if (value == null) {
     return null;
   }
-  return _asString(value, key);
+  return _getStringValue(value, key);
 }
 
-String _asString(Object? value, String field) {
+String _getStringValue(Object? value, String field) {
   if (value is String && value.isNotEmpty) {
     return value;
   }
   throw FormatException('$field must be a non-empty string.');
 }
 
-bool _bool(Map<String, dynamic> json, String key, {required bool fallback}) {
+bool _getBool(Map<String, dynamic> json, String key, {required bool fallback}) {
   final value = json[key];
   if (value == null) {
     return fallback;
@@ -434,7 +465,7 @@ bool _bool(Map<String, dynamic> json, String key, {required bool fallback}) {
   throw FormatException('$key must be a boolean.');
 }
 
-double _double(Map<String, dynamic> json, String key, {double? fallback}) {
+double _getDouble(Map<String, dynamic> json, String key, {double? fallback}) {
   final value = json[key];
   if (value == null && fallback != null) {
     return fallback;
@@ -445,7 +476,7 @@ double _double(Map<String, dynamic> json, String key, {double? fallback}) {
   throw FormatException('$key must be a number.');
 }
 
-int _int(Map<String, dynamic> json, String key, {int? fallback}) {
+int _getInt(Map<String, dynamic> json, String key, {int? fallback}) {
   final value = json[key];
   if (value == null && fallback != null) {
     return fallback;

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:scene_schema/scene_schema.dart';
 import 'package:test/test.dart';
 
@@ -134,8 +136,11 @@ void main() {
       ],
     );
 
-    final map = sceneDocumentToMap(document);
-    expect((map['nodes'] as List).single['visibleWhen'], {'not': 'isDormant'});
+    final nodeJson = jsonDecode(
+      encodeSceneNode(document.nodes.single),
+    ) as Map<String, dynamic>;
+    expect(nodeJson['visibleWhen'], {'not': 'isDormant'});
+    expect(nodeJson.containsKey('transform'), isFalse);
   });
 
   test('rejects an unknown predicate', () {
