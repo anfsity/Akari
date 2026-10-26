@@ -52,6 +52,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   bool _dormant = false;
   bool _inspect = false;
   bool _confirmReload = false;
+  int _seedRevision = 0;
+  String? _lastBackgroundAsset;
 
   @override
   void initState() {
@@ -111,7 +113,6 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
             _error = null;
           });
           unawaited(_savePreferences(preferences));
-          unawaited(_loadSeed());
         },
       ),
     );
@@ -130,10 +131,37 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     );
   }
 
+  static String? _getEffectiveBackgroundAsset(SceneBackground background) {
+    return background.kind == SceneBackgroundKind.image
+        ? background.asset
+        : null;
+  }
+
+  void _onEditorChanged() {
+    final editor = _editor;
+    if (editor == null) return;
+    final currentAsset =
+        _getEffectiveBackgroundAsset(editor.document.background);
+    if (currentAsset != _lastBackgroundAsset) {
+      _lastBackgroundAsset = currentAsset;
+      unawaited(_loadSeed());
+    }
+  }
+
+  void _setEditor(SceneEditor editor) {
+    _editor?.removeListener(_onEditorChanged);
+    _editor?.dispose();
+    _editor = editor..addListener(_onEditorChanged);
+    _lastBackgroundAsset =
+        _getEffectiveBackgroundAsset(editor.document.background);
+  }
+
   Future<void> _loadSeed() async {
-    final theme = _theme;
-    final asset = _editor?.document.background.asset ??
-        theme.document.background.asset;
+    final revision = ++_seedRevision;
+    final editor = _editor;
+    final asset = editor != null
+        ? _getEffectiveBackgroundAsset(editor.document.background)
+        : _getEffectiveBackgroundAsset(_theme.document.background);
     Color? seed;
     if (asset != null) {
       final file = _assets.findFile(asset);
@@ -145,18 +173,26 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
           seed = null;
         }
       } else {
-        seed = await theme.findBackgroundSeed();
+        seed = await _theme.findBackgroundSeed();
       }
     }
-    if (!mounted || !identical(theme, _theme)) return;
+    if (!mounted || revision != _seedRevision) return;
     setState(() => _updateTheme(_project.themeBuilder(seed: seed)));
   }
 
   @override
   void reassemble() {
     super.reassemble();
+    _lastBackgroundAsset = null;
     _updateTheme(_project.themeBuilder());
     unawaited(_loadSeed());
+  }
+
+  @override
+  void dispose() {
+    _editor?.removeListener(_onEditorChanged);
+    _editor?.dispose();
+    super.dispose();
   }
 
   void _openScene(String path) {
@@ -164,8 +200,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       final assets = StudioAssets.findForScene(File(path)) ?? _compiledAssets;
       final assetPaths = assets.getAssets();
       final editor = SceneEditor(File(path));
-      _editor?.dispose();
-      _editor = editor;
+      _setEditor(editor);
       _assets = assets;
       _assetPaths = assetPaths;
       _path = path;
@@ -203,8 +238,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         rethrow;
       }
       setState(() {
-        _editor?.dispose();
-        _editor = editor;
+        _setEditor(editor);
         _project = project;
         _compiledAssets = assets;
         _assets = assets;
@@ -331,7 +365,6 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
           asset: asset,
         ),
       );
-      unawaited(_loadSeed());
       setState(() => _error = null);
     } on Object catch (error) {
       if (mounted) setState(() => _error = 'Cannot use image: $error');
@@ -371,12 +404,6 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         _error = '$error';
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _editor?.dispose();
-    super.dispose();
   }
 
   @override
