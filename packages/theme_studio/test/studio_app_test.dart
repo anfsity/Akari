@@ -55,7 +55,14 @@ ThemeDefinition _buildTheme({Color? seed}) => ThemeDefinition(
   components: (_) => _Components(),
   bundle: ThemeBundle(
     tokens: ThemeTokens(
-      materialTheme: material.ThemeData(),
+      materialTheme: material.ThemeData(
+        colorScheme: seed == null
+            ? const material.ColorScheme.dark()
+            : material.ColorScheme.fromSeed(
+                seedColor: seed,
+                brightness: material.Brightness.dark,
+              ),
+      ),
       panelRadius: 8,
       mediumMotion: Duration.zero,
       standardCurve: Curves.linear,
@@ -1127,6 +1134,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Import asset'));
     await tester.pumpAndSettle();
+    final initialTheme =
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).theme;
     expect(File('${directory.path}/assets/wallpaper.png').existsSync(), isTrue);
     await tester.runAsync(() async {
       await tester.tap(find.text('Use image'));
@@ -1139,15 +1148,21 @@ void main() {
       'packages/test/assets/wallpaper.png',
     );
     expect(preview.document.background.kind, SceneBackgroundKind.image);
+    expect(
+      preview.theme.materialTheme.colorScheme.primary,
+      isNot(initialTheme.materialTheme.colorScheme.primary),
+    );
     await tester.tap(find.text('Undo'));
     await tester.pumpAndSettle();
+    final undonePreview =
+        tester.widget<StudioPreview>(find.byType(StudioPreview));
     expect(
-      tester
-          .widget<StudioPreview>(find.byType(StudioPreview))
-          .document
-          .background
-          .kind,
+      undonePreview.document.background.kind,
       SceneBackgroundKind.solid,
+    );
+    expect(
+      undonePreview.theme.materialTheme.colorScheme.primary,
+      initialTheme.materialTheme.colorScheme.primary,
     );
     expect(File('${directory.path}/assets/wallpaper.png').existsSync(), isTrue);
     expect(tester.takeException(), isNull);
