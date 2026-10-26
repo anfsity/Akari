@@ -22,10 +22,6 @@ Future<void> main() async {
     theme: theme,
     output: host,
     kind: ThemeHostKind.preview,
-    devDependencies: {
-      'flutter_test': {'sdk': 'flutter'},
-      'integration_test': {'sdk': 'flutter'},
-    },
   );
   final flutter = getFlutterCommand(root);
   if (await _execute([...flutter, 'pub', 'get'], host) != 0) {

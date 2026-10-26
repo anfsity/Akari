@@ -32,10 +32,6 @@ Future<void> main(List<String> arguments) async {
       theme: theme,
       output: host,
       kind: ThemeHostKind.preview,
-      devDependencies: {
-        'flutter_test': {'sdk': 'flutter'},
-        'integration_test': {'sdk': 'flutter'},
-      },
     );
     final flutter = getFlutterCommand(repoRoot);
     final dart = getDartCommand(repoRoot);
