@@ -19,13 +19,15 @@ class SceneEditor extends ChangeNotifier {
   SceneEditor(
     this.file, {
     this._componentCatalog = const ThemeComponentCatalog(),
-  }) {
+    ThemeLayoutDefinition? layout,
+  }) : _declaredLayout = layout {
     _loadFromDisk(initial: true);
     inspector = NodeInspectorController(selectedNode, document.canvas);
   }
 
   final File file;
   ThemeComponentCatalog _componentCatalog;
+  ThemeLayoutDefinition? _declaredLayout;
   late final NodeInspectorController inspector;
   late String _source;
   late String _savedDocument;
@@ -41,18 +43,71 @@ class SceneEditor extends ChangeNotifier {
   bool get isDirty => _revision.encoded != _savedDocument;
   bool get canUndo => _undo.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
-  bool get canDeleteNode => document.nodes.length > 1;
+  bool get canDeleteNode => deletionBlockReason == null;
+  bool get canDuplicateNode => layout?.findSlot(selectedId) == null;
+  String? get deletionBlockReason => getDeletionBlockReason(selectedId);
   ThemeComponentCatalog get componentCatalog => _componentCatalog;
+  ThemeLayoutDefinition? get layout =>
+      _declaredLayout?.sceneId == document.id ? _declaredLayout : null;
+  List<ThemeLayoutSlot> get missingRequiredSlots =>
+      layout?.findMissingRequiredSlots(document) ?? const [];
 
-  void updateComponentCatalog(ThemeComponentCatalog catalog) {
-    if (identical(catalog, _componentCatalog)) return;
-    // Undo and redo trust the revision invariant too. A hot-reloaded catalog
-    // must accept history before replacing the rules used by this session.
-    for (final revision in [_revision, ..._undo, ..._redo]) {
-      catalog.validateDocument(revision.document);
+  void updateAuthoring({
+    required ThemeComponentCatalog componentCatalog,
+    required ThemeLayoutDefinition? layout,
+  }) {
+    if (identical(componentCatalog, _componentCatalog) &&
+        identical(layout, _declaredLayout)) {
+      return;
     }
-    _componentCatalog = catalog;
+    // Undo and redo trust the revision invariant too. New authoring rules must
+    // accept history before replacing this session's catalog and layout.
+    for (final revision in [_revision, ..._undo, ..._redo]) {
+      componentCatalog.validateDocument(revision.document);
+      layout?.validateDocument(revision.document);
+    }
+    _componentCatalog = componentCatalog;
+    _declaredLayout = layout;
     notifyListeners();
+  }
+
+  String? getDeletionBlockReason(String nodeId) {
+    if (document.nodes.length == 1) return 'A scene needs at least one node.';
+    final slot = layout?.findSlot(nodeId);
+    if (slot != null && slot.isRequired) {
+      return '${slot.label} is required by this layout.';
+    }
+    return null;
+  }
+
+  void updateLayoutSlot(String nodeId, {required bool isPresent}) {
+    if (!applyDraft()) return;
+    final slot = layout?.findSlot(nodeId);
+    if (slot == null) throw ArgumentError.value(nodeId, 'nodeId');
+    if (document.nodes.any((node) => node.id == nodeId) == isPresent) return;
+    if (!isPresent) {
+      _removeNode(nodeId);
+      return;
+    }
+    _updateDocument(
+      document.copyWith(nodes: [...document.nodes, slot.defaultNode]),
+      selectedId: nodeId,
+    );
+  }
+
+  void addRequiredLayoutSlots() {
+    if (!applyDraft()) return;
+    final missing = missingRequiredSlots;
+    if (missing.isEmpty) return;
+    _updateDocument(
+      document.copyWith(
+        nodes: [
+          ...document.nodes,
+          for (final slot in missing) slot.defaultNode,
+        ],
+      ),
+      selectedId: missing.first.defaultNode.id,
+    );
   }
 
   bool applyDraft() {
@@ -99,6 +154,9 @@ class SceneEditor extends ChangeNotifier {
 
   void duplicateSelectedNode() {
     if (!applyDraft()) return;
+    if (!canDuplicateNode) {
+      throw StateError('Layout slots can only be added once.');
+    }
     final node = selectedNode;
     final ids = document.nodes.map((entry) => entry.id).toSet();
     var id = '${node.id}-copy';
@@ -113,15 +171,20 @@ class SceneEditor extends ChangeNotifier {
 
   void deleteSelectedNode() {
     if (!applyDraft()) return;
-    if (!canDeleteNode) {
-      throw StateError('A scene must contain at least one node.');
-    }
+    _removeNode(selectedId);
+  }
+
+  void _removeNode(String nodeId) {
+    final reason = getDeletionBlockReason(nodeId);
+    if (reason != null) throw StateError(reason);
     final nodes = [...document.nodes];
-    final index = nodes.indexWhere((node) => node.id == selectedId);
+    final index = nodes.indexWhere((node) => node.id == nodeId);
     nodes.removeAt(index);
     _updateDocument(
       document.copyWith(nodes: nodes),
-      selectedId: nodes[index < nodes.length ? index : index - 1].id,
+      selectedId: selectedId == nodeId
+          ? nodes[index < nodes.length ? index : index - 1].id
+          : selectedId,
     );
   }
 
@@ -132,6 +195,7 @@ class SceneEditor extends ChangeNotifier {
     if (encoded == _revision.encoded) return;
     final updated = decodeSceneDocument(encoded);
     _componentCatalog.validateDocument(updated);
+    _declaredLayout?.validateDocument(updated);
     _undo.add(_revision);
     _redo.clear();
     _applyRevision((
@@ -190,6 +254,7 @@ class SceneEditor extends ChangeNotifier {
     final source = file.readAsStringSync();
     final document = decodeSceneDocument(source);
     _componentCatalog.validateDocument(document);
+    _declaredLayout?.validateDocument(document);
     _source = source;
     final revision = (
       document: document,

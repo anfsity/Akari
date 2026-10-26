@@ -90,7 +90,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
       } else if (key == LogicalKeyboardKey.keyY) {
         session.redo();
       } else if (key == LogicalKeyboardKey.keyD) {
-        session.duplicateSelectedNode();
+        if (session.canDuplicateNode) session.duplicateSelectedNode();
       } else {
         return KeyEventResult.ignored;
       }

@@ -59,6 +59,32 @@ editing declarations. Hot reload preserves drafts and history; if a changed
 declaration invalidates the current scene or history, Studio keeps the previous
 theme and reports the refresh error.
 
+### Adding and removing layout components
+
+Open the left sidebar's **Add** tab to assemble the selected scene's layout.
+The default theme's **Terrace** layout offers date, signature, standby clock,
+standby greeting, wake hint, sign-in heading, and sign-in caption slots.
+
+- **Add** inserts a complete node at the theme's preset position, including its
+  properties, motion, visibility, and focus settings, then selects it for editing.
+- **Remove** deletes an optional node. Adding it again restores preset defaults;
+  use **Undo** to recover the removed node's customizations. Click an added
+  component's name to select it in the inspector.
+- Each slot can be added once. **Duplicate** and `Ctrl+D` are disabled for layout
+  slots; nodes outside the declared layout keep their existing editing behavior.
+- Required slots cannot be removed through either the layer actions or canvas
+  shortcuts. Terrace requires account selection, session selection, credential
+  input, sign-in action, authentication status, and power actions.
+- If an imported scene is missing required slots, a notice above all sidebar
+  tabs offers **Add required**. This inserts all missing nodes as one undo step.
+  An incomplete scene can still be opened and saved while it is being repaired.
+
+All assembly operations validate pending inspector drafts and use the existing
+undo/redo and save workflow. **Inspect code** keeps assembly controls read-only.
+Insertion defaults survive saved removals and rebuilding. Layout rules apply
+only to their declared scene ID; other scenes remain freely editable. Theme
+authors can [declare their own slots](../reference/theme-package.md#declaring-layout-slots).
+
 ### Coordinate units
 
 Scene JSON always stores normalized `[0, 1]` coordinates, while the inspector can display reference pixels or percentages. On a `1920x1080` reference canvas, these represent the same rectangle:
@@ -91,8 +117,8 @@ Switch preview states with **State: Login / Dormant**, adjust zoom with **− / 
 | `Ctrl+Mouse wheel` | Zoom around the pointer |
 | `Shift+1` | Fit and recenter the canvas |
 | `Arrow` / `Shift+Arrow` | Nudge selected node by `1` / `10` reference pixels |
-| `Ctrl+D` | Duplicate selected node (`<id>-copy`, `<id>-copy-2`, ...) |
-| `Delete` | Delete selected node (disabled when only one node remains) |
+| `Ctrl+D` | Duplicate a node outside layout slots (`<id>-copy`, `<id>-copy-2`, ...) |
+| `Delete` | Delete selected node (disabled for required slots and the last node) |
 | `Ctrl+S` | Apply pending inspector fields and save scene JSON |
 
 > [!NOTE]

@@ -26,6 +26,41 @@ const _catalog = ThemeComponentCatalog(
   },
 );
 
+const _caption = SceneNode(
+  id: 'caption',
+  componentId: 'label',
+  rect: SceneRect(x: 0.2, y: 0.05, width: 0.4, height: 0.1),
+  renderOrder: 20,
+  motion: SceneMotionPreset.fadeSlide,
+  visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
+  properties: {'text': 'Welcome'},
+);
+const _action = SceneNode(
+  id: 'action',
+  componentId: 'primaryAction',
+  rect: SceneRect(x: 0.6, y: 0.5, width: 0.1, height: 0.1),
+  interactive: true,
+  focusOrder: 40,
+);
+const _layout = ThemeLayoutDefinition(
+  sceneId: 'test',
+  label: 'Test layout',
+  slots: [
+    ThemeLayoutSlot(
+      label: 'Login panel',
+      isRequired: true,
+      defaultNode: SceneNode(
+        id: 'panel',
+        componentId: 'panel',
+        rect: SceneRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5),
+        properties: {'variant': 'compact'},
+      ),
+    ),
+    ThemeLayoutSlot(label: 'Standby caption', defaultNode: _caption),
+    ThemeLayoutSlot(label: 'Sign in', defaultNode: _action, isRequired: true),
+  ],
+);
+
 void main() {
   late Directory directory;
   late File file;
@@ -61,8 +96,149 @@ void main() {
     directory.deleteSync(recursive: true);
   });
 
+  test(
+    'slot insertion, edits, removal and restoration use document history',
+    () {
+      editor.updateAuthoring(componentCatalog: _catalog, layout: _layout);
+      final original = editor.encodedDocument;
+      editor.updateLayoutSlot('caption', isPresent: true);
+      expect(editor.selectedId, 'caption');
+      expect(editor.selectedNode.properties, {'text': 'Welcome'});
+      expect(editor.selectedNode.rect.x, 0.2);
+      expect(editor.selectedNode.motion, SceneMotionPreset.fadeSlide);
+      expect(
+        evaluateSceneCondition(editor.selectedNode.visibleWhen!, {}),
+        isFalse,
+      );
+      editor.updateLayoutSlot('caption', isPresent: true);
+      expect(editor.document.nodes, hasLength(2));
+      editor.undo();
+      expect(editor.encodedDocument, original);
+      expect(editor.selectedId, 'panel');
+      expect(editor.canUndo, isFalse);
+      editor.redo();
+      editor.inspector.updateProperty('text', 'Edited caption');
+      editor.inspector.getField('X').text = '576';
+      editor.applyDraft();
+      editor.selectNode('panel');
+      editor.updateLayoutSlot('caption', isPresent: false);
+      expect(editor.selectedId, 'panel');
+      editor.undo();
+      expect(editor.selectedId, 'panel');
+      final restored = editor.document.nodes.singleWhere(
+        (node) => node.id == 'caption',
+      );
+      expect(restored.properties, {'text': 'Edited caption'});
+      expect(restored.rect.x, 0.3);
+      editor.redo();
+      editor.save();
+      editor.dispose();
+      editor = SceneEditor(file, componentCatalog: _catalog, layout: _layout);
+      editor.updateLayoutSlot('caption', isPresent: true);
+      expect(editor.selectedNode.properties, {'text': 'Welcome'});
+      expect(editor.selectedNode.rect.x, 0.2);
+      editor.updateLayoutSlot('caption', isPresent: false);
+      expect(editor.document.nodes, hasLength(1));
+      expect(editor.selectedId, 'panel');
+    },
+  );
+
+  test(
+    'required slots are protected and missing slots are repaired in one edit',
+    () {
+      editor.updateAuthoring(componentCatalog: _catalog, layout: _layout);
+      expect(editor.missingRequiredSlots.single.defaultNode.id, 'action');
+      editor.addRequiredLayoutSlots();
+      expect(editor.selectedId, 'action');
+      expect(editor.missingRequiredSlots, isEmpty);
+      expect(editor.selectedNode.interactive, isTrue);
+      expect(editor.selectedNode.focusOrder, 40);
+      expect(editor.canDeleteNode, isFalse);
+      expect(editor.deletionBlockReason, 'Sign in is required by this layout.');
+      expect(editor.deleteSelectedNode, throwsStateError);
+      expect(
+        () => editor.updateLayoutSlot('panel', isPresent: false),
+        throwsStateError,
+      );
+      expect(editor.canDuplicateNode, isFalse);
+      expect(editor.duplicateSelectedNode, throwsStateError);
+      editor.addRequiredLayoutSlots();
+      editor.undo();
+      expect(editor.document.nodes, hasLength(1));
+      expect(editor.canUndo, isFalse);
+      editor.redo();
+      editor.save();
+      editor.reload();
+      expect(editor.missingRequiredSlots, isEmpty);
+    },
+  );
+
+  test(
+    'invalid drafts block assembly commands without changing the document',
+    () {
+      editor.updateAuthoring(componentCatalog: _catalog, layout: _layout);
+      final original = editor.encodedDocument;
+      editor.inspector.getField('Width').text = '3840';
+      editor.updateLayoutSlot('caption', isPresent: true);
+      editor.updateLayoutSlot('panel', isPresent: false);
+      editor.addRequiredLayoutSlots();
+      expect(editor.encodedDocument, original);
+      expect(editor.canUndo, isFalse);
+      expect(editor.inspector.error, isNotNull);
+    },
+  );
+
+  test('layout reservations validate loads and edits, with opt-out for other scenes', () {
+    editor.updateAuthoring(componentCatalog: _catalog, layout: _layout);
+    final original = editor.document;
+    expect(
+      () =>
+          editor.updateNode(editor.selectedNode.copyWith(componentId: 'label')),
+      throwsFormatException,
+    );
+    expect(
+      () => editor.updateLayoutSlot('unknown', isPresent: true),
+      throwsArgumentError,
+    );
+    expect(editor.document, same(original));
+    file.writeAsStringSync(
+      encodeSceneDocument(
+        original.copyWith(
+          nodes: [original.nodes.single.copyWith(componentId: 'label')],
+        ),
+      ),
+    );
+    expect(() => SceneEditor(file, layout: _layout), throwsFormatException);
+    expect(editor.reload, throwsFormatException);
+    expect(editor.document, same(original));
+    file.writeAsStringSync(encodeSceneDocument(original.copyWith(id: 'other')));
+    editor.reload();
+    expect(editor.layout, isNull);
+    expect(editor.missingRequiredSlots, isEmpty);
+    expect(editor.canDuplicateNode, isTrue);
+    editor.duplicateSelectedNode();
+    expect(editor.canDeleteNode, isTrue);
+  });
+
+  test(
+    'hot-reloaded layout and catalog replace atomically against history',
+    () {
+      editor.updateNode(editor.selectedNode.copyWith(componentId: 'label'));
+      editor.updateNode(editor.selectedNode.copyWith(componentId: 'panel'));
+      expect(
+        () =>
+            editor.updateAuthoring(componentCatalog: _catalog, layout: _layout),
+        throwsFormatException,
+      );
+      expect(editor.layout, isNull);
+      expect(editor.componentCatalog.components, isEmpty);
+      editor.undo();
+      expect(editor.selectedNode.componentId, 'label');
+    },
+  );
+
   test('theme choices validate drafts before preview, history and saving', () {
-    editor.updateComponentCatalog(_catalog);
+    editor.updateAuthoring(componentCatalog: _catalog, layout: null);
     editor.inspector.updateProperty('variant', 'wide');
     expect(editor.applyDraft(), isTrue);
     final valid = editor.document;
@@ -91,7 +267,7 @@ void main() {
   });
 
   test('invalid theme choices cannot load or replace a working session', () {
-    editor.updateComponentCatalog(_catalog);
+    editor.updateAuthoring(componentCatalog: _catalog, layout: null);
     final valid = editor.document;
     file.writeAsStringSync(
       encodeSceneDocument(
@@ -115,7 +291,7 @@ void main() {
   });
 
   test('catalog replacement preserves valid undo and redo history', () {
-    editor.updateComponentCatalog(_catalog);
+    editor.updateAuthoring(componentCatalog: _catalog, layout: null);
     editor.inspector.updateProperty('variant', 'wide');
     editor.applyDraft();
     const compactOnly = ThemeComponentCatalog(
@@ -134,12 +310,12 @@ void main() {
       },
     );
     expect(
-      () => editor.updateComponentCatalog(compactOnly),
+      () => editor.updateAuthoring(componentCatalog: compactOnly, layout: null),
       throwsFormatException,
     );
     editor.undo();
     expect(
-      () => editor.updateComponentCatalog(compactOnly),
+      () => editor.updateAuthoring(componentCatalog: compactOnly, layout: null),
       throwsFormatException,
     );
     editor.redo();
