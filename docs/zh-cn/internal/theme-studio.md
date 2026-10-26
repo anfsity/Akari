@@ -29,6 +29,27 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 4. **应用到预览**：按 `Enter`、移出输入框或点击 **Apply to preview** 即可校验并应用修改。若输入无效，检查器会提示错误并保留上一次有效画面。
 5. **撤销与保存**：使用 **Undo** / **Redo**（`Ctrl+Z` / `Ctrl+Shift+Z`）回退历史，点击 **Save scene**（`Ctrl+S`）以原子方式写入场景 JSON。
 
+### 组件定制
+
+主题可以通过 [`componentCatalog`](../reference/theme-package.md#声明组件的可编辑属性)
+声明可编辑属性。Studio 会使用作者提供的组件名称、属性名称、文本输入框和选项菜单，
+并展示场景 JSON 尚未填写的属性默认值。仅查看默认值不会产生修改或将其写入文件。
+
+默认主题目前开放：
+
+| 组件 | 控件 |
+| --- | --- |
+| 标题与说明（`terraceLabel`） | **Text** 文本、**Text style: Regular / Large** 文字样式 |
+| 日期与时间（`dateTime`） | **Display: Date / Time** 显示内容 |
+
+选项选择后立即应用；文本在按 Enter、移出输入框或点击 **Apply to preview** 时应用。
+两者均沿用撤销、重做和 **Save scene** 保存流程。无效选项（包括在 **Advanced properties**
+中输入的值）无法替换有效预览或进入历史记录；可以通过选项菜单修复 JSON 草稿中的无效值。
+
+已声明组件的其他属性仍可在 **Advanced properties** 中查看和修改，编辑可视化控件时会原样保留。
+未声明组件沿用原有的字符串属性编辑方式。切换主题会同步切换属性声明。
+热重载保留草稿和历史；若修改后的声明与当前场景或历史不兼容，Studio 会保留先前主题并显示刷新错误。
+
 ### 坐标单位换算
 
 场景 JSON 始终保存 `[0, 1]` 归一化坐标，而检查器支持切换参考像素或百分比显示。以 `1920x1080` 参考画布为例，以下三种写法表示同一个矩形：

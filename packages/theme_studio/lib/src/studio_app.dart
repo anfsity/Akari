@@ -119,6 +119,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   }
 
   void _updateTheme(ThemeDefinition theme) {
+    _editor?.updateComponentCatalog(theme.componentCatalog);
     _theme = theme.copyWith(
       bundle: theme.bundle.copyWith(
         backgrounds: {
@@ -140,8 +141,9 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   void _onEditorChanged() {
     final editor = _editor;
     if (editor == null) return;
-    final currentAsset =
-        _getEffectiveBackgroundAsset(editor.document.background);
+    final currentAsset = _getEffectiveBackgroundAsset(
+      editor.document.background,
+    );
     if (currentAsset != _lastBackgroundAsset) {
       _lastBackgroundAsset = currentAsset;
       unawaited(_loadSeed());
@@ -152,8 +154,9 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     _editor?.removeListener(_onEditorChanged);
     _editor?.dispose();
     _editor = editor..addListener(_onEditorChanged);
-    _lastBackgroundAsset =
-        _getEffectiveBackgroundAsset(editor.document.background);
+    _lastBackgroundAsset = _getEffectiveBackgroundAsset(
+      editor.document.background,
+    );
   }
 
   Future<void> _loadSeed() async {
@@ -177,14 +180,22 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       }
     }
     if (!mounted || revision != _seedRevision) return;
-    setState(() => _updateTheme(_project.themeBuilder(seed: seed)));
+    setState(() => _refreshTheme(seed: seed));
+  }
+
+  void _refreshTheme({Color? seed}) {
+    try {
+      _updateTheme(_project.themeBuilder(seed: seed));
+    } on FormatException catch (error) {
+      _error = 'Cannot refresh theme: ${error.message}';
+    }
   }
 
   @override
   void reassemble() {
     super.reassemble();
     _lastBackgroundAsset = null;
-    _updateTheme(_project.themeBuilder());
+    _refreshTheme();
     unawaited(_loadSeed());
   }
 
@@ -199,7 +210,10 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     try {
       final assets = StudioAssets.findForScene(File(path)) ?? _compiledAssets;
       final assetPaths = assets.getAssets();
-      final editor = SceneEditor(File(path));
+      final editor = SceneEditor(
+        File(path),
+        componentCatalog: _theme.componentCatalog,
+      );
       _setEditor(editor);
       _assets = assets;
       _assetPaths = assetPaths;
@@ -223,20 +237,16 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     try {
       // Prepare the entire target before releasing the current session. A bad
       // preset file must leave the working document and its renderer intact.
-      final editor = SceneEditor(File(scenePath ?? project.scenePaths.first));
+      final theme = project.themeBuilder();
       final assets = StudioAssets(
         directory: Directory(project.directory),
         packageName: project.packageName,
       );
-      final List<String> assetPaths;
-      final ThemeDefinition theme;
-      try {
-        assetPaths = assets.getAssets();
-        theme = project.themeBuilder();
-      } on Object {
-        editor.dispose();
-        rethrow;
-      }
+      final assetPaths = assets.getAssets();
+      final editor = SceneEditor(
+        File(scenePath ?? project.scenePaths.first),
+        componentCatalog: theme.componentCatalog,
+      );
       setState(() {
         _setEditor(editor);
         _project = project;
@@ -500,6 +510,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                       ? CodeInspector(key: ObjectKey(editor), editor: editor)
                       : NodeInspector(
                           controller: editor.inspector,
+                          componentCatalog: editor.componentCatalog,
                           onApply: editor.applyDraft,
                         ),
                 ),

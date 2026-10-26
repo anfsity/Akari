@@ -1,9 +1,30 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scene/scene.dart';
+import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_studio/src/scene_editor.dart';
 import 'package:theme_studio/src/node_inspector_controller.dart';
+
+enum _PanelVariant { compact, wide }
+
+const _catalog = ThemeComponentCatalog(
+  components: {
+    'panel': ThemeComponentDefinition(
+      label: 'Panel',
+      properties: [
+        ThemeChoiceProperty(
+          name: 'variant',
+          label: 'Style',
+          defaultValue: _PanelVariant.compact,
+          choices: {
+            _PanelVariant.compact: 'Compact',
+            _PanelVariant.wide: 'Wide',
+          },
+        ),
+      ],
+    ),
+  },
+);
 
 void main() {
   late Directory directory;
@@ -38,6 +59,98 @@ void main() {
   tearDown(() {
     editor.dispose();
     directory.deleteSync(recursive: true);
+  });
+
+  test('theme choices validate drafts before preview, history and saving', () {
+    editor.updateComponentCatalog(_catalog);
+    editor.inspector.updateProperty('variant', 'wide');
+    expect(editor.applyDraft(), isTrue);
+    final valid = editor.document;
+    editor.inspector.updateProperty('variant', 'unsupported');
+    expect(editor.applyDraft(), isFalse);
+    expect(editor.save(), isFalse);
+    expect(editor.document, same(valid));
+    expect(
+      editor.inspector.error,
+      contains('Node "panel": Property "variant"'),
+    );
+    expect(
+      decodeSceneDocument(file.readAsStringSync()).nodes.single.properties,
+      {'variant': 'compact'},
+    );
+
+    editor.inspector.updateProperty('variant', 'compact');
+    expect(editor.applyDraft(), isTrue);
+    editor.undo();
+    expect(editor.selectedNode.properties['variant'], 'wide');
+    editor.undo();
+    expect(editor.selectedNode.properties['variant'], 'compact');
+    expect(editor.canUndo, isFalse);
+    editor.redo();
+    expect(editor.selectedNode.properties['variant'], 'wide');
+  });
+
+  test('invalid theme choices cannot load or replace a working session', () {
+    editor.updateComponentCatalog(_catalog);
+    final valid = editor.document;
+    file.writeAsStringSync(
+      encodeSceneDocument(
+        valid.copyWith(
+          nodes: [
+            editor.selectedNode.copyWith(
+              properties: {'variant': 'unsupported'},
+            ),
+          ],
+        ),
+      ),
+    );
+    expect(
+      () => SceneEditor(file, componentCatalog: _catalog),
+      throwsFormatException,
+    );
+    expect(editor.reload, throwsFormatException);
+    expect(editor.document, same(valid));
+    expect(editor.isDirty, isFalse);
+    expect(editor.canUndo, isFalse);
+  });
+
+  test('catalog replacement preserves valid undo and redo history', () {
+    editor.updateComponentCatalog(_catalog);
+    editor.inspector.updateProperty('variant', 'wide');
+    editor.applyDraft();
+    const compactOnly = ThemeComponentCatalog(
+      components: {
+        'panel': ThemeComponentDefinition(
+          label: 'Panel',
+          properties: [
+            ThemeChoiceProperty(
+              name: 'variant',
+              label: 'Style',
+              defaultValue: _PanelVariant.compact,
+              choices: {_PanelVariant.compact: 'Compact'},
+            ),
+          ],
+        ),
+      },
+    );
+    expect(
+      () => editor.updateComponentCatalog(compactOnly),
+      throwsFormatException,
+    );
+    editor.undo();
+    expect(
+      () => editor.updateComponentCatalog(compactOnly),
+      throwsFormatException,
+    );
+    editor.redo();
+    expect(editor.selectedNode.properties['variant'], 'wide');
+    expect(editor.componentCatalog, same(_catalog));
+    editor.inspector.updateProperty('private', 'keep');
+    expect(editor.save(), isTrue);
+    expect(
+      decodeSceneDocument(file.readAsStringSync()).nodes.single.properties,
+      {'variant': 'wide', 'private': 'keep'},
+    );
   });
 
   test('edit, undo, redo and save preserve the complete scene', () {

@@ -29,6 +29,33 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 4. **Apply & preview**: Press `Enter`, leave a field, or click **Apply to preview** to validate and apply edits. Invalid inputs display an error and keep the last valid scene.
 5. **Save or undo**: Use **Undo** / **Redo** (`Ctrl+Z` / `Ctrl+Shift+Z`) for history and **Save scene** (`Ctrl+S`) to write changes atomically to the scene JSON.
 
+### Component customization
+
+Themes can declare editable component properties through their
+[`componentCatalog`](../reference/theme-package.md#declaring-editable-component-properties).
+Studio shows the author's component and property labels, text inputs, and choice
+menus, including defaults for properties absent from the scene JSON.
+Viewing a default does not create an edit or add it to the saved scene.
+
+The default theme exposes:
+
+| Component | Controls |
+| --- | --- |
+| Heading and caption (`terraceLabel`) | **Text**, **Text style: Regular / Large** |
+| Date and time (`dateTime`) | **Display: Date / Time** |
+
+Choices apply immediately; text applies on Enter, blur, or **Apply to preview**.
+Both use the existing undo/redo and **Save scene** workflow. Unsupported choices,
+including values entered in **Advanced properties**, cannot replace the working
+preview or enter history. A choice menu can repair an unsupported JSON draft.
+
+For declared components, additional properties remain available in **Advanced
+properties** and are preserved when editing other controls. Components without a
+declaration retain their raw string fields. Switching themes also switches their
+editing declarations. Hot reload preserves drafts and history; if a changed
+declaration invalidates the current scene or history, Studio keeps the previous
+theme and reports the refresh error.
+
 ### Coordinate units
 
 Scene JSON always stores normalized `[0, 1]` coordinates, while the inspector can display reference pixels or percentages. On a `1920x1080` reference canvas, these represent the same rectangle:
