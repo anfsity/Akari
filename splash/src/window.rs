@@ -40,8 +40,7 @@ pub fn run(options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> Resul
     };
     event_loop.run_app(&mut app)?;
     // Destruction closes the surface before returning control to the launcher.
-    app.surface.take();
-    app.window.take();
+    app.close();
     app.error.map_or(Ok(()), Err)
 }
 
@@ -70,6 +69,11 @@ impl Preview {
         Ok(())
     }
 
+    fn close(&mut self) {
+        self.surface.take();
+        self.window.take();
+    }
+
     fn present(&mut self) -> Result {
         self.next_frame = Instant::now() + Duration::from_millis(33);
         let window = self.window.as_ref().unwrap();
@@ -79,9 +83,11 @@ impl Preview {
         else {
             return Ok(());
         };
-        if self.scene.as_ref().is_none_or(|scene| {
-            scene.pixels.width() != size.width || scene.pixels.height() != size.height
-        }) {
+        if self
+            .scene
+            .as_ref()
+            .is_none_or(|scene| !scene.has_size(size.width, size.height))
+        {
             self.scene = Some(self.renderer.create_scene(
                 size.width,
                 size.height,
@@ -93,7 +99,7 @@ impl Preview {
         let scene = self.scene.as_mut().unwrap();
         scene.draw(self.timing.get_elapsed(Instant::now()).as_secs_f32());
         if let Some(path) = self.options.snapshot.take() {
-            scene.pixels.save_png(path)?;
+            scene.save_png(path)?;
         }
         let mut buffer = surface.buffer_mut()?;
         scene.copy_xrgb(&mut buffer);
@@ -143,8 +149,10 @@ impl ApplicationHandler for Preview {
             event_loop.exit();
             return;
         }
-        if Instant::now() >= self.next_frame {
-            self.window.as_ref().unwrap().request_redraw();
+        if Instant::now() >= self.next_frame
+            && let Some(window) = self.window.as_ref()
+        {
+            window.request_redraw();
         }
         event_loop.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
     }
