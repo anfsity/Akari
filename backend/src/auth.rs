@@ -145,7 +145,7 @@ impl AuthActorHandle {
     }
 
     /// Moves an authenticated attempt into backend-owned session resolution.
-    pub(crate) async fn resolve_session(
+    pub(crate) async fn begin_session_resolution(
         &self,
         caller: String,
         attempt_id: String,
@@ -161,14 +161,14 @@ impl AuthActorHandle {
     }
 
     /// Reports that the selected session disappeared during catalog lookup.
-    pub(crate) async fn session_unavailable(
+    pub(crate) async fn report_session_unavailable(
         &self,
         caller: String,
         attempt_id: String,
         detail: String,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<()> {
-        self.send_with(|reply| AuthCommand::SessionUnavailable {
+        self.send_with(|reply| AuthCommand::ReportSessionUnavailable {
             caller,
             attempt_id,
             detail,
@@ -179,7 +179,7 @@ impl AuthActorHandle {
     }
 
     /// Reports a session-catalog failure while retaining actor ownership of state.
-    pub(crate) async fn session_resolution_failed(
+    pub(crate) async fn fail_session_resolution(
         &self,
         caller: String,
         attempt_id: String,
@@ -319,7 +319,7 @@ enum AuthCommand {
         emitter: SignalEmitter<'static>,
         reply: oneshot::Sender<fdo::Result<()>>,
     },
-    SessionUnavailable {
+    ReportSessionUnavailable {
         caller: String,
         attempt_id: String,
         detail: String,
@@ -349,7 +349,7 @@ impl AuthCommand {
             Self::Respond { .. } => "Respond",
             Self::Cancel { .. } => "Cancel",
             Self::BeginSessionResolution { .. } => "ResolveSession",
-            Self::SessionUnavailable { .. } => "SessionUnavailable",
+            Self::ReportSessionUnavailable { .. } => "SessionUnavailable",
             Self::FailSessionResolution { .. } => "FailSessionResolution",
             Self::StartSession { .. } => "StartSession",
             #[cfg(test)]
@@ -362,7 +362,7 @@ impl AuthCommand {
             Self::Begin { caller, .. }
             | Self::Respond { caller, .. }
             | Self::BeginSessionResolution { caller, .. }
-            | Self::SessionUnavailable { caller, .. }
+            | Self::ReportSessionUnavailable { caller, .. }
             | Self::FailSessionResolution { caller, .. }
             | Self::StartSession { caller, .. } => Some(caller),
             Self::Cancel {
@@ -377,7 +377,7 @@ impl AuthCommand {
         match self {
             Self::Respond { attempt_id, .. }
             | Self::BeginSessionResolution { attempt_id, .. }
-            | Self::SessionUnavailable { attempt_id, .. }
+            | Self::ReportSessionUnavailable { attempt_id, .. }
             | Self::FailSessionResolution { attempt_id, .. }
             | Self::StartSession { attempt_id, .. } => Some(attempt_id),
             Self::Cancel {
@@ -400,10 +400,11 @@ fn send_reply<T>(reply: oneshot::Sender<fdo::Result<T>>, result: fdo::Result<T>)
 }
 
 /// Mutable authentication resources owned exclusively by `run_actor`.
-#[derive(Default)]
 struct ActorState {
     auth: AuthStateMachine,
     attempt: Option<AttemptResources>,
+    snapshots: watch::Sender<AuthSnapshot>,
+    controls: watch::Sender<Option<AttemptControl>>,
     shutdown: CancellationToken,
 }
 
@@ -425,12 +426,27 @@ impl Drop for AttemptResources {
 }
 
 impl ActorState {
+    fn new(
+        snapshots: watch::Sender<AuthSnapshot>,
+        controls: watch::Sender<Option<AttemptControl>>,
+        shutdown: CancellationToken,
+    ) -> Self {
+        Self {
+            auth: AuthStateMachine::default(),
+            attempt: None,
+            snapshots,
+            controls,
+            shutdown,
+        }
+    }
+
     fn get_attempt(&self) -> &AttemptResources {
         self.attempt
             .as_ref()
             .expect("active authentication owns attempt resources")
     }
-    fn get_transport(&mut self) -> &mut GreetdTransport {
+
+    fn transport_mut(&mut self) -> &mut GreetdTransport {
         self.attempt
             .as_mut()
             .expect("active authentication owns attempt resources")
@@ -438,6 +454,36 @@ impl ActorState {
             .as_mut()
             .expect("connected authentication owns greetd transport")
     }
+
+    fn detach_resources(&mut self) {
+        self.attempt.take();
+        let _ = self.controls.send(None);
+    }
+
+    async fn publish_snapshot(&self, attempt_id: &str, emitter: Option<&SignalEmitter<'_>>) {
+        let snapshot = AuthSnapshot::from_auth(&self.auth, attempt_id);
+        tracing::info!(%attempt_id, state = %snapshot.state, "authentication state changed");
+        let _ = self.snapshots.send(snapshot.clone());
+        emit_state_best_effort(emitter, snapshot).await;
+    }
+
+    async fn apply_transition(
+        &mut self,
+        attempt_id: &str,
+        event: StateEvent,
+        emitter: Option<&SignalEmitter<'_>>,
+    ) {
+        self.auth
+            .transition(sanitize_event_detail(event))
+            .expect("authentication event matches the actor phase");
+        self.publish_snapshot(attempt_id, emitter).await;
+    }
+}
+
+#[derive(Clone, Copy)]
+enum PromptDisposition {
+    NeedsInput,
+    AutoAcknowledge,
 }
 
 async fn run_actor(
@@ -450,10 +496,7 @@ async fn run_actor(
     // Only external handles keep the command channel alive. Disconnect watchers
     // use weak senders so releasing the service can reach the final cleanup even
     // if an attempt watcher is still waiting for a bus event.
-    let mut actor = ActorState {
-        shutdown: shutdown.clone(),
-        ..ActorState::default()
-    };
+    let mut actor = ActorState::new(snapshots, controls, shutdown.clone());
     loop {
         let command = tokio::select! {
             biased;
@@ -492,8 +535,6 @@ async fn run_actor(
                         caller,
                         username.clone(),
                         &emitter,
-                        &snapshots,
-                        &controls,
                         &command_sender,
                     )
                     .await
@@ -508,15 +549,7 @@ async fn run_actor(
                     // a camera or other passive factor. Protocol failures are
                     // then reported through the attempt's state signals.
                     send_reply(reply, Ok(attempt_id.clone()));
-                    let _ = run_authentication(
-                        &mut actor,
-                        &attempt_id,
-                        &username,
-                        emitter,
-                        &snapshots,
-                        &controls,
-                    )
-                    .await;
+                    let _ = run_authentication(&mut actor, &attempt_id, &username, emitter).await;
                 }
                 AuthCommand::Respond {
                     caller,
@@ -529,15 +562,7 @@ async fn run_actor(
                         send_reply(reply, Err(error));
                         return;
                     }
-                    let result = handle_respond(
-                        &mut actor,
-                        &attempt_id,
-                        response,
-                        emitter,
-                        &snapshots,
-                        &controls,
-                    )
-                    .await;
+                    let result = handle_respond(&mut actor, &attempt_id, response, emitter).await;
                     send_reply(reply, result);
                 }
                 AuthCommand::Cancel {
@@ -553,8 +578,6 @@ async fn run_actor(
                         expected_caller.as_deref(),
                         allow_after_cleanup,
                         emitter,
-                        &snapshots,
-                        &controls,
                     )
                     .await;
                     send_reply(reply, result);
@@ -569,11 +592,10 @@ async fn run_actor(
                         send_reply(reply, Err(error));
                         return;
                     }
-                    let result =
-                        resolve_session(&mut actor, &attempt_id, &emitter, &snapshots).await;
+                    let result = begin_session_resolution(&mut actor, &attempt_id, &emitter).await;
                     send_reply(reply, result);
                 }
-                AuthCommand::SessionUnavailable {
+                AuthCommand::ReportSessionUnavailable {
                     caller,
                     attempt_id,
                     detail,
@@ -585,8 +607,7 @@ async fn run_actor(
                         return;
                     }
                     let result =
-                        session_unavailable(&mut actor, &attempt_id, detail, &emitter, &snapshots)
-                            .await;
+                        report_session_unavailable(&mut actor, &attempt_id, detail, &emitter).await;
                     send_reply(reply, result);
                 }
                 AuthCommand::FailSessionResolution {
@@ -600,15 +621,8 @@ async fn run_actor(
                         send_reply(reply, Err(error));
                         return;
                     }
-                    let result = session_resolution_failed(
-                        &mut actor,
-                        &attempt_id,
-                        detail,
-                        &emitter,
-                        &snapshots,
-                        &controls,
-                    )
-                    .await;
+                    let result =
+                        fail_session_resolution(&mut actor, &attempt_id, detail, &emitter).await;
                     send_reply(reply, result);
                 }
                 AuthCommand::StartSession {
@@ -622,15 +636,8 @@ async fn run_actor(
                         send_reply(reply, Err(error));
                         return;
                     }
-                    let result = handle_start_session(
-                        &mut actor,
-                        &attempt_id,
-                        session,
-                        emitter,
-                        &snapshots,
-                        &controls,
-                    )
-                    .await;
+                    let result =
+                        handle_start_session(&mut actor, &attempt_id, session, emitter).await;
                     send_reply(reply, result);
                 }
             }
@@ -639,7 +646,7 @@ async fn run_actor(
         .await;
     }
 
-    let _ = cancel_current(&mut actor, None, None, false, None, &snapshots, &controls).await;
+    let _ = cancel_current(&mut actor, None, None, false, None).await;
 }
 
 async fn create_attempt(
@@ -647,8 +654,6 @@ async fn create_attempt(
     caller: String,
     username: String,
     emitter: &SignalEmitter<'static>,
-    snapshots: &watch::Sender<AuthSnapshot>,
-    controls: &watch::Sender<Option<AttemptControl>>,
     commands: &mpsc::WeakSender<AuthCommand>,
 ) -> fdo::Result<String> {
     if actor
@@ -660,7 +665,7 @@ async fn create_attempt(
             "authentication belongs to another D-Bus caller".to_owned(),
         ));
     }
-    cancel_current(actor, None, None, false, None, snapshots, controls).await?;
+    cancel_current(actor, None, None, false, None).await?;
 
     let cancellation = actor.shutdown.child_token();
     let watcher_token = CancellationToken::new();
@@ -677,17 +682,12 @@ async fn create_attempt(
         user_response_submitted: false,
     });
     tracing::info!(%attempt_id, %caller, state = actor.auth.get_state().as_str(), "authentication started");
-    publish_state(&actor.auth, &attempt_id, snapshots);
-    let _ = controls.send(Some(AttemptControl {
+    let _ = actor.controls.send(Some(AttemptControl {
         caller: caller.clone(),
         attempt_id: attempt_id.clone(),
         cancellation: cancellation.clone(),
     }));
-    emit_state_best_effort(
-        Some(emitter),
-        &AuthSnapshot::from_auth(&actor.auth, &attempt_id),
-    )
-    .await;
+    actor.publish_snapshot(&attempt_id, Some(emitter)).await;
     spawn_caller_watcher(
         emitter.connection().clone(),
         caller,
@@ -705,15 +705,12 @@ async fn run_authentication(
     attempt_id: &str,
     username: &str,
     emitter: SignalEmitter<'static>,
-    snapshots: &watch::Sender<AuthSnapshot>,
-    controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<()> {
     let cancellation = actor.get_attempt().cancellation.clone();
     // I/O stays in the same actor command after acceptance, so cancellation
     // still finishes cleanup before a replacement transaction can start.
     let result = GreetdTransport::connect(&cancellation).await;
-    let transport =
-        handle_transport_result(actor, attempt_id, result, &emitter, snapshots, controls).await?;
+    let transport = handle_transport_result(actor, attempt_id, result, &emitter).await?;
     actor
         .attempt
         .as_mut()
@@ -721,22 +718,12 @@ async fn run_authentication(
         .transport = Some(transport);
 
     let response = actor
-        .get_transport()
+        .transport_mut()
         .create_session(username, &cancellation)
         .await;
-    let response =
-        handle_transport_result(actor, attempt_id, response, &emitter, snapshots, controls).await?;
+    let response = handle_transport_result(actor, attempt_id, response, &emitter).await?;
 
-    consume_response(
-        actor,
-        attempt_id,
-        response,
-        emitter,
-        &cancellation,
-        snapshots,
-        controls,
-    )
-    .await
+    consume_response(actor, attempt_id, response, emitter, &cancellation).await
 }
 
 async fn handle_respond(
@@ -744,10 +731,8 @@ async fn handle_respond(
     attempt_id: &str,
     response: zeroize::Zeroizing<String>,
     emitter: SignalEmitter<'static>,
-    snapshots: &watch::Sender<AuthSnapshot>,
-    controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<()> {
-    require_state(&actor.auth, AuthState::WaitingForInput)?;
+    validate_state(&actor.auth, AuthState::WaitingForInput)?;
     let cancellation = actor.get_attempt().cancellation.clone();
 
     actor
@@ -757,100 +742,63 @@ async fn handle_respond(
         .user_response_submitted = true;
 
     actor
-        .auth
-        .transition(StateEvent::ResponseSubmitted)
-        .expect("authentication event matches the actor phase");
-    publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(
-        Some(&emitter),
-        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-    )
-    .await;
+        .apply_transition(attempt_id, StateEvent::ResponseSubmitted, Some(&emitter))
+        .await;
 
     let result = actor
-        .get_transport()
+        .transport_mut()
         .post_auth_message_response(Some(response.as_str()), &cancellation)
         .await;
     drop(response);
-    let next_response =
-        handle_transport_result(actor, attempt_id, result, &emitter, snapshots, controls).await?;
+    let next_response = handle_transport_result(actor, attempt_id, result, &emitter).await?;
 
-    consume_response(
-        actor,
-        attempt_id,
-        next_response,
-        emitter,
-        &cancellation,
-        snapshots,
-        controls,
-    )
-    .await
+    consume_response(actor, attempt_id, next_response, emitter, &cancellation).await
 }
 
-async fn resolve_session(
+async fn begin_session_resolution(
     actor: &mut ActorState,
     attempt_id: &str,
     emitter: &SignalEmitter<'static>,
-    snapshots: &watch::Sender<AuthSnapshot>,
 ) -> fdo::Result<()> {
-    require_state(&actor.auth, AuthState::Authenticated)?;
+    validate_state(&actor.auth, AuthState::Authenticated)?;
     actor
-        .auth
-        .transition(StateEvent::StartSessionRequested)
-        .expect("authentication event matches the actor phase");
-    publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(
-        Some(emitter),
-        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-    )
-    .await;
+        .apply_transition(attempt_id, StateEvent::StartSessionRequested, Some(emitter))
+        .await;
     Ok(())
 }
 
-async fn session_unavailable(
+async fn report_session_unavailable(
     actor: &mut ActorState,
     attempt_id: &str,
     detail: String,
     emitter: &SignalEmitter<'static>,
-    snapshots: &watch::Sender<AuthSnapshot>,
 ) -> fdo::Result<()> {
-    require_state(&actor.auth, AuthState::ResolvingSession)?;
+    validate_state(&actor.auth, AuthState::ResolvingSession)?;
     actor
-        .auth
-        .transition(StateEvent::SessionUnavailable { detail })
-        .expect("authentication event matches the actor phase");
-    publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(
-        Some(emitter),
-        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-    )
-    .await;
+        .apply_transition(
+            attempt_id,
+            StateEvent::SessionUnavailable { detail },
+            Some(emitter),
+        )
+        .await;
     Ok(())
 }
 
-async fn session_resolution_failed(
+async fn fail_session_resolution(
     actor: &mut ActorState,
     attempt_id: &str,
     detail: String,
     emitter: &SignalEmitter<'static>,
-    snapshots: &watch::Sender<AuthSnapshot>,
-    controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<()> {
-    require_state(&actor.auth, AuthState::ResolvingSession)?;
-    let detail = display_detail(&detail);
+    validate_state(&actor.auth, AuthState::ResolvingSession)?;
     actor
-        .auth
-        .transition(StateEvent::ProtocolFailure {
-            detail: detail.clone(),
-        })
-        .expect("authentication event matches the actor phase");
-    publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(
-        Some(emitter),
-        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-    )
-    .await;
-    detach_resources(actor, controls);
+        .apply_transition(
+            attempt_id,
+            StateEvent::ProtocolFailure { detail },
+            Some(emitter),
+        )
+        .await;
+    actor.detach_resources();
     Ok(())
 }
 
@@ -859,62 +807,38 @@ async fn handle_start_session(
     attempt_id: &str,
     session: SessionEntry,
     emitter: SignalEmitter<'static>,
-    snapshots: &watch::Sender<AuthSnapshot>,
-    controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<()> {
-    require_state(&actor.auth, AuthState::ResolvingSession)?;
+    validate_state(&actor.auth, AuthState::ResolvingSession)?;
     let (command, environment) = match get_session_launch(&session) {
         Ok(launch) => launch,
         Err(error) => {
-            let detail = format!("could not prepare user session launcher: {error}");
+            let detail =
+                sanitize_detail(&format!("could not prepare user session launcher: {error}"));
             tracing::error!(%attempt_id, error = ?error, "user session launcher preparation failed");
-            session_resolution_failed(
-                actor,
-                attempt_id,
-                detail.clone(),
-                &emitter,
-                snapshots,
-                controls,
-            )
-            .await?;
+            fail_session_resolution(actor, attempt_id, detail.clone(), &emitter).await?;
             return Err(fdo::Error::Failed(detail));
         }
     };
     let cancellation = actor.get_attempt().cancellation.clone();
 
     actor
-        .auth
-        .transition(StateEvent::SessionResolved)
-        .expect("authentication event matches the actor phase");
-    publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(
-        Some(&emitter),
-        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-    )
-    .await;
+        .apply_transition(attempt_id, StateEvent::SessionResolved, Some(&emitter))
+        .await;
 
     tracing::info!(%attempt_id, session_id = %session.session_id, source = %session.source.display(), state = actor.auth.get_state().as_str(), "starting desktop session");
     let response = actor
-        .get_transport()
+        .transport_mut()
         .start_session(&command, &environment, &cancellation)
         .await;
-    let response =
-        handle_transport_result(actor, attempt_id, response, &emitter, snapshots, controls).await?;
+    let response = handle_transport_result(actor, attempt_id, response, &emitter).await?;
 
     match response {
         GreetdResponse::Success => {
             tracing::info!(%attempt_id, session_id = %session.session_id, "desktop session accepted by greetd");
             actor
-                .auth
-                .transition(StateEvent::SessionStarted)
-                .expect("authentication event matches the actor phase");
-            publish_state(&actor.auth, attempt_id, snapshots);
-            emit_state_best_effort(
-                Some(&emitter),
-                &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-            )
-            .await;
-            detach_resources(actor, controls);
+                .apply_transition(attempt_id, StateEvent::SessionStarted, Some(&emitter))
+                .await;
+            actor.detach_resources();
             Ok(())
         }
         GreetdResponse::Error {
@@ -922,20 +846,17 @@ async fn handle_start_session(
             description,
         } => {
             tracing::error!(%attempt_id, %error_type, state = actor.auth.get_state().as_str(), "desktop session start failed");
-            let detail = display_detail(&format!("{error_type}: {description}"));
+            let detail = sanitize_detail(&format!("{error_type}: {description}"));
             actor
-                .auth
-                .transition(StateEvent::SessionStartFailed {
-                    detail: detail.clone(),
-                })
-                .expect("authentication event matches the actor phase");
-            publish_state(&actor.auth, attempt_id, snapshots);
-            emit_state_best_effort(
-                Some(&emitter),
-                &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-            )
-            .await;
-            detach_resources(actor, controls);
+                .apply_transition(
+                    attempt_id,
+                    StateEvent::SessionStartFailed {
+                        detail: detail.clone(),
+                    },
+                    Some(&emitter),
+                )
+                .await;
+            actor.detach_resources();
             Err(fdo::Error::Failed(detail))
         }
         GreetdResponse::AuthMessage { .. } => Err(fail_transaction(
@@ -945,8 +866,6 @@ async fn handle_start_session(
                 "greetd returned an authentication message while starting a session".to_owned(),
             ),
             &emitter,
-            snapshots,
-            controls,
         )
         .await),
     }
@@ -960,17 +879,13 @@ async fn handle_transport_result<T>(
     attempt_id: &str,
     result: Result<T, GreetdError>,
     emitter: &SignalEmitter<'static>,
-    snapshots: &watch::Sender<AuthSnapshot>,
-    controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<T> {
     match result {
         Ok(value) => Ok(value),
         Err(GreetdError::Cancelled) => {
-            Err(finish_cancellation(actor, attempt_id, Some(emitter), snapshots, controls).await)
+            Err(finish_cancellation(actor, attempt_id, Some(emitter)).await)
         }
-        Err(error) => {
-            Err(fail_transaction(actor, attempt_id, error, emitter, snapshots, controls).await)
-        }
+        Err(error) => Err(fail_transaction(actor, attempt_id, error, emitter).await),
     }
 }
 
@@ -980,52 +895,38 @@ async fn consume_response(
     mut response: GreetdResponse,
     emitter: SignalEmitter<'static>,
     cancellation: &CancellationToken,
-    snapshots: &watch::Sender<AuthSnapshot>,
-    controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<()> {
     // One greetd response can require several follow-up frames: visible and
     // secret prompts wait for the UI, while informational messages are
     // acknowledged automatically and continue the same transaction.
     loop {
         if cancellation.is_cancelled() {
-            return Err(finish_cancellation(
-                actor,
-                attempt_id,
-                Some(&emitter),
-                snapshots,
-                controls,
-            )
-            .await);
+            return Err(finish_cancellation(actor, attempt_id, Some(&emitter)).await);
         }
         match response {
             GreetdResponse::Success => {
                 tracing::info!(%attempt_id, state = actor.auth.get_state().as_str(), "authentication succeeded");
                 actor
-                    .auth
-                    .transition(StateEvent::AuthenticationSucceeded)
-                    .expect("authentication event matches the actor phase");
-                publish_state(&actor.auth, attempt_id, snapshots);
-                emit_state_best_effort(
-                    Some(&emitter),
-                    &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-                )
-                .await;
+                    .apply_transition(
+                        attempt_id,
+                        StateEvent::AuthenticationSucceeded,
+                        Some(&emitter),
+                    )
+                    .await;
                 return Ok(());
             }
             GreetdResponse::Error {
                 error_type,
                 description,
             } => {
-                let detail = display_detail(&format!("{error_type}: {description}"));
+                let detail = sanitize_detail(&format!("{error_type}: {description}"));
                 // greetd 0.10 retains its configuring slot after PAM failure.
                 // Cancel removes that slot before contacting the dead worker,
                 // so even its Error response completes server-side cleanup.
                 // Transport failures and unexpected prompts remain failures.
-                let result = actor.get_transport().cancel_session(cancellation).await;
-                let cancel_response = handle_transport_result(
-                    actor, attempt_id, result, &emitter, snapshots, controls,
-                )
-                .await?;
+                let result = actor.transport_mut().cancel_session(cancellation).await;
+                let cancel_response =
+                    handle_transport_result(actor, attempt_id, result, &emitter).await?;
                 if matches!(cancel_response, GreetdResponse::AuthMessage { .. }) {
                     return Err(fail_transaction(
                         actor,
@@ -1034,8 +935,6 @@ async fn consume_response(
                             "unexpected prompt while cancelling rejected authentication".to_owned(),
                         ),
                         &emitter,
-                        snapshots,
-                        controls,
                     )
                     .await);
                 }
@@ -1051,17 +950,14 @@ async fn consume_response(
                         .expect("active authentication owns a username")
                         .to_owned();
                     actor
-                        .auth
-                        .transition(StateEvent::CredentialRejected {
-                            detail: detail.clone(),
-                        })
-                        .expect("authentication event matches the actor phase");
-                    publish_state(&actor.auth, attempt_id, snapshots);
-                    emit_state_best_effort(
-                        Some(&emitter),
-                        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-                    )
-                    .await;
+                        .apply_transition(
+                            attempt_id,
+                            StateEvent::CredentialRejected {
+                                detail: detail.clone(),
+                            },
+                            Some(&emitter),
+                        )
+                        .await;
                     emit_prompt_best_effort(&emitter, attempt_id, "error", detail, cancellation)
                         .await;
 
@@ -1073,65 +969,58 @@ async fn consume_response(
                     resources.user_response_submitted = false;
 
                     let result = GreetdTransport::connect(cancellation).await;
-                    let transport = handle_transport_result(
-                        actor, attempt_id, result, &emitter, snapshots, controls,
-                    )
-                    .await?;
+                    let transport =
+                        handle_transport_result(actor, attempt_id, result, &emitter).await?;
                     actor
                         .attempt
                         .as_mut()
                         .expect("active authentication owns attempt resources")
                         .transport = Some(transport);
                     let result = actor
-                        .get_transport()
+                        .transport_mut()
                         .create_session(&username, cancellation)
                         .await;
-                    response = handle_transport_result(
-                        actor, attempt_id, result, &emitter, snapshots, controls,
-                    )
-                    .await?;
+                    response = handle_transport_result(actor, attempt_id, result, &emitter).await?;
                     continue;
                 }
 
                 tracing::warn!(%attempt_id, %error_type, state = actor.auth.get_state().as_str(), "authentication rejected by greetd");
                 actor
-                    .auth
-                    .transition(StateEvent::AuthenticationFailed {
-                        detail: detail.clone(),
-                    })
-                    .expect("authentication event matches the actor phase");
-                publish_state(&actor.auth, attempt_id, snapshots);
-                emit_state_best_effort(
-                    Some(&emitter),
-                    &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-                )
-                .await;
-                detach_resources(actor, controls);
+                    .apply_transition(
+                        attempt_id,
+                        StateEvent::AuthenticationFailed {
+                            detail: detail.clone(),
+                        },
+                        Some(&emitter),
+                    )
+                    .await;
+                actor.detach_resources();
                 return Err(fdo::Error::Failed(detail));
             }
             GreetdResponse::AuthMessage {
                 auth_message_type,
                 auth_message,
             } => {
+                let disposition = match auth_message_type.as_str() {
+                    "visible" | "secret" => PromptDisposition::NeedsInput,
+                    "info" | "error" => PromptDisposition::AutoAcknowledge,
+                    _ => {
+                        return Err(fail_transaction(
+                            actor,
+                            attempt_id,
+                            GreetdError::UnexpectedResponse(format!(
+                                "unsupported authentication message type: {auth_message_type}"
+                            )),
+                            &emitter,
+                        )
+                        .await);
+                    }
+                };
                 actor
-                    .auth
-                    .transition(StateEvent::AuthMessage)
-                    .expect("authentication event matches the actor phase");
-                publish_state(&actor.auth, attempt_id, snapshots);
-                emit_state_best_effort(
-                    Some(&emitter),
-                    &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-                )
-                .await;
+                    .apply_transition(attempt_id, StateEvent::AuthMessage, Some(&emitter))
+                    .await;
                 if cancellation.is_cancelled() {
-                    return Err(finish_cancellation(
-                        actor,
-                        attempt_id,
-                        Some(&emitter),
-                        snapshots,
-                        controls,
-                    )
-                    .await);
+                    return Err(finish_cancellation(actor, attempt_id, Some(&emitter)).await);
                 }
                 emit_prompt_best_effort(
                     &emitter,
@@ -1141,72 +1030,39 @@ async fn consume_response(
                     cancellation,
                 )
                 .await;
-                match auth_message_type.as_str() {
-                    "visible" | "secret" => {
-                        if cancellation.is_cancelled() {
-                            return Err(finish_cancellation(
-                                actor,
-                                attempt_id,
-                                Some(&emitter),
-                                snapshots,
-                                controls,
-                            )
-                            .await);
-                        }
+                if cancellation.is_cancelled() {
+                    return Err(finish_cancellation(actor, attempt_id, Some(&emitter)).await);
+                }
+                match disposition {
+                    PromptDisposition::NeedsInput => {
                         actor
-                            .auth
-                            .transition(StateEvent::PromptNeedsInput)
-                            .expect("authentication event matches the actor phase");
-                        publish_state(&actor.auth, attempt_id, snapshots);
-                        emit_state_best_effort(
-                            Some(&emitter),
-                            &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-                        )
-                        .await;
-                        if cancellation.is_cancelled() {
-                            return Err(finish_cancellation(
-                                actor,
+                            .apply_transition(
                                 attempt_id,
+                                StateEvent::PromptNeedsInput,
                                 Some(&emitter),
-                                snapshots,
-                                controls,
                             )
-                            .await);
+                            .await;
+                        if cancellation.is_cancelled() {
+                            return Err(
+                                finish_cancellation(actor, attempt_id, Some(&emitter)).await
+                            );
                         }
                         return Ok(());
                     }
-                    "info" | "error" => {
+                    PromptDisposition::AutoAcknowledge => {
                         actor
-                            .auth
-                            .transition(StateEvent::PromptAutoResponse)
-                            .expect("authentication event matches the actor phase");
-                        publish_state(&actor.auth, attempt_id, snapshots);
-                        emit_state_best_effort(
-                            Some(&emitter),
-                            &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-                        )
-                        .await;
+                            .apply_transition(
+                                attempt_id,
+                                StateEvent::PromptAutoResponse,
+                                Some(&emitter),
+                            )
+                            .await;
                         let result = actor
-                            .get_transport()
+                            .transport_mut()
                             .post_auth_message_response(None, cancellation)
                             .await;
-                        response = handle_transport_result(
-                            actor, attempt_id, result, &emitter, snapshots, controls,
-                        )
-                        .await?;
-                    }
-                    _ => {
-                        return Err(fail_transaction(
-                            actor,
-                            attempt_id,
-                            GreetdError::UnexpectedResponse(format!(
-                                "unsupported authentication message type: {auth_message_type}"
-                            )),
-                            &emitter,
-                            snapshots,
-                            controls,
-                        )
-                        .await);
+                        response =
+                            handle_transport_result(actor, attempt_id, result, &emitter).await?;
                     }
                 }
             }
@@ -1220,25 +1076,15 @@ async fn cancel_current(
     expected_caller: Option<&str>,
     allow_after_cleanup: bool,
     emitter: Option<SignalEmitter<'static>>,
-    snapshots: &watch::Sender<AuthSnapshot>,
-    controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Result<()> {
     // Invalidate resources before publishing Idle. Delayed disconnect or UI
     // cancellation commands are then harmless after cleanup completes.
-    validate_cancel_target(&actor.auth, expected_attempt, allow_after_cleanup)?;
-    if let Some(expected_caller) = expected_caller
-        && actor
-            .attempt
-            .as_ref()
-            .is_none_or(|attempt| attempt.caller != expected_caller)
-    {
-        if allow_after_cleanup && actor.auth.get_state() == AuthState::Idle {
-            return Ok(());
-        }
-        return Err(fdo::Error::AccessDenied(
-            "authentication belongs to another D-Bus caller".to_owned(),
-        ));
-    }
+    validate_cancel_request(
+        actor,
+        expected_attempt,
+        expected_caller,
+        allow_after_cleanup,
+    )?;
     if !actor.auth.get_state().is_active() {
         return Ok(());
     }
@@ -1250,24 +1096,15 @@ async fn cancel_current(
         .to_owned();
     tracing::info!(%attempt_id, state = actor.auth.get_state().as_str(), "cancelling authentication");
     actor
-        .auth
-        .transition(StateEvent::CancelRequested)
-        .expect("authentication event matches the actor phase");
-    publish_state(&actor.auth, &attempt_id, snapshots);
-    if let Some(emitter) = emitter.as_ref() {
-        emit_state_best_effort(
-            Some(emitter),
-            &AuthSnapshot::from_auth(&actor.auth, &attempt_id),
-        )
+        .apply_transition(&attempt_id, StateEvent::CancelRequested, emitter.as_ref())
         .await;
-    }
     let mut resources = actor
         .attempt
         .take()
         .expect("active authentication owns attempt resources");
     resources.cancellation.cancel();
     resources.caller_watcher.cancel();
-    let _ = controls.send(None);
+    let _ = actor.controls.send(None);
     let cancel_result = if let Some(mut transport) = resources.transport.take() {
         // The attempt token is already cancelled. A fresh token permits a
         // bounded graceful cancel exchange before the socket is dropped.
@@ -1284,15 +1121,12 @@ async fn cancel_current(
         Ok(GreetdResponse::Success)
     };
     actor
-        .auth
-        .transition(StateEvent::CancellationFinished)
-        .expect("cancellation completes from Cancelling");
-    publish_state(&actor.auth, &attempt_id, snapshots);
-    emit_state_best_effort(
-        emitter.as_ref(),
-        &AuthSnapshot::from_auth(&actor.auth, &attempt_id),
-    )
-    .await;
+        .apply_transition(
+            &attempt_id,
+            StateEvent::CancellationFinished,
+            emitter.as_ref(),
+        )
+        .await;
 
     match cancel_result {
         Ok(GreetdResponse::Success) => {
@@ -1306,7 +1140,7 @@ async fn cancel_current(
             tracing::warn!(%attempt_id, %error_type, "greetd rejected cancellation; transport closed");
             Err(fdo::Error::Failed(format!(
                 "could not cancel greetd session: {}",
-                display_detail(&format!("{error_type}: {description}"))
+                sanitize_detail(&format!("{error_type}: {description}"))
             )))
         }
         Ok(GreetdResponse::AuthMessage { .. }) => {
@@ -1328,8 +1162,6 @@ async fn finish_cancellation(
     actor: &mut ActorState,
     attempt_id: &str,
     emitter: Option<&SignalEmitter<'static>>,
-    snapshots: &watch::Sender<AuthSnapshot>,
-    controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Error {
     // Interrupted framing may leave unread response bytes or a partial request.
     // Close this transport instead of sending another request over a socket
@@ -1340,21 +1172,15 @@ async fn finish_cancellation(
     );
     tracing::info!(%attempt_id, state = actor.auth.get_state().as_str(), "cancelling authentication");
     actor
-        .auth
-        .transition(StateEvent::CancelRequested)
-        .expect("transport cancellation occurs during active authentication");
-    publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(emitter, &AuthSnapshot::from_auth(&actor.auth, attempt_id)).await;
-    detach_resources(actor, controls);
+        .apply_transition(attempt_id, StateEvent::CancelRequested, emitter)
+        .await;
+    actor.detach_resources();
     actor
-        .auth
-        .transition(StateEvent::CancellationFinished)
-        .expect("cancellation completes from Cancelling");
-    publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(emitter, &AuthSnapshot::from_auth(&actor.auth, attempt_id)).await;
+        .apply_transition(attempt_id, StateEvent::CancellationFinished, emitter)
+        .await;
 
     tracing::info!(%attempt_id, "authentication cancelled; transport closed");
-    cancelled_error()
+    fdo::Error::Failed("authentication attempt was cancelled".to_owned())
 }
 
 async fn fail_transaction(
@@ -1362,43 +1188,24 @@ async fn fail_transaction(
     attempt_id: &str,
     error: GreetdError,
     emitter: &SignalEmitter<'static>,
-    snapshots: &watch::Sender<AuthSnapshot>,
-    controls: &watch::Sender<Option<AttemptControl>>,
 ) -> fdo::Error {
     tracing::error!(%attempt_id, error = ?error, state = actor.auth.get_state().as_str(), "authentication transaction failed");
-    let detail = display_detail(&error.to_string());
+    let detail = sanitize_detail(&error.to_string());
     assert!(
         actor.auth.is_current_attempt(attempt_id),
         "actor fails its current attempt"
     );
     actor
-        .auth
-        .transition(StateEvent::ProtocolFailure {
-            detail: detail.clone(),
-        })
-        .expect("protocol failure occurs during active authentication");
-    publish_state(&actor.auth, attempt_id, snapshots);
-    emit_state_best_effort(
-        Some(emitter),
-        &AuthSnapshot::from_auth(&actor.auth, attempt_id),
-    )
-    .await;
-    detach_resources(actor, controls);
+        .apply_transition(
+            attempt_id,
+            StateEvent::ProtocolFailure {
+                detail: detail.clone(),
+            },
+            Some(emitter),
+        )
+        .await;
+    actor.detach_resources();
     fdo::Error::Failed(detail)
-}
-
-fn detach_resources(actor: &mut ActorState, controls: &watch::Sender<Option<AttemptControl>>) {
-    actor.attempt.take();
-    let _ = controls.send(None);
-}
-
-fn publish_state(
-    auth: &AuthStateMachine,
-    attempt_id: &str,
-    snapshots: &watch::Sender<AuthSnapshot>,
-) {
-    tracing::info!(%attempt_id, state = auth.get_state().as_str(), "authentication state changed");
-    let _ = snapshots.send(AuthSnapshot::from_auth(auth, attempt_id));
 }
 
 fn spawn_caller_watcher(
@@ -1469,22 +1276,24 @@ async fn cancel_for_caller_disconnect(
     .await;
 }
 
-async fn emit_state_best_effort(emitter: Option<&SignalEmitter<'_>>, snapshot: &AuthSnapshot) {
+async fn emit_state_best_effort(emitter: Option<&SignalEmitter<'_>>, snapshot: AuthSnapshot) {
     let Some(emitter) = emitter else {
         return;
     };
+    let attempt_id = snapshot.attempt_id;
+    let state = snapshot.state;
     if let Err(error) = crate::service::GreeterService::state_changed(
         emitter,
-        snapshot.attempt_id.clone(),
-        snapshot.state.clone(),
-        snapshot.detail.clone(),
+        attempt_id.clone(),
+        state.clone(),
+        snapshot.detail,
     )
     .await
     {
         if emitter.connection().is_closed() {
-            tracing::debug!(attempt_id = %snapshot.attempt_id, state = %snapshot.state, %error, "StateChanged skipped on closed bus");
+            tracing::debug!(%attempt_id, %state, %error, "StateChanged skipped on closed bus");
         } else {
-            tracing::warn!(attempt_id = %snapshot.attempt_id, state = %snapshot.state, %error, "could not emit StateChanged");
+            tracing::warn!(%attempt_id, %state, %error, "could not emit StateChanged");
         }
     }
 }
@@ -1513,7 +1322,9 @@ async fn emit_prompt_best_effort(
 }
 
 fn validate_owned_attempt(actor: &ActorState, attempt_id: &str, caller: &str) -> fdo::Result<()> {
-    validate_attempt(&actor.auth, attempt_id)?;
+    if !actor.auth.is_current_attempt(attempt_id) {
+        return Err(fdo::Error::Failed("stale or unknown attempt id".to_owned()));
+    }
     if actor.get_attempt().caller != caller {
         return Err(fdo::Error::AccessDenied(
             "authentication belongs to another D-Bus caller".to_owned(),
@@ -1522,34 +1333,37 @@ fn validate_owned_attempt(actor: &ActorState, attempt_id: &str, caller: &str) ->
     Ok(())
 }
 
-fn validate_attempt(auth: &AuthStateMachine, attempt_id: &str) -> fdo::Result<()> {
-    if auth.is_current_attempt(attempt_id) {
-        Ok(())
-    } else {
-        Err(fdo::Error::Failed("stale or unknown attempt id".to_owned()))
-    }
-}
-
-fn validate_cancel_target(
-    auth: &AuthStateMachine,
+fn validate_cancel_request(
+    actor: &ActorState,
     expected_attempt: Option<&str>,
+    expected_caller: Option<&str>,
     allow_after_cleanup: bool,
 ) -> fdo::Result<()> {
     // An explicit Cancel that already interrupted its owned token may arrive
     // after I/O cleanup returned to Idle. Only that acknowledged interruption
     // permits success here; a delayed watcher must still reject a stale target.
+    if allow_after_cleanup && actor.auth.get_state() == AuthState::Idle {
+        return Ok(());
+    }
     if let Some(expected_attempt) = expected_attempt
-        && !auth.is_current_attempt(expected_attempt)
+        && !actor.auth.is_current_attempt(expected_attempt)
     {
-        if allow_after_cleanup && auth.get_state() == AuthState::Idle {
-            return Ok(());
-        }
         return Err(fdo::Error::Failed("stale or unknown attempt id".to_owned()));
+    }
+    if let Some(expected_caller) = expected_caller
+        && actor
+            .attempt
+            .as_ref()
+            .is_none_or(|attempt| attempt.caller != expected_caller)
+    {
+        return Err(fdo::Error::AccessDenied(
+            "authentication belongs to another D-Bus caller".to_owned(),
+        ));
     }
     Ok(())
 }
 
-fn require_state(auth: &AuthStateMachine, expected: AuthState) -> fdo::Result<()> {
+fn validate_state(auth: &AuthStateMachine, expected: AuthState) -> fdo::Result<()> {
     if auth.get_state() == expected {
         Ok(())
     } else {
@@ -1560,7 +1374,28 @@ fn require_state(auth: &AuthStateMachine, expected: AuthState) -> fdo::Result<()
     }
 }
 
-fn display_detail(detail: &str) -> String {
+fn sanitize_event_detail(event: StateEvent) -> StateEvent {
+    match event {
+        StateEvent::AuthenticationFailed { detail } => StateEvent::AuthenticationFailed {
+            detail: sanitize_detail(&detail),
+        },
+        StateEvent::CredentialRejected { detail } => StateEvent::CredentialRejected {
+            detail: sanitize_detail(&detail),
+        },
+        StateEvent::SessionUnavailable { detail } => StateEvent::SessionUnavailable {
+            detail: sanitize_detail(&detail),
+        },
+        StateEvent::SessionStartFailed { detail } => StateEvent::SessionStartFailed {
+            detail: sanitize_detail(&detail),
+        },
+        StateEvent::ProtocolFailure { detail } => StateEvent::ProtocolFailure {
+            detail: sanitize_detail(&detail),
+        },
+        other => other,
+    }
+}
+
+fn sanitize_detail(detail: &str) -> String {
     // Error text crosses the D-Bus boundary, so remove control characters and
     // cap its size before retaining or displaying it.
     detail
@@ -1570,50 +1405,64 @@ fn display_detail(detail: &str) -> String {
         .collect()
 }
 
-fn cancelled_error() -> fdo::Error {
-    fdo::Error::Failed("authentication attempt was cancelled".to_owned())
-}
-
 #[cfg(test)]
 mod tests {
     use tokio::sync::watch;
+    use tokio_util::sync::CancellationToken;
 
     use super::{
-        ActorState, AuthActorHandle, AuthSnapshot, cancel_current, display_detail,
-        validate_attempt, validate_cancel_target,
+        ActorState, AttemptResources, AuthActorHandle, AuthSnapshot, cancel_current,
+        sanitize_detail, sanitize_event_detail, validate_cancel_request, validate_owned_attempt,
     };
     use crate::state::{AuthState, AuthStateMachine, StateEvent};
 
-    fn cancelled_attempt() -> (AuthStateMachine, String) {
-        let mut auth = AuthStateMachine::default();
-        let attempt_id = auth.begin_authentication("alice".to_owned()).unwrap();
-        auth.transition(StateEvent::CancelRequested).unwrap();
-        auth.transition(StateEvent::CancellationFinished).unwrap();
-        (auth, attempt_id)
+    fn test_actor() -> ActorState {
+        let (snapshots, _) = watch::channel(AuthSnapshot::idle());
+        let (controls, _) = watch::channel(None);
+        ActorState::new(snapshots, controls, CancellationToken::new())
+    }
+
+    fn cancelled_actor() -> (ActorState, String) {
+        let mut actor = test_actor();
+        let attempt_id = actor.auth.begin_authentication("alice".to_owned()).unwrap();
+        actor.auth.transition(StateEvent::CancelRequested).unwrap();
+        actor
+            .auth
+            .transition(StateEvent::CancellationFinished)
+            .unwrap();
+        (actor, attempt_id)
     }
 
     #[test]
     fn disconnect_cancel_stops_at_cleanup() {
-        let (auth, attempt_id) = cancelled_attempt();
+        let (actor, attempt_id) = cancelled_actor();
 
-        assert_eq!(auth.get_state(), AuthState::Idle);
-        assert!(validate_cancel_target(&auth, Some(&attempt_id), false).is_err());
+        assert_eq!(actor.auth.get_state(), AuthState::Idle);
+        assert!(validate_cancel_request(&actor, Some(&attempt_id), Some(":1.1"), false).is_err());
     }
 
     #[test]
     fn cancel_is_idempotent_after_cleanup() {
-        let (auth, attempt_id) = cancelled_attempt();
+        let (actor, attempt_id) = cancelled_actor();
 
-        assert!(validate_cancel_target(&auth, Some(&attempt_id), true).is_ok());
+        assert!(validate_cancel_request(&actor, Some(&attempt_id), Some(":1.1"), true).is_ok());
     }
 
     #[test]
-    fn validates_current_attempt() {
-        let mut auth = AuthStateMachine::default();
-        let attempt_id = auth.begin_authentication("alice".to_owned()).unwrap();
+    fn validates_owned_current_attempt() {
+        let mut actor = test_actor();
+        let attempt_id = actor.auth.begin_authentication("alice".to_owned()).unwrap();
+        actor.attempt = Some(AttemptResources {
+            caller: ":1.1".to_owned(),
+            cancellation: CancellationToken::new(),
+            caller_watcher: CancellationToken::new(),
+            transport: None,
+            user_response_submitted: false,
+        });
 
-        assert!(validate_attempt(&auth, &attempt_id).is_ok());
-        assert!(validate_attempt(&auth, "attempt-stale").is_err());
+        assert!(validate_owned_attempt(&actor, &attempt_id, ":1.1").is_ok());
+        assert!(validate_owned_attempt(&actor, &attempt_id, ":1.2").is_err());
+        assert!(validate_owned_attempt(&actor, "attempt-stale", ":1.1").is_err());
     }
 
     #[test]
@@ -1636,53 +1485,43 @@ mod tests {
     }
 
     #[test]
-    fn sanitizes_detail() {
+    fn sanitizes_detail_and_session_unavailable_events() {
         let detail = format!("before\r\u{0}\nafter{}", "x".repeat(600));
-        let sanitized = display_detail(&detail);
+        let sanitized = sanitize_detail(&detail);
 
         assert!(!sanitized.contains('\r'));
         assert!(!sanitized.contains('\0'));
         assert!(sanitized.contains("before\nafter"));
         assert_eq!(sanitized.chars().count(), 512);
+
+        let StateEvent::SessionUnavailable {
+            detail: event_detail,
+        } = sanitize_event_detail(StateEvent::SessionUnavailable { detail })
+        else {
+            panic!("expected SessionUnavailable");
+        };
+        assert_eq!(event_detail, sanitized);
     }
 
     #[tokio::test]
     async fn cancel_after_cleanup_keeps_idle() {
-        let mut actor = ActorState::default();
+        let mut actor = test_actor();
         let attempt_id = actor.auth.begin_authentication("alice".to_owned()).unwrap();
-        actor.attempt = Some(super::AttemptResources {
+        actor.attempt = Some(AttemptResources {
             caller: ":1.1".to_owned(),
-            cancellation: tokio_util::sync::CancellationToken::new(),
-            caller_watcher: tokio_util::sync::CancellationToken::new(),
+            cancellation: CancellationToken::new(),
+            caller_watcher: CancellationToken::new(),
             transport: None,
             user_response_submitted: false,
         });
-        let (snapshots, _) = watch::channel(AuthSnapshot::idle());
-        let (controls, _) = watch::channel(None);
 
-        cancel_current(
-            &mut actor,
-            Some(&attempt_id),
-            None,
-            false,
-            None,
-            &snapshots,
-            &controls,
-        )
-        .await
-        .unwrap();
+        cancel_current(&mut actor, Some(&attempt_id), None, false, None)
+            .await
+            .unwrap();
 
-        cancel_current(
-            &mut actor,
-            Some(&attempt_id),
-            None,
-            true,
-            None,
-            &snapshots,
-            &controls,
-        )
-        .await
-        .unwrap();
+        cancel_current(&mut actor, Some(&attempt_id), Some(":1.1"), true, None)
+            .await
+            .unwrap();
         assert_eq!(actor.auth.get_state(), AuthState::Idle);
     }
 
