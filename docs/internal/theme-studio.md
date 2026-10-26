@@ -1,5 +1,8 @@
 # Theme Studio
 
+> [!NOTE]
+> Theme Studio is actively under development. Controls, workflows, and extension points are evolving as visual editing capabilities are added.
+
 Theme Studio is the visual Linux scene editor for compiled Akari themes. Its editor UI uses `shadcn_flutter`, while the live canvas renders the selected theme's own components, tokens, and assets through `SceneRuntime`.
 
 ## Launch Studio
