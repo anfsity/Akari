@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
@@ -157,6 +158,10 @@ class _AssetListState extends State<_AssetList> {
   @override
   void didUpdateWidget(_AssetList oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (identical(widget.paths, oldWidget.paths) ||
+        listEquals(widget.paths, oldWidget.paths)) {
+      return;
+    }
     final added = widget.paths.where((path) => !oldWidget.paths.contains(path));
     _selected =
         added.firstOrNull ??

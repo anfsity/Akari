@@ -14,6 +14,8 @@ class StudioPreferences {
     this.gridSize = 24,
   });
 
+  static const storageKey = 'akari.studio.preferences';
+
   final ThemeMode themeMode;
   final StudioPalette palette;
   final bool showGrid;
@@ -30,7 +32,7 @@ class StudioPreferences {
 
   static Future<StudioPreferences> load() async {
     final storage = await SharedPreferences.getInstance();
-    final source = storage.getString('akari.studio.preferences');
+    final source = storage.getString(storageKey);
     if (source == null) return const StudioPreferences();
     final json = jsonDecode(source);
     if (json is! Map<String, dynamic> ||
@@ -74,7 +76,7 @@ class StudioPreferences {
   Future<void> save() async {
     final storage = await SharedPreferences.getInstance();
     final saved = await storage.setString(
-      'akari.studio.preferences',
+      storageKey,
       jsonEncode({
         'themeMode': themeMode.name,
         'palette': palette.name,

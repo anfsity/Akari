@@ -31,7 +31,7 @@ void main() {
   test('legacy appearance choices migrate with the default palette', () async {
     for (final dark in [true, false]) {
       SharedPreferences.setMockInitialValues({
-        'akari.studio.preferences': jsonEncode({
+        StudioPreferences.storageKey: jsonEncode({
           'darkMode': dark,
           'showGrid': true,
           'snapToGrid': false,
@@ -55,7 +55,7 @@ void main() {
         {'palette': 'unknown'},
       ]) {
         SharedPreferences.setMockInitialValues({
-          'akari.studio.preferences': jsonEncode({
+          StudioPreferences.storageKey: jsonEncode({
             'themeMode': 'system',
             'palette': 'zinc',
             'showGrid': false,
@@ -71,7 +71,7 @@ void main() {
 
   test('corrupt stored preferences can be replaced with defaults', () async {
     SharedPreferences.setMockInitialValues({
-      'akari.studio.preferences': '{"gridSize":0}',
+      StudioPreferences.storageKey: '{"gridSize":0}',
     });
     await expectLater(StudioPreferences.load(), throwsFormatException);
     await const StudioPreferences().save();

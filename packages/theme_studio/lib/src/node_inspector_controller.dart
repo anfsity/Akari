@@ -40,9 +40,15 @@ class NodeInspectorController extends ChangeNotifier {
   }
 
   void updateMotion(SceneMotionPreset motion) {
+    if (motion == _motion) return;
     _motion = motion;
     _hasDraft = true;
     notifyListeners();
+  }
+
+  void resetScale() {
+    getField('Scale X').text = '1.0';
+    getField('Scale Y').text = '1.0';
   }
 
   void showError(String error) {
@@ -55,12 +61,15 @@ class NodeInspectorController extends ChangeNotifier {
   // every inspector section on each move.
   void updatePreviewNode(SceneNode node) {
     _updatingFields = true;
-    for (final entry in _getPreviewValues(node).entries) {
-      final field = getField(entry.key);
-      final text = _getFieldText(entry.key, entry.value);
-      if (field.text != text) field.text = text;
+    try {
+      for (final entry in _getPreviewValues(node).entries) {
+        final field = getField(entry.key);
+        final text = _getFieldText(entry.key, entry.value);
+        if (field.text != text) field.text = text;
+      }
+    } finally {
+      _updatingFields = false;
     }
-    _updatingFields = false;
   }
 
   Map<String, double> _getLayoutValues(SceneRect rect) => {
@@ -83,7 +92,8 @@ class NodeInspectorController extends ChangeNotifier {
     if (_layoutUnit == StudioLayoutUnit.percent) return 100;
     return switch (label) {
       'X' || 'Width' => _canvas.referenceWidth.toDouble(),
-      _ => _canvas.referenceHeight.toDouble(),
+      'Y' || 'Height' => _canvas.referenceHeight.toDouble(),
+      _ => throw ArgumentError.value(label, 'label'),
     };
   }
 
@@ -98,10 +108,13 @@ class NodeInspectorController extends ChangeNotifier {
       final rect = _getDraftRect();
       _layoutUnit = unit;
       _updatingFields = true;
-      for (final entry in _getLayoutValues(rect).entries) {
-        getField(entry.key).text = _getFieldText(entry.key, entry.value);
+      try {
+        for (final entry in _getLayoutValues(rect).entries) {
+          getField(entry.key).text = _getFieldText(entry.key, entry.value);
+        }
+      } finally {
+        _updatingFields = false;
       }
-      _updatingFields = false;
       notifyListeners();
     } on FormatException catch (error) {
       showError(error.message);
@@ -110,31 +123,34 @@ class NodeInspectorController extends ChangeNotifier {
 
   void resetNode(SceneNode node, {SceneCanvas? canvas}) {
     _updatingFields = true;
-    _node = node;
-    if (canvas != null) _canvas = canvas;
-    final transform = node.transform;
-    final values = <String, Object>{
-      ..._getPreviewValues(node),
-      'Depth': node.z,
-      'Paint order': node.renderOrder,
-      'Focus order': node.focusOrder,
-      'Translate X': transform.translateX,
-      'Translate Y': transform.translateY,
-      'Pivot X': transform.pivotX,
-      'Pivot Y': transform.pivotY,
-      'Perspective': transform.perspective,
-      'Properties': const JsonEncoder.withIndent('  ').convert(node.properties),
-    };
-    for (final entry in values.entries) {
-      final controller = _fields.putIfAbsent(entry.key, () {
-        return TextEditingController()..addListener(_markDraftChanged);
-      });
-      controller.text = _getFieldText(entry.key, entry.value);
+    try {
+      _node = node;
+      if (canvas != null) _canvas = canvas;
+      final transform = node.transform;
+      final values = <String, Object>{
+        ..._getPreviewValues(node),
+        'Depth': node.z,
+        'Paint order': node.renderOrder,
+        'Focus order': node.focusOrder,
+        'Translate X': transform.translateX,
+        'Translate Y': transform.translateY,
+        'Pivot X': transform.pivotX,
+        'Pivot Y': transform.pivotY,
+        'Perspective': transform.perspective,
+        'Properties': const JsonEncoder.withIndent('  ').convert(node.properties),
+      };
+      for (final entry in values.entries) {
+        final controller = _fields.putIfAbsent(entry.key, () {
+          return TextEditingController()..addListener(_markDraftChanged);
+        });
+        controller.text = _getFieldText(entry.key, entry.value);
+      }
+      _motion = node.motion;
+      _error = null;
+      _hasDraft = false;
+    } finally {
+      _updatingFields = false;
     }
-    _motion = node.motion;
-    _error = null;
-    _hasDraft = false;
-    _updatingFields = false;
     notifyListeners();
   }
 
