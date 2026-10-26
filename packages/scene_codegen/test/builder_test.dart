@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:scene_codegen/builder.dart';
+import 'package:scene_codegen/scene_codegen.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -37,10 +37,9 @@ void main() {
     // scene re-exports these models; use their Flutter-free source to execute
     // the generated constructors without requiring a Flutter runtime.
     await script.writeAsString('''
-import 'dart:convert';
 ${generated.replaceAll('package:scene/scene.dart', 'package:scene_schema/scene_schema.dart')}
 void main() {
-  print(jsonEncode(sceneDocumentToMap(testSceneDocument)));
+  print(encodeSceneDocument(testSceneDocument));
 }
 ''');
     final result = await Process.run(Platform.resolvedExecutable, [

@@ -1,7 +1,10 @@
 import 'package:scene_schema/scene_schema.dart';
 
 String generateScene(String input) {
-  final document = decodeSceneDocument(input);
+  return generateSceneFromDocument(decodeSceneDocument(input));
+}
+
+String generateSceneFromDocument(SceneDocument document) {
   // A getter creates a fresh document after hot reload. A cached top-level
   // final would keep the old scene even after regenerated code is loaded.
   return '''// GENERATED CODE - DO NOT MODIFY BY HAND
