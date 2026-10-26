@@ -47,6 +47,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _activeViewId =
         WidgetsBinding.instance.platformDispatcher.implicitView!.viewId;
     WidgetsBinding.instance.addObserver(this);
+    // Active display focus is tracked via dual mechanisms: GTK reports window
+    // focus changes over the akari/displays MethodChannel, while Listener
+    // taps activate views directly during in-engine pointer hit testing.
     _displayChannel.setMethodCallHandler((call) async {
       if (call.method == 'focusView') {
         _activateView(call.arguments as int);
@@ -72,7 +75,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     final seed = await theme.findBackgroundSeed();
     // A hot reload can replace the theme while asset decoding is pending.
     // Applying that old seed would overwrite the newly assembled theme.
-    if (!mounted || !identical(theme, _theme) || seed == null) {
+    // When seed is null (e.g. background image removed), reset _themeSeed.
+    if (!mounted || !identical(theme, _theme) || seed == _themeSeed) {
       return;
     }
     setState(() {

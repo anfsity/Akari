@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:scene/scene.dart';
 
 import 'greeter_models.dart';
 
@@ -67,3 +68,39 @@ class SessionPickerSlots {
 }
 
 typedef PowerSlots = ({PowerMode mode, GreeterError? error});
+
+/// Maps the current greeter slots onto the scene predicate vocabulary.
+Set<ScenePredicate> getActiveScenePredicates({
+  required ServiceSlots service,
+  required AuthPromptSlots auth,
+  required AccountPickerSlots account,
+  required SessionPickerSlots session,
+  required PowerSlots power,
+  required bool dormant,
+}) {
+  return <ScenePredicate>{
+    if (dormant) ScenePredicate.isDormant,
+    switch (service.mode) {
+      ServiceMode.starting => ScenePredicate.isServiceStarting,
+      ServiceMode.ready => ScenePredicate.isServiceReady,
+      ServiceMode.unavailable => ScenePredicate.isServiceUnavailable,
+    },
+    switch (auth.mode) {
+      AuthMode.userSelection => ScenePredicate.isUserSelection,
+      AuthMode.prompting => ScenePredicate.isAuthPrompting,
+      AuthMode.submitting => ScenePredicate.isAuthSubmitting,
+      AuthMode.sessionSelection => ScenePredicate.isSessionSelection,
+      AuthMode.handingOff => ScenePredicate.isHandingOff,
+      AuthMode.error => ScenePredicate.isAuthError,
+    },
+    if (account.selected != null) ScenePredicate.hasSelectedUser,
+    switch (session.mode) {
+      CatalogMode.empty => ScenePredicate.isSessionEmpty,
+      CatalogMode.loading => ScenePredicate.isSessionLoading,
+      CatalogMode.ready => ScenePredicate.isSessionReady,
+      CatalogMode.failed => ScenePredicate.isSessionFailed,
+    },
+    if (power.mode == PowerMode.executing) ScenePredicate.isPowerExecuting,
+    if (power.error != null) ScenePredicate.hasPowerError,
+  };
+}
