@@ -8,6 +8,51 @@ const _dormant = ScenePredicateCondition(ScenePredicate.isDormant);
 const terraceLayout = ThemeLayoutDefinition(
   sceneId: 'default',
   label: 'Terrace',
+  presets: {
+    'split': ThemeLayoutPreset(label: 'Terrace split'),
+    'centered': ThemeLayoutPreset(
+      label: 'Centered column',
+      rects: {
+        'clock': SceneRect(x: 0.34, y: 0.065, width: 0.32, height: 0.035),
+        'scene_signature': SceneRect(
+          x: 0.34,
+          y: 0.12,
+          width: 0.32,
+          height: 0.028,
+        ),
+        'clock_time': SceneRect(x: 0.34, y: 0.3, width: 0.32, height: 0.16),
+        'hello_world': SceneRect(x: 0.34, y: 0.485, width: 0.32, height: 0.095),
+        'wake_hint': SceneRect(x: 0.34, y: 0.605, width: 0.32, height: 0.025),
+        'entrance_heading': SceneRect(
+          x: 0.3,
+          y: 0.25,
+          width: 0.4,
+          height: 0.08,
+        ),
+        'entrance_caption': SceneRect(
+          x: 0.3,
+          y: 0.34,
+          width: 0.4,
+          height: 0.022,
+        ),
+        'account_picker': SceneRect(x: 0.3, y: 0.39, width: 0.4, height: 0.078),
+        'session_picker': SceneRect(x: 0.3, y: 0.49, width: 0.4, height: 0.065),
+        'credential_field': SceneRect(
+          x: 0.3,
+          y: 0.59,
+          width: 0.34,
+          height: 0.072,
+        ),
+        'primary_action': SceneRect(
+          x: 0.648,
+          y: 0.59,
+          width: 0.052,
+          height: 0.072,
+        ),
+        'status': SceneRect(x: 0.3, y: 0.69, width: 0.4, height: 0.045),
+      },
+    ),
+  },
   slots: [
     ThemeLayoutSlot(
       label: 'Date',
