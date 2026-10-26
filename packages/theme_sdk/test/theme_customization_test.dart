@@ -82,6 +82,11 @@ void main() {
       id: 'test',
       document: _getDocument({}),
       componentCatalog: _catalog,
+      layout: const ThemeLayoutDefinition(
+        sceneId: 'test',
+        label: 'Test',
+        slots: [],
+      ),
       components: (_) => throw UnimplementedError(),
       bundle: ThemeBundle(
         tokens: ThemeTokens(
@@ -96,5 +101,6 @@ void main() {
       ),
     );
     expect(theme.copyWith(id: 'copy').componentCatalog, same(_catalog));
+    expect(theme.copyWith(id: 'copy').layout, same(theme.layout));
   });
 }

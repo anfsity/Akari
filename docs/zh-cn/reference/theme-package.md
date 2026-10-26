@@ -72,6 +72,41 @@ Studio 在接收场景和编辑结果时使用同一校验。缺失属性使用�
 无效选项会抛出包含节点和属性名称的 `FormatException`。
 未声明的组件和属性原样保留。该声明不改变场景格式、认证流程或组件工厂。
 
+## 声明布局插槽
+
+可选的 `ThemeDefinition.layout` 描述一个 `sceneId` 对应的组件装配规则。
+每个 `ThemeLayoutSlot` 包含显示名称、完整的 `defaultNode` 添加模板，以及
+`isRequired` 必需标记。模板中稳定的节点 ID 标识该插槽，其他组件不能占用这个 ID。
+布局中的节点 ID 必须唯一。
+
+```dart
+const layout = ThemeLayoutDefinition(
+  sceneId: 'ocean',
+  label: 'Ocean',
+  slots: [
+    ThemeLayoutSlot(
+      label: 'Sign-in caption',
+      defaultNode: SceneNode(
+        id: 'caption',
+        componentId: 'heading',
+        rect: SceneRect(x: 0.1, y: 0.2, width: 0.4, height: 0.1),
+        properties: {'text': 'Welcome'},
+      ),
+    ),
+  ],
+);
+```
+
+构造主题时传入 `layout: layout`，并在载入场景时与属性校验一起调用
+`layout.validateDocument(document)`。其他场景 ID 不受该布局约束。
+模板应满足场景格式和组件属性声明，并包含正确的焦点、显隐和交互配置。
+添加模板应独立于可编辑场景维护，避免保存或移除节点后，重新构建就失去再次添加它的能力。
+
+模板只在添加插槽时使用。已有节点的位置和属性、布局外的节点继续属于场景创作数据。
+Studio 禁止移除已存在的必需插槽；通过 `findMissingRequiredSlots(document)`
+查询导入场景中缺失的必需项，供界面修复。缺失项不会导致载入失败。
+该标记只约束组件是否存在，不验证完整的认证流程。
+
 ## 构建与预览机制
 
 ```sh
