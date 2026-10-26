@@ -1,10 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:greeter_components/greeter_components.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
-import 'preset1.scene.g.dart';
 import 'preset_style.dart';
 import 'weekday_lettering.dart';
 
@@ -21,11 +18,11 @@ class PresetComponents implements GreeterThemeComponents {
   Widget build(BuildContext context, SceneNode node) {
     final host = theme.host;
     final component = switch (node.componentId) {
-      'presetClock' => PresetClock(
+      'presetClock' => _PresetClock(
         reflected: node.properties['variant'] == 'reflected',
         compact: node.properties['variant'] == 'compact',
       ),
-      'inscription' => PresetInscription(
+      'inscription' => _PresetInscription(
         title: node.properties['title']!,
         subtitle: node.properties['subtitle'] ?? '',
         light: node.properties['tone'] == 'light',
@@ -51,7 +48,7 @@ class PresetComponents implements GreeterThemeComponents {
           CatalogMode.loading => const Center(child: Text('Finding desktops…')),
           CatalogMode.failed => TextButton(
             onPressed: host.onRetrySessionCatalog,
-            child: const Text('Retry desktops ↻'),
+            child: Text(session.error?.message ?? 'Retry desktops ↻'),
           ),
           CatalogMode.empty => const Center(
             child: Text('No desktops available'),
@@ -78,16 +75,19 @@ class PresetComponents implements GreeterThemeComponents {
           ),
           const SizedBox(height: 5),
           Expanded(
-            child: Theme(
-              data: Theme.of(context).copyWith(
-                colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: Colors.transparent,
-                  onPrimary: presetPaper,
-                ),
-              ),
-              child: _standard.build(
-                context,
-                node.copyWith(componentId: 'primaryAction'),
+            child: ListenableBuilder(
+              listenable: Listenable.merge([
+                host.serviceSlots,
+                host.authPromptSlots,
+              ]),
+              builder: (context, _) => PrimaryAction(
+                service: host.serviceSlots.value,
+                auth: host.authPromptSlots.value,
+                filled: false,
+                foregroundColor: presetPaper,
+                onRespond: host.onRespondToPrompt,
+                onStartSession: host.onStartSession,
+                onRetry: host.onRetry,
               ),
             ),
           ),
@@ -96,9 +96,12 @@ class PresetComponents implements GreeterThemeComponents {
       'power' => Column(
         children: [
           Expanded(
-            child: _standard.build(
-              context,
-              node.copyWith(componentId: 'powerActions'),
+            child: SceneRegion<PowerSlots>(
+              valueListenable: host.powerSlots,
+              builder: (context, power) => PowerActions(
+                power: power,
+                onAction: host.onRequestPowerAction,
+              ),
             ),
           ),
           SceneRegion<PowerSlots>(
@@ -120,15 +123,10 @@ class PresetComponents implements GreeterThemeComponents {
       ),
       _ => _standard.build(context, node),
     };
-    // The runtime scales node placement, but leaves native text and icons at
-    // fixed logical sizes. Scale the composition from its authored bounds too,
-    // so Sway's output size changes placement and legibility together.
-    return FittedBox(
-      child: SizedBox(
-        width: node.rect.width * preset1SceneDocument.canvas.referenceWidth,
-        height: node.rect.height * preset1SceneDocument.canvas.referenceHeight,
-        child: component,
-      ),
+    return ScaledNodeRegion(
+      node: node,
+      canvas: theme.canvas,
+      child: component,
     );
   }
 }
@@ -240,12 +238,11 @@ class _PresetCredential extends StatelessWidget {
   );
 }
 
-class PresetInscription extends StatelessWidget {
-  const PresetInscription({
+class _PresetInscription extends StatelessWidget {
+  const _PresetInscription({
     required this.title,
     required this.subtitle,
     required this.light,
-    super.key,
   });
 
   final String title;
@@ -284,120 +281,81 @@ class PresetInscription extends StatelessWidget {
   );
 }
 
-class PresetClock extends StatefulWidget {
-  const PresetClock({
+class _PresetClock extends StatelessWidget {
+  const _PresetClock({
     required this.reflected,
     required this.compact,
-    super.key,
   });
 
   final bool reflected;
   final bool compact;
 
-  @override
-  State<PresetClock> createState() => _PresetClockState();
-}
-
-class _PresetClockState extends State<PresetClock> {
-  late DateTime _now;
-  late Timer _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _now = DateTime.now();
-    _startMinuteTimer();
-  }
-
-  void _startMinuteTimer() {
-    _timer = Timer(
-      Duration(milliseconds: 60000 - _now.second * 1000 - _now.millisecond),
-      () {
-        setState(() => _now = DateTime.now());
-        _startMinuteTimer();
-      },
-    );
-  }
+  static const _months = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
+  ];
 
   @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const days = [
-      'MONDAY',
-      'TUESDAY',
-      'WEDNESDAY',
-      'THURSDAY',
-      'FRIDAY',
-      'SATURDAY',
-      'SUNDAY',
-    ];
-    const months = [
-      'JAN',
-      'FEB',
-      'MAR',
-      'APR',
-      'MAY',
-      'JUN',
-      'JUL',
-      'AUG',
-      'SEP',
-      'OCT',
-      'NOV',
-      'DEC',
-    ];
-    final color = widget.reflected ? presetPaper : presetInk;
-    final time =
-        '${_now.hour.toString().padLeft(2, '0')}:${_now.minute.toString().padLeft(2, '0')}';
-    final day = WeekdayLettering(
-      text: days[_now.weekday - 1],
-      color: color,
-      height: widget.compact ? 24 : 48,
-    );
-    final date = Text(
-      '${_now.day} ${months[_now.month - 1]} ${_now.year}',
-      style: TextStyle(fontSize: 17, letterSpacing: 2, color: color),
-    );
-    final clock = Text(
-      '— $time —',
-      style: TextStyle(
-        fontSize: 15,
-        letterSpacing: 2,
-        color: color.withValues(alpha: .8),
-        fontFeatures: const [FontFeature.tabularFigures()],
-      ),
-    );
-    return Center(
-      child: FittedBox(
-        fit: BoxFit.contain,
-        child: SizedBox(
-          width: widget.compact ? 380 : 640,
-          height: widget.compact ? 130 : 140,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: widget.reflected
-                ? [
-                    clock,
-                    const SizedBox(height: 8),
-                    date,
-                    const SizedBox(height: 14),
-                    day,
-                  ]
-                : [
-                    day,
-                    const SizedBox(height: 12),
-                    date,
-                    const SizedBox(height: 8),
-                    clock,
-                  ],
+  Widget build(BuildContext context) => MinuteClockBuilder(
+    builder: (context, now) {
+      final color = reflected ? presetPaper : presetInk;
+      final time = formatClockTime(now);
+      final day = WeekdayLettering(
+        weekday: now.weekday,
+        color: color,
+        height: compact ? 24 : 48,
+      );
+      final date = Text(
+        '${now.day} ${_months[now.month - 1]} ${now.year}',
+        style: TextStyle(fontSize: 17, letterSpacing: 2, color: color),
+      );
+      final clock = Text(
+        '— $time —',
+        style: TextStyle(
+          fontSize: 15,
+          letterSpacing: 2,
+          color: color.withValues(alpha: .8),
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      );
+      return Center(
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: SizedBox(
+            width: compact ? 380 : 640,
+            height: compact ? 130 : 140,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: reflected
+                  ? [
+                      clock,
+                      const SizedBox(height: 8),
+                      date,
+                      const SizedBox(height: 14),
+                      day,
+                    ]
+                  : [
+                      day,
+                      const SizedBox(height: 12),
+                      date,
+                      const SizedBox(height: 8),
+                      clock,
+                    ],
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
 }
