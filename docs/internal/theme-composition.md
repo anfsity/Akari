@@ -27,9 +27,14 @@ combines those designs. Code-owned widgets and shaders remain supported.
   checks the data shape; theme declarations validate supported values. Omitted
   choices retain author defaults without rewriting the document. JSON and Dart
   round trips are covered by tests (commit `c0fb434`).
-- Next: make theme builders consume the editing document, then implement the
-  theme preset catalog and its Studio controls. Follow with layout composition,
-  runtime state previews, and independent project synthesis.
+- Builders now receive the editing document (`d30c313`). A typed preset catalog
+  is shared with runtime (`00c23f5`); no-motion policy reaches scene widgets and
+  wake transitions (`1aeb860`). Terrace implements palette, material, and motion
+  presets, including 36 tested combinations (`93709c7`). Studio controls use
+  document validation, history, saving, and read-only inspection.
+- Remaining: layout composition and component variants, faithful file-based
+  background previews, runtime state previews, independent project synthesis,
+  and end-to-end build/native verification.
 
 Completion requires the entire end state above; a working property editor or
 project copy alone is not a completed composition workflow.

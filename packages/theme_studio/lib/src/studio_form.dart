@@ -97,6 +97,7 @@ class StudioEnumSelect<T extends Enum> extends StatelessWidget {
     required this.onChanged,
     this.label,
     this.formatValue,
+    this.enabled = true,
     super.key,
   });
 
@@ -105,6 +106,7 @@ class StudioEnumSelect<T extends Enum> extends StatelessWidget {
   final ValueChanged<T> onChanged;
   final String? label;
   final String Function(T)? formatValue;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) => StudioSelect<T>(
@@ -113,6 +115,7 @@ class StudioEnumSelect<T extends Enum> extends StatelessWidget {
     onChanged: onChanged,
     label: label,
     formatValue: (value) => formatValue?.call(value) ?? value.name,
+    enabled: enabled,
   );
 }
 
@@ -126,6 +129,7 @@ class StudioSelect<T> extends StatefulWidget {
     required this.formatValue,
     this.label,
     this.placeholder,
+    this.enabled = true,
     super.key,
   });
 
@@ -135,6 +139,7 @@ class StudioSelect<T> extends StatefulWidget {
   final String Function(T) formatValue;
   final String? label;
   final Widget? placeholder;
+  final bool enabled;
 
   @override
   State<StudioSelect<T>> createState() => _StudioSelectState<T>();
@@ -155,6 +160,7 @@ class _StudioSelectState<T> extends State<StudioSelect<T>> {
         offset: const Offset(0, 4),
       ),
       value: widget.value,
+      enabled: widget.enabled,
       placeholder: widget.placeholder,
       onChanged: (value) {
         if (value != null) widget.onChanged(value);

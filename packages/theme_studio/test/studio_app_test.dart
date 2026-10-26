@@ -51,6 +51,16 @@ class _Components implements GreeterThemeComponents {
 
 enum _PanelStyle { regular, large }
 
+enum _ThemePalette { ocean, rose }
+
+const _palette = ThemeChoiceProperty(
+  name: 'palette',
+  label: 'Palette',
+  defaultValue: _ThemePalette.ocean,
+  choices: {_ThemePalette.ocean: 'Ocean', _ThemePalette.rose: 'Rose'},
+);
+const _presets = ThemePresetCatalog(properties: [_palette]);
+
 const _editableCatalog = ThemeComponentCatalog(
   components: {
     'panel': ThemeComponentDefinition(
@@ -119,12 +129,14 @@ ThemeDefinition _buildTheme({
   Color? seed,
   SceneDocument? document,
   ThemeComponentCatalog componentCatalog = const ThemeComponentCatalog(),
+  ThemePresetCatalog presetCatalog = const ThemePresetCatalog(),
   ThemeLayoutDefinition? layout,
 }) => ThemeDefinition(
   id: 'test',
   document: document ?? _document,
   components: (_) => _Components(),
   componentCatalog: componentCatalog,
+  presetCatalog: presetCatalog,
   layout: layout,
   bundle: ThemeBundle(
     tokens: ThemeTokens(
@@ -689,6 +701,72 @@ void main() {
       await tester.tap(find.text('Apply to preview'));
       await tester.pumpAndSettle();
       expect(inspector.node.id, longId);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'theme presets drive runtime styling, undo, save, reopen and inspection',
+    (tester) async {
+      ThemeDefinition buildPresets({Color? seed, SceneDocument? document}) {
+        final palette = _palette.getValue(document?.themeProperties ?? {});
+        return _buildTheme(
+          seed: palette == _ThemePalette.ocean
+              ? material.Colors.blue
+              : material.Colors.red,
+          document: document,
+          presetCatalog: _presets,
+        );
+      }
+
+      await openStudio(tester, themeBuilder: buildPresets);
+      final source = file.readAsStringSync();
+      final choice = find.byKey(const ValueKey('preset-palette'));
+      expect(choice, findsOneWidget);
+      expect(find.text('Ocean'), findsOneWidget);
+      expect(find.text('Optional components'), findsNothing);
+      expect(find.text('Saved'), findsOneWidget);
+      final original = tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .theme
+          .materialTheme
+          .colorScheme
+          .primary;
+      await tester.tap(choice);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rose').last);
+      await tester.pumpAndSettle();
+      var preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(preview.document.themeProperties, {'palette': 'rose'});
+      expect(preview.theme.materialTheme.colorScheme.primary, isNot(original));
+      expect(file.readAsStringSync(), source);
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ocean'), findsOneWidget);
+      expect(find.text('Saved'), findsOneWidget);
+      await tester.tap(find.text('Redo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      expect(decodeSceneDocument(file.readAsStringSync()).themeProperties, {
+        'palette': 'rose',
+      });
+      await tester.pumpWidget(const SizedBox());
+      await openStudio(tester, themeBuilder: buildPresets);
+      expect(find.text('Rose'), findsOneWidget);
+      preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(preview.theme.materialTheme.colorScheme.primary, isNot(original));
+      await tester.tap(find.text('Inspect code'));
+      await tester.pumpAndSettle();
+      final selector = find.descendant(
+        of: choice,
+        matching: find.byType(Select<Enum>),
+      );
+      expect(tester.widget<Select<Enum>>(selector).enabled, isFalse);
+      await tester.tap(choice);
+      await tester.pumpAndSettle();
+      expect(find.text('Ocean'), findsNothing);
+      expect(preview.document.themeProperties, {'palette': 'rose'});
       expect(tester.takeException(), isNull);
     },
   );

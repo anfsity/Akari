@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import 'scene_editor.dart';
+import 'studio_form.dart';
 
 class StudioComponentAssembly extends StatelessWidget {
   const StudioComponentAssembly({
@@ -18,7 +19,7 @@ class StudioComponentAssembly extends StatelessWidget {
     listenable: editor,
     builder: (context, _) {
       final layout = editor.layout;
-      if (layout == null) {
+      if (layout == null && editor.presetCatalog.properties.isEmpty) {
         return const Padding(
           padding: EdgeInsets.all(16),
           child: Text('Component assembly is unavailable for this scene.'),
@@ -29,40 +30,70 @@ class StudioComponentAssembly extends StatelessWidget {
         key: const ValueKey('component-assembly'),
         padding: const EdgeInsets.all(12),
         children: [
-          Text(layout.label).semiBold(),
+          Text(layout?.label ?? 'Theme customization').semiBold(),
           const Gap(8),
-          const Text(
-            'Choose components, then select one to customize. '
-            'The layout supplies its starting position.',
+          Text(
+            layout == null
+                ? 'Choose the presets provided by this theme.'
+                : 'Choose components, then select one to customize. '
+                      'The layout supplies its starting position.',
           ).small().muted(),
           const Gap(16),
-          for (final (label, slots) in [
-            (
-              'Optional components',
-              layout.slots.where((slot) => !slot.isRequired).toList(),
-            ),
-            (
-              'Required controls',
-              layout.slots.where((slot) => slot.isRequired).toList(),
-            ),
-          ])
-            if (slots.isNotEmpty) ...[
-              Text(label).small().semiBold(),
-              const Gap(8),
-              for (final slot in slots)
-                _AssemblySlot(
-                  editor: editor,
-                  slot: slot,
-                  isPresent: ids.contains(slot.defaultNode.id),
-                  readOnly: readOnly,
+          if (editor.presetCatalog.properties.isNotEmpty) ...[
+            const Text('Theme presets').small().semiBold(),
+            const Gap(8),
+            for (final property in editor.presetCatalog.properties)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(property.label).small().muted(),
+                    const Gap(6),
+                    StudioEnumSelect<Enum>(
+                      enabled: !readOnly,
+                      key: ValueKey('preset-${property.name}'),
+                      value: property.getValue(editor.document.themeProperties),
+                      values: property.choices.keys,
+                      formatValue: (value) => property.choices[value]!,
+                      onChanged: (value) =>
+                          editor.updateThemeProperty(property.name, value.name),
+                    ),
+                  ],
                 ),
-              const Gap(12),
-            ],
-          const Text(
-            'Use Login / Dormant to preview both states. '
-            'Turning a component back on restores its defaults; '
-            'Undo restores your edits.',
-          ).small().muted(),
+              ),
+            const Divider(),
+            const Gap(12),
+          ],
+          if (layout != null)
+            for (final (label, slots) in [
+              (
+                'Optional components',
+                layout.slots.where((slot) => !slot.isRequired).toList(),
+              ),
+              (
+                'Required controls',
+                layout.slots.where((slot) => slot.isRequired).toList(),
+              ),
+            ])
+              if (slots.isNotEmpty) ...[
+                Text(label).small().semiBold(),
+                const Gap(8),
+                for (final slot in slots)
+                  _AssemblySlot(
+                    editor: editor,
+                    slot: slot,
+                    isPresent: ids.contains(slot.defaultNode.id),
+                    readOnly: readOnly,
+                  ),
+                const Gap(12),
+              ],
+          if (layout != null)
+            const Text(
+              'Use Login / Dormant to preview both states. '
+              'Turning a component back on restores its defaults; '
+              'Undo restores your edits.',
+            ).small().muted(),
         ],
       );
     },

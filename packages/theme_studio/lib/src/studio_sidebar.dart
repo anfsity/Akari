@@ -63,7 +63,10 @@ class _StudioSidebarState extends State<StudioSidebar> {
     final editor = widget.editor;
     final tab =
         _tab ??
-        (editor?.layout == null ? _SidebarTab.layers : _SidebarTab.components);
+        (editor?.layout != null ||
+                (editor?.presetCatalog.properties.isNotEmpty ?? false)
+            ? _SidebarTab.components
+            : _SidebarTab.layers);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

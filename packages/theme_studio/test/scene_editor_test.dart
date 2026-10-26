@@ -7,6 +7,16 @@ import 'package:theme_studio/src/node_inspector_controller.dart';
 
 enum _PanelVariant { compact, wide }
 
+enum _Palette { ocean, rose }
+
+const _palette = ThemeChoiceProperty(
+  name: 'palette',
+  label: 'Palette',
+  defaultValue: _Palette.ocean,
+  choices: {_Palette.ocean: 'Ocean', _Palette.rose: 'Rose'},
+);
+const _presets = ThemePresetCatalog(properties: [_palette]);
+
 const _catalog = ThemeComponentCatalog(
   components: {
     'panel': ThemeComponentDefinition(
@@ -94,6 +104,92 @@ void main() {
   tearDown(() {
     editor.dispose();
     directory.deleteSync(recursive: true);
+  });
+
+  test(
+    'theme presets validate, preserve private data and use document history',
+    () {
+      file.writeAsStringSync(
+        encodeSceneDocument(
+          editor.document.copyWith(themeProperties: {'private': 'keep'}),
+        ),
+      );
+      editor.reload();
+      editor.updateAuthoring(
+        componentCatalog: _catalog,
+        layout: _layout,
+        presetCatalog: _presets,
+      );
+      editor.updateThemeProperty('palette', 'rose');
+      expect(editor.document.themeProperties, {
+        'private': 'keep',
+        'palette': 'rose',
+      });
+      editor.undo();
+      expect(editor.document.themeProperties, {'private': 'keep'});
+      editor.redo();
+      editor.save();
+      final saved = editor.encodedDocument;
+      expect(
+        () => editor.updateThemeProperty('palette', 'unsupported'),
+        throwsFormatException,
+      );
+      expect(
+        () => editor.updateThemeProperty('undeclared', 'value'),
+        throwsArgumentError,
+      );
+      expect(editor.encodedDocument, saved);
+      editor.inspector.getField('Width').text = '-1';
+      editor.updateThemeProperty('palette', 'ocean');
+      expect(editor.encodedDocument, saved);
+      expect(editor.inspector.error, isNotNull);
+      editor.dispose();
+      editor = SceneEditor(file, presetCatalog: _presets);
+      expect(editor.document.themeProperties, {
+        'private': 'keep',
+        'palette': 'rose',
+      });
+      expect(editor.isDirty, isFalse);
+    },
+  );
+
+  test('preset reload and declaration changes preserve a valid session and history', () {
+    editor.updateAuthoring(
+      componentCatalog: _catalog,
+      layout: _layout,
+      presetCatalog: _presets,
+    );
+    editor.updateThemeProperty('palette', 'rose');
+    editor.undo();
+    const oceanOnly = ThemePresetCatalog(
+      properties: [
+        ThemeChoiceProperty(
+          name: 'palette',
+          label: 'Palette',
+          defaultValue: _Palette.ocean,
+          choices: {_Palette.ocean: 'Ocean'},
+        ),
+      ],
+    );
+    expect(
+      () => editor.updateAuthoring(
+        componentCatalog: _catalog,
+        layout: _layout,
+        presetCatalog: oceanOnly,
+      ),
+      throwsFormatException,
+    );
+    expect(editor.presetCatalog, same(_presets));
+    editor.redo();
+    expect(editor.document.themeProperties['palette'], 'rose');
+    final saved = editor.encodedDocument;
+    file.writeAsStringSync(
+      encodeSceneDocument(
+        editor.document.copyWith(themeProperties: {'palette': 'unsupported'}),
+      ),
+    );
+    expect(editor.reload, throwsFormatException);
+    expect(editor.encodedDocument, saved);
   });
 
   test(
