@@ -64,8 +64,9 @@ static GtkWindow* create_window(MyApplication* self, GdkMonitor* monitor) {
     fullscreen_on_monitor(window, monitor);
   }
 
+  const gboolean is_primary = self->engine == nullptr;
   FlView* view;
-  if (self->engine == nullptr) {
+  if (is_primary) {
     g_autoptr(FlDartProject) project = fl_dart_project_new();
     fl_dart_project_set_dart_entrypoint_arguments(
         project, self->dart_entrypoint_arguments);
@@ -93,11 +94,13 @@ static GtkWindow* create_window(MyApplication* self, GdkMonitor* monitor) {
   // Requires the view to be realized so we can start rendering.
   g_signal_connect(view, "first-frame", G_CALLBACK(first_frame_cb), nullptr);
   if (monitor != nullptr) {
-    g_signal_connect(view, "focus-in-event", G_CALLBACK(focus_in_cb), self);
+    g_signal_connect_object(view, "focus-in-event", G_CALLBACK(focus_in_cb),
+                            self, G_CONNECT_DEFAULT);
   }
-  g_signal_connect(window, "delete-event", G_CALLBACK(close_window_cb), self);
+  g_signal_connect_object(window, "delete-event", G_CALLBACK(close_window_cb),
+                          self, G_CONNECT_DEFAULT);
   gtk_widget_realize(GTK_WIDGET(view));
-  if (window == self->primary_window) {
+  if (is_primary) {
     fl_register_plugins(FL_PLUGIN_REGISTRY(view));
   }
 
@@ -212,29 +215,13 @@ static gboolean my_application_local_command_line(GApplication* application,
   return TRUE;
 }
 
-// Implements GApplication::startup.
-static void my_application_startup(GApplication* application) {
-  // MyApplication* self = MY_APPLICATION(object);
-
-  // Perform any actions required at application startup.
-
-  G_APPLICATION_CLASS(my_application_parent_class)->startup(application);
-}
-
-// Implements GApplication::shutdown.
-static void my_application_shutdown(GApplication* application) {
-  // MyApplication* self = MY_APPLICATION(object);
-
-  // Perform any actions required at application shutdown.
-
-  G_APPLICATION_CLASS(my_application_parent_class)->shutdown(application);
-}
-
 // Implements GObject::dispose.
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   g_clear_pointer(&self->monitor_windows, g_hash_table_unref);
+  self->primary_window = nullptr;
+  self->primary_monitor = nullptr;
   g_clear_object(&self->display_channel);
   g_clear_object(&self->engine);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
@@ -244,8 +231,6 @@ static void my_application_class_init(MyApplicationClass* klass) {
   G_APPLICATION_CLASS(klass)->activate = my_application_activate;
   G_APPLICATION_CLASS(klass)->local_command_line =
       my_application_local_command_line;
-  G_APPLICATION_CLASS(klass)->startup = my_application_startup;
-  G_APPLICATION_CLASS(klass)->shutdown = my_application_shutdown;
   G_OBJECT_CLASS(klass)->dispose = my_application_dispose;
 }
 
