@@ -573,7 +573,7 @@ void main() {
         await tester.pumpAndSettle();
         for (final label in [
           'Layers',
-          'Add',
+          'Compose',
           'Assets',
           'Design',
           'Inspect code',
@@ -585,6 +585,7 @@ void main() {
           final bounds = tester.getRect(tab);
           final text = tester.getRect(find.text(label));
           expect(bounds.height, greaterThanOrEqualTo(32));
+          expect(bounds.height, lessThanOrEqualTo(40));
           expect(text.center.dx, closeTo(bounds.center.dx, 0.1));
           expect(text.left, greaterThan(bounds.left));
           expect(text.right, lessThan(bounds.right));
@@ -771,16 +772,18 @@ void main() {
       ThemeDefinition buildAssembly({Color? seed}) =>
           _buildTheme(seed: seed, layout: _assemblyLayout);
       await openStudio(tester, themeBuilder: buildAssembly);
-      await tester.tap(find.byKey(const ValueKey('sidebar-components')));
-      await tester.pumpAndSettle();
       expect(find.text('Test composition'), findsOneWidget);
+      expect(find.byKey(const ValueKey('component-assembly')), findsOneWidget);
+      expect(find.text('Optional components'), findsOneWidget);
       final add = find.byKey(const ValueKey('slot-badge'));
+      expect(tester.widget<Switch>(add).value, isFalse);
       await tester.ensureVisible(add);
       await tester.pumpAndSettle();
       await tester.tap(add);
       await tester.pumpAndSettle();
       final canvas = tester.widget<StudioCanvas>(find.byType(StudioCanvas));
       expect(canvas.editor!.selectedId, 'badge');
+      expect(tester.widget<Switch>(add).value, isTrue);
       expect(canvas.editor!.selectedNode.properties, {'text': 'Welcome'});
       expect(canvas.editor!.selectedNode.rect.x, 0.2);
       expect(find.byKey(const ValueKey('preview-badge')), findsNothing);
@@ -799,10 +802,7 @@ void main() {
       await openStudio(tester, themeBuilder: buildAssembly);
       await tester.tap(find.byKey(const ValueKey('sidebar-components')));
       await tester.pumpAndSettle();
-      expect(
-        find.descendant(of: add, matching: find.text('Remove')),
-        findsOneWidget,
-      );
+      expect(tester.widget<Switch>(add).value, isTrue);
       await tester.ensureVisible(add);
       await tester.pumpAndSettle();
       await tester.tap(add);
@@ -854,6 +854,15 @@ void main() {
       expect(editor.selectedId, 'action');
       expect(editor.selectedNode.interactive, isTrue);
       expect(find.byKey(const ValueKey('layout-completeness')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('sidebar-layers')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('layer-action')),
+          matching: find.text('Sign-in action'),
+        ),
+        findsOneWidget,
+      );
       expect(
         tester
             .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Delete'))
@@ -885,11 +894,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('sidebar-components')));
       await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('slot-panel')), findsOneWidget);
       expect(
-        tester
-            .widget<OutlineButton>(find.byKey(const ValueKey('slot-panel')))
-            .onPressed,
-        isNull,
+        find.descendant(
+          of: find.byKey(const ValueKey('component-assembly')),
+          matching: find.text('Remove'),
+        ),
+        findsNothing,
       );
       expect(tester.takeException(), isNull);
     },
@@ -923,7 +934,7 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('field-Width')), '384');
     await tester.tap(find.text('Inspect code'));
     await tester.pumpAndSettle();
-    expect(tester.widget<OutlineButton>(add).onPressed, isNull);
+    expect(tester.widget<Switch>(add).enabled, isFalse);
     expect(
       tester
           .widget<OutlineButton>(

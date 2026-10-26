@@ -83,14 +83,14 @@ class _InspectorForm extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildLayoutSection(),
-        const Divider(),
-        const Gap(12),
         _InspectorProperties(
           controller: controller,
           definition: definition,
           onApply: onApply,
         ),
+        const Divider(),
+        const Gap(12),
+        _buildLayoutSection(),
         const Divider(),
         const Gap(12),
         _InspectorDisclosure(

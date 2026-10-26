@@ -88,8 +88,8 @@ class _WorkspacePanels extends StatelessWidget {
     children: [
       ResizablePane(
         key: const ValueKey('sidebar-pane'),
-        initialSize: 220,
-        minSize: 200,
+        initialSize: 260,
+        minSize: 240,
         maxSize: 360,
         child: sidebar,
       ),

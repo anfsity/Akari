@@ -9,8 +9,8 @@ import 'scene_editor.dart';
 import 'studio_component_assembly.dart';
 
 enum _SidebarTab {
+  components('Compose'),
   layers('Layers'),
-  components('Add'),
   assets('Assets');
 
   const _SidebarTab(this.label);
@@ -48,11 +48,22 @@ class StudioSidebar extends StatefulWidget {
 }
 
 class _StudioSidebarState extends State<StudioSidebar> {
-  _SidebarTab _tab = _SidebarTab.layers;
+  _SidebarTab? _tab;
+
+  @override
+  void didUpdateWidget(StudioSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.editor != oldWidget.editor && _tab != _SidebarTab.assets) {
+      _tab = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final editor = widget.editor;
+    final tab =
+        _tab ??
+        (editor?.layout == null ? _SidebarTab.layers : _SidebarTab.components);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -100,22 +111,26 @@ class _StudioSidebarState extends State<StudioSidebar> {
         Padding(
           padding: const EdgeInsets.all(8),
           child: Tabs(
-            index: _tab.index,
+            index: tab.index,
             expand: true,
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             onChanged: (index) =>
                 setState(() => _tab = _SidebarTab.values[index]),
             children: [
-              for (final tab in _SidebarTab.values)
+              for (final item in _SidebarTab.values)
                 TabItem(
-                  key: ValueKey('sidebar-${tab.name}'),
-                  child: Text(tab.label, textAlign: TextAlign.center),
+                  key: ValueKey('sidebar-${item.name}'),
+                  child: Text(
+                    item.label,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                  ),
                 ),
             ],
           ),
         ),
         Expanded(
-          child: _tab == _SidebarTab.assets
+          child: tab == _SidebarTab.assets
               ? _AssetList(
                   paths: widget.assetPaths,
                   resolveImage: widget.resolveAssetImage,
@@ -127,14 +142,14 @@ class _StudioSidebarState extends State<StudioSidebar> {
                 )
               : editor == null
               ? const SizedBox()
-              : _tab == _SidebarTab.components
+              : tab == _SidebarTab.components
               ? StudioComponentAssembly(
                   editor: editor,
                   readOnly: widget.readOnly,
                 )
               : _LayerList(key: ObjectKey(editor), editor: editor),
         ),
-        if (_tab == _SidebarTab.layers && editor != null) ...[
+        if (tab == _SidebarTab.layers && editor != null) ...[
           const Divider(),
           _NodeActions(editor: editor, readOnly: widget.readOnly),
         ],
@@ -348,6 +363,8 @@ class _LayerListState extends State<_LayerList> {
         itemBuilder: (context, index) {
           final node = nodes[index];
           final selected = node.id == widget.editor.selectedId;
+          final label =
+              widget.editor.layout?.findSlot(node.id)?.label ?? node.id;
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
             child: Button(
@@ -368,7 +385,7 @@ class _LayerListState extends State<_LayerList> {
                   const Gap(8),
                   Expanded(
                     child: Text(
-                      node.id,
+                      label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ).small(),
