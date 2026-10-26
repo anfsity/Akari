@@ -49,6 +49,20 @@ class _Components implements GreeterThemeComponents {
       Center(child: Text(node.componentId));
 }
 
+class _ThemedBackground extends BackgroundRenderer {
+  const _ThemedBackground({this.resolveImage});
+  final SceneImageProviderResolver? resolveImage;
+
+  @override
+  _ThemedBackground getWithImageResolver(
+    SceneImageProviderResolver resolveImage,
+  ) => _ThemedBackground(resolveImage: resolveImage);
+
+  @override
+  Widget build(BuildContext context, SceneBackground background) =>
+      const ColoredBox(color: Color(0xff123456));
+}
+
 enum _PanelStyle { regular, large }
 
 enum _ThemePalette { ocean, rose }
@@ -151,6 +165,10 @@ ThemeDefinition _buildTheme({
   presetCatalog: presetCatalog,
   layout: layout,
   bundle: ThemeBundle(
+    backgrounds: const {
+      SceneBackgroundKind.solid: SolidBackgroundRenderer(),
+      SceneBackgroundKind.image: ImageBackgroundRenderer(),
+    },
     tokens: ThemeTokens(
       materialTheme: material.ThemeData(
         colorScheme: seed == null
@@ -1861,6 +1879,70 @@ void main() {
       expect(updated.document, same(preview.document));
       expect(updated.theme, same(preview.theme));
       expect(find.text('Saved'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Studio binds file images without replacing the theme background renderer',
+    (tester) async {
+      await openStudio(
+        tester,
+        themeBuilder: ({Color? seed, SceneDocument? document}) {
+          final theme = _buildTheme(seed: seed, document: document);
+          return theme.copyWith(
+            bundle: theme.bundle.copyWith(
+              backgrounds: const {
+                SceneBackgroundKind.image: _ThemedBackground(),
+              },
+            ),
+          );
+        },
+      );
+      final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      final renderer =
+          preview.theme.bundle.backgrounds[SceneBackgroundKind.image]
+              as _ThemedBackground;
+      expect(
+        (renderer.resolveImage!('assets/test.png') as FileImage).file.path,
+        '${directory.path}/assets/test.png',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'themes without image backgrounds do not offer a misleading wallpaper action',
+    (tester) async {
+      final image = File('${directory.path}/assets/wallpaper.png');
+      image.parent.createSync();
+      await tester.runAsync(() => _writeImage(image));
+      await openStudio(
+        tester,
+        themeBuilder: ({Color? seed, SceneDocument? document}) {
+          final theme = _buildTheme(seed: seed, document: document);
+          return theme.copyWith(
+            bundle: theme.bundle.copyWith(backgrounds: const {}),
+          );
+        },
+      );
+      await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<PrimaryButton>(
+              find.widgetWithText(PrimaryButton, 'Use image'),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('settings-nav-background')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Background: solid'));
+      await tester.pumpAndSettle();
+      expect(find.text('image'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

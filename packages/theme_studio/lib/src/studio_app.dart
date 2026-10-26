@@ -109,6 +109,9 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         preferences: _preferences,
         assetPaths: _assetPaths,
         resolveAssetImage: _assets.getImageProvider,
+        supportsImageBackground: _theme.bundle.backgrounds.containsKey(
+          SceneBackgroundKind.image,
+        ),
         onApply: (canvas, background, preferences) {
           editor.updateScene(canvas: canvas, background: background);
           setState(() {
@@ -130,10 +133,10 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     _theme = theme.copyWith(
       bundle: theme.bundle.copyWith(
         backgrounds: {
-          ...theme.bundle.backgrounds,
-          SceneBackgroundKind.image: ImageBackgroundRenderer(
-            resolveImage: (asset) => _assets.getImageProvider(asset),
-          ),
+          for (final entry in theme.bundle.backgrounds.entries)
+            entry.key: entry.value.getWithImageResolver(
+              _assets.getImageProvider,
+            ),
         },
       ),
     );
@@ -480,7 +483,12 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
               onLoadJson: () => _loadJson(context),
               onSwitchScene: (path) => _switchScene(path, context),
               onImportAsset: _importAsset,
-              onApplyBackground: _applyBackground,
+              onApplyBackground:
+                  _theme.bundle.backgrounds.containsKey(
+                    SceneBackgroundKind.image,
+                  )
+                  ? _applyBackground
+                  : null,
             ),
           ),
         ],

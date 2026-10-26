@@ -14,6 +14,7 @@ class StudioSettings extends StatefulWidget {
     required this.preferences,
     required this.assetPaths,
     required this.resolveAssetImage,
+    required this.supportsImageBackground,
     required this.onApply,
     super.key,
   });
@@ -22,6 +23,7 @@ class StudioSettings extends StatefulWidget {
   final StudioPreferences preferences;
   final List<String> assetPaths;
   final ImageProvider Function(String) resolveAssetImage;
+  final bool supportsImageBackground;
   final void Function(SceneCanvas, SceneBackground, StudioPreferences) onApply;
 
   @override
@@ -162,12 +164,13 @@ class _StudioSettingsState extends State<StudioSettings> {
       Navigator.of(context).pop();
     } on FormatException catch (error) {
       final message = error.message.toLowerCase();
-      final targetSection = currentStep ??
+      final targetSection =
+          currentStep ??
           (message.contains('background')
               ? _SettingsSection.background
               : message.contains('canvas')
-                  ? _SettingsSection.canvas
-                  : _section);
+              ? _SettingsSection.canvas
+              : _section);
       setState(() {
         _section = targetSection;
         _error = error.message;
@@ -364,14 +367,18 @@ class _StudioSettingsState extends State<StudioSettings> {
                     padding: EdgeInsets.fromLTRB(12, 8, 0, 8),
                     child: Text('SCENE'),
                   ).small().muted(),
-                  for (final section in _SettingsSection.values.where((s) => s.isSceneSetting))
+                  for (final section in _SettingsSection.values.where(
+                    (s) => s.isSceneSetting,
+                  ))
                     buildButton(section),
                   const Gap(24),
                   const Padding(
                     padding: EdgeInsets.fromLTRB(12, 0, 0, 8),
                     child: Text('EDITOR'),
                   ).small().muted(),
-                  for (final section in _SettingsSection.values.where((s) => !s.isSceneSetting))
+                  for (final section in _SettingsSection.values.where(
+                    (s) => !s.isSceneSetting,
+                  ))
                     buildButton(section),
                 ],
               ),
@@ -462,7 +469,7 @@ class _StudioSettingsState extends State<StudioSettings> {
         // Preserve a custom renderer already selected by the scene.
         values: {
           SceneBackgroundKind.solid,
-          SceneBackgroundKind.image,
+          if (widget.supportsImageBackground) SceneBackgroundKind.image,
           widget.document.background.kind,
         },
         onChanged: (value) => setState(() => _background = value),

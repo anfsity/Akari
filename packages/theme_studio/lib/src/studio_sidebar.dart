@@ -41,7 +41,7 @@ class StudioSidebar extends StatefulWidget {
   final VoidCallback onLoadJson;
   final ValueChanged<String> onSwitchScene;
   final VoidCallback onImportAsset;
-  final ValueChanged<String> onApplyBackground;
+  final ValueChanged<String>? onApplyBackground;
 
   @override
   State<StudioSidebar> createState() => _StudioSidebarState();

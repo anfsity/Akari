@@ -5,12 +5,6 @@ import 'package:scene_schema/scene_schema.dart';
 
 import 'background_renderer.dart';
 
-/// Resolves a document asset path to an [ImageProvider].
-///
-/// The default reads from the Flutter asset bundle; a host without the assets
-/// in its bundle can supply a file-based resolver instead.
-typedef SceneImageProviderResolver = ImageProvider Function(String asset);
-
 ImageProvider _getAssetImageProvider(String asset) => AssetImage(asset);
 
 class ImageBackgroundRenderer extends BackgroundRenderer {
@@ -26,6 +20,15 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
   final Alignment alignment;
 
   final FilterQuality filterQuality;
+
+  @override
+  ImageBackgroundRenderer getWithImageResolver(
+    SceneImageProviderResolver resolveImage,
+  ) => ImageBackgroundRenderer(
+    resolveImage: resolveImage,
+    alignment: alignment,
+    filterQuality: filterQuality,
+  );
 
   @override
   Widget build(BuildContext context, SceneBackground background) {
