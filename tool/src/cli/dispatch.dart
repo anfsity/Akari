@@ -60,10 +60,9 @@ Future<int> runCliCommand(CliCommand command, CliArguments input) async {
       final repoRoot = _findRepoRoot();
       final values = getCliOptionValues(command, arguments);
       final shell = values['--shell'] ?? 'zsh';
-      final home = Platform.environment['HOME'];
-      if (home == null) {
-        throw const FormatException('HOME is required for installation.');
-      }
+      final home = findUserHomeDirectory(
+        requiredMessage: 'HOME is required for installation.',
+      ).path;
       final rcDirectory = shell == 'zsh'
           ? Platform.environment['ZDOTDIR'] ?? home
           : home;

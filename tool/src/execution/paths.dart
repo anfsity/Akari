@@ -19,3 +19,14 @@ String getRelativePath(Directory repoRoot, String path) {
 String getJoinedPath(String base, String relative) {
   return '$base${Platform.pathSeparator}${relative.replaceAll('/', Platform.pathSeparator)}';
 }
+
+Directory findUserHomeDirectory({
+  String requiredMessage = 'HOME is required.',
+}) {
+  final home = Platform.environment['HOME'];
+  if (home == null || home.isEmpty) {
+    throw FormatException(requiredMessage);
+  }
+  return Directory(home);
+}
+

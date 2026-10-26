@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-flutter_bin="${AKARI_FLUTTER_BIN:-$repo_root/.fvm/flutter_sdk/bin/flutter}"
-if [[ "$flutter_bin" != /* ]]; then
-  flutter_bin="$repo_root/$flutter_bin"
-fi
-dart_bin="${AKARI_DART_BIN:-$(dirname -- "$flutter_bin")/dart}"
-if [[ "$dart_bin" != /* ]]; then
-  dart_bin="$repo_root/$dart_bin"
-fi
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib.sh
+source "$script_dir/lib.sh"
+repo_root="$(akari_repo_root)"
 
-if [[ ! -x "$flutter_bin" || ! -x "$dart_bin" ]]; then
+akari_resolve_sdk_binaries "$repo_root"
+flutter_bin="$AKARI_RESOLVED_FLUTTER_BIN"
+dart_bin="$AKARI_RESOLVED_DART_BIN"
+
+if [[ -z "$flutter_bin" || ! -x "$flutter_bin" || -z "$dart_bin" || ! -x "$dart_bin" ]]; then
   printf '%s\n' 'Run fvm install, or set AKARI_FLUTTER_BIN and AKARI_DART_BIN to SDK executables.' >&2
   exit 1
 fi

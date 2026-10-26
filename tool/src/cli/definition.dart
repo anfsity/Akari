@@ -59,6 +59,8 @@ class CliCommand {
   final String? positionalUsage;
 
   bool get hasRunReport => development != null;
+  bool get isSubcommand => name.contains(' ');
+  bool get isRootCommand => !isSubcommand;
 
   List<String> get spellings => [name, ...aliases];
 }
