@@ -110,7 +110,7 @@ SceneCanvas _decodeCanvas(Map<String, dynamic> json) {
 /// Encodes a scene document into its JSON authoring form.
 String encodeSceneDocument(SceneDocument document) {
   return const JsonEncoder.withIndent('  ')
-      .convert(sceneDocumentToMap(document));
+      .convert(_encodeDocument(document));
 }
 
 /// Encodes a single scene node into its formatted JSON authoring form.
@@ -118,8 +118,7 @@ String encodeSceneNode(SceneNode node) {
   return const JsonEncoder.withIndent('  ').convert(_encodeNode(node));
 }
 
-/// Encodes a scene document into a JSON-ready map.
-Map<String, dynamic> sceneDocumentToMap(SceneDocument document) {
+Map<String, dynamic> _encodeDocument(SceneDocument document) {
   return {
     'id': document.id,
     'version': document.version,

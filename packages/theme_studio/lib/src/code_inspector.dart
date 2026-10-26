@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/services.dart';
 import 'package:scene/scene.dart';
 import 'package:scene_codegen/scene_codegen.dart';
@@ -30,15 +28,10 @@ class _CodeInspectorState extends State<CodeInspector> {
     builder: (context, _) {
       final document = widget.editor.document;
       final node = widget.editor.selectedNode;
-      final json = sceneDocumentToMap(document);
       final source = switch ((_format, _wholeScene)) {
-        (_CodeFormat.json, true) => encodeSceneDocument(document),
-        (_CodeFormat.json, false) => const JsonEncoder.withIndent('  ').convert(
-          (json['nodes'] as List).firstWhere((entry) => entry['id'] == node.id),
-        ),
-        (_CodeFormat.dart, true) => generateScene(
-          encodeSceneDocument(document),
-        ),
+        (_CodeFormat.json, true) => widget.editor.encodedDocument,
+        (_CodeFormat.json, false) => encodeSceneNode(node),
+        (_CodeFormat.dart, true) => generateSceneFromDocument(document),
         (_CodeFormat.dart, false) => generateSceneNode(node).trim(),
       };
       final canvas = document.canvas;
