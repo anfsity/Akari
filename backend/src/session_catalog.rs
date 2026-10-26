@@ -12,7 +12,7 @@ use std::{
 
 use thiserror::Error;
 
-const SESSION_COMMAND_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
+pub(crate) const DEFAULT_SESSION_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
 
 /// Errors encountered while reading a configured session directory.
 #[derive(Debug, Error)]
@@ -176,9 +176,6 @@ fn parse_session_file(path: &Path, session_type: SessionType) -> Option<SessionE
     }
 
     let stem = path.file_stem()?.to_str()?;
-    if stem.is_empty() {
-        return None;
-    }
 
     // DesktopNames is metadata supplied to the launched session, so reject
     // values that could break an environment assignment before storing them.
@@ -322,18 +319,15 @@ fn tokenize_exec(value: &str) -> Result<Vec<String>, ()> {
 /// before filesystem inspection. Arguments remain the already-tokenized
 /// values from the desktop entry.
 fn resolve_command(command: &str) -> Option<String> {
-    if command.is_empty()
-        || command.contains('\0')
-        || (command.contains('/') && !Path::new(command).is_absolute())
-    {
+    if command.is_empty() || command.contains('\0') {
         return None;
     }
-
     if command.contains('/') {
-        return is_executable(Path::new(command)).then(|| command.to_owned());
+        let path = Path::new(command);
+        return (path.is_absolute() && is_executable(path)).then(|| command.to_owned());
     }
 
-    env::split_paths(SESSION_COMMAND_PATH)
+    env::split_paths(DEFAULT_SESSION_PATH)
         .map(|directory| directory.join(command))
         .find(|path| is_executable(path))
         .map(|path| path.to_string_lossy().into_owned())
@@ -341,23 +335,12 @@ fn resolve_command(command: &str) -> Option<String> {
 
 /// Returns whether `path` is a regular file with an executable Unix mode bit.
 fn is_executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+
     let Ok(metadata) = fs::metadata(path) else {
         return false;
     };
-    if !metadata.is_file() {
-        return false;
-    }
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        metadata.permissions().mode() & 0o111 != 0
-    }
-
-    #[cfg(not(unix))]
-    {
-        true
-    }
+    metadata.is_file() && metadata.permissions().mode() & 0o111 != 0
 }
 
 fn is_true(value: Option<&String>) -> bool {

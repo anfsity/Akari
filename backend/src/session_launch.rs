@@ -19,7 +19,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::session_catalog::SessionEntry;
+use crate::session_catalog::{DEFAULT_SESSION_PATH, SessionEntry};
 use serde::{Deserialize, Serialize};
 
 pub const START_SESSION: &str = "--start-session";
@@ -45,7 +45,7 @@ pub fn get_session_launch(session: &SessionEntry) -> io::Result<(Vec<String>, Ve
     .map_err(io::Error::other)?;
     let command = vec![executable.clone(), START_SESSION.to_owned()];
     let mut environment = vec![
-        "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
+        format!("PATH={DEFAULT_SESSION_PATH}"),
         format!("XDG_SESSION_TYPE={}", session.session_type.as_str()),
     ];
     if let Some(desktop_name) = session.desktop_names.first() {
@@ -57,12 +57,9 @@ pub fn get_session_launch(session: &SessionEntry) -> io::Result<(Vec<String>, Ve
     }
     environment.push(format!("AKARI_SESSION_EXECUTABLE={executable}"));
     environment.push(format!("AKARI_SESSION_INVOCATION={invocation}"));
-    environment.push(format!(
-        "AKARI_SPLASH_BIN={}",
-        Path::new(&executable)
-            .with_file_name("akari-splash")
-            .display()
-    ));
+    if let Ok(splash) = env::var("AKARI_SPLASH_BIN") {
+        environment.push(format!("AKARI_SPLASH_BIN={splash}"));
+    }
     if let Ok(duration) = env::var("AKARI_SPLASH_DURATION") {
         environment.push(format!("AKARI_SPLASH_DURATION={duration}"));
     }
