@@ -122,7 +122,7 @@ Future<void> _waitFor(
   fail('Preview timed out waiting for $stage.');
 }
 
-class _PreviewGateway extends DemoGreeterGateway {
+class _PreviewGateway implements GreeterGateway {
   final _events = StreamController<GreeterEvent>.broadcast();
   static const _attemptId = 'preview-alice';
   final responses = <(String, String)>[];
@@ -133,12 +133,16 @@ class _PreviewGateway extends DemoGreeterGateway {
   Stream<GreeterEvent> get events => _events.stream;
 
   @override
-  Future<List<UserSummary>> listUsers() async => const [
+  Future<BackendStateSnapshot> getState() async =>
+      const BackendStateSnapshot(state: BackendAuthState.idle, detail: '');
+
+  @override
+  Future<List<UserSummary>> getUsers() async => const [
     UserSummary(id: 'alice', displayName: 'Alice'),
   ];
 
   @override
-  Future<List<SessionSummary>> listSessions() async => const [
+  Future<List<SessionSummary>> getSessions() async => const [
     (id: 'wayland:sway', name: 'Sway'),
   ];
 
@@ -195,14 +199,19 @@ class _PreviewGateway extends DemoGreeterGateway {
   }
 
   @override
+  Future<void> cancel(String attemptId) async {}
+
+  @override
   Future<void> startSession(String attemptId, String sessionId) async {
     sessions.add((attemptId, sessionId));
   }
 
   @override
+  Future<void> requestPowerAction(PowerAction action) async {}
+
+  @override
   Future<void> close() async {
     await _events.close();
-    await super.close();
     closed = true;
   }
 }

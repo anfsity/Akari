@@ -79,7 +79,7 @@ void main() {
 
     expect(feature.state.authMode, AuthMode.prompting);
     expect(feature.state.prompt?.kind, PromptKind.secret);
-    expect(effects.whereType<RequestFocusEffect>(), hasLength(1));
+    expect(effects.whereType<FocusCredentialEffect>(), hasLength(1));
 
     gateway.emit(
       const BackendPromptReceived(
@@ -109,7 +109,7 @@ void main() {
 
     expect(feature.state.authMode, AuthMode.submitting);
     expect(feature.state.prompt?.text, 'Authentication is continuing.');
-    expect(effects.whereType<ShowNoticeEffect>(), isEmpty);
+    expect(effects.whereType<ShowErrorNoticeEffect>(), isEmpty);
     expect(effects.whereType<ClearCredentialEffect>(), hasLength(1));
     expect(feature.state.promptError, 'The provider is unavailable.');
 
@@ -450,7 +450,7 @@ void main() {
 
       expect(feature.state.catalogMode, CatalogMode.loading);
       expect(feature.state.authMode, AuthMode.userSelection);
-      expect(gateway.listSessionsCalls, 1);
+      expect(gateway.getSessionsCalls, 1);
 
       await feature.dispatch(const WakeGreeterCommand());
       await feature.dispatch(SelectUserCommand(gateway.users.first));
@@ -493,7 +493,7 @@ void main() {
 
     expect(feature.state.catalogMode, CatalogMode.ready);
     expect(feature.state.authMode, AuthMode.userSelection);
-    expect(gateway.listSessionsCalls, 2);
+    expect(gateway.getSessionsCalls, 2);
 
     feature.dispose();
   });
@@ -800,7 +800,7 @@ class _FakeSessionStore implements SessionStore {
   final List<String> savedIds = [];
 
   @override
-  Future<String?> readSelectedSessionId() async => storedId;
+  Future<String?> findSelectedSessionId() async => storedId;
 
   @override
   Future<void> saveSelectedSessionId(String sessionId) async {
@@ -818,7 +818,7 @@ class _FakeGreeterGateway implements GreeterGateway {
     UserSummary(id: 'bob', displayName: 'Bob'),
   ];
   int getStateCalls = 0;
-  int listSessionsCalls = 0;
+  int getSessionsCalls = 0;
   int respondCalls = 0;
   int beginAuthenticationCalls = 0;
   String? attemptId;
@@ -847,11 +847,11 @@ class _FakeGreeterGateway implements GreeterGateway {
   }
 
   @override
-  Future<List<UserSummary>> listUsers() async => users;
+  Future<List<UserSummary>> getUsers() async => users;
 
   @override
-  Future<List<SessionSummary>> listSessions() async {
-    listSessionsCalls++;
+  Future<List<SessionSummary>> getSessions() async {
+    getSessionsCalls++;
     final future = sessionsFuture;
     if (future != null) {
       return future;
@@ -924,7 +924,7 @@ class _FakeGreeterGateway implements GreeterGateway {
   }
 
   @override
-  Future<void> powerAction(PowerAction action) async {
+  Future<void> requestPowerAction(PowerAction action) async {
     requestedPowerAction = action;
     final error = powerActionError;
     if (error != null) {

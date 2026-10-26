@@ -138,7 +138,7 @@ class _PowerFailureGateway extends DemoGreeterGateway {
   var _noticeCount = 0;
 
   @override
-  Future<void> powerAction(PowerAction action) async {
+  Future<void> requestPowerAction(PowerAction action) async {
     _noticeCount++;
     throw GreeterGatewayException(
       'Power warning $_noticeCount',

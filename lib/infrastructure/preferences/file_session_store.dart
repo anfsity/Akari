@@ -12,7 +12,7 @@ class FileSessionStore implements SessionStore {
   final File _file;
 
   @override
-  Future<String?> readSelectedSessionId() async {
+  Future<String?> findSelectedSessionId() async {
     try {
       return switch (jsonDecode(await _file.readAsString())) {
         {'sessionId': final String id} when id.isNotEmpty => id,

@@ -761,12 +761,12 @@ class _SingleUserGateway implements GreeterGateway {
       const BackendStateSnapshot(state: BackendAuthState.idle, detail: '');
 
   @override
-  Future<List<UserSummary>> listUsers() async => [
+  Future<List<UserSummary>> getUsers() async => [
     UserSummary(id: 'alice', displayName: 'Alice', iconPath: iconPath),
   ];
 
   @override
-  Future<List<SessionSummary>> listSessions() async => const [
+  Future<List<SessionSummary>> getSessions() async => const [
     (id: 'wayland:hyprland', name: 'Hyprland'),
   ];
 
@@ -811,7 +811,7 @@ class _SingleUserGateway implements GreeterGateway {
   Future<void> startSession(String attemptId, String sessionId) async {}
 
   @override
-  Future<void> powerAction(PowerAction action) async {}
+  Future<void> requestPowerAction(PowerAction action) async {}
 
   @override
   Future<void> close() => _events.close();

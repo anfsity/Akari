@@ -48,6 +48,8 @@ class BackendStateSnapshot {
   final String detail;
 }
 
+const serviceUnavailableMessage = 'The greeter service is unavailable.';
+
 /// Transport boundary for the feature, implemented by D-Bus and local preview.
 ///
 /// Events must preserve backend emission order. Authentication signals may
@@ -59,9 +61,9 @@ abstract interface class GreeterGateway {
 
   Future<BackendStateSnapshot> getState();
 
-  Future<List<UserSummary>> listUsers();
+  Future<List<UserSummary>> getUsers();
 
-  Future<List<SessionSummary>> listSessions();
+  Future<List<SessionSummary>> getSessions();
 
   Future<String> beginAuthentication(String username);
 
@@ -71,7 +73,7 @@ abstract interface class GreeterGateway {
 
   Future<void> startSession(String attemptId, String sessionId);
 
-  Future<void> powerAction(PowerAction action);
+  Future<void> requestPowerAction(PowerAction action);
 
   Future<void> close();
 }
@@ -115,7 +117,7 @@ class DemoGreeterGateway implements GreeterGateway {
   }
 
   @override
-  Future<List<UserSummary>> listUsers() async {
+  Future<List<UserSummary>> getUsers() async {
     return const [
       UserSummary(id: 'alice', displayName: 'Alice'),
       UserSummary(id: 'bob', displayName: 'Bob'),
@@ -123,7 +125,7 @@ class DemoGreeterGateway implements GreeterGateway {
   }
 
   @override
-  Future<List<SessionSummary>> listSessions() async {
+  Future<List<SessionSummary>> getSessions() async {
     return const [
       (id: 'wayland:sway', name: 'Sway'),
       (id: 'wayland:hyprland', name: 'Hyprland'),
@@ -164,12 +166,6 @@ class DemoGreeterGateway implements GreeterGateway {
 
   @override
   Future<void> respond(String attemptId, String response) async {
-    if (response.trim().isEmpty) {
-      throw const GreeterGatewayException(
-        'A response is required.',
-        kind: GreeterErrorKind.input,
-      );
-    }
     if (_attemptId == attemptId) {
       _events.add(
         BackendStateChanged(
@@ -209,7 +205,7 @@ class DemoGreeterGateway implements GreeterGateway {
   }
 
   @override
-  Future<void> powerAction(PowerAction action) async {}
+  Future<void> requestPowerAction(PowerAction action) async {}
 
   @override
   Future<void> close() => _events.close();
