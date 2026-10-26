@@ -63,26 +63,16 @@ if command -v cargo >/dev/null 2>&1 && [[ -f "$repo_root/backend/Cargo.toml" ]];
   fi
 fi
 
+akari_resolve_sdk_binaries "$repo_root"
 flutter_command=(fvm flutter)
 dart_command=(fvm dart)
-custom_flutter="${AKARI_FLUTTER_BIN:-}"
-custom_dart="${AKARI_DART_BIN:-}"
 
-if [[ -n "$custom_flutter" ]]; then
-  if [[ "$custom_flutter" != /* ]]; then
-    custom_flutter="$repo_root/$custom_flutter"
-  fi
-  flutter_command=("$custom_flutter")
-  if [[ -z "$custom_dart" ]]; then
-    custom_dart="$(dirname -- "$custom_flutter")/dart"
-  fi
+if [[ -n "${AKARI_RESOLVED_FLUTTER_BIN:-}" && -x "$AKARI_RESOLVED_FLUTTER_BIN" ]]; then
+  flutter_command=("$AKARI_RESOLVED_FLUTTER_BIN")
 fi
 
-if [[ -n "$custom_dart" ]]; then
-  if [[ "$custom_dart" != /* ]]; then
-    custom_dart="$repo_root/$custom_dart"
-  fi
-  dart_command=("$custom_dart")
+if [[ -n "${AKARI_RESOLVED_DART_BIN:-}" && -x "$AKARI_RESOLVED_DART_BIN" ]]; then
+  dart_command=("$AKARI_RESOLVED_DART_BIN")
 fi
 
 if [[ "${flutter_command[0]}" == fvm || "${dart_command[0]}" == fvm ]]; then

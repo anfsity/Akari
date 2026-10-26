@@ -7,13 +7,13 @@ String getShellCompletion(String shell) =>
 String _getZshCompletion() {
   final commands = [
     for (final command in cliCommands)
-      if (!command.name.contains(' '))
+      if (command.isRootCommand)
         for (final spelling in command.spellings)
           '      ${encodeShellArgument('$spelling:${command.description}')}\n',
   ].join();
   final subcommandCases = [
     for (final command in cliCommands)
-      if (command.name.contains(' '))
+      if (command.isSubcommand)
         '    ${encodeShellArgument(command.name)}) command=${encodeShellArgument(command.name)}; command_words=2;;\n',
   ].join();
   return [
@@ -105,11 +105,11 @@ String _encodeZshOption(CliOption option) {
 String _getBashCompletion() {
   final commands = [
     for (final command in cliCommands)
-      if (!command.name.contains(' ')) ...command.spellings,
+      if (command.isRootCommand) ...command.spellings,
   ].join(' ');
   final subcommandCases = [
     for (final command in cliCommands)
-      if (command.name.contains(' '))
+      if (command.isSubcommand)
         '    ${encodeShellArgument(command.name)}) command=${encodeShellArgument(command.name)};;\n',
   ].join();
   return [

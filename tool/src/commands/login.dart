@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../cli/arguments.dart';
 import '../cli/definition.dart';
 import '../sdk_commands.dart';
 
@@ -16,14 +17,20 @@ Future<int> runLoginCommand(
   final root = installation ?? Directory(loginInstallationPath);
   final operation = command.name.split(' ').last;
   final query = operation == 'status' || operation == 'logs';
-  final lines = int.tryParse(values['--lines'] ?? '100');
-  if (operation == 'logs' && (lines == null || lines < 1)) {
-    throw const FormatException('--lines must be a positive integer.');
-  }
-  final jobs = int.tryParse(values['--jobs'] ?? '4');
-  if (operation == 'install' && (jobs == null || jobs < 1)) {
-    throw const FormatException('--jobs must be a positive integer.');
-  }
+  final lines = operation == 'logs'
+      ? parsePositiveInteger(
+          values['--lines'],
+          optionName: '--lines',
+          defaultValue: 100,
+        )
+      : 100;
+  final jobs = operation == 'install'
+      ? parsePositiveInteger(
+          values['--jobs'],
+          optionName: '--jobs',
+          defaultValue: 4,
+        )
+      : 4;
   final controller = File('${root.path}/manage.py');
   final script =
       const {

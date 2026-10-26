@@ -47,6 +47,7 @@ akari_require_file "$repo_root/backend/Cargo.toml" 'backend Cargo manifest'
 build_args=(
   build
   --manifest-path "$repo_root/backend/Cargo.toml"
+  --target-dir "$repo_root/backend/target/akari-$mode"
   --locked
 )
 if [[ "$mode" == mock ]]; then
@@ -59,7 +60,7 @@ fi
 cd -- "$repo_root"
 cargo "${build_args[@]}"
 
-backend_binary="$repo_root/backend/target/$profile/backend"
+backend_binary="$repo_root/backend/target/akari-$mode/$profile/backend"
 if [[ ! -x "$backend_binary" ]]; then
   printf 'Backend binary was not produced: %s\n' "$backend_binary" >&2
   exit 1

@@ -16,10 +16,9 @@ Future<Map<String, Object?>> resolveDisplayProfile(
   if (stateHome != null && stateHome.isNotEmpty) {
     state = stateHome;
   } else {
-    final home = Platform.environment['HOME'];
-    if (home == null) {
-      throw const FormatException('HOME or XDG_STATE_HOME is required.');
-    }
+    final home = findUserHomeDirectory(
+      requiredMessage: 'HOME or XDG_STATE_HOME is required.',
+    ).path;
     state = '$home/.local/state';
   }
   final result = await Process.run('python3', [

@@ -18,6 +18,8 @@ class ThemePackage {
   final String packageName;
   final String builderName;
   final Directory directory;
+
+  String get name => packageName;
 }
 
 /// Resolves the physical project path and checks its authoring contract before

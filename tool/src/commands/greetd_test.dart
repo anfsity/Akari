@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../cli/arguments.dart';
 import '../cli/definition.dart';
 
 const greetdTestInstallationPath = '/opt/akari-test';
@@ -44,10 +45,11 @@ Future<int> runGreetdTestCommand(
     return 0;
   }
   if (command.name == 'greetd-test logs') {
-    final lines = int.tryParse(values['--lines'] ?? '100');
-    if (lines == null || lines < 1) {
-      throw const FormatException('--lines must be a positive integer.');
-    }
+    final lines = parsePositiveInteger(
+      values['--lines'],
+      optionName: '--lines',
+      defaultValue: 100,
+    );
     final file = getGreetdTestLogFile(
       root,
       callerUid,

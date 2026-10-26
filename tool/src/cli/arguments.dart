@@ -28,6 +28,21 @@ class CliArguments {
       options.any((argument) => argument == '-h' || argument == '--help');
 }
 
+int parsePositiveInteger(
+  String? raw, {
+  required String optionName,
+  int defaultValue = 1,
+}) {
+  if (raw == null) {
+    return defaultValue;
+  }
+  final value = int.tryParse(raw);
+  if (value == null || value < 1) {
+    throw FormatException('$optionName must be a positive integer.');
+  }
+  return value;
+}
+
 /// Typed options for commands that plan and report a development run. Defaults
 /// belong here; dispatch and execution consume already validated values.
 class DevCommandOptions {
@@ -64,13 +79,9 @@ class DevCommandOptions {
       );
     }
     final values = getCliOptionValues(command, arguments.options);
-    int? jobs;
-    if (values['--jobs'] case final value?) {
-      jobs = int.tryParse(value);
-      if (jobs == null || jobs < 1) {
-        throw const FormatException('--jobs must be a positive integer.');
-      }
-    }
+    final jobs = values['--jobs'] == null
+        ? null
+        : parsePositiveInteger(values['--jobs'], optionName: '--jobs');
     final options = DevCommandOptions._(
       values,
       arguments.theme,

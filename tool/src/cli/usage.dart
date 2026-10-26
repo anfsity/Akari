@@ -10,7 +10,7 @@ void writeCliUsage([CliCommand? command]) {
     for (final group in CommandGroup.values) {
       stdout.writeln('\n${group.label}:');
       for (final definition in cliCommands.where(
-        (entry) => entry.group == group && !entry.name.contains(' '),
+        (entry) => entry.group == group && entry.isRootCommand,
       )) {
         stdout.writeln(
           '  ${definition.spellings.join(', ').padRight(24)} ${definition.description}',
