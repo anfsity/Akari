@@ -61,16 +61,19 @@ bool evaluateSceneCondition(
   Set<ScenePredicate> activePredicates,
 ) {
   return switch (condition) {
-    ScenePredicateCondition(:final predicate) =>
-      activePredicates.contains(predicate),
+    ScenePredicateCondition(:final predicate) => activePredicates.contains(
+      predicate,
+    ),
     SceneAll(:final conditions) => conditions.every(
       (condition) => evaluateSceneCondition(condition, activePredicates),
     ),
     SceneAny(:final conditions) => conditions.any(
       (condition) => evaluateSceneCondition(condition, activePredicates),
     ),
-    SceneNot(:final condition) =>
-      !evaluateSceneCondition(condition, activePredicates),
+    SceneNot(:final condition) => !evaluateSceneCondition(
+      condition,
+      activePredicates,
+    ),
   };
 }
 
@@ -108,12 +111,7 @@ class SceneRect {
       x + width <= 1 &&
       y + height <= 1;
 
-  SceneRect copyWith({
-    double? x,
-    double? y,
-    double? width,
-    double? height,
-  }) {
+  SceneRect copyWith({double? x, double? y, double? width, double? height}) {
     return SceneRect(
       x: x ?? this.x,
       y: y ?? this.y,
@@ -160,6 +158,8 @@ class SceneTransform {
       rotationY == 0 &&
       rotationZ == 0 &&
       perspective == 0;
+
+  bool get isDefault => isIdentity && pivotX == 0.5 && pivotY == 0.5;
 
   SceneTransform copyWith({
     double? translateX,
@@ -342,15 +342,13 @@ class SceneDocument {
   /// Draw order uses renderOrder first and z as its tie-breaker. Focus order is
   /// independent. Sorting a copy preserves the original authoring order.
   List<SceneNode> get paintOrder {
-    final ordered = [...nodes]
-      ..sort((left, right) {
-        final byRenderOrder = left.renderOrder.compareTo(right.renderOrder);
-        if (byRenderOrder != 0) {
-          return byRenderOrder;
-        }
-        return left.z.compareTo(right.z);
-      });
-    return ordered;
+    return [...nodes]..sort((left, right) {
+      final byRenderOrder = left.renderOrder.compareTo(right.renderOrder);
+      if (byRenderOrder != 0) {
+        return byRenderOrder;
+      }
+      return left.z.compareTo(right.z);
+    });
   }
 
   SceneDocument copyWith({
