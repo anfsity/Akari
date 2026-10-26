@@ -13,7 +13,7 @@ description: 检查多屏、缩放和截图，对比桌面预览与真实登录�
 | 在多台物理显示器上测试状态同步与焦点切换 | `akari run`（默认全屏） |
 | 在 Wayland 桌面中还原独立 TTY 登录的缩放比例 | `akari run sway` |
 | 无需桌面环境，生成固定分辨率与缩放的对比截图 | `akari run sway --sway-backend headless` |
-| 验证真实硬件显示模式、DRM/KMS 启动画面、PAM 与 SDDM 恢复 | [独立 greetd 测试](greetd-testing.md) |
+| 验证真实硬件显示模式、DRM/KMS 启动画面、PAM 与显示管理器恢复 | [独立 greetd 测试](greetd-testing.md) |
 
 :::note
 `run` 与 `run sway` 默认在私有 D-Bus 会话中连接 Rust 模拟后端。Sway 相关流程需要安装 `python3`、`sway`、`swaymsg` 和 `grim`。

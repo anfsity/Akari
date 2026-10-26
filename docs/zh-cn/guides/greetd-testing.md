@@ -1,9 +1,9 @@
 ---
 title: 独立 greetd 测试
-description: 构建和安装真实登录测试工具、捕获显示器信息、查看日志并恢复 SDDM。
+description: 构建与安装真实登录测试工具、捕获显示器布局、查看会话日志并安全恢复系统。
 ---
 
-独立测试工具位于 `scripts/greetd-test/`，安装到 `/opt/akari-test`。它使用正式版后端连接真实的 `greetd` 与 `systemd-logind`，同时保留系统的 SDDM 开机配置，并提供自动恢复兜底机制。
+独立测试工具位于 `scripts/greetd-test/`，安装到 `/opt/akari-test`。它使用正式版后端连接真实的 `greetd` 与 `systemd-logind`，同时保留系统原有的开机显示管理器配置，并提供自动恢复兜底机制。
 
 :::caution
 测试工具连接真实系统后端，因此挂起、重启和关机操作会实际执行。日常桌面开发请使用 `akari run`（默认使用模拟认证与模拟电源）。
@@ -122,7 +122,7 @@ akari login disable-gaze
 akari greetd-test install
 
 # 或指定其他主题项目
-akari greetd-test install --theme themes/preset1
+akari greetd-test install --theme themes/fallback
 ```
 
 `install` 会以 release 模式（4 并行任务）构建主题与正式版后端，将旧文件备份到 `/opt/akari-test/backups/`，并将当前 Sway 或 Hyprland 桌面的显示器排列顺序保存到 `/opt/akari-test/display-layout.json`。
@@ -139,16 +139,16 @@ akari greetd-test install --theme themes/preset1
    常用可选参数：
    - `--scale NUMBER`：覆盖登录界面的输出缩放（默认为 `1`）。
    - `--log-dir /var/tmp/my-akari-test`：指定自定义的全局可遍历日志根目录。
-   - `--dry-run`：仅输出执行计划，不停止 SDDM。
+   - `--dry-run`：仅输出执行计划，不停止现有显示管理器。
 
-`start` 会在停止 SDDM 前挂载多重恢复保护。遇到以下任一情况时都会自动恢复 SDDM：
+`start` 会在停止当前显示管理器前挂载多重恢复保护。遇到以下任一情况时都会自动恢复原有显示管理器：
 - 前置检查或启动阶段失败；
 - `akari-test.service` 退出（通过 `ExecStopPost` 触发）；
 - 服务运行满 10 分钟（触发独立兜底计时器）。
 
-### 3. 手动恢复 SDDM
+### 3. 手动恢复原有显示管理器
 
-如需在 `tty3` 手动结束测试并恢复 SDDM：
+如需在 `tty3` 手动结束测试并恢复原显示管理器：
 
 ```sh
 akari greetd-test restore
@@ -198,7 +198,7 @@ akari greetd-test logs --run current --file flutter --follow
 | `Print` | 立即为每台活动显示器保存一张 PNG 截图 |
 | `Shift+Print` | 延迟 3 秒后截图（方便先展开账户或会话菜单） |
 
-截图与 `capture.json` 元数据保存在 `greeter/session-*/screenshots/<timestamp>-*/` 下，恢复 SDDM 后仍可在桌面直接读取：
+截图与 `capture.json` 元数据保存在 `greeter/session-*/screenshots/<timestamp>-*/` 下，返回原桌面后仍可直接读取：
 
 ```sh
 akari greetd-test logs --run current --file screenshot
