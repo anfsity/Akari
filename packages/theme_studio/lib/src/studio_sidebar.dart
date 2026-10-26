@@ -6,6 +6,16 @@ import 'package:flutter/services.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import 'scene_editor.dart';
+import 'studio_component_assembly.dart';
+
+enum _SidebarTab {
+  layers('Layers'),
+  components('Add'),
+  assets('Assets');
+
+  const _SidebarTab(this.label);
+  final String label;
+}
 
 class StudioSidebar extends StatefulWidget {
   const StudioSidebar({
@@ -38,7 +48,7 @@ class StudioSidebar extends StatefulWidget {
 }
 
 class _StudioSidebarState extends State<StudioSidebar> {
-  bool _showAssets = false;
+  _SidebarTab _tab = _SidebarTab.layers;
 
   @override
   Widget build(BuildContext context) {
@@ -85,26 +95,32 @@ class _StudioSidebarState extends State<StudioSidebar> {
           ),
         ),
         const Divider(),
+        if (editor != null)
+          StudioLayoutCompleteness(editor: editor, readOnly: widget.readOnly),
         Padding(
           padding: const EdgeInsets.all(8),
           child: Row(
             children: [
-              for (final assets in [false, true])
+              for (final tab in _SidebarTab.values)
                 Expanded(
                   child: Button(
-                    key: ValueKey(assets ? 'sidebar-assets' : 'sidebar-layers'),
-                    style: _showAssets == assets
-                        ? const ButtonStyle.secondary()
-                        : const ButtonStyle.ghost(),
-                    onPressed: () => setState(() => _showAssets = assets),
-                    child: Text(assets ? 'Assets' : 'Layers'),
+                    key: ValueKey('sidebar-${tab.name}'),
+                    style: _tab == tab
+                        ? const ButtonStyle.secondary(
+                            density: ButtonDensity.compact,
+                          )
+                        : const ButtonStyle.ghost(
+                            density: ButtonDensity.compact,
+                          ),
+                    onPressed: () => setState(() => _tab = tab),
+                    child: Text(tab.label).small(),
                   ),
                 ),
             ],
           ),
         ),
         Expanded(
-          child: _showAssets
+          child: _tab == _SidebarTab.assets
               ? _AssetList(
                   paths: widget.assetPaths,
                   resolveImage: widget.resolveAssetImage,
@@ -116,9 +132,14 @@ class _StudioSidebarState extends State<StudioSidebar> {
                 )
               : editor == null
               ? const SizedBox()
+              : _tab == _SidebarTab.components
+              ? StudioComponentAssembly(
+                  editor: editor,
+                  readOnly: widget.readOnly,
+                )
               : _LayerList(key: ObjectKey(editor), editor: editor),
         ),
-        if (!_showAssets && editor != null) ...[
+        if (_tab == _SidebarTab.layers && editor != null) ...[
           const Divider(),
           _NodeActions(editor: editor, readOnly: widget.readOnly),
         ],
@@ -386,7 +407,9 @@ class _NodeActions extends StatelessWidget {
               Expanded(
                 child: OutlineButton(
                   density: ButtonDensity.dense,
-                  onPressed: readOnly ? null : editor.duplicateSelectedNode,
+                  onPressed: !readOnly && editor.canDuplicateNode
+                      ? editor.duplicateSelectedNode
+                      : null,
                   child: const Text('Duplicate', maxLines: 1).small(),
                 ),
               ),
@@ -402,9 +425,15 @@ class _NodeActions extends StatelessWidget {
               ),
             ],
           ),
-          if (!editor.canDeleteNode) ...[
+          if (editor.deletionBlockReason case final reason?) ...[
             const Gap(8),
-            const Text('A scene needs at least one node.').small().muted(),
+            Text(reason).small().muted(),
+          ],
+          if (!editor.canDuplicateNode) ...[
+            const Gap(8),
+            const Text('Layout components can only be added once.')
+                .small()
+                .muted(),
           ],
         ],
       ),

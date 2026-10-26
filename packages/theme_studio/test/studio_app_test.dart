@@ -68,14 +68,63 @@ const _editableCatalog = ThemeComponentCatalog(
   },
 );
 
+const _assemblyLayout = ThemeLayoutDefinition(
+  sceneId: 'test',
+  label: 'Test composition',
+  slots: [
+    ThemeLayoutSlot(
+      label: 'Login panel',
+      isRequired: true,
+      defaultNode: SceneNode(
+        id: 'panel',
+        componentId: 'panel',
+        rect: SceneRect(x: 0.1, y: 0.1, width: 0.3, height: 0.4),
+      ),
+    ),
+    ThemeLayoutSlot(
+      label: 'Standby badge',
+      defaultNode: SceneNode(
+        id: 'badge',
+        componentId: 'label',
+        rect: SceneRect(x: 0.2, y: 0.05, width: 0.3, height: 0.1),
+        motion: SceneMotionPreset.fade,
+        visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
+        properties: {'text': 'Welcome'},
+      ),
+    ),
+    ThemeLayoutSlot(
+      label: 'Sign-in action',
+      isRequired: true,
+      defaultNode: SceneNode(
+        id: 'action',
+        componentId: 'primaryAction',
+        rect: SceneRect(x: 0.7, y: 0.5, width: 0.1, height: 0.1),
+        interactive: true,
+        focusOrder: 40,
+      ),
+    ),
+    ThemeLayoutSlot(
+      label: 'Status message',
+      isRequired: true,
+      defaultNode: SceneNode(
+        id: 'status',
+        componentId: 'status',
+        rect: SceneRect(x: 0.2, y: 0.7, width: 0.4, height: 0.1),
+      ),
+    ),
+  ],
+);
+
 ThemeDefinition _buildTheme({
   Color? seed,
   ThemeComponentCatalog componentCatalog = const ThemeComponentCatalog(),
+  ThemeLayoutDefinition? layout,
 }) => ThemeDefinition(
   id: 'test',
   document: _document,
   components: (_) => _Components(),
   componentCatalog: componentCatalog,
+  layout: layout,
   bundle: ThemeBundle(
     tokens: ThemeTokens(
       materialTheme: material.ThemeData(
@@ -205,6 +254,11 @@ void main() {
           bundle: _buildTheme().bundle,
           components: (_) => _PresetComponents(),
           componentCatalog: _editableCatalog,
+          layout: ThemeLayoutDefinition(
+            sceneId: 'preset',
+            label: 'Preset composition',
+            slots: [_assemblyLayout.slots.first],
+          ),
         ),
       );
       await openStudio(tester, additionalProjects: [preset]);
@@ -242,6 +296,14 @@ void main() {
         'preset',
       );
       expect(find.text('preset component panel'), findsOneWidget);
+      expect(
+        tester
+            .widget<StudioCanvas>(find.byType(StudioCanvas))
+            .editor!
+            .layout!
+            .label,
+        'Preset composition',
+      );
       expect(find.text('Panel appearance'), findsOneWidget);
       expect(find.byKey(const ValueKey('property-variant')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
@@ -270,6 +332,10 @@ void main() {
         0.2,
       );
       expect(find.text('preset.txt'), findsNothing);
+      expect(
+        tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!.layout,
+        isNull,
+      );
       expect(find.text('Panel appearance'), findsNothing);
       expect(find.byKey(const ValueKey('property-variant')), findsNothing);
       expect(
@@ -647,6 +713,216 @@ void main() {
       0.2,
     );
   });
+
+  testWidgets(
+    'assembly adds preset nodes, previews states and persists across reopening',
+    (tester) async {
+      ThemeDefinition buildAssembly({Color? seed}) =>
+          _buildTheme(seed: seed, layout: _assemblyLayout);
+      await openStudio(tester, themeBuilder: buildAssembly);
+      await tester.tap(find.byKey(const ValueKey('sidebar-components')));
+      await tester.pumpAndSettle();
+      expect(find.text('Test composition'), findsOneWidget);
+      final add = find.byKey(const ValueKey('slot-badge'));
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      final canvas = tester.widget<StudioCanvas>(find.byType(StudioCanvas));
+      expect(canvas.editor!.selectedId, 'badge');
+      expect(canvas.editor!.selectedNode.properties, {'text': 'Welcome'});
+      expect(canvas.editor!.selectedNode.rect.x, 0.2);
+      expect(find.byKey(const ValueKey('preview-badge')), findsNothing);
+      await tester.tap(find.text('State: Login'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('preview-badge')), findsOneWidget);
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(canvas.editor!.selectedId, 'panel');
+      expect(canvas.editor!.document.nodes, hasLength(2));
+      await tester.tap(find.text('Redo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      await openStudio(tester, themeBuilder: buildAssembly);
+      await tester.tap(find.byKey(const ValueKey('sidebar-components')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: add, matching: find.text('Remove')),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<StudioCanvas>(find.byType(StudioCanvas))
+            .editor!
+            .document
+            .nodes
+            .any((node) => node.id == 'badge'),
+        isFalse,
+      );
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<StudioCanvas>(find.byType(StudioCanvas))
+            .editor!
+            .document
+            .nodes
+            .singleWhere((node) => node.id == 'badge')
+            .properties,
+        {'text': 'Welcome'},
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'required repair is one undo step and canvas shortcuts respect slots',
+    (tester) async {
+      await openStudio(
+        tester,
+        themeBuilder: ({Color? seed}) =>
+            _buildTheme(seed: seed, layout: _assemblyLayout),
+      );
+      expect(
+        find.textContaining('Missing required components:'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('add-required-slots')));
+      await tester.pumpAndSettle();
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      expect(editor.missingRequiredSlots, isEmpty);
+      expect(editor.document.nodes, hasLength(4));
+      expect(editor.selectedId, 'action');
+      expect(editor.selectedNode.interactive, isTrue);
+      expect(find.byKey(const ValueKey('layout-completeness')), findsNothing);
+      expect(
+        tester
+            .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Delete'))
+            .onPressed,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<OutlineButton>(
+              find.widgetWithText(OutlineButton, 'Duplicate'),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const ValueKey('preview-action')));
+      await tester.pumpAndSettle();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+      await tester.pumpAndSettle();
+      expect(editor.document.nodes, hasLength(4));
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(editor.document.nodes, hasLength(2));
+      expect(editor.canUndo, isFalse);
+      expect(find.byKey(const ValueKey('add-required-slots')), findsOneWidget);
+      await tester.tap(find.text('Redo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('sidebar-components')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<OutlineButton>(find.byKey(const ValueKey('slot-panel')))
+            .onPressed,
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('invalid drafts and inspection prevent assembly mutations', (
+    tester,
+  ) async {
+    await openStudio(
+      tester,
+      themeBuilder: ({Color? seed}) =>
+          _buildTheme(seed: seed, layout: _assemblyLayout),
+    );
+    final editor = tester
+        .widget<StudioCanvas>(find.byType(StudioCanvas))
+        .editor!;
+    final original = editor.document;
+    await tester.enterText(find.byKey(const ValueKey('field-Width')), '2560');
+    await tester.tap(find.byKey(const ValueKey('sidebar-components')));
+    await tester.pumpAndSettle();
+    final add = find.byKey(const ValueKey('slot-badge'));
+    await tester.ensureVisible(add);
+    await tester.pumpAndSettle();
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-required-slots')));
+    await tester.pumpAndSettle();
+    expect(editor.document, same(original));
+    expect(editor.canUndo, isFalse);
+    expect(find.textContaining('non-normalized rect'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('field-Width')), '384');
+    await tester.tap(find.text('Inspect code'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<OutlineButton>(add).onPressed, isNull);
+    expect(
+      tester
+          .widget<OutlineButton>(
+            find.byKey(const ValueKey('add-required-slots')),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.text('Design'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(add);
+    await tester.pumpAndSettle();
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(editor.selectedId, 'badge');
+    expect(editor.inspector.error, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'loading a different scene keeps its nodes outside layout constraints',
+    (tester) async {
+      await openStudio(
+        tester,
+        themeBuilder: ({Color? seed}) =>
+            _buildTheme(seed: seed, layout: _assemblyLayout),
+      );
+      final other = File('${directory.path}/other.scene.json')
+        ..writeAsStringSync(
+          encodeSceneDocument(_document.copyWith(id: 'other')),
+        );
+      picker.selected = _PickedFile(other);
+      await tester.tap(find.text('Load JSON'));
+      await tester.pumpAndSettle();
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      expect(editor.layout, isNull);
+      expect(editor.canDuplicateNode, isTrue);
+      expect(find.byKey(const ValueKey('layout-completeness')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('sidebar-components')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Component assembly is unavailable for this scene.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('slot-panel')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('declared controls show defaults without creating scene edits', (
     tester,

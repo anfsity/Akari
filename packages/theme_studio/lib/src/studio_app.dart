@@ -119,7 +119,10 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   }
 
   void _updateTheme(ThemeDefinition theme) {
-    _editor?.updateComponentCatalog(theme.componentCatalog);
+    _editor?.updateAuthoring(
+      componentCatalog: theme.componentCatalog,
+      layout: theme.layout,
+    );
     _theme = theme.copyWith(
       bundle: theme.bundle.copyWith(
         backgrounds: {
@@ -213,6 +216,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       final editor = SceneEditor(
         File(path),
         componentCatalog: _theme.componentCatalog,
+        layout: _theme.layout,
       );
       _setEditor(editor);
       _assets = assets;
@@ -246,6 +250,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       final editor = SceneEditor(
         File(scenePath ?? project.scenePaths.first),
         componentCatalog: theme.componentCatalog,
+        layout: theme.layout,
       );
       setState(() {
         _setEditor(editor);
