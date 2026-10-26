@@ -2,8 +2,6 @@ import 'package:build/build.dart';
 
 import 'scene_codegen.dart';
 
-export 'scene_codegen.dart';
-
 Builder sceneBuilder(BuilderOptions options) => SceneBuilder();
 
 /// Converts authoring JSON to typed Dart during the theme build. Validation is
