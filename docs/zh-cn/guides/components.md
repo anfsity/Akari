@@ -52,8 +52,8 @@ class ServiceLabel extends StatelessWidget {
 | `onStartSession` | 启动已通过认证的桌面环境 |
 | `onRequestPowerAction` | 请求挂起、重启或关机 |
 
-:::caution[凭据控制器的所有权]
-密码输入框借用宿主的 `host.credentialController` 与 `host.credentialFocusNode`。它们的生命周期由外层应用管理——主题组件**不得**调用它们的 `dispose()`，也严禁将密码文本复制到场景属性或日志中。
+:::caution[凭据控制器的生命周期与安全]
+密码输入框由宿主注入并统一管理 `host.credentialController` 与 `host.credentialFocusNode`。主题组件**严禁**调用它们的 `dispose()`，也严禁将密码明文复制到场景属性或输出到日志中。
 :::
 
 ## 4. 遵守挂载生命周期约定
