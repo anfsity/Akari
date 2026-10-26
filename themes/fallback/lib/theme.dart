@@ -54,7 +54,6 @@ ThemeDefinition buildFallbackTheme({Color? seed}) {
         SceneBackgroundKind.image: ImageBackgroundRenderer(),
         SceneBackgroundKind.solid: SolidBackgroundRenderer(),
       },
-      motions: const {SceneMotionPreset.none: FadeMotionBuilder()},
     ),
     components: StandardGreeterComponents.new,
   );

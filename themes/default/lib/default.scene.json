@@ -218,7 +218,8 @@
               "isAuthPrompting",
               "isAuthSubmitting",
               "isSessionSelection",
-              "isAuthError"
+              "isAuthError",
+              "isServiceUnavailable"
             ]
           }
         ]
