@@ -13,7 +13,7 @@ const _surfaceVariant = Color(0xff26343c);
 /// Minimal independent theme with a fixed palette and no presence animation.
 /// The seed parameter preserves the host's builder contract but is deliberately
 /// ignored so this fallback stays predictable without wallpaper sampling.
-ThemeDefinition buildFallbackTheme({Color? seed}) {
+ThemeDefinition buildFallbackTheme({Color? seed, SceneDocument? document}) {
   final colorScheme =
       ColorScheme.fromSeed(
         seedColor: _accent,
@@ -47,7 +47,7 @@ ThemeDefinition buildFallbackTheme({Color? seed}) {
   );
   return ThemeDefinition(
     id: 'fallback',
-    document: fallbackSceneDocument,
+    document: document ?? fallbackSceneDocument,
     bundle: ThemeBundle(
       tokens: tokens,
       backgrounds: const {

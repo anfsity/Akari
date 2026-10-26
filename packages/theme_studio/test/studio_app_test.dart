@@ -117,11 +117,12 @@ const _assemblyLayout = ThemeLayoutDefinition(
 
 ThemeDefinition _buildTheme({
   Color? seed,
+  SceneDocument? document,
   ThemeComponentCatalog componentCatalog = const ThemeComponentCatalog(),
   ThemeLayoutDefinition? layout,
 }) => ThemeDefinition(
   id: 'test',
-  document: _document,
+  document: document ?? _document,
   components: (_) => _Components(),
   componentCatalog: componentCatalog,
   layout: layout,
@@ -248,18 +249,19 @@ void main() {
         packageName: 'theme_preset',
         directory: presetDirectory.path,
         scenePaths: [presetFile.path],
-        themeBuilder: ({Color? seed}) => ThemeDefinition(
-          id: 'preset',
-          document: _document,
-          bundle: _buildTheme().bundle,
-          components: (_) => _PresetComponents(),
-          componentCatalog: _editableCatalog,
-          layout: ThemeLayoutDefinition(
-            sceneId: 'preset',
-            label: 'Preset composition',
-            slots: [_assemblyLayout.slots.first],
-          ),
-        ),
+        themeBuilder: ({Color? seed, SceneDocument? document}) =>
+            ThemeDefinition(
+              id: 'preset',
+              document: _document,
+              bundle: _buildTheme().bundle,
+              components: (_) => _PresetComponents(),
+              componentCatalog: _editableCatalog,
+              layout: ThemeLayoutDefinition(
+                sceneId: 'preset',
+                label: 'Preset composition',
+                slots: [_assemblyLayout.slots.first],
+              ),
+            ),
       );
       await openStudio(tester, additionalProjects: [preset]);
       Future<void> choosePreset() async {
@@ -361,7 +363,8 @@ void main() {
         packageName: 'theme_preset',
         directory: presetDirectory.path,
         scenePaths: [presetFile.path],
-        themeBuilder: ({Color? seed}) => _buildTheme().copyWith(id: 'preset'),
+        themeBuilder: ({Color? seed, SceneDocument? document}) =>
+            _buildTheme().copyWith(id: 'preset'),
       );
       await openStudio(tester, additionalProjects: [preset]);
       presetFile.writeAsStringSync('invalid');
@@ -690,14 +693,49 @@ void main() {
     },
   );
 
+  testWidgets(
+    'theme builders resolve the authored document on open and reload',
+    (tester) async {
+      final authored = _document.copyWith(themeProperties: {'palette': 'nord'});
+      file.writeAsStringSync(encodeSceneDocument(authored));
+      SceneDocument? received;
+      await openStudio(
+        tester,
+        themeBuilder: ({Color? seed, SceneDocument? document}) {
+          received = document;
+          return _buildTheme(seed: seed, document: document);
+        },
+      );
+      expect(received!.themeProperties, {'palette': 'nord'});
+      expect(
+        tester
+            .widget<StudioPreview>(find.byType(StudioPreview))
+            .theme
+            .document
+            .themeProperties,
+        {'palette': 'nord'},
+      );
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
+      await tester.tap(find.text('Apply to preview'));
+      await tester.pumpAndSettle();
+      final reload = tester.binding.reassembleApplication();
+      await tester.pumpAndSettle();
+      await reload;
+      expect(received!.nodes.first.rect.x, 0.2);
+      expect(received!.themeProperties, {'palette': 'nord'});
+      expect(find.text('Unsaved changes'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('preview dependencies survive edits and refresh on hot reload', (
     tester,
   ) async {
     var componentCreations = 0;
     await openStudio(
       tester,
-      themeBuilder: ({Color? seed}) {
-        final theme = _buildTheme(seed: seed);
+      themeBuilder: ({Color? seed, SceneDocument? document}) {
+        final theme = _buildTheme(seed: seed, document: document);
         return ThemeDefinition(
           id: theme.id,
           document: theme.document,
@@ -769,8 +807,8 @@ void main() {
   testWidgets(
     'assembly adds preset nodes, previews states and persists across reopening',
     (tester) async {
-      ThemeDefinition buildAssembly({Color? seed}) =>
-          _buildTheme(seed: seed, layout: _assemblyLayout);
+      ThemeDefinition buildAssembly({Color? seed, SceneDocument? document}) =>
+          _buildTheme(seed: seed, document: document, layout: _assemblyLayout);
       await openStudio(tester, themeBuilder: buildAssembly);
       expect(find.text('Test composition'), findsOneWidget);
       expect(find.byKey(const ValueKey('component-assembly')), findsOneWidget);
@@ -837,8 +875,11 @@ void main() {
     (tester) async {
       await openStudio(
         tester,
-        themeBuilder: ({Color? seed}) =>
-            _buildTheme(seed: seed, layout: _assemblyLayout),
+        themeBuilder: ({Color? seed, SceneDocument? document}) => _buildTheme(
+          seed: seed,
+          document: document,
+          layout: _assemblyLayout,
+        ),
       );
       expect(
         find.textContaining('Missing required components:'),
@@ -911,8 +952,8 @@ void main() {
   ) async {
     await openStudio(
       tester,
-      themeBuilder: ({Color? seed}) =>
-          _buildTheme(seed: seed, layout: _assemblyLayout),
+      themeBuilder: ({Color? seed, SceneDocument? document}) =>
+          _buildTheme(seed: seed, document: document, layout: _assemblyLayout),
     );
     final editor = tester
         .widget<StudioCanvas>(find.byType(StudioCanvas))
@@ -959,8 +1000,11 @@ void main() {
     (tester) async {
       await openStudio(
         tester,
-        themeBuilder: ({Color? seed}) =>
-            _buildTheme(seed: seed, layout: _assemblyLayout),
+        themeBuilder: ({Color? seed, SceneDocument? document}) => _buildTheme(
+          seed: seed,
+          document: document,
+          layout: _assemblyLayout,
+        ),
       );
       final other = File('${directory.path}/other.scene.json')
         ..writeAsStringSync(
@@ -992,8 +1036,11 @@ void main() {
     final source = file.readAsStringSync();
     await openStudio(
       tester,
-      themeBuilder: ({Color? seed}) =>
-          _buildTheme(seed: seed, componentCatalog: _editableCatalog),
+      themeBuilder: ({Color? seed, SceneDocument? document}) => _buildTheme(
+        seed: seed,
+        document: document,
+        componentCatalog: _editableCatalog,
+      ),
     );
     expect(find.text('Panel appearance'), findsOneWidget);
     final text = find.byKey(const ValueKey('property-text'));
@@ -1028,8 +1075,12 @@ void main() {
           ),
         ),
       );
-      ThemeDefinition buildEditable({Color? seed}) =>
-          _buildTheme(seed: seed, componentCatalog: _editableCatalog);
+      ThemeDefinition buildEditable({Color? seed, SceneDocument? document}) =>
+          _buildTheme(
+            seed: seed,
+            document: document,
+            componentCatalog: _editableCatalog,
+          );
       await openStudio(tester, themeBuilder: buildEditable);
       expect(find.byKey(const ValueKey('property-private')), findsNothing);
       final text = find.byKey(const ValueKey('property-text'));
@@ -1082,8 +1133,11 @@ void main() {
   ) async {
     await openStudio(
       tester,
-      themeBuilder: ({Color? seed}) =>
-          _buildTheme(seed: seed, componentCatalog: _editableCatalog),
+      themeBuilder: ({Color? seed, SceneDocument? document}) => _buildTheme(
+        seed: seed,
+        document: document,
+        componentCatalog: _editableCatalog,
+      ),
     );
     final inspector = tester
         .widget<NodeInspector>(find.byType(NodeInspector))
@@ -1128,8 +1182,11 @@ void main() {
       var catalog = const ThemeComponentCatalog();
       await openStudio(
         tester,
-        themeBuilder: ({Color? seed}) =>
-            _buildTheme(seed: seed, componentCatalog: catalog),
+        themeBuilder: ({Color? seed, SceneDocument? document}) => _buildTheme(
+          seed: seed,
+          document: document,
+          componentCatalog: catalog,
+        ),
       );
       await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
       catalog = _editableCatalog;
