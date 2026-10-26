@@ -491,19 +491,20 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
               children: [
                 Padding(
                   padding: const EdgeInsets.all(8),
-                  child: Row(
+                  child: Tabs(
+                    index: _inspect ? 1 : 0,
+                    expand: true,
+                    padding: const EdgeInsets.all(8),
+                    onChanged: (index) {
+                      if (!editor.applyDraft()) return;
+                      setState(() => _inspect = index == 1);
+                    },
                     children: [
                       for (final inspect in [false, true])
-                        Expanded(
-                          child: Button(
-                            style: _inspect == inspect
-                                ? const ButtonStyle.secondary()
-                                : const ButtonStyle.ghost(),
-                            onPressed: () {
-                              if (!editor.applyDraft()) return;
-                              setState(() => _inspect = inspect);
-                            },
-                            child: Text(inspect ? 'Inspect code' : 'Design'),
+                        TabItem(
+                          child: Text(
+                            inspect ? 'Inspect code' : 'Design',
+                            textAlign: TextAlign.center,
                           ),
                         ),
                     ],

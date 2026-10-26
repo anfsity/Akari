@@ -99,22 +99,17 @@ class _StudioSidebarState extends State<StudioSidebar> {
           StudioLayoutCompleteness(editor: editor, readOnly: widget.readOnly),
         Padding(
           padding: const EdgeInsets.all(8),
-          child: Row(
+          child: Tabs(
+            index: _tab.index,
+            expand: true,
+            padding: const EdgeInsets.all(8),
+            onChanged: (index) =>
+                setState(() => _tab = _SidebarTab.values[index]),
             children: [
               for (final tab in _SidebarTab.values)
-                Expanded(
-                  child: Button(
-                    key: ValueKey('sidebar-${tab.name}'),
-                    style: _tab == tab
-                        ? const ButtonStyle.secondary(
-                            density: ButtonDensity.compact,
-                          )
-                        : const ButtonStyle.ghost(
-                            density: ButtonDensity.compact,
-                          ),
-                    onPressed: () => setState(() => _tab = tab),
-                    child: Text(tab.label).small(),
-                  ),
+                TabItem(
+                  key: ValueKey('sidebar-${tab.name}'),
+                  child: Text(tab.label, textAlign: TextAlign.center),
                 ),
             ],
           ),
@@ -299,7 +294,7 @@ class _LayerList extends StatefulWidget {
 }
 
 class _LayerListState extends State<_LayerList> {
-  static const _rowHeight = 48.0;
+  static const _rowHeight = 36.0;
   final _scroll = ScrollController();
   late String _selectedId;
 
@@ -358,8 +353,8 @@ class _LayerListState extends State<_LayerList> {
             child: Button(
               key: ValueKey('layer-${node.id}'),
               style: selected
-                  ? const ButtonStyle.secondary()
-                  : const ButtonStyle.ghost(),
+                  ? const ButtonStyle.secondary(density: ButtonDensity.dense)
+                  : const ButtonStyle.ghost(density: ButtonDensity.dense),
               onPressed: () => widget.editor.selectNode(node.id),
               child: Row(
                 children: [
