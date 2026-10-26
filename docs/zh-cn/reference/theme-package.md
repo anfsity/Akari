@@ -14,7 +14,7 @@ my_theme/
   lib/
     <name>.scene.json          # 场景布局与可见性条件源文件
     <name>.scene.g.dart        # 由 build_runner 自动生成
-    theme.dart                 # 导出 build<Name>Theme({Color? seed})
+    theme.dart                 # 导出 build<Name>Theme({Color? seed, SceneDocument? document})
     components/                # 主题自有 Flutter 组件
   test/
 ```
@@ -32,6 +32,10 @@ my_theme/
 :::note
 存放在仓库外部的主题项目，需将 `pubspec.yaml` 中的 SDK 路径依赖指向本地 Akari 仓库对应目录。
 :::
+
+Builder 接受 `SceneDocument? document`：传入时使用该文档，否则使用主题包生成的场景。
+Studio 会传入包含 `themeProperties` 的当前编辑文档，正式运行时则省略此参数。
+主题应从这份文档解析样式与组件配置，确保保存后的选择在预览与正式运行时一致。
 
 ## 声明组件的可编辑属性
 

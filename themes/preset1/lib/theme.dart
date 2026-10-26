@@ -6,7 +6,7 @@ import 'preset_components.dart';
 import 'preset_style.dart';
 import 'preset_visuals.dart';
 
-ThemeDefinition buildPreset1Theme({Color? seed}) {
+ThemeDefinition buildPreset1Theme({Color? seed, SceneDocument? document}) {
   final scheme =
       ColorScheme.fromSeed(
         seedColor: presetPaper,
@@ -20,7 +20,7 @@ ThemeDefinition buildPreset1Theme({Color? seed}) {
       );
   return ThemeDefinition(
     id: 'preset1',
-    document: preset1SceneDocument,
+    document: document ?? preset1SceneDocument,
     bundle: ThemeBundle(
       tokens: ThemeTokens(
         materialTheme: ThemeData(

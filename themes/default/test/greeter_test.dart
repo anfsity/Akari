@@ -267,7 +267,7 @@ void main() {
     'hot reload refreshes theme while retaining authentication and credentials',
     (tester) async {
       var selectedSeed = Colors.red;
-      ThemeDefinition buildTheme({Color? seed}) =>
+      ThemeDefinition buildTheme({Color? seed, SceneDocument? document}) =>
           buildDefaultTheme(seed: selectedSeed);
       await tester.pumpWidget(MyApp(themeBuilder: buildTheme));
       await tester.pumpAndSettle();
@@ -642,10 +642,7 @@ Future<GreeterFeature> _mountGreeter(
     body = MediaQuery(data: mediaQueryData, child: body);
   }
   await tester.pumpWidget(
-    MaterialApp(
-      theme: activeTheme.materialTheme,
-      home: body,
-    ),
+    MaterialApp(theme: activeTheme.materialTheme, home: body),
   );
   return feature;
 }

@@ -188,7 +188,9 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   void _refreshTheme({Color? seed}) {
     try {
-      _updateTheme(_project.themeBuilder(seed: seed));
+      _updateTheme(
+        _project.themeBuilder(seed: seed, document: _editor?.document),
+      );
     } on FormatException catch (error) {
       _error = 'Cannot refresh theme: ${error.message}';
     }
@@ -213,15 +215,12 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     try {
       final assets = StudioAssets.findForScene(File(path)) ?? _compiledAssets;
       final assetPaths = assets.getAssets();
-      final editor = SceneEditor(
-        File(path),
-        componentCatalog: _theme.componentCatalog,
-        layout: _theme.layout,
-      );
-      _setEditor(editor);
+      final session = _project.createSceneSession(path);
+      _setEditor(session.editor);
       _assets = assets;
       _assetPaths = assetPaths;
       _path = path;
+      _updateTheme(session.theme);
       if (!_scenePaths.contains(path)) _scenePaths.add(path);
       _error = null;
       _confirmReload = false;
@@ -241,27 +240,24 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     try {
       // Prepare the entire target before releasing the current session. A bad
       // preset file must leave the working document and its renderer intact.
-      final theme = project.themeBuilder();
       final assets = StudioAssets(
         directory: Directory(project.directory),
         packageName: project.packageName,
       );
       final assetPaths = assets.getAssets();
-      final editor = SceneEditor(
-        File(scenePath ?? project.scenePaths.first),
-        componentCatalog: theme.componentCatalog,
-        layout: theme.layout,
+      final session = project.createSceneSession(
+        scenePath ?? project.scenePaths.first,
       );
       setState(() {
-        _setEditor(editor);
+        _setEditor(session.editor);
         _project = project;
         _compiledAssets = assets;
         _assets = assets;
         _assetPaths = assetPaths;
         _scenePaths = [...project.scenePaths];
-        _path = editor.file.path;
+        _path = session.editor.file.path;
         if (!_scenePaths.contains(_path)) _scenePaths.add(_path);
-        _updateTheme(theme);
+        _updateTheme(session.theme);
         _error = null;
         _confirmReload = false;
       });

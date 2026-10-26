@@ -1186,7 +1186,7 @@ environment:
 import 'package:flutter/material.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
-ThemeDefinition buildOceanTheme({Color? seed}) => throw UnimplementedError();
+ThemeDefinition buildOceanTheme({Color? seed, SceneDocument? document}) => throw UnimplementedError();
 ''');
   await File('${project.path}/lib/ocean.scene.json').writeAsString('{}');
   return project;
