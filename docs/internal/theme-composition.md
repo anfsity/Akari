@@ -32,7 +32,10 @@ combines those designs. Code-owned widgets and shaders remain supported.
   wake transitions (`1aeb860`). Terrace implements palette, material, and motion
   presets, including 36 tested combinations (`93709c7`). Studio controls use
   document validation, history, saving, and read-only inspection.
-- Remaining: layout composition and component variants, faithful file-based
+- Terrace split and centered layouts now compose all 72 global preset
+  combinations. Layout changes preserve edited content, optional omissions and
+  custom nodes, repair required controls, and update insertion defaults.
+- Remaining: richer component variants, faithful file-based
   background previews, runtime state previews, independent project synthesis,
   and end-to-end build/native verification.
 

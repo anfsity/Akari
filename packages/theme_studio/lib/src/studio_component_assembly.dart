@@ -26,6 +26,8 @@ class StudioComponentAssembly extends StatelessWidget {
         );
       }
       final ids = editor.document.nodes.map((node) => node.id).toSet();
+      final slots =
+          layout?.getSlots(editor.document) ?? const <ThemeLayoutSlot>[];
       return ListView(
         key: const ValueKey('component-assembly'),
         padding: const EdgeInsets.all(12),
@@ -39,6 +41,19 @@ class StudioComponentAssembly extends StatelessWidget {
                       'The layout supplies its starting position.',
           ).small().muted(),
           const Gap(16),
+          if (layout != null && layout.presets.length > 1) ...[
+            const Text('Layout preset').small().muted(),
+            const Gap(6),
+            StudioSelect<String>(
+              key: const ValueKey('layout-preset'),
+              enabled: !readOnly,
+              value: layout.getPresetId(editor.document),
+              values: layout.presets.keys,
+              formatValue: (id) => layout.presets[id]!.label,
+              onChanged: editor.updateLayoutPreset,
+            ),
+            const Gap(16),
+          ],
           if (editor.presetCatalog.properties.isNotEmpty) ...[
             const Text('Theme presets').small().semiBold(),
             const Gap(8),
@@ -69,11 +84,11 @@ class StudioComponentAssembly extends StatelessWidget {
             for (final (label, slots) in [
               (
                 'Optional components',
-                layout.slots.where((slot) => !slot.isRequired).toList(),
+                slots.where((slot) => !slot.isRequired).toList(),
               ),
               (
                 'Required controls',
-                layout.slots.where((slot) => slot.isRequired).toList(),
+                slots.where((slot) => slot.isRequired).toList(),
               ),
             ])
               if (slots.isNotEmpty) ...[

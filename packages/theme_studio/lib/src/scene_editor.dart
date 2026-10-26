@@ -102,7 +102,7 @@ class SceneEditor extends ChangeNotifier {
 
   void updateLayoutSlot(String nodeId, {required bool isPresent}) {
     if (!applyDraft()) return;
-    final slot = layout?.findSlot(nodeId);
+    final slot = layout?.findSlot(nodeId, document: document);
     if (slot == null) throw ArgumentError.value(nodeId, 'nodeId');
     if (document.nodes.any((node) => node.id == nodeId) == isPresent) return;
     if (!isPresent) {
@@ -112,6 +112,16 @@ class SceneEditor extends ChangeNotifier {
     _updateDocument(
       document.copyWith(nodes: [...document.nodes, slot.defaultNode]),
       selectedId: nodeId,
+    );
+  }
+
+  void updateLayoutPreset(String presetId) {
+    if (!applyDraft()) return;
+    final layout = this.layout;
+    if (layout == null) throw StateError('This scene has no layout.');
+    _updateDocument(
+      layout.getDocumentWithPreset(document, presetId),
+      selectedId: selectedId,
     );
   }
 

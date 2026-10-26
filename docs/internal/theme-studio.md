@@ -61,6 +61,11 @@ theme and reports the refresh error.
 
 ### Theme presets
 
+**Compose → Layout preset** switches between Terrace split and Centered column.
+Switching restores preset geometry while preserving component properties,
+optional omissions, and custom nodes; missing required controls are added in
+the same undo step. Newly enabled components use the current layout's positions.
+
 **Compose → Theme presets** displays the theme's declared global choices.
 Terrace offers wallpaper-derived, Ocean, Rose, and Violet palettes; airy underline,
 frosted capsule, and solid control materials; and Terrace entrance, quiet fade,
