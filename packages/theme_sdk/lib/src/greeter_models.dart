@@ -25,7 +25,6 @@ enum GreeterRecovery {
   reconnectService,
   retrySessionCatalog,
   selectUser,
-  selectSession,
 }
 
 typedef GreeterError = ({

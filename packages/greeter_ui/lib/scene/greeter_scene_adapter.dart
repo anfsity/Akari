@@ -168,7 +168,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
         onSelectSession: (session) => _dispatch(SelectSessionCommand(session)),
         onRequestPowerAction: (action) =>
             _dispatch(RequestPowerActionCommand(action)),
-        onRetry: (recovery) => _dispatch(recoveryCommand(recovery)),
+        onRetry: (recovery) => _dispatch(getRecoveryCommand(recovery)),
         onRetrySessionCatalog: () =>
             _dispatch(const RetrySessionCatalogCommand()),
         onRespondToPrompt: _respondToPrompt,
@@ -308,7 +308,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       case AuthMode.error:
         final error = auth.error;
         if (error != null) {
-          _dispatch(recoveryCommand(error.recovery));
+          _dispatch(getRecoveryCommand(error.recovery));
         }
       case AuthMode.userSelection:
       case AuthMode.submitting:
