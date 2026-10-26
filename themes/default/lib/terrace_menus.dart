@@ -6,8 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:greeter_components/greeter_components.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
-import 'terrace_visuals.dart';
-
 /// Account and desktop choices use one anchored surface and selection treatment.
 /// Popup routes retain keyboard ownership, so Escape closes a choice without
 /// sleeping the greeter or sending a credential through its early key handler.
@@ -96,11 +94,11 @@ class TerraceSessionPicker extends StatelessWidget {
       onPressed: onRetry,
       child: Text(session.error?.message ?? 'Retry sessions'),
     ),
-    CatalogMode.empty when session.sessions.isEmpty => const Align(
+    CatalogMode.empty => const Align(
       alignment: Alignment.centerLeft,
       child: Text('No desktop sessions available.'),
     ),
-    CatalogMode.ready || CatalogMode.empty => _TerraceMenu<SessionSummary>(
+    CatalogMode.ready => _TerraceMenu<SessionSummary>(
       tooltip: 'Choose a session',
       entries: [
         for (final item in session.sessions)
@@ -155,32 +153,63 @@ class _TerraceChoiceHeader extends StatelessWidget {
       SizedBox.square(dimension: 48, child: leading),
       const SizedBox(width: 16),
       Flexible(
-        child: TerraceChoiceLabel(id: id, label: label, style: style),
+        child: _TerraceChoiceLabel(id: id, label: label, style: style),
       ),
       if (showArrow) ...[
         const SizedBox(width: 8),
-        _TerraceChoiceArrow(open: open),
+        AnimatedRotation(
+          turns: open ? 0.5 : 0,
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          child: Icon(
+            Icons.expand_more,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
       ],
     ],
   );
 }
 
-class _TerraceChoiceArrow extends StatelessWidget {
-  const _TerraceChoiceArrow({required this.open});
+class _TerraceChoiceLabel extends StatelessWidget {
+  const _TerraceChoiceLabel({
+    required this.id,
+    required this.label,
+    this.style,
+  });
 
-  final bool open;
+  final String? id;
+  final String label;
+  final TextStyle? style;
 
   @override
-  Widget build(BuildContext context) => AnimatedRotation(
-    turns: open ? 0.5 : 0,
+  Widget build(BuildContext context) => AnimatedSwitcher(
     duration: MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 220),
-    curve: Curves.easeOutCubic,
-    child: Icon(
-      Icons.expand_more,
-      size: 18,
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    switchInCurve: Curves.easeOutCubic,
+    switchOutCurve: Curves.easeInCubic,
+    layoutBuilder: (child, previous) =>
+        Stack(alignment: Alignment.centerLeft, children: [...previous, ?child]),
+    transitionBuilder: (child, animation) => FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.35),
+          end: Offset.zero,
+        ).animate(animation),
+        child: child,
+      ),
+    ),
+    child: Text(
+      label,
+      key: ValueKey(id),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: style,
     ),
   );
 }

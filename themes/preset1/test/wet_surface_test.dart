@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:theme_preset1/preset_style.dart';
 import 'package:theme_preset1/preset_visuals.dart';
 
 const _frameSize = Size(1920, 1080);
@@ -45,12 +46,13 @@ void main() {
     for (var y = 0; y < 1080; y++) {
       for (var x = 0; x < 1920; x++) {
         final offset = (y * 1920 + x) * 4;
-        if (y < 920 - x * 710 / 1920 - 2) {
+        final nightTop = calculatePresetNightTop(x.toDouble());
+        if (y < nightTop - 2) {
           paleAlpha = math.max(
             paleAlpha,
             math.max(start[offset + 3], flowing[offset + 3]),
           );
-        } else if (y > 920 - x * 710 / 1920 + 2) {
+        } else if (y > nightTop + 2) {
           nightAlpha = math.min(nightAlpha, start[offset + 3]);
           if ((start[offset] - flowing[offset]).abs() > 2) {
             movingPixels++;

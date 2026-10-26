@@ -1,12 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:greeter_components/greeter_components.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
-import 'default.scene.g.dart';
-import 'terrace_visuals.dart';
 import 'terrace_menus.dart';
+import 'terrace_visuals.dart';
 
 const _contentScale = 1.3;
 
@@ -54,31 +51,27 @@ class TerraceComponents implements GreeterThemeComponents {
           ),
         ),
       ),
-      'primaryAction' => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: Theme.of(context).colorScheme.copyWith(
-            primary: Colors.transparent,
-            onPrimary: Theme.of(context).colorScheme.primary,
-          ),
+      'primaryAction' => ListenableBuilder(
+        listenable: Listenable.merge([
+          theme.host.serviceSlots,
+          theme.host.authPromptSlots,
+        ]),
+        builder: (context, _) => PrimaryAction(
+          service: theme.host.serviceSlots.value,
+          auth: theme.host.authPromptSlots.value,
+          filled: false,
+          onRespond: theme.host.onRespondToPrompt,
+          onStartSession: theme.host.onStartSession,
+          onRetry: theme.host.onRetry,
         ),
-        child: _controls.build(context, node),
       ),
       _ => _controls.build(context, node),
     };
-    // Smaller logical bounds enlarge text, icons and padding together while
-    // scene rectangles continue to own placement and control geometry.
-    return FittedBox(
-      child: SizedBox(
-        width:
-            node.rect.width *
-            defaultSceneDocument.canvas.referenceWidth /
-            _contentScale,
-        height:
-            node.rect.height *
-            defaultSceneDocument.canvas.referenceHeight /
-            _contentScale,
-        child: component,
-      ),
+    return ScaledNodeRegion(
+      node: node,
+      canvas: theme.canvas,
+      scale: _contentScale,
+      child: component,
     );
   }
 }
@@ -109,55 +102,26 @@ class _TerraceLabel extends StatelessWidget {
   );
 }
 
-class _TerraceClock extends StatefulWidget {
+class _TerraceClock extends StatelessWidget {
   const _TerraceClock();
 
   @override
-  State<_TerraceClock> createState() => _TerraceClockState();
-}
-
-class _TerraceClockState extends State<_TerraceClock> {
-  late DateTime _now;
-  late Timer _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _now = DateTime.now();
-    _startMinuteTimer();
-  }
-
-  void _startMinuteTimer() {
-    _timer = Timer(
-      Duration(milliseconds: 60000 - (_now.second * 1000 + _now.millisecond)),
-      () {
-        setState(() => _now = DateTime.now());
-        _startMinuteTimer();
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.centerLeft,
-    child: FittedBox(
-      fit: BoxFit.scaleDown,
+  Widget build(BuildContext context) => MinuteClockBuilder(
+    builder: (context, now) => Align(
       alignment: Alignment.centerLeft,
-      child: Text(
-        '${_now.hour.toString().padLeft(2, '0')}:${_now.minute.toString().padLeft(2, '0')}',
-        style: const TextStyle(
-          fontSize: 132,
-          fontWeight: FontWeight.w300,
-          letterSpacing: -6,
-          height: 1,
-          color: Color(0xffeefaff),
-          fontFeatures: [FontFeature.tabularFigures()],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Text(
+          formatClockTime(now),
+          style: const TextStyle(
+            fontSize: 132,
+            fontWeight: FontWeight.w300,
+            letterSpacing: -6,
+            height: 1,
+            color: Color(0xffeefaff),
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
         ),
       ),
     ),

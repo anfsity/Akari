@@ -36,6 +36,10 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
   @override
   void initState() {
     super.initState();
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    _visible = lifecycle == null ||
+        lifecycle == AppLifecycleState.resumed ||
+        lifecycle == AppLifecycleState.inactive;
     _weather = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 120),
@@ -46,16 +50,20 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
   }
 
   Future<void> _createSurface() async {
+    if (_surfaceImage != null) return;
     final program = await ui.FragmentProgram.fromAsset(
       'packages/theme_preset1/shaders/wet_surface.frag',
     );
     final recorder = ui.PictureRecorder();
     const PresetArtworkPainter().paint(
       Canvas(recorder),
-      const Size(1920, 1080),
+      presetCanvasSize,
     );
     final picture = recorder.endRecording();
-    final image = await picture.toImage(1920, 1080);
+    final image = await picture.toImage(
+      presetCanvasSize.width.toInt(),
+      presetCanvasSize.height.toInt(),
+    );
     picture.dispose();
     if (!mounted) {
       image.dispose();
@@ -124,7 +132,7 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
               ),
             const RepaintBoundary(
               child: CustomPaint(
-                painter: PresetBranchPainter(),
+                painter: _PresetBranchPainter(),
                 isComplex: true,
               ),
             ),
@@ -138,13 +146,6 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
   );
 }
 
-Path _getNightPath() => Path()
-  ..moveTo(0, 920)
-  ..lineTo(1920, 210)
-  ..lineTo(1920, 1080)
-  ..lineTo(0, 1080)
-  ..close();
-
 /// The same cached light streaks provide the water texture and its still frame.
 /// Refraction and flow displace that texture without another blur pass.
 class PresetArtworkPainter extends CustomPainter {
@@ -153,12 +154,15 @@ class PresetArtworkPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.scale(size.width / 1920, size.height / 1080);
+    canvas.scale(
+      size.width / presetCanvasSize.width,
+      size.height / presetCanvasSize.height,
+    );
     canvas.drawColor(presetPaper, BlendMode.src);
     canvas.save();
-    canvas.clipPath(_getNightPath());
+    canvas.clipPath(getPresetNightPath());
     canvas.drawRect(
-      const Rect.fromLTWH(0, 0, 1920, 1080),
+      Offset.zero & presetCanvasSize,
       Paint()
         ..shader = ui.Gradient.linear(
           const Offset(650, 400),
@@ -194,13 +198,16 @@ class PresetArtworkPainter extends CustomPainter {
   bool shouldRepaint(PresetArtworkPainter oldDelegate) => false;
 }
 
-class PresetBranchPainter extends CustomPainter {
-  const PresetBranchPainter();
+class _PresetBranchPainter extends CustomPainter {
+  const _PresetBranchPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.scale(size.width / 1920, size.height / 1080);
+    canvas.scale(
+      size.width / presetCanvasSize.width,
+      size.height / presetCanvasSize.height,
+    );
     final stems = <(Path, double)>[
       (
         Path()
@@ -410,7 +417,7 @@ class PresetBranchPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(PresetBranchPainter oldDelegate) => false;
+  bool shouldRepaint(_PresetBranchPainter oldDelegate) => false;
 }
 
 class PresetSurfacePainter extends CustomPainter {
@@ -418,16 +425,19 @@ class PresetSurfacePainter extends CustomPainter {
 
   final Animation<double> time;
   final ui.FragmentShader shader;
-  static final _night = _getNightPath();
+  static final _night = getPresetNightPath();
 
   @override
   void paint(Canvas canvas, Size size) {
     shader.setFloat(0, time.value);
     canvas.save();
-    canvas.scale(size.width / 1920, size.height / 1080);
+    canvas.scale(
+      size.width / presetCanvasSize.width,
+      size.height / presetCanvasSize.height,
+    );
     canvas.clipPath(_night);
     canvas.drawRect(
-      const Rect.fromLTWH(0, 0, 1920, 1080),
+      Offset.zero & presetCanvasSize,
       Paint()..shader = shader,
     );
     canvas.restore();
@@ -464,7 +474,7 @@ class PresetWeatherPainter extends CustomPainter {
           : 2 + random.nextDouble() * 15,
     );
   });
-  static final _night = _getNightPath();
+  static final _night = getPresetNightPath();
   static final _petal = Path()
     ..moveTo(-1, 0)
     ..quadraticBezierTo(-.2, -1.3, 1, -.3)
@@ -474,7 +484,10 @@ class PresetWeatherPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.scale(size.width / 1920, size.height / 1080);
+    canvas.scale(
+      size.width / presetCanvasSize.width,
+      size.height / presetCanvasSize.height,
+    );
     // Integer cycles make every position and flutter phase continuous when
     // the controller wraps, including the rain's faster independent motion.
     final progress = time.value;
@@ -485,7 +498,7 @@ class PresetWeatherPainter extends CustomPainter {
           (p.x + progress * 2000 + math.sin(angle * 9 + p.phase) * 22) % 2000 -
           40;
       final y = (p.y - progress * 1160 * p.cycles) % 1160 - 40;
-      final light = y < 920 - x * 710 / 1920;
+      final light = y < calculatePresetNightTop(x);
       petalPaint.color = light
           ? const Color(0x66737780)
           : const Color(0x225f6078);

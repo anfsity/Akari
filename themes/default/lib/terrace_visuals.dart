@@ -68,7 +68,13 @@ class _TerraceBackdrop extends StatefulWidget {
 }
 
 class _TerraceBackdropState extends State<_TerraceBackdrop> {
-  Offset _target = Offset.zero;
+  final _target = ValueNotifier<Offset>(Offset.zero);
+
+  @override
+  void dispose() {
+    _target.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,12 +83,10 @@ class _TerraceBackdropState extends State<_TerraceBackdrop> {
       builder: (context, constraints) => MouseRegion(
         onHover: reducedMotion
             ? null
-            : (event) => setState(() {
-                _target = Offset(
-                  (event.localPosition.dx / constraints.maxWidth - 0.5) * 12,
-                  (event.localPosition.dy / constraints.maxHeight - 0.5) * 8,
-                );
-              }),
+            : (event) => _target.value = Offset(
+                (event.localPosition.dx / constraints.maxWidth - 0.5) * 12,
+                (event.localPosition.dy / constraints.maxHeight - 0.5) * 8,
+              ),
         onExit: reducedMotion
             ? null
             : (event) {
@@ -90,21 +94,25 @@ class _TerraceBackdropState extends State<_TerraceBackdrop> {
                 // its offset then; reset only when the pointer leaves the view.
                 final bounds = Offset.zero & constraints.biggest;
                 if (!bounds.contains(event.localPosition)) {
-                  setState(() => _target = Offset.zero);
+                  _target.value = Offset.zero;
                 }
               },
         child: ClipRect(
-          child: TweenAnimationBuilder<Offset>(
-            tween: Tween(
-              begin: Offset.zero,
-              end: reducedMotion ? Offset.zero : _target,
+          child: ValueListenableBuilder<Offset>(
+            valueListenable: _target,
+            builder: (context, target, child) => TweenAnimationBuilder<Offset>(
+              tween: Tween(
+                begin: Offset.zero,
+                end: reducedMotion ? Offset.zero : target,
+              ),
+              duration: reducedMotion
+                  ? Duration.zero
+                  : const Duration(milliseconds: 700),
+              curve: Curves.easeOutCubic,
+              builder: (context, offset, child) =>
+                  Transform.translate(offset: offset, child: child),
+              child: child,
             ),
-            duration: reducedMotion
-                ? Duration.zero
-                : const Duration(milliseconds: 700),
-            curve: Curves.easeOutCubic,
-            builder: (context, offset, child) =>
-                Transform.translate(offset: offset, child: child),
             child: widget.wallpaper,
           ),
         ),
@@ -165,11 +173,11 @@ class TerraceActionMotion extends SceneMotionBuilder {
     SceneMotionSpec spec,
     Animation<double> progress,
     Widget child,
-  ) => FadeTransition(
-    opacity: progress.drive(
-      CurveTween(curve: const Interval(0.24, 1, curve: Curves.easeOutCubic)),
-    ),
-    child: const HoverLiftMotionBuilder().build(
+  ) => const TerraceFadeMotion().build(
+    context,
+    spec,
+    progress,
+    const HoverLiftMotionBuilder().build(
       context,
       (
         preset: spec.preset,
@@ -264,46 +272,5 @@ class _TerraceCredentialFeedbackState extends State<TerraceCredentialFeedback>
       );
     },
     child: RepaintBoundary(child: widget.child),
-  );
-}
-
-class TerraceChoiceLabel extends StatelessWidget {
-  const TerraceChoiceLabel({
-    required this.id,
-    required this.label,
-    this.style,
-    super.key,
-  });
-
-  final String? id;
-  final String label;
-  final TextStyle? style;
-
-  @override
-  Widget build(BuildContext context) => AnimatedSwitcher(
-    duration: MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 220),
-    switchInCurve: Curves.easeOutCubic,
-    switchOutCurve: Curves.easeInCubic,
-    layoutBuilder: (child, previous) =>
-        Stack(alignment: Alignment.centerLeft, children: [...previous, ?child]),
-    transitionBuilder: (child, animation) => FadeTransition(
-      opacity: animation,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.35),
-          end: Offset.zero,
-        ).animate(animation),
-        child: child,
-      ),
-    ),
-    child: Text(
-      label,
-      key: ValueKey(id),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: style,
-    ),
   );
 }

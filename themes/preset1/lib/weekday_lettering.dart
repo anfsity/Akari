@@ -1,18 +1,30 @@
 import 'package:flutter/material.dart';
 
+const _weekdayNames = [
+  'MONDAY',
+  'TUESDAY',
+  'WEDNESDAY',
+  'THURSDAY',
+  'FRIDAY',
+  'SATURDAY',
+  'SUNDAY',
+];
+
 /// A small authored display alphabet for weekdays, matching the reference's
 /// squared, open geometry. Body text stays native for selection and access.
 class WeekdayLettering extends StatelessWidget {
   const WeekdayLettering({
-    required this.text,
+    required this.weekday,
     required this.color,
     required this.height,
     super.key,
   });
 
-  final String text;
+  final int weekday;
   final Color color;
   final double height;
+
+  String get text => _weekdayNames[(weekday - 1).clamp(0, 6)];
 
   @override
   Widget build(BuildContext context) => Semantics(
