@@ -1,8 +1,5 @@
 //! D-Bus bridge between the Flutter greeter, greetd, session catalogs, and logind.
 
-#[path = "auth.rs"]
-mod auth;
-
 use std::sync::Arc;
 
 use tokio::sync::Notify;
@@ -12,8 +9,8 @@ use zbus::{
     object_server::{ResponseDispatchNotifier, SignalEmitter},
 };
 
-use self::auth::{AuthActorHandle, AuthActorTask};
 use crate::{
+    auth::{AuthActorHandle, AuthActorTask},
     session_catalog::{SessionCatalog, SessionCatalogError},
     users::UserCatalog,
 };
@@ -221,7 +218,7 @@ impl GreeterService {
     }
 
     #[zbus(signal)]
-    async fn prompt(
+    pub(crate) async fn prompt(
         emitter: &SignalEmitter<'_>,
         attempt_id: String,
         prompt_kind: String,
@@ -229,7 +226,7 @@ impl GreeterService {
     ) -> zbus::Result<()>;
 
     #[zbus(signal)]
-    async fn state_changed(
+    pub(crate) async fn state_changed(
         emitter: &SignalEmitter<'_>,
         attempt_id: String,
         state: String,
