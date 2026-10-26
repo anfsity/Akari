@@ -1,13 +1,12 @@
-import '../tool/src/theme/display_profile.dart';
-
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../tool/src/execution/model.dart';
 import '../tool/src/commands/development.dart';
 import '../tool/src/commands/plan.dart';
+import '../tool/src/execution/model.dart';
+import '../tool/src/theme/display_profile.dart';
 
 void main() {
   late Directory temp;

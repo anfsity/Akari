@@ -16,15 +16,6 @@ fvm install
 fvm use stable --force
 fvm flutter config --enable-linux-desktop
 
-if [[ ! -f pubspec.yaml ]]; then
-  fvm flutter create \
-    --platforms=linux \
-    --project-name=greeter \
-    --org=dev.akari \
-    --no-pub \
-    .
-fi
-
 fvm flutter pub get
 cargo fetch --manifest-path "$repo_root/backend/Cargo.toml" --locked
 cargo fetch --manifest-path "$repo_root/splash/Cargo.toml" --locked

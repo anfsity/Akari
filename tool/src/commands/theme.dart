@@ -61,7 +61,7 @@ RunPlan createBuildPlan(
           id: 'build.links',
           command: [
             ...getDartCommand(repoRoot),
-            'tool/build_links.dart',
+            'update-build-links',
             repoRoot.path,
             theme.directory.path,
             mode.name,
@@ -351,7 +351,7 @@ List<RunStep> _createHostPreparationSteps(
       id: 'theme.host.generate',
       command: [
         ...getDartCommand(repoRoot),
-        'tool/theme_host.dart',
+        'create-theme-host',
         theme.directory.path,
         getAbsolutePath(repoRoot, host),
         if (kind == ThemeHostKind.studio)

@@ -152,7 +152,6 @@ if [[ "$start_backend" -eq 1 ]]; then
   fi
 fi
 
-export AKARI_BUS_MODE=private
 export RUST_LOG="${RUST_LOG:-backend=info,warn}"
 # Non-interactive shells may redirect a background job's stdin to /dev/null.
 # Preserve the caller's descriptor explicitly so reload and quit keys arrive.

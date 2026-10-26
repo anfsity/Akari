@@ -11,7 +11,6 @@ export AKARI_BACKEND_MODE=real
 export AKARI_BACKEND_BIN="$AKARI_RELEASE/backend"
 export AKARI_SPLASH_BIN="$AKARI_RELEASE/akari-splash"
 export AKARI_APP="$AKARI_RELEASE/frontend/greeter"
-export AKARI_BUS_MODE=private
 export AKARI_WINDOW_MODE=fullscreen
 export XDG_STATE_HOME=/var/lib/akari/greeter
 export GDK_BACKEND=wayland

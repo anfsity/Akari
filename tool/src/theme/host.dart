@@ -16,7 +16,6 @@ void createThemeHost({
   required Directory output,
   required ThemeHostKind kind,
   List<ThemePackage>? studioThemes,
-  Map<String, Object?> devDependencies = const {},
 }) {
   final studio = kind == ThemeHostKind.studio;
   final preview = kind == ThemeHostKind.preview;
@@ -74,13 +73,10 @@ void createThemeHost({
         project.packageName: {'path': project.directory.path},
     },
     'flutter': {'uses-material-design': true},
-    if (preview || devDependencies.isNotEmpty)
-      'dev_dependencies': {
-        if (preview) ...{
-          'flutter_test': {'sdk': 'flutter'},
-          'integration_test': {'sdk': 'flutter'},
-        },
-        ...devDependencies,
+    if (preview)
+      'dev_dependencies': const {
+        'flutter_test': {'sdk': 'flutter'},
+        'integration_test': {'sdk': 'flutter'},
       },
   };
   _writeIfChanged(

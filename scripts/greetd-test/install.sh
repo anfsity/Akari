@@ -57,7 +57,7 @@ else
 fi
 backup="$test_root/backups/$(date +%Y%m%d-%H%M%S)-$$"
 install -d -m 0755 "$backup"
-for path in frontend backend akari-splash scripts start.sh restore.sh launch.sh greetd.toml sway.conf display-layout.json display-layout.py display_profile.py screenshot.py mock-power; do
+for path in frontend backend akari-splash scripts start.sh restore.sh launch.sh greetd.toml sway.conf display-layout.json display-layout.py display_profile.py screenshot.py; do
   if [[ -e "$test_root/$path" ]]; then
     cp -a "$test_root/$path" "$backup/"
   fi
@@ -84,6 +84,5 @@ if [[ -n "$layout" ]]; then
 fi
 install -d -m 0755 "$test_root/scripts"
 install -m 0755 "$repo_root/scripts/debug-dbus.sh" "$repo_root/scripts/lib.sh" "$repo_root/scripts/splash.sh" "$test_root/scripts/"
-rm -f "$test_root/mock-power"
 echo "Installed test files; previous version: $backup"
 echo 'No display manager was started or stopped.'

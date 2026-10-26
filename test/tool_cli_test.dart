@@ -1,18 +1,17 @@
-import '../tool/src/theme/model.dart';
-
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../tool/src/commands/development.dart';
+import '../tool/src/commands/plan.dart';
 import '../tool/src/commands/theme.dart';
 import '../tool/src/commands/verification.dart';
 import '../tool/src/execution/model.dart';
-import '../tool/src/commands/development.dart';
-import '../tool/src/commands/plan.dart';
 import '../tool/src/sdk_commands.dart';
-import '../tool/src/theme/project.dart';
 import '../tool/src/theme/host.dart';
+import '../tool/src/theme/model.dart';
+import '../tool/src/theme/project.dart';
 
 void main() {
   late Directory tempRoot;
@@ -668,7 +667,7 @@ if sys.argv[1] == 'test':
 if [ "\$1" = run ] && [ "\$2" = build_runner ]; then
   exit 0
 fi
-if [ "\$1" = tool/theme_host.dart ]; then
+if [ "\$1" = create-theme-host ]; then
   exit 99
 fi
 exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"

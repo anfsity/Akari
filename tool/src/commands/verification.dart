@@ -75,7 +75,6 @@ RunPlan createVerificationPlan(
           'test',
           'tool/src',
           'tool/akari.dart',
-          'tool/theme_host.dart',
           'tool/theme_session.dart',
           'tool/dbus_gateway_smoke.dart',
           if (!selectedThemeOnly) 'tool/dev_main.dart',
