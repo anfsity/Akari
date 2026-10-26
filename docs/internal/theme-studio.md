@@ -27,8 +27,8 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 ## Editing workflow
 
 1. **Choose a theme and scene**: Select a compiled theme in **THEME** and a scene in **Scenes**, or click **Load JSON** to open any `*.scene.json` file from disk.
-2. **Select a node**: Click a node on the canvas or in the **Layers** tab (ordered front-to-back, including nodes hidden in the current preview state). Canvas selection automatically reveals its layer; **Assets** has its own full-height tab with thumbnails and actions for the selected file.
-3. **Edit layout & properties**: Update position/size (in reference pixels or percentages), depth (`z`), `renderOrder`, `focusOrder`, transforms, `motion`, or component `properties` in the right-hand inspector.
+2. **Choose components**: Scenes with a declared layout open in **Compose**, where you can toggle optional components and select included components. **Layers** shows compact rows with the layout's component labels, ordered front-to-back, including hidden nodes. **Assets** provides thumbnails and actions for the selected file.
+3. **Customize**: The right-hand inspector shows component properties first, followed by position/size and advanced layout controls. Canvas selection automatically reveals the selected row when **Layers** is open.
 4. **Apply & preview**: Press `Enter`, leave a field, or click **Apply to preview** to validate and apply edits. Invalid inputs display an error and keep the last valid scene.
 5. **Save or undo**: Use **Undo** / **Redo** (`Ctrl+Z` / `Ctrl+Shift+Z`) for history and **Save scene** (`Ctrl+S`) to write changes atomically to the scene JSON.
 
@@ -61,18 +61,19 @@ theme and reports the refresh error.
 
 ### Adding and removing layout components
 
-Open the left sidebar's **Add** tab to assemble the selected scene's layout.
+The left sidebar's **Compose** tab opens by default for scenes with a declared layout.
 The default theme's **Terrace** layout offers date, signature, standby clock,
 standby greeting, wake hint, sign-in heading, and sign-in caption slots.
 
-- **Add** inserts a complete node at the theme's preset position, including its
+- Turn on an optional component to insert a complete node at the theme's preset position, including its
   properties, motion, visibility, and focus settings, then selects it for editing.
-- **Remove** deletes an optional node. Adding it again restores preset defaults;
+- Turn it off to remove it. Turning it on again restores preset defaults;
   use **Undo** to recover the removed node's customizations. Click an added
   component's name to select it in the inspector.
 - Each slot can be added once. **Duplicate** and `Ctrl+D` are disabled for layout
   slots; nodes outside the declared layout keep their existing editing behavior.
-- Required slots cannot be removed through either the layer actions or canvas
+- **Required controls** lists included controls with a checkmark and missing controls with **Add**.
+  Required slots cannot be removed through either the layer actions or canvas
   shortcuts. Terrace requires account selection, session selection, credential
   input, sign-in action, authentication status, and power actions.
 - If an imported scene is missing required slots, a notice above all sidebar

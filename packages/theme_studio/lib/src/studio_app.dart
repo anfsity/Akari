@@ -505,6 +505,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                           child: Text(
                             inspect ? 'Inspect code' : 'Design',
                             textAlign: TextAlign.center,
+                            maxLines: 1,
                           ),
                         ),
                     ],

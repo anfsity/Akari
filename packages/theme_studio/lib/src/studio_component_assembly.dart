@@ -32,16 +32,37 @@ class StudioComponentAssembly extends StatelessWidget {
           Text(layout.label).semiBold(),
           const Gap(8),
           const Text(
-            'Add restores preset defaults. Undo restores removed edits.',
+            'Choose components, then select one to customize. '
+            'The layout supplies its starting position.',
           ).small().muted(),
           const Gap(16),
-          for (final slot in layout.slots)
-            _AssemblySlot(
-              editor: editor,
-              slot: slot,
-              isPresent: ids.contains(slot.defaultNode.id),
-              readOnly: readOnly,
+          for (final (label, slots) in [
+            (
+              'Optional components',
+              layout.slots.where((slot) => !slot.isRequired).toList(),
             ),
+            (
+              'Required controls',
+              layout.slots.where((slot) => slot.isRequired).toList(),
+            ),
+          ])
+            if (slots.isNotEmpty) ...[
+              Text(label).small().semiBold(),
+              const Gap(8),
+              for (final slot in slots)
+                _AssemblySlot(
+                  editor: editor,
+                  slot: slot,
+                  isPresent: ids.contains(slot.defaultNode.id),
+                  readOnly: readOnly,
+                ),
+              const Gap(12),
+            ],
+          const Text(
+            'Use Login / Dormant to preview both states. '
+            'Turning a component back on restores its defaults; '
+            'Undo restores your edits.',
+          ).small().muted(),
         ],
       );
     },
@@ -62,47 +83,83 @@ class _AssemblySlot extends StatelessWidget {
   final bool readOnly;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Row(
-      children: [
-        Expanded(
-          child: GhostButton(
-            density: ButtonDensity.compact,
-            onPressed: isPresent
-                ? () => editor.selectNode(slot.defaultNode.id)
-                : null,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(slot.label, maxLines: 2).small(),
-                  if (slot.isRequired) const Text('Required').small().muted(),
-                ],
+  Widget build(BuildContext context) {
+    final selected = isPresent && editor.selectedId == slot.defaultNode.id;
+    final colors = Theme.of(context).colorScheme;
+    final canToggle =
+        !readOnly &&
+        (!isPresent ||
+            editor.getDeletionBlockReason(slot.defaultNode.id) == null);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? colors.secondary : null,
+          border: Border.all(color: selected ? colors.primary : colors.border),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: GhostButton(
+                key: ValueKey('select-slot-${slot.defaultNode.id}'),
+                density: ButtonDensity.dense,
+                alignment: Alignment.centerLeft,
+                onPressed: isPresent
+                    ? () => editor.selectNode(slot.defaultNode.id)
+                    : null,
+                child: Text(
+                  slot.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ).small(),
               ),
             ),
-          ),
-        ),
-        const Gap(8),
-        OutlineButton(
-          key: ValueKey('slot-${slot.defaultNode.id}'),
-          density: ButtonDensity.compact,
-          onPressed:
-              readOnly ||
-                  (isPresent &&
-                      editor.getDeletionBlockReason(slot.defaultNode.id) !=
-                          null)
-              ? null
-              : () => editor.updateLayoutSlot(
-                  slot.defaultNode.id,
-                  isPresent: !isPresent,
+            const Gap(8),
+            if (slot.isRequired)
+              if (isPresent)
+                Semantics(
+                  label: '${slot.label}: required, included',
+                  child: Icon(
+                    LucideIcons.check,
+                    key: ValueKey('slot-${slot.defaultNode.id}'),
+                    size: 16,
+                    color: colors.mutedForeground,
+                  ),
+                )
+              else
+                OutlineButton(
+                  key: ValueKey('slot-${slot.defaultNode.id}'),
+                  density: ButtonDensity.dense,
+                  onPressed: readOnly
+                      ? null
+                      : () => editor.updateLayoutSlot(
+                          slot.defaultNode.id,
+                          isPresent: true,
+                        ),
+                  child: const Text('Add').small(),
+                )
+            else
+              Semantics(
+                label: 'Include ${slot.label}',
+                child: Switch(
+                  key: ValueKey('slot-${slot.defaultNode.id}'),
+                  value: isPresent,
+                  enabled: canToggle,
+                  onChanged: canToggle
+                      ? (value) => editor.updateLayoutSlot(
+                          slot.defaultNode.id,
+                          isPresent: value,
+                        )
+                      : null,
                 ),
-          child: Text(isPresent ? 'Remove' : 'Add').small(),
+              ),
+          ],
         ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 /// Remains visible above every sidebar tab so imported incomplete scenes can
