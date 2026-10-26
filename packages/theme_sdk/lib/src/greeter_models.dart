@@ -17,14 +17,7 @@ enum PowerMode { idle, executing, succeeded, failed }
 
 enum PowerAction { powerOff, reboot, suspend, hibernate }
 
-enum GreeterErrorKind {
-  input,
-  authentication,
-  transport,
-  session,
-  power,
-  visual,
-}
+enum GreeterErrorKind { input, authentication, transport, session, power }
 
 enum GreeterRecovery {
   retryAuthentication,

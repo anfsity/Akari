@@ -36,17 +36,23 @@ Future<Color> extractSeedFromBytes(Uint8List bytes) async {
     targetWidth: _sampleSize,
     targetHeight: _sampleSize,
   );
-  final frame = await codec.getNextFrame();
-  final image = frame.image;
-  final rgba = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-  image.dispose();
-  codec.dispose();
-  if (rgba == null) {
-    return _lightNeutralAccent;
+  try {
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    try {
+      final rgba = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      if (rgba == null) {
+        return _lightNeutralAccent;
+      }
+      return calculateAccentFromRgba(
+        rgba.buffer.asUint8List(rgba.offsetInBytes, rgba.lengthInBytes),
+      );
+    } finally {
+      image.dispose();
+    }
+  } finally {
+    codec.dispose();
   }
-  return calculateAccentFromRgba(
-    rgba.buffer.asUint8List(rgba.offsetInBytes, rgba.lengthInBytes),
-  );
 }
 
 /// Picks the dominant vibrant hue from tightly packed RGBA bytes.

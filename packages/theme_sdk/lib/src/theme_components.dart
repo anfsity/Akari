@@ -8,10 +8,15 @@ import 'greeter_host.dart';
 /// The application owns the host's controllers and listenables. A component may
 /// subscribe while mounted, but must not dispose those borrowed resources.
 class GreeterThemeContext {
-  const GreeterThemeContext({required this.host, required this.tokens});
+  const GreeterThemeContext({
+    required this.host,
+    required this.tokens,
+    this.canvas = const SceneCanvas(),
+  });
 
   final GreeterHost host;
   final ThemeTokens tokens;
+  final SceneCanvas canvas;
 }
 
 /// Resolves a theme's authored component identifiers into Flutter widgets.

@@ -48,7 +48,7 @@ class ThemeDefinition {
     required Animation<double> wakeProgress,
   }) {
     final components = this.components(
-      GreeterThemeContext(host: host, tokens: tokens),
+      GreeterThemeContext(host: host, tokens: tokens, canvas: document.canvas),
     );
     // A sharp background has no wake-dependent work. Subscribing to a constant
     // zero tween would rebuild its renderer on every transition frame.
