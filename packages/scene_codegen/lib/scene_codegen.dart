@@ -14,6 +14,8 @@ import 'package:scene/scene.dart';
 SceneDocument get ${_getVariableName(document.id)} => SceneDocument(
   id: ${_encodeDartString(document.id)},
   version: ${document.version},
+  themeProperties: <String, String>{
+${document.themeProperties.entries.map((entry) => '    ${_encodeDartString(entry.key)}: ${_encodeDartString(entry.value)},\n').join()}  },
   canvas: const SceneCanvas(
     fit: SceneCanvasFit.${document.canvas.fit.name},
     useSafeArea: ${document.canvas.useSafeArea},

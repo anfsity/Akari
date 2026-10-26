@@ -331,6 +331,7 @@ class SceneDocument {
     required this.canvas,
     required this.background,
     required this.nodes,
+    this.themeProperties = const {},
   });
 
   final String id;
@@ -338,6 +339,10 @@ class SceneDocument {
   final SceneCanvas canvas;
   final SceneBackground background;
   final List<SceneNode> nodes;
+
+  /// Theme-owned preset selections, compiled with the scene so Studio and the
+  /// greeter resolve the same layout, palette, material and motion choices.
+  final Map<String, String> themeProperties;
 
   /// Draw order uses renderOrder first and z as its tie-breaker. Focus order is
   /// independent. Sorting a copy preserves the original authoring order.
@@ -357,6 +362,7 @@ class SceneDocument {
     SceneCanvas? canvas,
     SceneBackground? background,
     List<SceneNode>? nodes,
+    Map<String, String>? themeProperties,
   }) {
     return SceneDocument(
       id: id ?? this.id,
@@ -364,6 +370,7 @@ class SceneDocument {
       canvas: canvas ?? this.canvas,
       background: background ?? this.background,
       nodes: nodes ?? this.nodes,
+      themeProperties: themeProperties ?? this.themeProperties,
     );
   }
 }

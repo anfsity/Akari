@@ -31,6 +31,42 @@ const _scene = '''
 ''';
 
 void main() {
+  test('theme selections survive edits and JSON round trips', () {
+    final original = decodeSceneDocument(_scene);
+    expect(original.themeProperties, isEmpty);
+    expect(
+      jsonDecode(encodeSceneDocument(original)),
+      isNot(contains('themeProperties')),
+    );
+    final document = original.copyWith(
+      themeProperties: {'palette': 'nord', 'private': 'keep'},
+    );
+    final edited = document.copyWith(
+      background: original.background.copyWith(blurSigma: 8),
+    );
+    expect(decodeSceneDocument(encodeSceneDocument(edited)).themeProperties, {
+      'palette': 'nord',
+      'private': 'keep',
+    });
+    expect(document.copyWith(themeProperties: {}).themeProperties, isEmpty);
+  });
+
+  test('theme selections validate their external shape', () {
+    for (final value in [
+      [],
+      'nord',
+      {'palette': 12},
+      {'palette': null},
+    ]) {
+      final json = jsonDecode(_scene) as Map<String, dynamic>;
+      json['themeProperties'] = value;
+      expect(
+        () => decodeSceneDocument(jsonEncode(json)),
+        throwsFormatException,
+      );
+    }
+  });
+
   test('preserves authored pivots before a transform is applied', () {
     final document = decodeSceneDocument(_scene);
     final updated = document.copyWith(
