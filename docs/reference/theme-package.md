@@ -33,6 +33,49 @@ my_theme/
 External theme repositories must point their SDK path dependencies at a local Akari checkout.
 :::
 
+## Declaring editable component properties
+
+Themes can opt into visual editing with `ThemeDefinition.componentCatalog`.
+The catalog belongs to the theme package; Studio does not infer supported
+properties from a node's current JSON or prescribe a global component vocabulary.
+
+```dart
+enum HeadingStyle { regular, large }
+
+const headingStyle = ThemeChoiceProperty(
+  name: 'variant',
+  label: 'Text style',
+  defaultValue: HeadingStyle.regular,
+  choices: {HeadingStyle.regular: 'Regular', HeadingStyle.large: 'Large'},
+);
+const headingText = ThemeTextProperty(
+  name: 'text',
+  label: 'Text',
+  defaultValue: 'Welcome',
+);
+const catalog = ThemeComponentCatalog(
+  components: {
+    'heading': ThemeComponentDefinition(
+      label: 'Heading',
+      properties: [headingText, headingStyle],
+    ),
+  },
+);
+```
+
+Pass `componentCatalog: catalog` when constructing the theme. Components read
+`headingStyle.getValue(node.properties)` and `headingText.getValue(node.properties)`
+so runtime and editor share defaults and choices. Choice values persist as enum
+names, independent of display labels; keep those names stable and include the
+default in `choices`. Text values follow the scene's non-empty string contract.
+
+At a theme's document-loading boundary, call `catalog.validateDocument(document)`
+before rendering. Studio uses the same validation before accepting a document or
+edit. Missing properties use their declared defaults without rewriting JSON;
+invalid choices raise `FormatException` with the node and property name.
+Unlisted components and properties are preserved. The catalog is optional and
+does not change the scene format, authentication, or the component factory.
+
 ## Build and preview lifecycle
 
 ```sh
