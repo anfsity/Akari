@@ -24,12 +24,12 @@ type AppResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
 fn main() -> AppResult<()> {
     let arguments: Vec<_> = std::env::args_os().skip(1).collect();
-    match arguments.first().and_then(|argument| argument.to_str()) {
-        None if arguments.is_empty() => run_backend(),
-        Some(session_launch::START_SESSION) if arguments.len() == 1 => {
+    match arguments.as_slice() {
+        [] => run_backend(),
+        [arg] if arg == session_launch::START_SESSION => {
             session_launch::start_session().map_err(Into::into)
         }
-        Some(session_launch::EXEC_DESKTOP) if arguments.len() == 1 => {
+        [arg] if arg == session_launch::EXEC_DESKTOP => {
             session_launch::exec_desktop().map_err(Into::into)
         }
         _ => Err("expected no arguments, --start-session or --exec-desktop".into()),
@@ -57,15 +57,15 @@ async fn run() -> AppResult<()> {
     })?;
     let handoff = Arc::new(Notify::new());
     let (service, mut actor) = GreeterService::new(Arc::clone(&handoff));
-    let connection_result = async {
+    let connection = match async {
         Builder::session()?
             .name(BUS_NAME)?
             .serve_at(OBJECT_PATH, service)?
             .build()
             .await
     }
-    .await;
-    let connection = match connection_result {
+    .await
+    {
         Ok(connection) => connection,
         Err(error) => {
             tracing::error!(error = ?error, event = "startup_failed", "could not start D-Bus service");
@@ -80,26 +80,32 @@ async fn run() -> AppResult<()> {
         object_path = OBJECT_PATH,
         "D-Bus service ready"
     );
-    let result: AppResult<()> = tokio::select! {
-        _ = interrupt.recv() => { tracing::info!(reason = "SIGINT", "shutdown requested"); Ok(()) },
-        _ = terminate.recv() => { tracing::info!(reason = "SIGTERM", "shutdown requested"); Ok(()) },
-        _ = handoff.notified() => { tracing::info!(reason = "handoff", "session reply dispatched; shutting down"); Ok(()) },
-        _ = connection.closed() => { Err("greeter D-Bus connection closed".into()) },
+    tokio::select! {
+        _ = interrupt.recv() => tracing::info!(reason = "SIGINT", "shutdown requested"),
+        _ = terminate.recv() => tracing::info!(reason = "SIGTERM", "shutdown requested"),
+        _ = handoff.notified() => {
+            tracing::info!(reason = "handoff", "session reply dispatched; shutting down")
+        }
+        _ = connection.closed() => {
+            actor.stop();
+            (&mut actor.task).await?;
+            return Err("greeter D-Bus connection closed".into());
+        }
         result = &mut actor.task => {
             connection.close().await?;
             return match result {
                 Ok(()) => Err("authentication actor stopped unexpectedly".into()),
                 Err(error) => Err(error.into()),
             };
-        },
-    };
+        }
+    }
     // Stop accepting calls before cancelling the active protocol exchange.
     let close_result = connection.close().await;
     actor.stop();
     (&mut actor.task).await?;
     close_result?;
     tracing::info!("backend shutdown complete");
-    result
+    Ok(())
 }
 
 fn init_tracing() -> AppResult<()> {
