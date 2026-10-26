@@ -1,7 +1,6 @@
-# Theme Studio 架构提案
+# Theme Studio 架构规范
 
-> [!NOTE]
-> **状态**：架构提案，阐述 Theme Studio、Flutter 登录界面与 Rust 后端之间的目标协作架构。当前已实现的进程间通信规范请参阅 [D-Bus 接口约定](../reference/dbus.md)。
+Akari 将编译期 Flutter 登录界面平台与可视化编辑器 **Theme Studio** 相结合，二者共用同一套 `GreeterHost` 契约与 `SceneRuntime`。进程间通信规范请参阅 [D-Bus 接口约定](../reference/dbus.md)。
 
 ## 1. 产品形态与端到端拓扑
 

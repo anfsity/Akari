@@ -1,7 +1,6 @@
 # Native login handoff
 
-> [!NOTE]
-> **Status**: Native window preview and process-ordering tests pass. The DRM/KMS implementation is wired into both VT launch boundaries; visual continuity, VT switching, and GPU-specific behavior still require hardware acceptance.
+The native login handoff coordinates seamless visual transitions and VT ownership across two distinct boot stages: before the Greeter Sway compositor starts, and before the authenticated user desktop begins.
 
 ## 1. Launch boundaries
 
