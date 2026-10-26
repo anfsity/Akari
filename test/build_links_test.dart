@@ -1,14 +1,13 @@
-import '../tool/src/theme/model.dart';
-
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../tool/src/theme/build_links.dart';
-import '../tool/src/commands/theme.dart';
-import '../tool/src/execution/model.dart';
 import '../tool/src/commands/development.dart';
 import '../tool/src/commands/plan.dart';
+import '../tool/src/commands/theme.dart';
+import '../tool/src/execution/model.dart';
+import '../tool/src/theme/build_links.dart';
+import '../tool/src/theme/model.dart';
 import '../tool/src/theme/project.dart';
 
 void main() {

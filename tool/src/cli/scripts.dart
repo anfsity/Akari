@@ -46,11 +46,6 @@ const repositoryScripts = [
     'Run a command with a backend on a private D-Bus.',
   ),
   ScriptDefinition(
-    'debug-sway.sh',
-    ScriptKind.tool,
-    'Forward to akari run sway.',
-  ),
-  ScriptDefinition(
     'sway-session.py',
     ScriptKind.tool,
     'Run a command in isolated Sway; requires --log-dir.',
