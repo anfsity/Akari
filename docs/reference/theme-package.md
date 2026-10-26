@@ -76,6 +76,44 @@ invalid choices raise `FormatException` with the node and property name.
 Unlisted components and properties are preserved. The catalog is optional and
 does not change the scene format, authentication, or the component factory.
 
+## Declaring layout slots
+
+`ThemeDefinition.layout` optionally describes composition for one `sceneId`.
+Each `ThemeLayoutSlot` has a label, a complete `defaultNode` insertion template,
+and an `isRequired` presence rule. The template's stable node ID identifies the
+slot; another component cannot occupy that ID. Node IDs in a layout must be unique.
+
+```dart
+const layout = ThemeLayoutDefinition(
+  sceneId: 'ocean',
+  label: 'Ocean',
+  slots: [
+    ThemeLayoutSlot(
+      label: 'Sign-in caption',
+      defaultNode: SceneNode(
+        id: 'caption',
+        componentId: 'heading',
+        rect: SceneRect(x: 0.1, y: 0.2, width: 0.4, height: 0.1),
+        properties: {'text': 'Welcome'},
+      ),
+    ),
+  ],
+);
+```
+
+Pass `layout: layout` to the theme and call `layout.validateDocument(document)`
+at its document-loading boundary alongside property validation. Other scene IDs
+remain unrestricted. Templates must satisfy the scene schema and component
+catalog, including focus, visibility, and interaction settings. Keep insertion
+templates independent of the editable scene: saving or removing a node must not
+remove the ability to insert it again after rebuilding.
+
+Templates apply only when adding a slot. Existing node positions and properties,
+and nodes outside the layout, remain authored scene data. Required slots cannot
+be removed through Studio; `findMissingRequiredSlots(document)` identifies gaps
+in imported scenes so Studio can repair them. Missing slots do not make loading
+fail. This presence rule does not validate an entire authentication flow.
+
 ## Build and preview lifecycle
 
 ```sh

@@ -6,6 +6,7 @@ import 'greeter_host.dart';
 import 'palette_extractor.dart';
 import 'theme_components.dart';
 import 'theme_customization.dart';
+import 'theme_layout.dart';
 
 typedef ThemeBuilder = ThemeDefinition Function({Color? seed});
 
@@ -18,6 +19,7 @@ class ThemeDefinition {
     required this.bundle,
     required this.components,
     this.componentCatalog = const ThemeComponentCatalog(),
+    this.layout,
   });
 
   final String id;
@@ -25,6 +27,7 @@ class ThemeDefinition {
   final ThemeBundle bundle;
   final GreeterThemeComponentsFactory components;
   final ThemeComponentCatalog componentCatalog;
+  final ThemeLayoutDefinition? layout;
 
   ThemeTokens get tokens => bundle.tokens;
 
@@ -87,6 +90,7 @@ class ThemeDefinition {
       bundle: bundle ?? this.bundle,
       components: components,
       componentCatalog: componentCatalog,
+      layout: layout,
     );
   }
 }
