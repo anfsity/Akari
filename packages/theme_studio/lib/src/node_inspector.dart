@@ -1,5 +1,5 @@
-import 'package:scene/scene.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:theme_sdk/theme_sdk.dart';
 
 import 'node_inspector_controller.dart';
 import 'studio_form.dart';
@@ -7,11 +7,13 @@ import 'studio_form.dart';
 class NodeInspector extends StatelessWidget {
   const NodeInspector({
     required this.controller,
+    required this.componentCatalog,
     required this.onApply,
     super.key,
   });
 
   final NodeInspectorController controller;
+  final ThemeComponentCatalog componentCatalog;
   final VoidCallback onApply;
 
   @override
@@ -20,10 +22,18 @@ class NodeInspector extends StatelessWidget {
     builder: (context, _) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _InspectorHeader(node: controller.node),
+        _InspectorHeader(
+          node: controller.node,
+          definition: componentCatalog.components[controller.node.componentId],
+        ),
         const Divider(),
         Expanded(
-          child: _InspectorForm(controller: controller, onApply: onApply),
+          child: _InspectorForm(
+            controller: controller,
+            definition:
+                componentCatalog.components[controller.node.componentId],
+            onApply: onApply,
+          ),
         ),
         const Divider(),
         _InspectorActions(error: controller.error, onApply: onApply),
@@ -33,9 +43,10 @@ class NodeInspector extends StatelessWidget {
 }
 
 class _InspectorHeader extends StatelessWidget {
-  const _InspectorHeader({required this.node});
+  const _InspectorHeader({required this.node, required this.definition});
 
   final SceneNode node;
+  final ThemeComponentDefinition? definition;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -45,7 +56,7 @@ class _InspectorHeader extends StatelessWidget {
       children: [
         Text(node.id, maxLines: 1, overflow: TextOverflow.ellipsis).semiBold(),
         Text(
-          node.componentId,
+          definition?.label ?? node.componentId,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ).muted().small(),
@@ -55,9 +66,14 @@ class _InspectorHeader extends StatelessWidget {
 }
 
 class _InspectorForm extends StatelessWidget {
-  const _InspectorForm({required this.controller, required this.onApply});
+  const _InspectorForm({
+    required this.controller,
+    required this.definition,
+    required this.onApply,
+  });
 
   final NodeInspectorController controller;
+  final ThemeComponentDefinition? definition;
   final VoidCallback onApply;
 
   @override
@@ -70,7 +86,11 @@ class _InspectorForm extends StatelessWidget {
         _buildLayoutSection(),
         const Divider(),
         const Gap(12),
-        _InspectorProperties(controller: controller, onApply: onApply),
+        _InspectorProperties(
+          controller: controller,
+          definition: definition,
+          onApply: onApply,
+        ),
         const Divider(),
         const Gap(12),
         _InspectorDisclosure(
@@ -208,9 +228,14 @@ class _InspectorDisclosureState extends State<_InspectorDisclosure> {
 }
 
 class _InspectorProperties extends StatelessWidget {
-  const _InspectorProperties({required this.controller, required this.onApply});
+  const _InspectorProperties({
+    required this.controller,
+    required this.definition,
+    required this.onApply,
+  });
 
   final NodeInspectorController controller;
+  final ThemeComponentDefinition? definition;
   final VoidCallback onApply;
 
   @override
@@ -225,17 +250,31 @@ class _InspectorProperties extends StatelessWidget {
           'Correct the JSON in Advanced properties to edit component fields.',
         ).small().muted();
       }
+      // Undeclared components retain their existing raw string editor. For an
+      // opted-in component only its author-declared controls appear here;
+      // additional properties remain intact in Advanced properties.
+      final definitions =
+          definition?.properties ??
+          [
+            for (final entry in properties.entries)
+              ThemeTextProperty(
+                name: entry.key,
+                label: entry.key,
+                defaultValue: entry.value,
+              ),
+          ];
       return StudioFormSection(
         title: 'Component properties',
         children: [
-          if (properties.isEmpty)
-            const Text('This component has no configured properties.')
+          if (definitions.isEmpty)
+            const Text('This component has no editable properties.')
                 .small()
                 .muted()
           else
             _PropertyRows(
               key: ValueKey(controller.node.id),
               properties: properties,
+              definitions: definitions,
               onChanged: controller.updateProperty,
               onApply: onApply,
             ),
@@ -252,12 +291,14 @@ class _InspectorProperties extends StatelessWidget {
 class _PropertyRows extends StatefulWidget {
   const _PropertyRows({
     required this.properties,
+    required this.definitions,
     required this.onChanged,
     required this.onApply,
     super.key,
   });
 
   final Map<String, String> properties;
+  final List<ThemeProperty<Object>> definitions;
   final void Function(String, String) onChanged;
   final VoidCallback onApply;
 
@@ -281,7 +322,8 @@ class _PropertyRowsState extends State<_PropertyRows> {
   }
 
   void _updateFields() {
-    final active = widget.properties.keys.toSet();
+    final definitions = widget.definitions.whereType<ThemeTextProperty>();
+    final active = definitions.map((property) => property.name).toSet();
     _fields.removeWhere((key, controller) {
       if (!active.contains(key)) {
         controller.dispose();
@@ -289,9 +331,13 @@ class _PropertyRowsState extends State<_PropertyRows> {
       }
       return false;
     });
-    for (final entry in widget.properties.entries) {
-      final field = _fields.putIfAbsent(entry.key, TextEditingController.new);
-      if (field.text != entry.value) field.text = entry.value;
+    for (final property in definitions) {
+      final field = _fields.putIfAbsent(
+        property.name,
+        TextEditingController.new,
+      );
+      final value = property.getValue(widget.properties);
+      if (field.text != value) field.text = value;
     }
   }
 
@@ -306,17 +352,57 @@ class _PropertyRowsState extends State<_PropertyRows> {
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      for (final name in widget.properties.keys)
-        StudioFormField(
-          label: name,
-          inputKey: ValueKey('property-$name'),
-          controller: _fields[name]!,
-          onChanged: (value) => widget.onChanged(name, value),
-          onSubmitted: widget.onApply,
-          onFocusLost: widget.onApply,
-        ),
+      for (final property in widget.definitions)
+        switch (property) {
+          ThemeTextProperty() => StudioFormField(
+            label: property.label,
+            inputKey: ValueKey('property-${property.name}'),
+            controller: _fields[property.name]!,
+            onChanged: (value) {
+              // shadcn also emits changes while controllers are synchronized.
+              // Projecting an omitted default must never create a JSON draft.
+              if (value == property.getValue(widget.properties)) return;
+              widget.onChanged(property.name, value);
+            },
+            onSubmitted: widget.onApply,
+            onFocusLost: widget.onApply,
+          ),
+          ThemeChoiceProperty() => _buildChoice(property),
+        },
     ],
   );
+
+  Widget _buildChoice(ThemeChoiceProperty<Enum> property) {
+    Enum? value;
+    try {
+      value = property.getValue(widget.properties);
+    } on FormatException {
+      // A raw JSON draft may contain an unsupported choice. Keep the selector
+      // available to repair it while the canvas retains its last valid scene.
+      value = null;
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(property.label).small().muted(),
+          const Gap(6),
+          StudioSelect<Enum>(
+            key: ValueKey('property-${property.name}'),
+            value: value,
+            values: property.choices.keys,
+            formatValue: (choice) => property.choices[choice]!,
+            placeholder: const Text('Choose a valid option'),
+            onChanged: (choice) {
+              widget.onChanged(property.name, choice.name);
+              widget.onApply();
+            },
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _InspectorActions extends StatelessWidget {

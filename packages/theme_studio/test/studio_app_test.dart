@@ -49,10 +49,33 @@ class _Components implements GreeterThemeComponents {
       Center(child: Text(node.componentId));
 }
 
-ThemeDefinition _buildTheme({Color? seed}) => ThemeDefinition(
+enum _PanelStyle { regular, large }
+
+const _editableCatalog = ThemeComponentCatalog(
+  components: {
+    'panel': ThemeComponentDefinition(
+      label: 'Panel appearance',
+      properties: [
+        ThemeTextProperty(name: 'text', label: 'Text', defaultValue: 'Welcome'),
+        ThemeChoiceProperty(
+          name: 'variant',
+          label: 'Text style',
+          defaultValue: _PanelStyle.regular,
+          choices: {_PanelStyle.regular: 'Regular', _PanelStyle.large: 'Large'},
+        ),
+      ],
+    ),
+  },
+);
+
+ThemeDefinition _buildTheme({
+  Color? seed,
+  ThemeComponentCatalog componentCatalog = const ThemeComponentCatalog(),
+}) => ThemeDefinition(
   id: 'test',
   document: _document,
   components: (_) => _Components(),
+  componentCatalog: componentCatalog,
   bundle: ThemeBundle(
     tokens: ThemeTokens(
       materialTheme: material.ThemeData(
@@ -181,6 +204,7 @@ void main() {
           document: _document,
           bundle: _buildTheme().bundle,
           components: (_) => _PresetComponents(),
+          componentCatalog: _editableCatalog,
         ),
       );
       await openStudio(tester, additionalProjects: [preset]);
@@ -218,6 +242,8 @@ void main() {
         'preset',
       );
       expect(find.text('preset component panel'), findsOneWidget);
+      expect(find.text('Panel appearance'), findsOneWidget);
+      expect(find.byKey(const ValueKey('property-variant')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
       await tester.pumpAndSettle();
       expect(find.text('preset.txt'), findsWidgets);
@@ -244,6 +270,8 @@ void main() {
         0.2,
       );
       expect(find.text('preset.txt'), findsNothing);
+      expect(find.text('Panel appearance'), findsNothing);
+      expect(find.byKey(const ValueKey('property-variant')), findsNothing);
       expect(
         tester.widget<StudioPreview>(find.byType(StudioPreview)).theme.id,
         'test',
@@ -619,6 +647,181 @@ void main() {
       0.2,
     );
   });
+
+  testWidgets('declared controls show defaults without creating scene edits', (
+    tester,
+  ) async {
+    final source = file.readAsStringSync();
+    await openStudio(
+      tester,
+      themeBuilder: ({Color? seed}) =>
+          _buildTheme(seed: seed, componentCatalog: _editableCatalog),
+    );
+    expect(find.text('Panel appearance'), findsOneWidget);
+    final text = find.byKey(const ValueKey('property-text'));
+    expect(tester.widget<TextField>(text).controller!.text, 'Welcome');
+    expect(find.text('Regular'), findsOneWidget);
+    expect(find.text('Text style'), findsOneWidget);
+    expect(find.text('Saved'), findsOneWidget);
+    final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+    expect(preview.document.nodes.first.properties, isEmpty);
+    await tester.tap(find.text('Save scene'));
+    await tester.pumpAndSettle();
+    expect(
+      decodeSceneDocument(file.readAsStringSync()).nodes.first.properties,
+      isEmpty,
+    );
+    expect(
+      encodeSceneDocument(decodeSceneDocument(source)),
+      encodeSceneDocument(decodeSceneDocument(file.readAsStringSync())),
+    );
+  });
+
+  testWidgets(
+    'declared text and choices save, undo and reopen with private data',
+    (tester) async {
+      file.writeAsStringSync(
+        encodeSceneDocument(
+          _document.copyWith(
+            nodes: [
+              _document.nodes.first.copyWith(properties: {'private': 'keep'}),
+              _document.nodes.last,
+            ],
+          ),
+        ),
+      );
+      ThemeDefinition buildEditable({Color? seed}) =>
+          _buildTheme(seed: seed, componentCatalog: _editableCatalog);
+      await openStudio(tester, themeBuilder: buildEditable);
+      expect(find.byKey(const ValueKey('property-private')), findsNothing);
+      final text = find.byKey(const ValueKey('property-text'));
+      await tester.enterText(text, 'My desktop');
+      await tester.tap(find.text('Apply to preview'));
+      await tester.pumpAndSettle();
+      final choice = find.byKey(const ValueKey('property-variant'));
+      await tester.tap(choice);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Large').last);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<StudioPreview>(find.byType(StudioPreview))
+            .document
+            .nodes
+            .first
+            .properties,
+        {'private': 'keep', 'text': 'My desktop', 'variant': 'large'},
+      );
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Regular'), findsOneWidget);
+      expect(tester.widget<TextField>(text).controller!.text, 'My desktop');
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(text).controller!.text, 'Welcome');
+      await tester.tap(find.text('Redo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Redo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save scene'));
+      await tester.pumpAndSettle();
+      expect(
+        decodeSceneDocument(file.readAsStringSync()).nodes.first.properties,
+        {'private': 'keep', 'text': 'My desktop', 'variant': 'large'},
+      );
+
+      await tester.pumpWidget(const SizedBox());
+      await openStudio(tester, themeBuilder: buildEditable);
+      expect(tester.widget<TextField>(text).controller!.text, 'My desktop');
+      expect(find.text('Large'), findsOneWidget);
+      expect(find.text('Saved'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('unsupported JSON choices keep the preview and can be repaired', (
+    tester,
+  ) async {
+    await openStudio(
+      tester,
+      themeBuilder: ({Color? seed}) =>
+          _buildTheme(seed: seed, componentCatalog: _editableCatalog),
+    );
+    final inspector = tester
+        .widget<NodeInspector>(find.byType(NodeInspector))
+        .controller;
+    final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+    inspector.getField('Properties').text = '{"variant":"unsupported"}';
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Apply to preview'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Property "variant" must be one of'),
+      findsOneWidget,
+    );
+    expect(
+      tester.widget<StudioPreview>(find.byType(StudioPreview)).document,
+      same(preview.document),
+    );
+    expect(find.text('Choose a valid option'), findsOneWidget);
+    final choice = find.byKey(const ValueKey('property-variant'));
+    await tester.ensureVisible(choice);
+    await tester.pumpAndSettle();
+    await tester.tap(choice);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Large').last);
+    await tester.pumpAndSettle();
+    expect(inspector.error, isNull);
+    expect(
+      tester
+          .widget<StudioPreview>(find.byType(StudioPreview))
+          .document
+          .nodes
+          .first
+          .properties,
+      {'variant': 'large'},
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'hot reload refreshes declared controls without resetting drafts',
+    (tester) async {
+      var catalog = const ThemeComponentCatalog();
+      await openStudio(
+        tester,
+        themeBuilder: ({Color? seed}) =>
+            _buildTheme(seed: seed, componentCatalog: catalog),
+      );
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
+      catalog = _editableCatalog;
+      final reload = tester.binding.reassembleApplication();
+      await tester.pumpAndSettle();
+      await reload;
+      expect(find.text('Panel appearance'), findsOneWidget);
+      expect(find.text('Regular'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('field-X')))
+            .controller!
+            .text,
+        '256',
+      );
+      await tester.tap(find.text('Apply to preview'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<StudioPreview>(find.byType(StudioPreview))
+            .document
+            .nodes
+            .first
+            .rect
+            .x,
+        0.2,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('inspector sections preserve fields while scrolling', (
     tester,
@@ -1134,8 +1337,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Import asset'));
     await tester.pumpAndSettle();
-    final initialTheme =
-        tester.widget<StudioPreview>(find.byType(StudioPreview)).theme;
+    final initialTheme = tester
+        .widget<StudioPreview>(find.byType(StudioPreview))
+        .theme;
     expect(File('${directory.path}/assets/wallpaper.png').existsSync(), isTrue);
     await tester.runAsync(() async {
       await tester.tap(find.text('Use image'));
@@ -1154,12 +1358,10 @@ void main() {
     );
     await tester.tap(find.text('Undo'));
     await tester.pumpAndSettle();
-    final undonePreview =
-        tester.widget<StudioPreview>(find.byType(StudioPreview));
-    expect(
-      undonePreview.document.background.kind,
-      SceneBackgroundKind.solid,
+    final undonePreview = tester.widget<StudioPreview>(
+      find.byType(StudioPreview),
     );
+    expect(undonePreview.document.background.kind, SceneBackgroundKind.solid);
     expect(
       undonePreview.theme.materialTheme.colorScheme.primary,
       initialTheme.materialTheme.colorScheme.primary,

@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:scene/scene.dart';
+import 'package:theme_sdk/theme_sdk.dart';
 
 import 'node_inspector_controller.dart';
 
@@ -16,12 +16,16 @@ typedef _SceneRevision = ({
 /// Owns one authoring session. Only validated documents enter history, and
 /// saving refuses to replace a file modified outside this session.
 class SceneEditor extends ChangeNotifier {
-  SceneEditor(this.file) {
+  SceneEditor(
+    this.file, {
+    this._componentCatalog = const ThemeComponentCatalog(),
+  }) {
     _loadFromDisk(initial: true);
     inspector = NodeInspectorController(selectedNode, document.canvas);
   }
 
   final File file;
+  ThemeComponentCatalog _componentCatalog;
   late final NodeInspectorController inspector;
   late String _source;
   late String _savedDocument;
@@ -38,6 +42,18 @@ class SceneEditor extends ChangeNotifier {
   bool get canUndo => _undo.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
   bool get canDeleteNode => document.nodes.length > 1;
+  ThemeComponentCatalog get componentCatalog => _componentCatalog;
+
+  void updateComponentCatalog(ThemeComponentCatalog catalog) {
+    if (identical(catalog, _componentCatalog)) return;
+    // Undo and redo trust the revision invariant too. A hot-reloaded catalog
+    // must accept history before replacing the rules used by this session.
+    for (final revision in [_revision, ..._undo, ..._redo]) {
+      catalog.validateDocument(revision.document);
+    }
+    _componentCatalog = catalog;
+    notifyListeners();
+  }
 
   bool applyDraft() {
     if (!inspector.hasDraft) return true;
@@ -115,6 +131,7 @@ class SceneEditor extends ChangeNotifier {
     final encoded = encodeSceneDocument(document);
     if (encoded == _revision.encoded) return;
     final updated = decodeSceneDocument(encoded);
+    _componentCatalog.validateDocument(updated);
     _undo.add(_revision);
     _redo.clear();
     _applyRevision((
@@ -172,11 +189,13 @@ class SceneEditor extends ChangeNotifier {
   void _loadFromDisk({bool initial = false}) {
     final source = file.readAsStringSync();
     final document = decodeSceneDocument(source);
+    _componentCatalog.validateDocument(document);
     _source = source;
     final revision = (
       document: document,
       encoded: encodeSceneDocument(document),
-      selectedId: !initial && document.nodes.any((node) => node.id == selectedId)
+      selectedId:
+          !initial && document.nodes.any((node) => node.id == selectedId)
           ? selectedId
           : document.nodes.first.id,
     );
