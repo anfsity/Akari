@@ -72,6 +72,14 @@ SceneDocument decodeSceneDocument(String source) {
     canvas: _decodeCanvas(_getMap(decoded, 'canvas')),
     background: _decodeBackground(_getMap(decoded, 'background')),
     nodes: nodes,
+    themeProperties: {
+      for (final entry in _getMap(
+        decoded,
+        'themeProperties',
+        fallback: const {},
+      ).entries)
+        entry.key: _getStringValue(entry.value, 'themeProperties.${entry.key}'),
+    },
   );
 }
 
@@ -109,8 +117,7 @@ SceneCanvas _decodeCanvas(Map<String, dynamic> json) {
 
 /// Encodes a scene document into its JSON authoring form.
 String encodeSceneDocument(SceneDocument document) {
-  return const JsonEncoder.withIndent('  ')
-      .convert(_encodeDocument(document));
+  return const JsonEncoder.withIndent('  ').convert(_encodeDocument(document));
 }
 
 /// Encodes a single scene node into its formatted JSON authoring form.
@@ -122,6 +129,8 @@ Map<String, dynamic> _encodeDocument(SceneDocument document) {
   return {
     'id': document.id,
     'version': document.version,
+    if (document.themeProperties.isNotEmpty)
+      'themeProperties': document.themeProperties,
     'canvas': {
       'fit': document.canvas.fit.name,
       'useSafeArea': document.canvas.useSafeArea,

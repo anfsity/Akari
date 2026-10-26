@@ -15,6 +15,7 @@ void main() {
       jsonEncode({
         'id': 'test',
         'version': 2,
+        'themeProperties': properties,
         'canvas': {'fit': 'contain'},
         'background': {
           'kind': 'custom',
@@ -53,6 +54,7 @@ void main() {
     expect(document['nodes'][0]['id'], r'$node');
     expect(document['nodes'][0]['component'], r'${component}');
     expect(document['nodes'][0]['properties'], properties);
+    expect(document['themeProperties'], properties);
   });
 
   test('generates a typed document from a valid scene', () {
