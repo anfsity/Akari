@@ -42,12 +42,26 @@ On real VTs, `akari-splash` renders a pure black (`#000000`) loading screen via 
 
 ## Facial authentication
 
-When the greeter wakes with an account and session selected, Akari automatically starts PAM authentication:
+### Architectural separation & boundaries
 
-- **Face match**: PAM messages display during recognition, and the desktop launches immediately without password submission.
-- **Password fallback**: If recognition times out or no camera is available, the password field regains keyboard focus within the same attempt.
+Akari **does not implement or manage biometric algorithms, sensor hardware, or facial recognition models**.
 
-Akari uses [Gaze](https://github.com/GunduLabs/gaze) as its reference face provider. Camera access, face models, timeouts, and fallback rules belong entirely to Gaze and PAM—Akari never captures camera frames.
+Architecturally, Akari simply interfaces with the standard Linux **PAM (Pluggable Authentication Modules)** mechanism via `greetd`:
+
+- **Complete decoupling**: All biometric operations (camera access, liveness detection, model inference) are handled independently by dedicated PAM modules and external daemons.
+- **Presentation isolation**: Both the Flutter frontend and the Rust backend run in unprivileged presentation space; they never capture sensor frames or touch biometric templates.
+
+### How it works
+
+1. **Transparent status forwarding**: When the greeter wakes with a selected user, Akari initiates the PAM conversation. Any status messages emitted by the active PAM module are forwarded via D-Bus and displayed on screen.
+2. **Direct session launch**: If biometric verification succeeds, PAM returns an authenticated status and Akari immediately launches the user desktop without prompting for credentials.
+3. **Seamless password fallback**: If recognition times out or fails, PAM continues through its configured stack to password verification. Akari restores keyboard focus to the password field within the exact same attempt (`attempt_id`).
+
+### Reference implementation: Gaze
+
+Throughout development and integration testing, Akari uses [Gaze](https://github.com/GunduLabs/gaze) as its **validated reference implementation**.
+
+To avoid manual edits to `/etc/pam.d/greetd`, the Akari CLI provides safe orchestration helpers (`akari login enable-gaze` and `akari login disable-gaze`) that route authentication through an isolated `akari-gaze` sub-stack with atomic backups and easy rollback.
 
 ### Install and verify Gaze
 
