@@ -6,7 +6,14 @@ import 'package:theme_sdk/theme_sdk.dart';
 /// The sky stays in focus. Local shadows provide contrast without a full-screen
 /// blur pass, and pointer motion moves the cached wallpaper rather than inputs.
 class TerraceBackgroundRenderer extends BackgroundRenderer {
-  const TerraceBackgroundRenderer();
+  const TerraceBackgroundRenderer({this.resolveImage = AssetImage.new});
+
+  final SceneImageProviderResolver resolveImage;
+
+  @override
+  TerraceBackgroundRenderer getWithImageResolver(
+    SceneImageProviderResolver resolveImage,
+  ) => TerraceBackgroundRenderer(resolveImage: resolveImage);
 
   @override
   Widget build(BuildContext context, SceneBackground background) =>
@@ -19,7 +26,8 @@ class TerraceBackgroundRenderer extends BackgroundRenderer {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                const ImageBackgroundRenderer(
+                ImageBackgroundRenderer(
+                  resolveImage: resolveImage,
                   alignment: Alignment(0.72, 0),
                   filterQuality: FilterQuality.low,
                 ).build(context, background.copyWith(blurSigma: 0)),

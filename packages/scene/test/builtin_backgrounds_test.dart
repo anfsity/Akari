@@ -5,6 +5,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scene/scene.dart';
 
 void main() {
+  test(
+    'binding images preserves renderer settings and code-owned backgrounds',
+    () {
+      const original = ImageBackgroundRenderer(
+        alignment: Alignment.topRight,
+        filterQuality: FilterQuality.low,
+      );
+      final bound = original.getWithImageResolver(_memoryImage);
+      expect(bound.resolveImage('assets/test.png'), isA<MemoryImage>());
+      expect(bound.alignment, Alignment.topRight);
+      expect(bound.filterQuality, FilterQuality.low);
+      const solid = SolidBackgroundRenderer();
+      expect(solid.getWithImageResolver(_memoryImage), same(solid));
+    },
+  );
+
   testWidgets('clips a blurred background to the scene rectangle', (
     tester,
   ) async {

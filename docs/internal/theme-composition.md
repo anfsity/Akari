@@ -35,8 +35,10 @@ combines those designs. Code-owned widgets and shaders remain supported.
 - Terrace split and centered layouts now compose all 72 global preset
   combinations. Layout changes preserve edited content, optional omissions and
   custom nodes, repair required controls, and update insertion defaults.
-- Remaining: richer component variants, faithful file-based
-  background previews, runtime state previews, independent project synthesis,
+- File-based previews now bind images through the theme's own background
+  renderer, preserving its gradients, focal alignment, and custom atmosphere.
+  Themes without an image renderer no longer offer wallpaper replacement.
+- Remaining: richer component variants, runtime state previews, independent project synthesis,
   and end-to-end build/native verification.
 
 Completion requires the entire end state above; a working property editor or
