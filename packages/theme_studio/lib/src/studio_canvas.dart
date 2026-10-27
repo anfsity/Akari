@@ -35,6 +35,7 @@ class StudioCanvas extends StatefulWidget {
 class _StudioCanvasState extends State<StudioCanvas> {
   StudioCanvasTool _tool = StudioCanvasTool.move;
   bool _lockAspectRatio = false;
+  bool _snapToGuides = true;
   bool _handTool = false;
   bool _spacePan = false;
   bool _previewing = false;
@@ -263,6 +264,20 @@ class _StudioCanvasState extends State<StudioCanvas> {
                     ),
                     if (!widget.readOnly && !_previewing)
                       Tooltip(
+                        tooltip: (_) =>
+                            const Text('Smart guides · Alt to bypass'),
+                        child: Button(
+                          key: const ValueKey('smart-guides'),
+                          style: _snapToGuides
+                              ? const ButtonStyle.primaryIcon()
+                              : const ButtonStyle.outlineIcon(),
+                          onPressed: () =>
+                              setState(() => _snapToGuides = !_snapToGuides),
+                          child: const Icon(LucideIcons.magnet, size: 16),
+                        ),
+                      ),
+                    if (!widget.readOnly && !_previewing)
+                      Tooltip(
                         tooltip: (_) => const Text(
                           'Lock aspect ratio · Shift while resizing',
                         ),
@@ -365,6 +380,9 @@ class _StudioCanvasState extends State<StudioCanvas> {
                             selectedIds: session.selectedIds,
                             onSelectNodes: session.selectNodes,
                             onCommitNodes: session.updateNodes,
+                            onPlaceNode: session.placeNode,
+                            onUpdateText: session.updateNodeText,
+                            snapToGuides: _snapToGuides,
                             dormant: widget.dormant,
                             scenario: _scenario,
                             preferences: widget.preferences,

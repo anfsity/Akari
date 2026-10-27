@@ -329,6 +329,53 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('component library drops a slot at the canvas pointer in one edit', (tester) async {
+    await openStudio(tester, themeBuilder: ({Color? seed, SceneDocument? document}) =>
+      _buildTheme(seed: seed, document: document, layout: _assemblyLayout));
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.ensureVisible(find.byKey(const ValueKey('select-slot-badge')));
+    await tester.pumpAndSettle();
+    final canvas = tester.getRect(find.byType(SceneRuntime));
+    final target = canvas.topLeft + Offset(canvas.width * .6, canvas.height * .6);
+    final drag = find.ancestor(of: find.byKey(const ValueKey('select-slot-badge')), matching: find.byType(Draggable<SceneNode>));
+    expect(drag, findsOneWidget);
+    final gesture = await tester.startGesture(tester.getCenter(find.byKey(const ValueKey('select-slot-badge'))));
+    await gesture.moveBy(const Offset(40, 0)); await tester.pump();
+    expect(find.text('Standby badge'), findsNWidgets(2));
+    await gesture.moveTo(target); await tester.pump(); await gesture.up();
+    await tester.pumpAndSettle();
+    expect(editor.selectedId, 'badge');
+    expect(editor.selectedNode.rect.x, closeTo(.6, .001));
+    expect(editor.selectedNode.rect.y, closeTo(.6, .001));
+    editor.undo(); expect(editor.document.nodes.any((node) => node.id == 'badge'), isFalse);
+    expect(editor.canUndo, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('canvas text edits commit once and Escape discards the draft', (tester) async {
+    await openStudio(tester, themeBuilder: ({Color? seed, SceneDocument? document}) =>
+      _buildTheme(seed: seed, document: document, componentCatalog: _editableCatalog));
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    final node = find.byKey(const ValueKey('preview-panel'));
+    await tester.tap(node); await tester.pump(const Duration(milliseconds: 50)); await tester.tap(node);
+    await tester.pumpAndSettle();
+    final input = find.byKey(const ValueKey('canvas-text-editor'));
+    expect(input, findsOneWidget);
+    await tester.enterText(input, 'Hello canvas');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(editor.selectedNode.properties['text'], 'Hello canvas');
+    editor.undo();
+    expect(editor.canUndo, isFalse);
+    await tester.tap(node); await tester.pump(const Duration(milliseconds: 50)); await tester.tap(node);
+    await tester.pumpAndSettle();
+    await tester.enterText(input, 'Discard me');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(editor.selectedNode.properties['text'], isNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('preview scenarios wake the canvas without editing the scene', (
     tester,
   ) async {
@@ -2644,10 +2691,12 @@ void main() {
     );
     await openStudio(tester);
     final canvasRect = tester.getRect(find.byType(SceneRuntime));
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
     await tester.drag(
       find.byKey(const ValueKey('preview-panel')),
       const Offset(60, 30),
     );
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
     await tester.pumpAndSettle();
     final node = tester
         .widget<StudioPreview>(find.byType(StudioPreview))

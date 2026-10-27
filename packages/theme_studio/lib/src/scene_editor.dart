@@ -435,6 +435,40 @@ class SceneEditor extends ChangeNotifier {
     );
   }
 
+  void placeNode(SceneNode template, Offset position) {
+    if (!applyDraft()) return;
+    final existing = document.nodes
+        .where((node) => node.id == template.id)
+        .firstOrNull;
+    final node = existing ?? template;
+    final rect = node.rect.copyWith(
+      x: position.dx.clamp(0.0, 1 - node.rect.width),
+      y: position.dy.clamp(0.0, 1 - node.rect.height),
+    );
+    final placed = node.copyWith(parentId: null, rect: rect);
+    _updateDocument(
+      document.copyWith(
+        nodes: [
+          for (final current in document.nodes)
+            if (current.id == node.id) placed else current,
+          if (existing == null) placed,
+        ],
+      ),
+      selectedId: node.id,
+      selectedIds: {node.id},
+    );
+  }
+
+  void updateNodeText(String id, String text) {
+    if (!applyDraft()) return;
+    final node = document.nodes.firstWhere((node) => node.id == id);
+    if (text.isEmpty) {
+      inspector.showError('Text must not be empty.');
+      return;
+    }
+    updateNode(node.copyWith(properties: {...node.properties, 'text': text}));
+  }
+
   void duplicateSelectedNode() {
     if (!applyDraft()) return;
     if (!canDuplicateNode) {

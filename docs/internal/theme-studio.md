@@ -139,6 +139,14 @@ Transform translations (`translateX`, `translateY`) remain in logical pixels as 
 
 ## Canvas tools & gestures
 
+Drag a component row from **Compose** onto the canvas to place it at the pointer.
+Dragging an included slot moves that slot without duplicating it. Double-click
+a component with a `text` property to edit on the canvas; Enter or clicking
+outside commits, and Escape cancels. Smart guides snap moving edges/centers to
+visible components and canvas edges/centers with a six-screen-pixel tolerance.
+Use the magnet button to toggle guides or hold Alt to bypass them. Grid snapping
+takes precedence when enabled. Selection-wide moves retain relative spacing.
+
 Shift-click canvas components or layer rows to toggle multiple selections.
 Drag empty canvas space to marquee-select visible layers; Shift adds to the
 selection. `Ctrl+A` selects all layers. With sibling layers selected, the
