@@ -8,6 +8,19 @@ enum SceneMainAlignment { start, center, end, spaceBetween }
 
 enum SceneCrossAlignment { start, center, end, stretch }
 
+enum SceneGuideAxis { horizontal, vertical }
+
+class SceneGuide {
+  const SceneGuide({required this.axis, required this.position});
+  final SceneGuideAxis axis;
+  final double position;
+  @override
+  bool operator ==(Object other) =>
+      other is SceneGuide && other.axis == axis && other.position == position;
+  @override
+  int get hashCode => Object.hash(axis, position);
+}
+
 /// Container spacing uses logical pixels. Child rectangles are relative to
 /// this container; row/column containers own their children's positions.
 class SceneLayout {
@@ -209,8 +222,8 @@ class SceneMotionTiming {
 
 enum SceneBackgroundKind { image, solid, video, custom }
 
-/// Fractions of the available canvas, independent of screen pixel dimensions.
-/// Layout uses the safe-area-adjusted canvas when that policy is enabled.
+/// Fractions of the available parent content area, independent of resolution.
+/// Root nodes use the safe-area-adjusted canvas when that policy is enabled.
 class SceneRect {
   const SceneRect({
     required this.x,
@@ -488,6 +501,7 @@ class SceneDocument {
     required this.nodes,
     this.themeProperties = const {},
     this.styleTokens = const {},
+    this.guides = const [],
   });
 
   final String id;
@@ -500,6 +514,7 @@ class SceneDocument {
   /// greeter resolve the same layout, palette, material and motion choices.
   final Map<String, String> themeProperties;
   final Map<String, SceneStyle> styleTokens;
+  final List<SceneGuide> guides;
 
   /// Draw order uses renderOrder first and z as its tie-breaker. Focus order is
   /// independent. Sorting a copy preserves the original authoring order.
@@ -538,6 +553,7 @@ class SceneDocument {
     List<SceneNode>? nodes,
     Map<String, String>? themeProperties,
     Map<String, SceneStyle>? styleTokens,
+    List<SceneGuide>? guides,
   }) {
     return SceneDocument(
       id: id ?? this.id,
@@ -547,6 +563,7 @@ class SceneDocument {
       nodes: nodes ?? this.nodes,
       themeProperties: themeProperties ?? this.themeProperties,
       styleTokens: styleTokens ?? this.styleTokens,
+      guides: guides ?? this.guides,
     );
   }
 }

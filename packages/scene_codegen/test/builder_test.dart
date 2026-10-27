@@ -16,6 +16,9 @@ void main() {
         'id': '123 test',
         'version': 2,
         'themeProperties': properties,
+        'guides': [
+          {'axis': 'vertical', 'position': .4},
+        ],
         'styleTokens': {
           'glass': {
             'fill': '#112233',
@@ -84,6 +87,9 @@ void main() {
     expect(document['nodes'][0]['sizing']['width'], 320);
     expect(document['nodes'][1]['parentId'], r'$node');
     expect(document['themeProperties'], properties);
+    expect(document['guides'], [
+      {'axis': 'vertical', 'position': .4},
+    ]);
     expect(document['styleTokens']['glass']['gradientEnd'], '#445566');
     expect(document['styleTokens']['glass']['radius'], 16);
     expect(document['nodes'][0]['styleToken'], 'glass');

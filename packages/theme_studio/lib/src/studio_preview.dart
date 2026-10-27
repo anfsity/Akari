@@ -1,4 +1,5 @@
 import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:theme_sdk/theme_sdk.dart';
@@ -9,6 +10,7 @@ import 'studio_preview_host.dart';
 import 'studio_viewport.dart';
 import 'smart_guides.dart';
 import 'studio_timeline.dart';
+import 'studio_rulers.dart';
 
 enum StudioCanvasTool {
   move('Move', 'Drag to move', 'V'),
@@ -52,6 +54,11 @@ class StudioPreview extends StatefulWidget {
     this.transition = StudioTransition.wake,
     this.presenting = false,
     this.viewportSize,
+    this.showRulers = false,
+    this.onPrepareGuide,
+    this.onCreateGuide,
+    this.onUpdateGuide,
+    this.onDeleteGuide,
     this.readOnly = false,
     this.scenario = StudioPreviewScenario.password,
     this.interactive = false,
@@ -79,6 +86,11 @@ class StudioPreview extends StatefulWidget {
   final StudioTransition transition;
   final bool presenting;
   final Size? viewportSize;
+  final bool showRulers;
+  final bool Function()? onPrepareGuide;
+  final ValueChanged<SceneGuide>? onCreateGuide;
+  final void Function(int, SceneGuide)? onUpdateGuide;
+  final ValueChanged<int>? onDeleteGuide;
   final bool dormant;
   final StudioPreferences preferences;
   final StudioCanvasTool tool;
@@ -106,10 +118,13 @@ class _StudioPreviewState extends State<StudioPreview>
   Set<String> _marqueeSelection = {};
   List<double> _verticalGuides = [];
   List<double> _horizontalGuides = [];
+  List<GuideMeasurement> _measurements = [];
   double _viewportScale = 1;
   SceneNode? _editingText;
   final _text = TextEditingController();
   final _textFocus = FocusNode(debugLabel: 'Canvas text');
+  SceneGuide? _guideDraft;
+  int? _guideIndex;
   Set<String> get _selectedIds => widget.selectedIds ?? {widget.selectedId};
 
   Map<String, SceneNodeGeometry> _getGeometry(SceneDocument document) =>
@@ -230,6 +245,7 @@ class _StudioPreviewState extends State<StudioPreview>
     var updated = calculate(drag);
     _verticalGuides = [];
     _horizontalGuides = [];
+    _measurements = [];
     if (widget.snapToGuides &&
         !widget.preferences.snapToGrid &&
         !HardwareKeyboard.instance.isAltPressed &&
@@ -266,6 +282,16 @@ class _StudioPreviewState extends State<StudioPreview>
         ],
         canvasSize: drag.canvas.size,
         tolerance: 6 / _viewportScale,
+        verticalGuides: widget.showRulers
+            ? widget.document.guides
+                  .where((guide) => guide.axis == SceneGuideAxis.vertical)
+                  .map((guide) => guide.position * drag.canvas.size.width)
+            : const [],
+        horizontalGuides: widget.showRulers
+            ? widget.document.guides
+                  .where((guide) => guide.axis == SceneGuideAxis.horizontal)
+                  .map((guide) => guide.position * drag.canvas.size.height)
+            : const [],
       );
       position = drag.canvas.localToGlobal(
         drag.canvas.globalToLocal(position) + guides.correction,
@@ -273,6 +299,7 @@ class _StudioPreviewState extends State<StudioPreview>
       updated = calculate(drag);
       _verticalGuides = guides.vertical;
       _horizontalGuides = guides.horizontal;
+      _measurements = guides.measurements;
     }
     final changed = drag.hasGeometryChange(updated);
     setState(() => drag.preview = updated);
@@ -295,6 +322,7 @@ class _StudioPreviewState extends State<StudioPreview>
       _otherDrags.clear();
       _verticalGuides = [];
       _horizontalGuides = [];
+      _measurements = [];
     });
     if (commit) {
       if (widget.onCommitNodes case final onCommit?) {
@@ -352,6 +380,10 @@ class _StudioPreviewState extends State<StudioPreview>
   @override
   void didUpdateWidget(StudioPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!listEquals(oldWidget.document.guides, widget.document.guides)) {
+      _guideDraft = null;
+      _guideIndex = null;
+    }
     if (oldWidget.dormant != widget.dormant ||
         oldWidget.interactive != widget.interactive ||
         oldWidget.theme.tokens != widget.theme.tokens) {
@@ -466,6 +498,59 @@ class _StudioPreviewState extends State<StudioPreview>
     widget.onUpdateText?.call(node.id, _text.text);
     setState(() => _editingText = null);
   }
+
+  void _startGuide(SceneGuideAxis axis, int? index) {
+    if (widget.onPrepareGuide?.call() == false) return;
+    setState(() {
+      _guideIndex = index;
+      _guideDraft = SceneGuide(
+        axis: axis,
+        position: index == null ? 0 : widget.document.guides[index].position,
+      );
+    });
+  }
+
+  void _updateGuide(Offset globalPosition) {
+    final guide = _guideDraft;
+    if (guide == null) return;
+    final canvas = _canvas.currentContext!.findRenderObject()! as RenderBox;
+    final point = canvas.globalToLocal(globalPosition);
+    setState(
+      () => _guideDraft = SceneGuide(
+        axis: guide.axis,
+        position:
+            (guide.axis == SceneGuideAxis.vertical
+                    ? point.dx / canvas.size.width
+                    : point.dy / canvas.size.height)
+                .clamp(0.0, 1.0),
+      ),
+    );
+  }
+
+  void _stopGuide({required bool commit}) {
+    final guide = _guideDraft;
+    if (guide == null) return;
+    final index = _guideIndex;
+    setState(() {
+      _guideDraft = null;
+      _guideIndex = null;
+    });
+    if (commit) {
+      if (index == null) {
+        widget.onCreateGuide?.call(guide);
+      } else {
+        widget.onUpdateGuide?.call(index, guide);
+      }
+    }
+  }
+
+  List<SceneGuide> _getRulerGuides() => _guideDraft == null
+      ? widget.document.guides
+      : [
+          for (final (index, guide) in widget.document.guides.indexed)
+            index == _guideIndex ? _guideDraft! : guide,
+          if (_guideIndex == null) _guideDraft!,
+        ];
 
   @override
   Widget build(BuildContext context) {
@@ -646,11 +731,26 @@ class _StudioPreviewState extends State<StudioPreview>
                       painter: SmartGuidePainter(
                         vertical: _verticalGuides,
                         horizontal: _horizontalGuides,
+                        measurements: _measurements,
                         scale: viewportScale,
                       ),
                     ),
                   ),
                 ),
+                if (widget.showRulers && !widget.interactive)
+                  Positioned.fill(
+                    child: StudioRulers(
+                      size: referenceSize,
+                      scale: viewportScale,
+                      guides: _getRulerGuides(),
+                      readOnly: widget.readOnly,
+                      onStart: _startGuide,
+                      onUpdate: _updateGuide,
+                      onStop: () => _stopGuide(commit: true),
+                      onCancel: () => _stopGuide(commit: false),
+                      onDelete: (index) => widget.onDeleteGuide?.call(index),
+                    ),
+                  ),
                 if (_editingText case final node?)
                   Positioned.fromRect(
                     rect: geometry[node.id]!.bounds,

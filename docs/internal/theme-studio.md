@@ -160,6 +160,12 @@ Transform translations (`translateX`, `translateY`) remain in logical pixels as 
 
 ## Canvas tools & gestures
 
+Use the ruler button below the canvas to show rulers and saved reference lines.
+Drag from the top ruler to create a vertical guide or from the left ruler for a
+horizontal guide. Drag a line to move it; double-click to remove it. Each gesture
+is one undo step and guides save with the scene. Smart snapping also targets
+visible guides and labels the nearest horizontal/vertical gap in reference pixels.
+
 **State flow** displays the core dormant/login/submitting/success/error path.
 Click a state to preview it. **Design → State rules** edits visibility using
 readable state labels, inversion, and state-entry Shake/Pulse responses. Complex

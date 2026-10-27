@@ -14,6 +14,8 @@ import 'package:scene/scene.dart';
 SceneDocument get ${getSceneDocumentVariableName(document.id)} => SceneDocument(
   id: ${encodeDartString(document.id)},
   version: ${document.version},
+  guides: <SceneGuide>[
+${document.guides.map((guide) => '    SceneGuide(axis: SceneGuideAxis.${guide.axis.name}, position: ${guide.position}),\n').join()}  ],
   styleTokens: <String, SceneStyle>{
 ${document.styleTokens.entries.map((entry) => '    ${encodeDartString(entry.key)}: ${_encodeStyle(entry.value)},\n').join()}  },
   themeProperties: <String, String>{

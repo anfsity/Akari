@@ -3,6 +3,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:theme_studio/src/smart_guides.dart';
 
 void main() {
+  test(
+    'reference guides snap and nearest spacing is measured after correction',
+    () {
+      final result = calculateSmartGuides(
+        moving: const Rect.fromLTWH(203, 100, 40, 40),
+        targets: const [Rect.fromLTWH(100, 100, 40, 40)],
+        canvasSize: const Size(1000, 600),
+        tolerance: 6,
+        verticalGuides: const [200],
+      );
+      expect(result.correction.dx, -3);
+      expect(
+        result.measurements.single.end.dx - result.measurements.single.start.dx,
+        60,
+      );
+    },
+  );
   test('snaps the nearest edge or center independently on each axis', () {
     final result = calculateSmartGuides(
       moving: const Rect.fromLTWH(103, 202, 50, 40),
