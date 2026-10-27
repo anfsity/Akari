@@ -274,18 +274,20 @@ class _AssetListState extends State<_AssetList> {
     if (kind == StudioAssetKind.image ||
         kind == StudioAssetKind.material ||
         kind == StudioAssetKind.svg) {
-      return SizedBox(
-        width: 40,
-        height: 40,
-        child: SceneAssetView(
-          asset: SceneAsset(
-            path: path,
-            kind: kind == StudioAssetKind.svg
-                ? SceneAssetKind.svg
-                : SceneAssetKind.image,
+      return StudioAssetSurface(
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: SceneAssetView(
+            asset: SceneAsset(
+              path: path,
+              kind: kind == StudioAssetKind.svg
+                  ? SceneAssetKind.svg
+                  : SceneAssetKind.image,
+            ),
+            resolveImage: widget.resolveImage,
+            loadSvg: widget.loadText,
           ),
-          resolveImage: widget.resolveImage,
-          loadSvg: widget.loadText,
         ),
       );
     }
@@ -453,10 +455,7 @@ class _AssetListState extends State<_AssetList> {
                 onPressed: () => _selectAsset(path),
                 child: Row(
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: _thumbnail(path),
-                    ),
+                    _thumbnail(path),
                     const Gap(10),
                     Expanded(
                       child: Text(

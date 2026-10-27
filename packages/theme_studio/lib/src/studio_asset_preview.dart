@@ -3,6 +3,38 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import 'studio_assets.dart';
 
+class StudioAssetSurface extends StatelessWidget {
+  const StudioAssetSurface({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(4),
+    child: CustomPaint(painter: const _TransparencyPainter(), child: child),
+  );
+}
+
+class _TransparencyPainter extends CustomPainter {
+  const _TransparencyPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+    for (var y = 0.0; y < size.height; y += 10) {
+      for (var x = 0.0; x < size.width; x += 10) {
+        paint.color = (x ~/ 10 + y ~/ 10).isEven
+            ? const Color(0xffc4c4c4)
+            : const Color(0xffe0e0e0);
+        canvas.drawRect(Rect.fromLTWH(x, y, 10, 10), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TransparencyPainter oldDelegate) => false;
+}
+
 class StudioAssetPreview extends StatefulWidget {
   const StudioAssetPreview({
     required this.path,
@@ -59,18 +91,20 @@ class _StudioAssetPreviewState extends State<StudioAssetPreview> {
       switch (getStudioAssetKind(widget.path)) {
         StudioAssetKind.image ||
         StudioAssetKind.material ||
-        StudioAssetKind.svg => SizedBox(
-          height: 120,
-          child: SceneAssetView(
-            asset: SceneAsset(
-              path: widget.path,
-              kind: getStudioAssetKind(widget.path) == StudioAssetKind.svg
-                  ? SceneAssetKind.svg
-                  : SceneAssetKind.image,
-              tint: widget.tint,
+        StudioAssetKind.svg => StudioAssetSurface(
+          child: SizedBox(
+            height: 120,
+            child: SceneAssetView(
+              asset: SceneAsset(
+                path: widget.path,
+                kind: getStudioAssetKind(widget.path) == StudioAssetKind.svg
+                    ? SceneAssetKind.svg
+                    : SceneAssetKind.image,
+                tint: widget.tint,
+              ),
+              resolveImage: widget.resolveImage,
+              loadSvg: widget.loadText,
             ),
-            resolveImage: widget.resolveImage,
-            loadSvg: widget.loadText,
           ),
         ),
         StudioAssetKind.font => FutureBuilder<String>(
