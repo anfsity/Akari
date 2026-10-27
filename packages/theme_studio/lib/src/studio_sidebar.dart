@@ -332,7 +332,7 @@ class _LayerListState extends State<_LayerList> {
 
   void _revealSelection() {
     if (!mounted || !_scroll.hasClients) return;
-    final nodes = widget.editor.document.paintOrder.reversed.toList();
+    final nodes = widget.editor.document.layerOrder;
     final top = nodes.indexWhere((node) => node.id == _selectedId) * _rowHeight;
     final bottom = top + _rowHeight;
     final position = _scroll.position;
@@ -356,7 +356,7 @@ class _LayerListState extends State<_LayerList> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.editor,
     builder: (context, _) {
-      final nodes = widget.editor.document.paintOrder.reversed.toList();
+      final nodes = widget.editor.document.layerOrder;
       return ListView.builder(
         key: const ValueKey('layer-list'),
         controller: _scroll,
@@ -365,7 +365,13 @@ class _LayerListState extends State<_LayerList> {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         itemBuilder: (context, index) {
           final node = nodes[index];
-          final selected = node.id == widget.editor.selectedId;
+          final selected = widget.editor.selectedIds.contains(node.id);
+          var depth = 0;
+          var parentId = node.parentId;
+          while (parentId != null) {
+            depth++;
+            parentId = nodes.firstWhere((node) => node.id == parentId).parentId;
+          }
           final label =
               widget.editor.layout?.findSlot(node.id)?.label ?? node.id;
           return Padding(
@@ -375,9 +381,13 @@ class _LayerListState extends State<_LayerList> {
               style: selected
                   ? const ButtonStyle.secondary(density: ButtonDensity.dense)
                   : const ButtonStyle.ghost(density: ButtonDensity.dense),
-              onPressed: () => widget.editor.selectNode(node.id),
+              onPressed: () => widget.editor.selectNode(
+                node.id,
+                toggle: HardwareKeyboard.instance.isShiftPressed,
+              ),
               child: Row(
                 children: [
+                  SizedBox(width: depth * 12),
                   Icon(
                     LucideIcons.layers,
                     size: 14,

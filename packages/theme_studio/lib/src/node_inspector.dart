@@ -3,18 +3,22 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import 'node_inspector_controller.dart';
 import 'studio_form.dart';
+import 'scene_editor.dart';
+import 'node_layout_inspector.dart';
 
 class NodeInspector extends StatelessWidget {
   const NodeInspector({
     required this.controller,
     required this.componentCatalog,
     required this.onApply,
+    this.editor,
     super.key,
   });
 
   final NodeInspectorController controller;
   final ThemeComponentCatalog componentCatalog;
   final VoidCallback onApply;
+  final SceneEditor? editor;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -33,6 +37,7 @@ class NodeInspector extends StatelessWidget {
             definition:
                 componentCatalog.components[controller.node.componentId],
             onApply: onApply,
+            editor: editor,
           ),
         ),
         const Divider(),
@@ -70,11 +75,13 @@ class _InspectorForm extends StatelessWidget {
     required this.controller,
     required this.definition,
     required this.onApply,
+    required this.editor,
   });
 
   final NodeInspectorController controller;
   final ThemeComponentDefinition? definition;
   final VoidCallback onApply;
+  final SceneEditor? editor;
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
@@ -91,6 +98,7 @@ class _InspectorForm extends StatelessWidget {
         const Divider(),
         const Gap(12),
         _buildLayoutSection(),
+        if (editor case final session?) NodeLayoutInspector(editor: session),
         const Divider(),
         const Gap(12),
         _InspectorDisclosure(
