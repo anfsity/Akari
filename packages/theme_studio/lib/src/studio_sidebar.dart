@@ -163,7 +163,7 @@ class _StudioSidebarState extends State<StudioSidebar> {
                   editor: editor,
                   readOnly: widget.readOnly,
                 )
-              : _LayerList(key: ObjectKey(editor), editor: editor),
+              : _LayerList(key: ObjectKey(editor), editor: editor, readOnly: widget.readOnly),
         ),
         if (tab == _SidebarTab.layers && editor != null) ...[
           const Divider(),
@@ -478,7 +478,9 @@ class _AssetListState extends State<_AssetList> {
 /// Fixed-height rows let canvas selection reveal a layer even when its row
 /// has not been built. Only a changed selection moves the user's scroll view.
 class _LayerList extends StatefulWidget {
-  const _LayerList({required this.editor, super.key});
+  const _LayerList({required this.editor, required this.readOnly, super.key});
+
+  final bool readOnly;
 
   final SceneEditor editor;
 
@@ -536,9 +538,24 @@ class _LayerListState extends State<_LayerList> {
         key: const ValueKey('layer-list'),
         controller: _scroll,
         itemExtent: _rowHeight,
-        itemCount: nodes.length,
+        itemCount: nodes.length + 1,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         itemBuilder: (context, index) {
+          if (index == nodes.length) {
+            return DragTarget<String>(
+              onWillAcceptWithDetails: (_) => !widget.readOnly,
+              onAcceptWithDetails: (details) =>
+                  widget.editor.moveLayer(details.data, parentId: null),
+              builder: (context, candidates, _) => Container(
+                key: const ValueKey('layer-root-drop'),
+                alignment: Alignment.centerLeft,
+                color: candidates.isEmpty
+                    ? null
+                    : Theme.of(context).colorScheme.secondary,
+                child: const Text('Move to scene root').small().muted(),
+              ),
+            );
+          }
           final node = nodes[index];
           final selected = widget.editor.selectedIds.contains(node.id);
           var depth = 0;
@@ -549,38 +566,13 @@ class _LayerListState extends State<_LayerList> {
           }
           final label =
               widget.editor.layout?.findSlot(node.id)?.label ?? node.id;
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Button(
-              key: ValueKey('layer-${node.id}'),
-              style: selected
-                  ? const ButtonStyle.secondary(density: ButtonDensity.dense)
-                  : const ButtonStyle.ghost(density: ButtonDensity.dense),
-              onPressed: () => widget.editor.selectNode(
-                node.id,
-                toggle: HardwareKeyboard.instance.isShiftPressed,
-              ),
-              child: Row(
-                children: [
-                  SizedBox(width: depth * 12),
-                  Icon(
-                    LucideIcons.layers,
-                    size: 14,
-                    color: selected
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.mutedForeground,
-                  ),
-                  const Gap(8),
-                  Expanded(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ).small(),
-                  ),
-                ],
-              ),
-            ),
+          return _LayerRow(
+            editor: widget.editor,
+            node: node,
+            label: label,
+            depth: depth,
+            selected: selected,
+            readOnly: widget.readOnly,
           );
         },
       );
@@ -638,5 +630,135 @@ class _NodeActions extends StatelessWidget {
         ],
       ),
     ),
+  );
+}
+
+class _LayerRow extends StatefulWidget {
+  const _LayerRow({
+    required this.editor,
+    required this.node,
+    required this.label,
+    required this.depth,
+    required this.selected,
+    required this.readOnly,
+  });
+  final SceneEditor editor;
+  final SceneNode node;
+  final String label;
+  final int depth;
+  final bool selected;
+  final bool readOnly;
+  @override
+  State<_LayerRow> createState() => _LayerRowState();
+}
+
+class _LayerRowState extends State<_LayerRow> {
+  int _zone = 0;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final colors = Theme.of(context).colorScheme;
+      return DragTarget<String>(
+        onWillAcceptWithDetails: (details) =>
+            !widget.readOnly && details.data != widget.node.id,
+        onMove: (details) {
+          final box = context.findRenderObject()! as RenderBox;
+          final y =
+              box.globalToLocal(details.offset).dy / constraints.maxHeight;
+          final zone = widget.node.layout != null && y > .25 && y < .75
+              ? 0
+              : y < .5
+              ? -1
+              : 1;
+          if (zone != _zone) setState(() => _zone = zone);
+        },
+        onAcceptWithDetails: (details) {
+          if (_zone == 0 && widget.node.layout != null) {
+            widget.editor.moveLayer(details.data, parentId: widget.node.id);
+            return;
+          }
+          final siblings = widget.editor.document
+              .getChildren(widget.node.parentId)
+              .reversed
+              .where((node) => node.id != details.data)
+              .toList();
+          final index = siblings.indexWhere(
+            (node) => node.id == widget.node.id,
+          );
+          final before = _zone < 0
+              ? widget.node.id
+              : index + 1 < siblings.length
+              ? siblings[index + 1].id
+              : null;
+          widget.editor.moveLayer(
+            details.data,
+            parentId: widget.node.parentId,
+            beforeId: before,
+          );
+        },
+        builder: (context, candidates, _) => Container(
+          decoration: BoxDecoration(
+            color: candidates.isNotEmpty && _zone == 0
+                ? colors.secondary
+                : null,
+            border: Border(
+              top: BorderSide(
+                color: candidates.isNotEmpty && _zone < 0
+                    ? colors.primary
+                    : Colors.transparent,
+              ),
+              bottom: BorderSide(
+                color: candidates.isNotEmpty && _zone > 0
+                    ? colors.primary
+                    : Colors.transparent,
+              ),
+            ),
+          ),
+          child: Draggable<String>(
+            data: widget.node.id,
+            affinity: Axis.horizontal,
+            maxSimultaneousDrags: widget.readOnly ? 0 : 1,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
+            feedback: Container(
+              padding: const EdgeInsets.all(8),
+              color: colors.background,
+              child: Text(widget.label),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 1),
+              child: Button(
+                key: ValueKey('layer-${widget.node.id}'),
+                style: widget.selected
+                    ? const ButtonStyle.secondary(density: ButtonDensity.dense)
+                    : const ButtonStyle.ghost(density: ButtonDensity.dense),
+                onPressed: () => widget.editor.selectNode(
+                  widget.node.id,
+                  toggle: HardwareKeyboard.instance.isShiftPressed,
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(width: widget.depth * 12),
+                    Icon(
+                      widget.node.layout == null
+                          ? LucideIcons.layers
+                          : LucideIcons.frame,
+                      size: 14,
+                    ),
+                    const Gap(8),
+                    Expanded(
+                      child: Text(
+                        widget.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ).small(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
   );
 }

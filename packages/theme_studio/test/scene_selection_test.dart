@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_studio/src/node_geometry.dart';
 import 'package:theme_studio/src/scene_editor.dart';
+import 'package:theme_studio/src/studio_components.dart';
 
 void main() {
   late Directory directory;
@@ -50,6 +51,32 @@ void main() {
     document: editor.document,
     size: const Size(1920, 1080),
   );
+
+  test('layer moves preserve untransformed reference bounds, reject cycles and undo atomically', () {
+    editor.createComponent(StudioComponent.frame, position: Offset.zero);
+    final frame = editor.selectedId;
+    final before = geometry()['a']!.bounds;
+    editor.moveLayer('a', parentId: frame);
+    expect(editor.selectedNode.parentId, frame);
+    expect((geometry()['a']!.bounds.topLeft - before.topLeft).distance, lessThan(1e-8));
+    expect((geometry()['a']!.bounds.bottomRight - before.bottomRight).distance, lessThan(1e-8));
+    editor.createComponent(StudioComponent.frame);
+    final nested = editor.selectedId;
+    editor.moveLayer(nested, parentId: frame);
+    final encoded = editor.encodedDocument;
+    editor.moveLayer(frame, parentId: nested);
+    expect(editor.encodedDocument, encoded);
+    expect(editor.inspector.error, contains('ancestors'));
+    editor.moveLayer('a', parentId: null, beforeId: 'c');
+    expect(editor.document.layerOrder.indexWhere((node) => node.id == 'a'),
+      lessThan(editor.document.layerOrder.indexWhere((node) => node.id == 'c')));
+    editor.undo();
+    expect(editor.selectedNode.parentId, frame);
+    editor.redo();
+    editor.save();
+    editor.reload();
+    expect(editor.document.nodes.firstWhere((node) => node.id == 'a').parentId, isNull);
+  });
 
   test(
     'style scrubbing stays transient and shared token edits undo atomically',
