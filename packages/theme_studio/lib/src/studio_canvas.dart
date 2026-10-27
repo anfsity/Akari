@@ -552,6 +552,7 @@ class StudioCanvasState extends State<StudioCanvas> {
                                           theme: widget.theme,
                                           readOnly:
                                               widget.readOnly ||
+                                              _responsiveSize != null ||
                                               _previewing ||
                                               _elapsed != null ||
                                               presenting,
