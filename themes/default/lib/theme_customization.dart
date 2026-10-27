@@ -3,6 +3,8 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 enum TerraceLabelVariant { regular, large }
 
+enum TerraceClockVariant { display, stacked, compact }
+
 enum TerracePalette { wallpaper, ocean, rose, violet }
 
 enum TerraceMaterial { airy, frosted, solid }
@@ -63,6 +65,17 @@ const terraceLabelVariant = ThemeChoiceProperty(
   },
 );
 
+const terraceClockVariant = ThemeChoiceProperty(
+  name: 'variant',
+  label: 'Clock style',
+  defaultValue: TerraceClockVariant.display,
+  choices: {
+    TerraceClockVariant.display: 'Wide display',
+    TerraceClockVariant.stacked: 'Stacked digits',
+    TerraceClockVariant.compact: 'Compact',
+  },
+);
+
 const terraceComponentCatalog = ThemeComponentCatalog(
   components: {
     'terraceLabel': ThemeComponentDefinition(
@@ -70,5 +83,9 @@ const terraceComponentCatalog = ThemeComponentCatalog(
       properties: [terraceLabelText, terraceLabelVariant],
     ),
     'dateTime': dateTimeComponent,
+    'terraceClock': ThemeComponentDefinition(
+      label: 'Standby clock',
+      properties: [terraceClockVariant],
+    ),
   },
 );

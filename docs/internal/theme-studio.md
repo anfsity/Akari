@@ -46,6 +46,7 @@ The default theme exposes:
 | --- | --- |
 | Heading and caption (`terraceLabel`) | **Text**, **Text style: Regular / Large** |
 | Date and time (`dateTime`) | **Display: Date / Time** |
+| Standby clock (`terraceClock`) | **Clock style: Wide display / Stacked digits / Compact** |
 
 Choices apply immediately; text applies on Enter, blur, or **Apply to preview**.
 Both use the existing undo/redo and **Save scene** workflow. Unsupported choices,
