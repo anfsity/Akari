@@ -6,6 +6,7 @@ environment:
   sdk: ^3.13.2
 
 dependencies:
+  analyzer: ^14.6.0
   path: ^1.9.1
   scene_codegen:
     path: ../scene_codegen

@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
-import 'package:theme_project/theme_project.dart';
+import 'package:theme_project/project.dart';
 
 import 'studio_form.dart';
 

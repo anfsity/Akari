@@ -238,6 +238,53 @@ ThemeDefinition buildOriginalTheme({Color? seed, SceneDocument? document}) => th
   });
 
   test(
+    'rebases external Dart directives while preserving local code',
+    () async {
+      final shared = Directory(p.join(root.path, "shared 'sdk\$"));
+      await shared.create();
+      for (final name in ['stub', 'native', 'exported']) {
+        await File(p.join(shared.path, '$name.dart'))
+            .writeAsString("const $name = '$name';");
+      }
+      String getSourceUri(String name) => Uri.file(
+        p.relative(
+          p.join(shared.path, '$name.dart'),
+          from: p.join(source.path, 'perf'),
+        ),
+      ).toString();
+      await write('perf/local.dart', "const local = 'local';");
+      await write('perf/run.dart', '''
+import 'dart:io';
+import 'local.dart';
+import ${encodeDartString(getSourceUri('stub'))}
+  if (dart.library.io) ${encodeDartString(getSourceUri('native'))};
+export ${encodeDartString(getSourceUri('exported'))};
+// import '../unrelated/comment.dart';
+const example = "import '../unrelated/example.dart';";
+void main() { stdout.write('\$local:\$native'); }
+''');
+      await createThemeProject(
+        source: source,
+        destination: target,
+        packageName: 'theme_neon',
+        document: _document,
+      );
+      final script = File(p.join(target.path, 'perf/run.dart'));
+      final copied = await script.readAsString();
+      expect(copied, contains("import 'local.dart'"));
+      expect(copied, contains("// import '../unrelated/comment.dart';"));
+      expect(
+        copied,
+        contains("const example = \"import '../unrelated/example.dart';\";"),
+      );
+      await source.delete(recursive: true);
+      final run = await Process.run(Platform.resolvedExecutable, [script.path]);
+      expect(run.exitCode, 0, reason: '${run.stdout}\n${run.stderr}');
+      expect(run.stdout, 'local:native');
+    },
+  );
+
+  test(
     'absolute SDK paths and unregistered referenced resources remain usable',
     () async {
       final manifest = File(p.join(source.path, 'pubspec.yaml'));

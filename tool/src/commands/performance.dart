@@ -125,7 +125,10 @@ RunPlan createPerformancePlan(
         id: 'theme.perf.$operation',
         command: [...executable, ...entrypoint.skip(1), ...themeArguments],
         workingDirectory: theme.directory.path,
-        environment: {'AKARI_PERF_OUTPUT_DIR': outputDirectory.path},
+        environment: {
+          'AKARI_PERF_OUTPUT_DIR': outputDirectory.path,
+          'AKARI_REPO_ROOT': repoRoot.path,
+        },
       ),
     ],
   );
