@@ -6,6 +6,57 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scene/scene.dart';
 
 void main() {
+  testWidgets('frames own child layout, transforms and presence', (
+    tester,
+  ) async {
+    final document = _document(
+      nodes: const [
+        SceneNode(
+          id: 'frame',
+          componentId: 'frame',
+          rect: SceneRect(x: .1, y: .1, width: .8, height: .8),
+          layout: SceneLayout(
+            direction: SceneLayoutDirection.column,
+            padding: 16,
+            gap: 8,
+          ),
+          visibleWhen: ScenePredicateCondition(ScenePredicate.isAuthPrompting),
+        ),
+        SceneNode(
+          id: 'input',
+          componentId: 'input',
+          parentId: 'frame',
+          interactive: true,
+          rect: SceneRect(x: 0, y: 0, width: 1, height: .1),
+          sizing: SceneSizing(height: 50),
+        ),
+      ],
+    );
+    Future<void> render(bool visible) => tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SceneRuntime(
+            document: document,
+            theme: ThemeBundle(tokens: _tokens()),
+            activePredicates: {if (visible) ScenePredicate.isAuthPrompting},
+            nodeBuilder: (_, node) => Text(node.id),
+          ),
+        ),
+      ),
+    );
+    await render(true);
+    expect(find.text('frame'), findsNothing);
+    expect(find.text('input').hitTestable(), findsOneWidget);
+    final input = tester.getRect(find.text('input'));
+    expect(
+      input.top,
+      greaterThan(tester.getSize(find.byType(Scaffold)).height * .1),
+    );
+    expect(input.height, 50);
+    await render(false);
+    expect(find.text('input').hitTestable(), findsNothing);
+  });
+
   testWidgets(
     'theme no-motion policy reaches custom components and preserves their state',
     (tester) async {

@@ -6,10 +6,17 @@ import '../model/theme_bundle.dart';
 import 'builtin_backgrounds.dart';
 import 'motion.dart';
 import 'node_transform.dart';
+import 'scene_layout.dart';
 
 typedef SceneNodeBuilder = Widget Function(
   BuildContext context,
   SceneNode node,
+);
+
+typedef SceneFrameBuilder = Widget Function(
+  BuildContext context,
+  SceneNode node,
+  Widget child,
 );
 
 /// Executes an authored document using compiled renderers and components.
@@ -22,6 +29,7 @@ class SceneRuntime extends StatelessWidget {
     required this.document,
     required this.theme,
     required this.nodeBuilder,
+    this.frameBuilder,
     this.activePredicates = const <ScenePredicate>{},
     this.activePredicatesListenable,
     this.backgroundBlurSigma,
@@ -32,6 +40,7 @@ class SceneRuntime extends StatelessWidget {
   final SceneDocument document;
   final ThemeBundle theme;
   final SceneNodeBuilder nodeBuilder;
+  final SceneFrameBuilder? frameBuilder;
 
   /// Predicates currently true for the scene.
   ///
@@ -66,12 +75,18 @@ class SceneRuntime extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final size = Size(constraints.maxWidth, constraints.maxHeight);
+          final geometry = calculateSceneLayout(
+            document: document,
+            size: size,
+            safeArea: MediaQuery.paddingOf(context),
+            minHitTarget: theme.tokens.minHitTarget,
+          );
           return Stack(
             fit: StackFit.expand,
             children: [
               _buildBackground(context),
-              for (final node in document.paintOrder)
-                _buildNode(context, size, node),
+              for (final node in document.getChildren(null))
+                _buildNode(context, geometry, node),
             ],
           );
         },
@@ -100,16 +115,18 @@ class SceneRuntime extends StatelessWidget {
     );
   }
 
-  Widget _buildNode(BuildContext context, Size size, SceneNode node) {
+  Widget _buildNode(
+    BuildContext context,
+    Map<String, SceneNodeGeometry> geometry,
+    SceneNode node,
+  ) {
     final visibleWhen = node.visibleWhen;
     final visible =
         visibleWhen == null ||
         evaluateSceneCondition(visibleWhen, activePredicates);
     final reducedMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
-    final safeArea = document.canvas.useSafeArea
-        ? MediaQuery.paddingOf(context)
-        : EdgeInsets.zero;
+    final layout = node.layout;
     final content = _SceneNodeHost(
       visible: visible,
       activePredicatesListenable: visibleWhen == null
@@ -125,15 +142,22 @@ class SceneRuntime extends StatelessWidget {
         reducedMotion: reducedMotion,
       ),
       node: node,
-      nodeBuilder: nodeBuilder,
+      nodeBuilder: layout == null
+          ? nodeBuilder
+          : (context, node) {
+              final child = Stack(
+                fit: StackFit.expand,
+                clipBehavior: layout.clip ? Clip.hardEdge : Clip.none,
+                children: [
+                  for (final child in document.getChildren(node.id))
+                    _buildNode(context, geometry, child),
+                ],
+              );
+              return frameBuilder?.call(context, node, child) ?? child;
+            },
     );
 
-    final rect = sceneNodeRect(
-      node: node,
-      sceneSize: size,
-      safeArea: safeArea,
-      minHitTarget: theme.tokens.minHitTarget,
-    );
+    final rect = geometry[node.id]!.rect;
     final contentBoundary = RepaintBoundary(
       child: node.interactive
           // Keyboard order is authored separately from paint order; raising a

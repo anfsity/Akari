@@ -51,7 +51,7 @@ SceneDocument decodeSceneDocument(String source) {
     throw const FormatException('Scene document root must be a JSON object.');
   }
   final version = _getInt(decoded, 'version');
-  if (version != 1 && version != currentSceneVersion) {
+  if (version < 1 || version > currentSceneVersion) {
     throw FormatException('Unsupported scene version: $version');
   }
 
@@ -65,6 +65,7 @@ SceneDocument decodeSceneDocument(String source) {
       'Scene document must contain at least one node.',
     );
   }
+  _validateHierarchy(nodes);
 
   return SceneDocument(
     id: _getString(decoded, 'id'),
@@ -208,6 +209,11 @@ SceneNode _decodeNode(
     id: id,
     componentId: component.id,
     rect: rect,
+    parentId: _findString(json, 'parentId'),
+    layout: json['layout'] == null
+        ? null
+        : _decodeLayout(_getMap(json, 'layout')),
+    sizing: _decodeSizing(_getMap(json, 'sizing', fallback: const {})),
     transform: json['transform'] == null
         ? const SceneTransform()
         : _decodeTransform(_getMap(json, 'transform')),
@@ -301,6 +307,24 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
   return {
     'id': node.id,
     'component': node.componentId,
+    if (node.parentId != null) 'parentId': node.parentId,
+    if (node.layout case final layout?)
+      'layout': {
+        'direction': layout.direction.name,
+        'padding': layout.padding,
+        'gap': layout.gap,
+        'mainAlignment': layout.mainAlignment.name,
+        'crossAlignment': layout.crossAlignment.name,
+        'clip': layout.clip,
+      },
+    if (node.sizing.width != null ||
+        node.sizing.height != null ||
+        node.sizing.flex != 0)
+      'sizing': {
+        if (node.sizing.width != null) 'width': node.sizing.width,
+        if (node.sizing.height != null) 'height': node.sizing.height,
+        if (node.sizing.flex != 0) 'flex': node.sizing.flex,
+      },
     'rect': {
       'x': node.rect.x,
       'y': node.rect.y,
@@ -318,6 +342,73 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
     if (node.interactive) 'interactive': true,
     if (node.properties.isNotEmpty) 'properties': node.properties,
   };
+}
+
+SceneLayout _decodeLayout(Map<String, dynamic> json) => SceneLayout(
+  direction: _getEnumValue(
+    SceneLayoutDirection.values,
+    _getString(json, 'direction', fallback: 'absolute'),
+    'layout.direction',
+  ),
+  padding: _getNonNegative(json, 'padding'),
+  gap: _getNonNegative(json, 'gap'),
+  mainAlignment: _getEnumValue(
+    SceneMainAlignment.values,
+    _getString(json, 'mainAlignment', fallback: 'start'),
+    'layout.mainAlignment',
+  ),
+  crossAlignment: _getEnumValue(
+    SceneCrossAlignment.values,
+    _getString(json, 'crossAlignment', fallback: 'start'),
+    'layout.crossAlignment',
+  ),
+  clip: _getBool(json, 'clip', fallback: false),
+);
+
+SceneSizing _decodeSizing(Map<String, dynamic> json) {
+  final width = json['width'] == null ? null : _getNonNegative(json, 'width');
+  final height = json['height'] == null
+      ? null
+      : _getNonNegative(json, 'height');
+  if (width == 0 || height == 0) {
+    throw const FormatException('Fixed dimensions must be greater than zero.');
+  }
+  return SceneSizing(
+    width: width,
+    height: height,
+    flex: _getNonNegative(json, 'flex'),
+  );
+}
+
+double _getNonNegative(Map<String, dynamic> json, String key) {
+  final value = _getDouble(json, key, fallback: 0);
+  if (!value.isFinite || value < 0)
+    throw FormatException('$key must be finite and >= 0.');
+  return value;
+}
+
+void _validateHierarchy(List<SceneNode> nodes) {
+  final byId = {for (final node in nodes) node.id: node};
+  final checked = <String>{};
+  for (final node in nodes) {
+    var current = node;
+    final path = <String>{};
+    while (!checked.contains(current.id)) {
+      if (!path.add(current.id)) {
+        throw FormatException('Cyclic frame hierarchy at ${current.id}.');
+      }
+      final parentId = current.parentId;
+      if (parentId == null) break;
+      final parent = byId[parentId];
+      if (parent == null || parent.layout == null) {
+        throw FormatException(
+          'Node ${current.id} requires a frame parent: $parentId.',
+        );
+      }
+      current = parent;
+    }
+    checked.addAll(path);
+  }
 }
 
 Map<String, dynamic> _encodeTransform(SceneTransform transform) {

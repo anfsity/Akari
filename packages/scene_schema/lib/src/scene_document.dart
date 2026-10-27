@@ -1,6 +1,42 @@
 enum SceneCanvasFit { cover, contain, reflow }
 
-const currentSceneVersion = 2;
+const currentSceneVersion = 3;
+
+enum SceneLayoutDirection { absolute, row, column }
+
+enum SceneMainAlignment { start, center, end, spaceBetween }
+
+enum SceneCrossAlignment { start, center, end, stretch }
+
+/// Container spacing uses logical pixels. Child rectangles are relative to
+/// this container; row/column containers own their children's positions.
+class SceneLayout {
+  const SceneLayout({
+    this.direction = SceneLayoutDirection.absolute,
+    this.padding = 0,
+    this.gap = 0,
+    this.mainAlignment = SceneMainAlignment.start,
+    this.crossAlignment = SceneCrossAlignment.start,
+    this.clip = false,
+  });
+
+  final SceneLayoutDirection direction;
+  final double padding;
+  final double gap;
+  final SceneMainAlignment mainAlignment;
+  final SceneCrossAlignment crossAlignment;
+  final bool clip;
+}
+
+/// Fixed logical dimensions override proportional rectangle dimensions. In a
+/// row/column, flex shares the remaining main-axis space with other flex items.
+class SceneSizing {
+  const SceneSizing({this.width, this.height, this.flex = 0});
+
+  final double? width;
+  final double? height;
+  final double flex;
+}
 
 /// Boolean questions about semantic greeter state used by [SceneCondition].
 ///
@@ -268,6 +304,9 @@ class SceneNode {
     required this.id,
     required this.componentId,
     required this.rect,
+    this.parentId,
+    this.layout,
+    this.sizing = const SceneSizing(),
     this.transform = const SceneTransform(),
     this.z = 0,
     this.renderOrder = 0,
@@ -281,6 +320,11 @@ class SceneNode {
   final String id;
   final String componentId;
   final SceneRect rect;
+  final String? parentId;
+
+  /// Non-null marks a runtime-owned frame, independent of theme components.
+  final SceneLayout? layout;
+  final SceneSizing sizing;
   final SceneTransform transform;
   final int z;
   final int renderOrder;
@@ -297,6 +341,9 @@ class SceneNode {
     String? id,
     String? componentId,
     SceneRect? rect,
+    Object? parentId = _unset,
+    Object? layout = _unset,
+    SceneSizing? sizing,
     SceneTransform? transform,
     int? z,
     int? renderOrder,
@@ -310,6 +357,11 @@ class SceneNode {
       id: id ?? this.id,
       componentId: componentId ?? this.componentId,
       rect: rect ?? this.rect,
+      parentId: identical(parentId, _unset)
+          ? this.parentId
+          : parentId as String?,
+      layout: identical(layout, _unset) ? this.layout : layout as SceneLayout?,
+      sizing: sizing ?? this.sizing,
       transform: transform ?? this.transform,
       z: z ?? this.z,
       renderOrder: renderOrder ?? this.renderOrder,
@@ -354,6 +406,23 @@ class SceneDocument {
       }
       return left.z.compareTo(right.z);
     });
+  }
+
+  List<SceneNode> getChildren(String? parentId) =>
+      paintOrder.where((node) => node.parentId == parentId).toList();
+
+  /// Depth-first authoring order keeps descendants beside their owning frame.
+  List<SceneNode> get layerOrder {
+    final result = <SceneNode>[];
+    void append(String? parentId) {
+      for (final node in getChildren(parentId).reversed) {
+        result.add(node);
+        append(node.id);
+      }
+    }
+
+    append(null);
+    return result;
   }
 
   SceneDocument copyWith({

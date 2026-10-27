@@ -45,6 +45,18 @@ String generateSceneNode(SceneNode node) {
   return '''    SceneNode(
       id: ${encodeDartString(node.id)},
       componentId: ${encodeDartString(node.componentId)},
+      parentId: ${_encodeDartNullableString(node.parentId)},
+      ${node.layout == null ? '' : '''layout: const SceneLayout(
+        direction: SceneLayoutDirection.${node.layout!.direction.name},
+        padding: ${node.layout!.padding},
+        gap: ${node.layout!.gap},
+        mainAlignment: SceneMainAlignment.${node.layout!.mainAlignment.name},
+        crossAlignment: SceneCrossAlignment.${node.layout!.crossAlignment.name},
+        clip: ${node.layout!.clip},
+      ),'''}
+      sizing: const SceneSizing(
+        width: ${node.sizing.width}, height: ${node.sizing.height}, flex: ${node.sizing.flex},
+      ),
       rect: const SceneRect(
         x: ${node.rect.x},
         y: ${node.rect.y},

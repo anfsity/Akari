@@ -1,12 +1,12 @@
 ---
 title: Scene format
-description: The current version 2 authoring document and its validation rules.
+description: The current version 3 authoring document and its validation rules.
 ---
 
 Scene JSON files (`*.scene.json`) define a theme's canvas, background, nodes, transforms, and visibility rules. `packages/scene_schema` validates the JSON at build time and generates typed Dart (`*.scene.g.dart`) for production.
 
 :::note
-Current schema version is `2`. The decoder still accepts version `1` and normalizes legacy `kind`/`action` fields, but all new scenes should be authored in version `2`.
+Current schema version is `3`. The decoder accepts versions `1` and `2`, normalizes legacy `kind`/`action` fields, and preserves existing flat layouts.
 :::
 
 ## Minimal example
@@ -86,6 +86,36 @@ Built-in renderers support `image` and `solid`. Using `video` or `custom` requir
 | `interactive` | `boolean` | `false` | Enforce minimum hit target and focus traversal |
 | `properties` | `Record<string, string>` | `{}` | String key-value pairs interpreted by the component |
 | `transform` | Transform object | Identity | Node-local translation, scale, rotation, and pivot |
+
+## Frames and auto layout
+
+Set a node's `layout` to create a runtime-owned frame. Its `component` may be
+`frame`; it does not call the theme component factory. Other nodes reference
+the frame with `parentId`. IDs remain document-wide, and missing/non-frame
+parents and cycles are rejected. Paint order applies within each parent.
+Ancestor visibility and transforms apply to the entire subtree.
+
+`layout.direction` accepts `absolute` (default), `row`, or `column`. `padding`
+and `gap` are non-negative logical pixels. `mainAlignment` accepts `start`,
+`center`, `end`, or `spaceBetween`; `crossAlignment` accepts `start`, `center`,
+`end`, or `stretch`. Set `clip: true` to clip overflowing children.
+
+Child `rect` coordinates are relative to the parent's padded content area.
+Row/column layout supplies positions instead of `rect.x/y`. Optional `sizing`
+provides positive fixed `width`/`height` in logical pixels and a non-negative
+`flex` weight. Flex children share remaining main-axis space after fixed sizes,
+spacing, and minimum interactive hit targets. Hidden children retain their
+layout slots so authentication transitions do not move neighboring controls.
+Fixed content can overflow a small frame; clipping is an explicit frame policy.
+
+```json
+{
+  "id": "form", "component": "frame",
+  "rect": {"x": 0.25, "y": 0.2, "width": 0.5, "height": 0.6},
+  "layout": {"direction": "column", "padding": 24, "gap": 12,
+             "crossAlignment": "stretch"}
+}
+```
 
 ## Transforms
 

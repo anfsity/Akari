@@ -26,8 +26,16 @@ void main() {
           {
             'id': r'$node',
             'component': r'${component}',
+            'layout': {'direction': 'column', 'gap': 12},
+            'sizing': {'width': 320, 'flex': 1},
             'rect': {'x': 0, 'y': 0, 'width': 1, 'height': 1},
             'properties': properties,
+          },
+          {
+            'id': 'child',
+            'component': 'text',
+            'parentId': r'$node',
+            'rect': {'x': 0, 'y': 0, 'width': 1, 'height': 1},
           },
         ],
       }),
@@ -54,6 +62,9 @@ void main() {
     expect(document['nodes'][0]['id'], r'$node');
     expect(document['nodes'][0]['component'], r'${component}');
     expect(document['nodes'][0]['properties'], properties);
+    expect(document['nodes'][0]['layout']['direction'], 'column');
+    expect(document['nodes'][0]['sizing']['width'], 320);
+    expect(document['nodes'][1]['parentId'], r'$node');
     expect(document['themeProperties'], properties);
   });
 
