@@ -33,6 +33,7 @@ ${document.themeProperties.entries.map((entry) => '    ${encodeDartString(entry.
     scrimOpacity: ${document.background.scrimOpacity},
     blurSigma: ${document.background.blurSigma},
     rendererId: ${_encodeDartNullableString(document.background.rendererId)},
+    shader: ${document.background.shader == null ? 'null' : _encodeShader(document.background.shader!)},
     parameters: <String, double>{
 ${document.background.parameters.entries.map((entry) => '      ${encodeDartString(entry.key)}: ${entry.value},\n').join()}    },
   ),
@@ -98,6 +99,9 @@ $properties      },
     ),
 ''';
 }
+
+String _encodeShader(SceneShader shader) =>
+    'SceneShader(asset: ${encodeDartString(shader.asset)}, uniforms: <SceneShaderUniform>[${shader.uniforms.map((uniform) => 'SceneShaderUniform(name: ${encodeDartString(uniform.name)},source: SceneUniformSource.${uniform.source.name},value: ${uniform.value},scale: ${uniform.scale})').join(', ')}], textures: <SceneShaderTexture>[${shader.textures.map((texture) => 'SceneShaderTexture(name: ${encodeDartString(texture.name)},asset: ${encodeDartString(texture.asset)})').join(', ')}])';
 
 String _encodeLayout(SceneLayout layout) =>
     'const SceneLayout(direction: SceneLayoutDirection.${layout.direction.name}, padding: ${layout.padding}, gap: ${layout.gap}, mainAlignment: SceneMainAlignment.${layout.mainAlignment.name}, crossAlignment: SceneCrossAlignment.${layout.crossAlignment.name}, clip: ${layout.clip}, wrap: ${layout.wrap})';

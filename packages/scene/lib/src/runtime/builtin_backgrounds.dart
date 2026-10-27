@@ -37,7 +37,7 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
       return const SolidBackgroundRenderer().build(context, background);
     }
 
-    Widget image = Image(
+    final image = Image(
       image: resolveImage(asset),
       fit: BoxFit.cover,
       alignment: alignment,
@@ -47,17 +47,33 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
         return const SolidBackgroundRenderer().build(context, background);
       },
     );
+    return SceneBackgroundEffects(background: background, child: image);
+  }
+}
+
+/// Atmosphere is shared by image and authored shader backgrounds.
+class SceneBackgroundEffects extends StatelessWidget {
+  const SceneBackgroundEffects({
+    required this.background,
+    required this.child,
+    super.key,
+  });
+  final SceneBackground background;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    Widget content = child;
     if (background.blurSigma > 0) {
       // ImageFiltered paints outside the child's bounds; clip it so a larger
       // sigma does not grow the background beyond the scene rectangle.
-      image = ClipRect(
+      content = ClipRect(
         child: ImageFiltered(
           imageFilter: ui.ImageFilter.blur(
             sigmaX: background.blurSigma,
             sigmaY: background.blurSigma,
             tileMode: TileMode.clamp,
           ),
-          child: image,
+          child: content,
         ),
       );
     }
@@ -65,7 +81,7 @@ class ImageBackgroundRenderer extends BackgroundRenderer {
     return Stack(
       fit: StackFit.expand,
       children: [
-        image,
+        content,
         ColoredBox(
           color: Color(background.color)
               .withValues(alpha: background.scrimOpacity.clamp(0, 1)),

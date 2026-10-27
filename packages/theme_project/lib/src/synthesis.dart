@@ -88,11 +88,21 @@ Future<SynthesizedTheme> createThemeProject({
         mappings[value] ??
         _getRenamedPackageReferences(value, sourceName, packageName);
     final composed = validated.copyWith(
-      background: validated.background.asset == null
-          ? validated.background
-          : validated.background.copyWith(
-              asset: rewriteAsset(validated.background.asset!),
-            ),
+      background: validated.background.copyWith(
+        asset: validated.background.asset == null
+            ? null
+            : rewriteAsset(validated.background.asset!),
+        shader: validated.background.shader?.copyWith(
+          asset: rewriteAsset(validated.background.shader!.asset),
+          textures: [
+            for (final texture in validated.background.shader!.textures)
+              SceneShaderTexture(
+                name: texture.name,
+                asset: rewriteAsset(texture.asset),
+              ),
+          ],
+        ),
+      ),
       themeProperties: validated.themeProperties.map(
         (key, value) => MapEntry(key, rewriteAsset(value)),
       ),
@@ -126,6 +136,9 @@ Future<SynthesizedTheme> createThemeProject({
         target,
         packageName,
         mappings.values,
+        composed.background.shader == null
+            ? const []
+            : [composed.background.shader!.asset],
       ),
     );
     final sceneGetter = getSceneDocumentVariableName(composed.id);
@@ -341,6 +354,10 @@ Future<Map<String, String>> _copyReferencedAssets(
   final mappings = <String, String>{};
   final references = {
     if (validated.background.asset != null) validated.background.asset!,
+    if (validated.background.shader case final shader?) ...[
+      shader.asset,
+      for (final texture in shader.textures) texture.asset,
+    ],
     ...validated.themeProperties.values,
     for (final style in validated.styleTokens.values)
       if (style.fontAsset != null) style.fontAsset!,
@@ -382,6 +399,7 @@ String _getProjectManifest(
   String target,
   String packageName,
   Iterable<String> assetReferences,
+  Iterable<String> shaderReferences,
 ) {
   final yaml = YamlEditor(manifestText);
   yaml.update(['name'], packageName);
@@ -431,6 +449,15 @@ String _getProjectManifest(
       }
     }
     yaml.update(['flutter'], {...flutter, 'assets': assets});
+  }
+  if (shaderReferences.isNotEmpty) {
+    final flutter = yaml.parseAt(['flutter']).value as Map? ?? {};
+    final shaders = List<Object?>.of(flutter['shaders'] as List? ?? []);
+    for (final reference in shaderReferences) {
+      final relative = reference.substring('packages/$packageName/'.length);
+      if (!shaders.contains(relative)) shaders.add(relative);
+    }
+    yaml.update(['flutter'], {...flutter, 'shaders': shaders});
   }
   return yaml.toString();
 }

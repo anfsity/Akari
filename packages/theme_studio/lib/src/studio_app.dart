@@ -679,6 +679,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         assetImageResolver: _assets.getImageProvider,
         assetSvgLoader: _assets.loadTextAsset,
         assetFontLoader: _assets.loadFontPreview,
+        shaderLoader: _assets.loadShaderProgram,
       ),
       inspector: editor == null
           ? const SizedBox()
@@ -722,7 +723,13 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                   child: _inspect
                       ? CodeInspector(key: ObjectKey(editor), editor: editor)
                       : _effects
-                      ? StudioEffectsInspector(editor: editor, theme: _theme)
+                      ? StudioEffectsInspector(
+                          editor: editor,
+                          theme: _theme,
+                          assets: _assets,
+                          onAssetsChanged: () =>
+                              setState(() => _assetPaths = _assets.getAssets()),
+                        )
                       : NodeInspector(
                           editor: editor,
                           controller: editor.inspector,

@@ -3,15 +3,21 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import 'scene_editor.dart';
 import 'studio_form.dart';
+import 'studio_assets.dart';
+import 'studio_shader_playground.dart';
 
 class StudioEffectsInspector extends StatefulWidget {
   const StudioEffectsInspector({
     required this.editor,
     required this.theme,
+    required this.assets,
+    required this.onAssetsChanged,
     super.key,
   });
   final SceneEditor editor;
   final ThemeDefinition theme;
+  final StudioAssets assets;
+  final VoidCallback onAssetsChanged;
   @override
   State<StudioEffectsInspector> createState() => _StudioEffectsInspectorState();
 }
@@ -94,6 +100,28 @@ class _StudioEffectsInspectorState extends State<StudioEffectsInspector> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text('Background effects').semiBold(),
+          const Gap(12),
+          OutlineButton(
+            key: const ValueKey('open-shader-playground'),
+            onPressed: () => showOverlay<void>(
+              context,
+              const DialogConfiguration(),
+              builder: (_) => StudioShaderPlayground(
+                editor: widget.editor,
+                assets: widget.assets,
+                onAssetsChanged: widget.onAssetsChanged,
+              ),
+            ),
+            child: const Text('Shader Playground'),
+          ),
+          if (_draft.shader != null) ...[
+            const Gap(8),
+            Text(_draft.shader!.asset.split('/').last).small().muted(),
+            GhostButton(
+              onPressed: () => _commit(_draft.copyWith(shader: null)),
+              child: const Text('Remove authored shader').small(),
+            ),
+          ],
           const Gap(16),
           _slider(
             'blur',

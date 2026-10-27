@@ -1,3 +1,5 @@
+import 'scene_shader.dart';
+
 enum SceneCanvasFit { cover, contain, reflow }
 
 const currentSceneVersion = 3;
@@ -539,6 +541,7 @@ class SceneBackground {
     this.blurSigma = 0,
     this.rendererId,
     this.parameters = const {},
+    this.shader,
   });
 
   final SceneBackgroundKind kind;
@@ -556,6 +559,7 @@ class SceneBackground {
   final double blurSigma;
   final String? rendererId;
   final Map<String, double> parameters;
+  final SceneShader? shader;
 
   SceneBackground copyWith({
     SceneBackgroundKind? kind,
@@ -565,6 +569,7 @@ class SceneBackground {
     double? blurSigma,
     String? rendererId,
     Map<String, double>? parameters,
+    Object? shader = _unset,
   }) {
     return SceneBackground(
       kind: kind ?? this.kind,
@@ -574,6 +579,7 @@ class SceneBackground {
       blurSigma: blurSigma ?? this.blurSigma,
       rendererId: rendererId ?? this.rendererId,
       parameters: parameters ?? this.parameters,
+      shader: identical(shader, _unset) ? this.shader : shader as SceneShader?,
     );
   }
 }

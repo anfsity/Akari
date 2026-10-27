@@ -18,6 +18,34 @@ void main() {
   });
   tearDown(() => directory.deleteSync(recursive: true));
 
+  test(
+    'shader imports register compilation and keep sources inside their theme',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'studio-shader-import-',
+      );
+      addTearDown(() => root.delete(recursive: true));
+      final theme = Directory('${root.path}/theme')..createSync();
+      File('${theme.path}/pubspec.yaml').writeAsStringSync(
+        'name: theme_test\nflutter:\n  assets:\n    - assets/\n',
+      );
+      final source = File('${root.path}/effect.frag')
+        ..writeAsStringSync('void main() {}');
+      final assets = StudioAssets(directory: theme, packageName: 'theme_test');
+      final path = assets.importFile(source, shader: true);
+      expect(path, 'packages/theme_test/assets/effect.frag');
+      expect(
+        File('${theme.path}/pubspec.yaml').readAsStringSync(),
+        contains('shaders:'),
+      );
+      expect(assets.getAssets(), contains(path));
+      expect(
+        () => assets.importFile(source, shader: true, targetDirectory: root),
+        throwsFormatException,
+      );
+    },
+  );
+
   test('font preview registration is shared across panels and reloads after a source revision', () async {
     final font = File('${directory.path}/assets/Preview.otf');
     font.parent.createSync();

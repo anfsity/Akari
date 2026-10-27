@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import 'package:theme_sdk/theme_sdk.dart';
+
+import 'studio_shader_compiler.dart';
 
 enum StudioAssetKind { image, svg, font, material, audio, shader, other }
 
@@ -35,6 +38,14 @@ class StudioAssets {
 
   final Directory directory;
   final String packageName;
+  late final shaderCompiler = StudioShaderCompiler(directory: directory);
+
+  Future<ui.FragmentProgram> loadShaderProgram(String asset) {
+    final file = findFile(asset);
+    return file == null
+        ? ui.FragmentProgram.fromAsset(asset)
+        : shaderCompiler.loadFile(asset, file);
+  }
 
   /// A standalone JSON keeps the host theme's assets. Stop at the nearest
   /// package boundary so it cannot inherit an unrelated ancestor's theme.
@@ -56,25 +67,44 @@ class StudioAssets {
     }
   }
 
-  String importFile(File source) {
-    final target = _getAvailableAssetFile(source.uri.pathSegments.last);
-    final relative = 'assets/${target.uri.pathSegments.last}';
+  String importFile(
+    File source, {
+    bool shader = false,
+    Directory? targetDirectory,
+  }) {
+    final target = _getAvailableAssetFile(
+      source.uri.pathSegments.last,
+      parent: targetDirectory,
+    );
+    final relative = target.path
+        .substring(directory.path.length + 1)
+        .replaceAll(Platform.pathSeparator, '/');
     final manifest = File('${directory.path}/pubspec.yaml');
     final original = manifest.readAsStringSync();
-    final updated = _getRegisteredManifest(original, relative);
-    target.parent.createSync();
+    final updated = _getRegisteredManifest(original, relative, shader: shader);
+    target.parent.createSync(recursive: true);
     _writeImport(source, target, manifest, original, updated);
     return 'packages/$packageName/$relative';
   }
 
-  File _getAvailableAssetFile(String name) {
+  File _getAvailableAssetFile(String name, {Directory? parent}) {
     if (name.contains('..')) {
       throw const FormatException('Asset names cannot contain "..".');
     }
     final dot = name.lastIndexOf('.');
     final stem = dot > 0 ? name.substring(0, dot) : name;
     final extension = dot > 0 ? name.substring(dot) : '';
-    final assets = '${directory.path}/assets';
+    if (parent != null) {
+      final root = directory.resolveSymbolicLinksSync();
+      final target = parent.resolveSymbolicLinksSync();
+      if (target != root &&
+          !target.startsWith('$root${Platform.pathSeparator}')) {
+        throw const FormatException(
+          'Shader sources must stay inside the current theme.',
+        );
+      }
+    }
+    final assets = parent?.path ?? '${directory.path}/assets';
     var target = File('$assets/$name');
     var suffix = 2;
     while (FileSystemEntity.typeSync(target.path) !=
@@ -84,23 +114,29 @@ class StudioAssets {
     return target;
   }
 
-  String _getRegisteredManifest(String original, String relative) {
+  String _getRegisteredManifest(
+    String original,
+    String relative, {
+    bool shader = false,
+  }) {
     final yaml = YamlEditor(original);
     final root = yaml.parseAt([]).value as Map;
     final flutter = root['flutter'] as Map?;
-    final entries = (flutter?['assets'] as List?) ?? [];
-    if (entries.contains('assets/') || entries.contains(relative)) {
+    final section = shader ? 'shaders' : 'assets';
+    final entries = (flutter?[section] as List?) ?? [];
+    if ((!shader && entries.contains('assets/')) ||
+        entries.contains(relative)) {
       return original;
     }
     if (flutter == null) {
       yaml.update(
         ['flutter'],
         {
-          'assets': [relative],
+          section: [relative],
         },
       );
     } else {
-      yaml.update(['flutter', 'assets'], [...entries, relative]);
+      yaml.update(['flutter', section], [...entries, relative]);
     }
     return yaml.toString();
   }
