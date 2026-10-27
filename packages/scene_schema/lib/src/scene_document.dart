@@ -95,6 +95,10 @@ class SceneStyle {
     this.backgroundBlur = 0,
     this.textColor,
     this.fontSize = 0,
+    this.fontAsset,
+    this.fontWeight = 0,
+    this.letterSpacing,
+    this.lineHeight,
     this.opacity = 1,
   });
 
@@ -110,6 +114,10 @@ class SceneStyle {
   final double backgroundBlur;
   final int? textColor;
   final double fontSize;
+  final String? fontAsset;
+  final int fontWeight;
+  final double? letterSpacing;
+  final double? lineHeight;
   final double opacity;
 
   SceneStyle copyWith({
@@ -125,6 +133,10 @@ class SceneStyle {
     double? backgroundBlur,
     Object? textColor = _unset,
     double? fontSize,
+    Object? fontAsset = _unset,
+    int? fontWeight,
+    Object? letterSpacing = _unset,
+    Object? lineHeight = _unset,
     double? opacity,
   }) => SceneStyle(
     fill: fill ?? this.fill,
@@ -143,6 +155,16 @@ class SceneStyle {
         ? this.textColor
         : textColor as int?,
     fontSize: fontSize ?? this.fontSize,
+    fontAsset: identical(fontAsset, _unset)
+        ? this.fontAsset
+        : fontAsset as String?,
+    fontWeight: fontWeight ?? this.fontWeight,
+    letterSpacing: identical(letterSpacing, _unset)
+        ? this.letterSpacing
+        : letterSpacing as double?,
+    lineHeight: identical(lineHeight, _unset)
+        ? this.lineHeight
+        : lineHeight as double?,
     opacity: opacity ?? this.opacity,
   );
 }

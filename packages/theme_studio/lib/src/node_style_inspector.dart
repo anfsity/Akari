@@ -65,8 +65,9 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
     String label,
     double value,
     double maximum,
-    SceneStyle Function(double) update,
-  ) => Padding(
+    SceneStyle Function(double) update, {
+    double minimum = 0,
+  }) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -77,6 +78,7 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
           key: ValueKey('style-$label'),
           value: value,
           maximum: maximum,
+          minimum: minimum,
           onCancel: () {
             widget.editor.cancelPreview();
             setState(_updateDraft);
@@ -187,6 +189,43 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
         _draft.fontSize,
         160,
         (value) => _draft.copyWith(fontSize: value),
+      ),
+      if (_draft.fontAsset != null)
+        Row(
+          children: [
+            Expanded(child: Text(_draft.fontAsset!.split('/').last).small()),
+            GhostButton(
+              onPressed: () => _commit(_draft.copyWith(fontAsset: null)),
+              child: const Text('Inherit font').small(),
+            ),
+          ],
+        ),
+      const Gap(8),
+      StudioSelect<int>(
+        key: const ValueKey('style-font-weight'),
+        value: _draft.fontWeight,
+        values: [
+          0,
+          for (var weight = 100; weight <= 900; weight += 100) weight,
+        ],
+        formatValue: (weight) =>
+            weight == 0 ? 'Inherit weight' : 'Weight $weight',
+        onChanged: (weight) => _commit(_draft.copyWith(fontWeight: weight)),
+      ),
+      const Gap(12),
+      _slider(
+        'Letter spacing',
+        _draft.letterSpacing ?? 0,
+        16,
+        (value) => _draft.copyWith(letterSpacing: value),
+        minimum: -4,
+      ),
+      _slider(
+        'Line height',
+        _draft.lineHeight ?? 1.2,
+        3,
+        (value) => _draft.copyWith(lineHeight: value),
+        minimum: .5,
       ),
       _slider(
         'Opacity',

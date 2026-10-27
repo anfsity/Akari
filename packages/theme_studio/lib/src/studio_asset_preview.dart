@@ -42,6 +42,8 @@ class StudioAssetPreview extends StatefulWidget {
     required this.loadText,
     required this.loadFont,
     this.tint,
+    this.expanded = false,
+    this.initialSample,
     super.key,
   });
   final String path;
@@ -49,12 +51,17 @@ class StudioAssetPreview extends StatefulWidget {
   final SceneSvgLoader loadText;
   final Future<String> Function(String) loadFont;
   final int? tint;
+  final bool expanded;
+  final String? initialSample;
   @override
   State<StudioAssetPreview> createState() => _StudioAssetPreviewState();
 }
 
 class _StudioAssetPreviewState extends State<StudioAssetPreview> {
-  final _sample = TextEditingController(text: 'Aa · Welcome · 欢迎 · 0123456789');
+  late final _sample = TextEditingController(
+    text: widget.initialSample ?? 'Aa · Welcome · 欢迎 · 0123456789',
+  );
+  late double _fontSize = widget.expanded ? 48 : 22;
   Future<String>? _content;
   @override
   void initState() {
@@ -81,9 +88,43 @@ class _StudioAssetPreviewState extends State<StudioAssetPreview> {
   }
 
   @override
+  void reassemble() {
+    super.reassemble();
+    _loadContent();
+  }
+
+  @override
   void dispose() {
     _sample.dispose();
     super.dispose();
+  }
+
+  void _openFontPreview() {
+    showOverlay<void>(
+      context,
+      const DialogConfiguration(),
+      builder: (context) => AlertDialog(
+        title: Text(widget.path.split('/').last),
+        content: SizedBox(
+          width: 560,
+          height: 320,
+          child: StudioAssetPreview(
+            path: widget.path,
+            resolveImage: widget.resolveImage,
+            loadText: widget.loadText,
+            loadFont: widget.loadFont,
+            expanded: true,
+            initialSample: _sample.text,
+          ),
+        ),
+        actions: [
+          OutlineButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -112,6 +153,17 @@ class _StudioAssetPreviewState extends State<StudioAssetPreview> {
           builder: (context, snapshot) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (!widget.expanded)
+                Row(
+                  children: [
+                    const Expanded(child: Text('Font sample')),
+                    GhostButton(
+                      key: const ValueKey('expand-font-preview'),
+                      onPressed: _openFontPreview,
+                      child: const Icon(LucideIcons.expand, size: 16),
+                    ),
+                  ],
+                ),
               TextField(
                 key: const ValueKey('font-preview-text'),
                 controller: _sample,
@@ -119,12 +171,20 @@ class _StudioAssetPreviewState extends State<StudioAssetPreview> {
               ),
               const Gap(8),
               if (snapshot.hasData)
-                Text(
-                  _sample.text,
-                  key: const ValueKey('font-preview-sample'),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontFamily: snapshot.data, fontSize: 28),
+                SizedBox(
+                  height: widget.expanded ? 160 : 32,
+                  child: SingleChildScrollView(
+                    child: Text(
+                      _sample.text,
+                      key: const ValueKey('font-preview-sample'),
+                      maxLines: widget.expanded ? 3 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: snapshot.data,
+                        fontSize: _fontSize,
+                      ),
+                    ),
+                  ),
                 )
               else
                 Text(
@@ -132,6 +192,16 @@ class _StudioAssetPreviewState extends State<StudioAssetPreview> {
                       ? 'Unable to preview this font.'
                       : 'Loading font…',
                 ).small().muted(),
+              if (widget.expanded) ...[
+                const Gap(20),
+                Text('Size · ${_fontSize.round()} px').small().muted(),
+                Slider(
+                  value: SliderValue.single(_fontSize),
+                  min: 12,
+                  max: 96,
+                  onChanged: (value) => setState(() => _fontSize = value.value),
+                ),
+              ],
             ],
           ),
         ),

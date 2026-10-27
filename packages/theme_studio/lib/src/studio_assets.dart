@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 import 'package:yaml_edit/yaml_edit.dart';
+import 'package:theme_sdk/theme_sdk.dart';
 
 enum StudioAssetKind { image, svg, font, material, audio, shader, other }
 
@@ -26,11 +27,6 @@ StudioAssetKind getStudioAssetKind(String path) {
   }
   return StudioAssetKind.other;
 }
-
-// Flutter retains dynamically registered fonts for the engine's lifetime.
-// Match that ownership with a cache keyed by source revision, avoiding another
-// native font registration each time the user selects the same preview.
-final _fontPreviewLoads = <String, Future<String>>{};
 
 /// Imports into the scene's theme package so saved scene references remain
 /// portable. The manifest keeps its comments and existing asset declarations.
@@ -226,11 +222,10 @@ class StudioAssets {
     final stat = await file?.stat();
     final key =
         '${file?.absolute.path ?? asset}:${stat?.modified.microsecondsSinceEpoch}:${stat?.size}';
-    return _fontPreviewLoads.putIfAbsent(key, () async {
-      final family = 'studio-preview-${_fontPreviewLoads.length}';
-      final loader = FontLoader(family)..addFont(loadBytes(asset));
-      await loader.load();
-      return family;
-    });
+    return registerSceneFont(
+      source: file?.absolute.path ?? asset,
+      revision: key,
+      loadBytes: () => loadBytes(asset),
+    );
   }
 }

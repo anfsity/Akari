@@ -96,6 +96,16 @@ Future<SynthesizedTheme> createThemeProject({
       themeProperties: validated.themeProperties.map(
         (key, value) => MapEntry(key, rewriteAsset(value)),
       ),
+      styleTokens: validated.styleTokens.map(
+        (key, style) => MapEntry(
+          key,
+          style.copyWith(
+            fontAsset: style.fontAsset == null
+                ? null
+                : rewriteAsset(style.fontAsset!),
+          ),
+        ),
+      ),
       nodes: [
         for (final node in validated.nodes)
           node.copyWith(
@@ -332,6 +342,8 @@ Future<Map<String, String>> _copyReferencedAssets(
   final references = {
     if (validated.background.asset != null) validated.background.asset!,
     ...validated.themeProperties.values,
+    for (final style in validated.styleTokens.values)
+      if (style.fontAsset != null) style.fontAsset!,
     for (final node in validated.nodes) ...node.properties.values,
     for (final node in validated.nodes)
       if (node.asset != null) node.asset!.path,

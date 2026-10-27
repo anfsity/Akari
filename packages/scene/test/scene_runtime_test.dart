@@ -9,6 +9,72 @@ import 'package:scene/src/runtime/state_effects.dart';
 
 void main() {
   testWidgets(
+    'authored fonts and typography reach explicit text without reloading on style edits',
+    (tester) async {
+      var loads = 0;
+      Future<String> loadFont(String asset) async {
+        loads++;
+        return 'AuthoredFont';
+      }
+
+      Future<void> render(double spacing) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SceneRuntime(
+              document:
+                  _document(
+                    nodes: const [
+                      SceneNode(
+                        id: 'text',
+                        componentId: 'label',
+                        styleToken: 'type',
+                        rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+                      ),
+                    ],
+                  ).copyWith(
+                    styleTokens: {
+                      'type': SceneStyle(
+                        fontAsset: 'assets/font.otf',
+                        fontWeight: 700,
+                        letterSpacing: spacing,
+                        lineHeight: 1.5,
+                      ),
+                    },
+                  ),
+              theme: ThemeBundle(tokens: _tokens()),
+              assetFontLoader: loadFont,
+              nodeBuilder: (_, _) => Builder(
+                builder: (context) => Text(
+                  'Authored type',
+                  style: getSceneTextStyle(
+                    context,
+                    const TextStyle(fontSize: 24),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await render(1);
+      await tester.pumpAndSettle();
+      final style = tester.widget<Text>(find.text('Authored type')).style!;
+      expect(style.fontFamily, 'AuthoredFont');
+      expect(style.fontWeight, FontWeight.w700);
+      expect(style.letterSpacing, 1);
+      expect(style.height, 1.5);
+      await render(2);
+      await tester.pumpAndSettle();
+      expect(loads, 1);
+      expect(
+        tester.widget<Text>(find.text('Authored type')).style!.letterSpacing,
+        2,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'primitive text and shapes render without entering the theme factory',
     (tester) async {
       await tester.pumpWidget(

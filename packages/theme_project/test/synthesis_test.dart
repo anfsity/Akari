@@ -118,7 +118,15 @@ ThemeDefinition buildOriginalTheme({Color? seed, SceneDocument? document}) => th
     () async {
       final icon = File(p.join(root.path, 'external', 'icon.svg'));
       await icon.writeAsString('<svg xmlns="http://www.w3.org/2000/svg"/>');
+      final font = File(p.join(root.path, 'external', 'type.otf'));
+      await font.writeAsString('font bytes');
       final document = _document.copyWith(
+        styleTokens: {
+          'type': const SceneStyle(
+            fontAsset: 'packages/external/assets/type.otf',
+            fontWeight: 700,
+          ),
+        },
         nodes: [
           _document.nodes.single.copyWith(
             asset: const SceneAsset(
@@ -137,6 +145,7 @@ ThemeDefinition buildOriginalTheme({Color? seed, SceneDocument? document}) => th
         assetFiles: {
           document.background.asset!: wallpaper,
           'packages/external/assets/icon.svg': icon,
+          'packages/external/assets/type.otf': font,
         },
       );
       expect(
@@ -144,6 +153,15 @@ ThemeDefinition buildOriginalTheme({Color? seed, SceneDocument? document}) => th
         'packages/theme_icons/assets/composed/icon.svg',
       );
       expect(result.document.nodes.single.asset!.tint, 0xff123456);
+      expect(
+        result.document.styleTokens['type']!.fontAsset,
+        'packages/theme_icons/assets/composed/type.otf',
+      );
+      expect(
+        await File(p.join(target.path, 'assets/composed/type.otf'))
+            .readAsString(),
+        'font bytes',
+      );
       expect(
         await File(p.join(target.path, 'assets/composed/icon.svg'))
             .readAsString(),

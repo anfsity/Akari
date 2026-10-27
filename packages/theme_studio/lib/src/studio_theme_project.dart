@@ -31,6 +31,8 @@ class StudioThemeProject {
     final references = {
       if (document.background.asset != null) document.background.asset!,
       ...document.themeProperties.values,
+      for (final style in document.styleTokens.values)
+        if (style.fontAsset != null) style.fontAsset!,
       for (final node in document.nodes) ...node.properties.values,
       for (final node in document.nodes)
         if (node.asset != null) node.asset!.path,

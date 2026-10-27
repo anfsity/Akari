@@ -29,6 +29,7 @@ class StudioSidebar extends StatefulWidget {
     required this.loadAssetText,
     required this.loadFontPreview,
     required this.onPlaceAsset,
+    required this.onApplyFont,
     required this.editor,
     required this.loadingFile,
     required this.onLoadJson,
@@ -46,6 +47,7 @@ class StudioSidebar extends StatefulWidget {
   final SceneSvgLoader loadAssetText;
   final Future<String> Function(String) loadFontPreview;
   final ValueChanged<SceneAsset>? onPlaceAsset;
+  final ValueChanged<String>? onApplyFont;
   final SceneEditor? editor;
   final bool loadingFile;
   final VoidCallback onLoadJson;
@@ -150,6 +152,7 @@ class _StudioSidebarState extends State<StudioSidebar> {
                   loadText: widget.loadAssetText,
                   loadFont: widget.loadFontPreview,
                   onPlaceAsset: widget.readOnly ? null : widget.onPlaceAsset,
+                  onApplyFont: widget.readOnly ? null : widget.onApplyFont,
                   loading: widget.loadingFile,
                   onImport: widget.readOnly ? null : widget.onImportAsset,
                   onApplyBackground: editor == null || widget.readOnly
@@ -163,7 +166,11 @@ class _StudioSidebarState extends State<StudioSidebar> {
                   editor: editor,
                   readOnly: widget.readOnly,
                 )
-              : _LayerList(key: ObjectKey(editor), editor: editor, readOnly: widget.readOnly),
+              : _LayerList(
+                  key: ObjectKey(editor),
+                  editor: editor,
+                  readOnly: widget.readOnly,
+                ),
         ),
         if (tab == _SidebarTab.layers && editor != null) ...[
           const Divider(),
@@ -184,6 +191,7 @@ class _AssetList extends StatefulWidget {
     required this.onImport,
     required this.onApplyBackground,
     required this.onPlaceAsset,
+    required this.onApplyFont,
   });
   final List<String> paths;
   final ImageProvider Function(String) resolveImage;
@@ -193,6 +201,7 @@ class _AssetList extends StatefulWidget {
   final VoidCallback? onImport;
   final ValueChanged<String>? onApplyBackground;
   final ValueChanged<SceneAsset>? onPlaceAsset;
+  final ValueChanged<String>? onApplyFont;
   @override
   State<_AssetList> createState() => _AssetListState();
 }
@@ -367,6 +376,14 @@ class _AssetListState extends State<_AssetList> {
                             Clipboard.setData(ClipboardData(text: selected)),
                         child: const Text('Copy path').small(),
                       ),
+                      if (kind == StudioAssetKind.font)
+                        PrimaryButton(
+                          key: const ValueKey('apply-asset-font'),
+                          onPressed: widget.onApplyFont == null
+                              ? null
+                              : () => widget.onApplyFont!(selected),
+                          child: const Text('Apply to selection').small(),
+                        ),
                       if (raster)
                         PrimaryButton(
                           onPressed: widget.onApplyBackground == null
@@ -460,7 +477,7 @@ class _AssetListState extends State<_AssetList> {
                     Expanded(
                       child: Text(
                         path.split('/').last,
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ).small(),
                     ),

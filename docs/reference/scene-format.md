@@ -142,6 +142,13 @@ preserve the theme's visuals. Explicit component typography can opt into authore
 overrides using `getSceneTextStyle(context, fallback)`; Terrace labels and clocks
 do so. Other components retain their own explicit text styles.
 
+Typography also supports `fontAsset` (a portable asset path), `fontWeight`
+(`100..900` in steps of 100; `0` inherits), optional finite `letterSpacing`, and
+optional positive `lineHeight` as a font-size multiplier. Omitted values inherit
+the theme. Referenced fonts load from the bundle in production and from disk in
+Studio; independent theme creation copies and rewrites their paths. Components
+with explicit styles can use `getSceneTextStyle` to receive these overrides.
+
 ## Motion timing
 
 Nodes may also declare `stateEffects`, for example
