@@ -1,12 +1,14 @@
 import 'dart:io';
 
+import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:path/path.dart' as p;
 import 'package:scene_codegen/scene_codegen.dart';
 import 'package:scene_schema/scene_schema.dart';
 import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 
-import 'project.dart';
+import '../project.dart';
 
 class SynthesizedTheme {
   const SynthesizedTheme({
@@ -62,13 +64,11 @@ Future<SynthesizedTheme> createThemeProject({
   await parent.create(recursive: true);
   final staging = await parent.createTemp('.akari-theme-');
   try {
-    await _copySourceProject(
-      sourceRoot,
-      staging,
-      manifest,
-      sourceName,
-      packageName,
-    );
+    await _SourceCopier(
+      sourceRoot: sourceRoot,
+      sourceName: sourceName,
+      targetName: packageName,
+    ).copyProject(staging, manifest);
     final sourceEntrypoint = File(p.join(staging.path, 'lib', 'theme.dart'));
     var localSource = 'source_theme.dart';
     var suffix = 2;
@@ -86,7 +86,7 @@ Future<SynthesizedTheme> createThemeProject({
     );
     String rewriteAsset(String value) =>
         mappings[value] ??
-        _rewriteSelfReferences(value, sourceName, packageName);
+        _getRenamedPackageReferences(value, sourceName, packageName);
     final composed = validated.copyWith(
       background: validated.background.asset == null
           ? validated.background
@@ -199,93 +199,126 @@ Set<String> _getSourceRoots(Map manifest) {
   return roots;
 }
 
-Future<void> _copyEntry(
-  String source,
-  String target,
-  String sourceName,
-  String targetName,
-  Set<String> ancestors,
-) async {
-  final name = p.basename(source);
-  if ({
-        '.git',
-        '.dart_tool',
-        '.fvm',
-        'build',
-        'target',
-        'node_modules',
-        '__pycache__',
-      }.contains(name) ||
-      name.endsWith('.scene.g.dart')) {
-    return;
-  }
-  final type = await FileSystemEntity.type(source, followLinks: true);
-  if (type == FileSystemEntityType.directory) {
-    final physical = await Directory(source).resolveSymbolicLinks();
-    if (ancestors.contains(physical)) {
-      throw FileSystemException('Cyclic directory link in theme.', source);
+/// Owns source identity during traversal. External relative Dart directives
+/// belong to the shared SDK and must retain their physical target after moving
+/// the theme; in-package directives continue to follow the copied code.
+class _SourceCopier {
+  const _SourceCopier({
+    required this.sourceRoot,
+    required this.sourceName,
+    required this.targetName,
+  });
+
+  final String sourceRoot;
+  final String sourceName;
+  final String targetName;
+
+  Future<void> copyProject(Directory staging, Map manifest) async {
+    final roots = _getSourceRoots(manifest);
+    await for (final entry in Directory(sourceRoot).list(followLinks: false)) {
+      final name = p.basename(entry.path);
+      if (!roots.contains(name) &&
+          !name.startsWith('README') &&
+          !name.startsWith('LICENSE')) {
+        continue;
+      }
+      await _copyEntry(entry.path, p.join(staging.path, name), {});
     }
-    await Directory(target).create(recursive: true);
-    await for (final entry in Directory(source).list(followLinks: false)) {
-      await _copyEntry(
-        entry.path,
-        p.join(target, p.basename(entry.path)),
-        sourceName,
-        targetName,
-        {...ancestors, physical},
+  }
+
+  Future<void> _copyEntry(
+    String source,
+    String target,
+    Set<String> ancestors,
+  ) async {
+    final name = p.basename(source);
+    if ({
+          '.git',
+          '.dart_tool',
+          '.fvm',
+          'build',
+          'target',
+          'node_modules',
+          '__pycache__',
+        }.contains(name) ||
+        name.endsWith('.scene.g.dart')) {
+      return;
+    }
+    final type = await FileSystemEntity.type(source, followLinks: true);
+    if (type == FileSystemEntityType.directory) {
+      final physical = await Directory(source).resolveSymbolicLinks();
+      if (ancestors.contains(physical)) {
+        throw FileSystemException('Cyclic directory link in theme.', source);
+      }
+      await Directory(target).create(recursive: true);
+      await for (final entry in Directory(source).list(followLinks: false)) {
+        await _copyEntry(entry.path, p.join(target, p.basename(entry.path)), {
+          ...ancestors,
+          physical,
+        });
+      }
+      return;
+    }
+    if (type != FileSystemEntityType.file) {
+      throw FileSystemException('Unreadable theme resource.', source);
+    }
+    await File(target).parent.create(recursive: true);
+    if (!source.endsWith('.dart') && !source.endsWith('.scene.json')) {
+      await File(source).copy(target);
+      return;
+    }
+    var content = _getRenamedPackageReferences(
+      await File(source).readAsString(),
+      sourceName,
+      targetName,
+    );
+    if (source.endsWith('.dart')) {
+      content = _getRebasedDirectives(content, source, target);
+    }
+    await File(target).writeAsString(content);
+  }
+
+  String _getRebasedDirectives(String content, String source, String target) {
+    final unit = parseString(content: content, throwIfDiagnostics: false).unit;
+    final literals = <StringLiteral>[
+      for (final directive in unit.directives) ...[
+        if (directive is UriBasedDirective) directive.uri,
+        if (directive is ImportDirective)
+          for (final configuration in directive.configurations)
+            configuration.uri,
+        if (directive is ExportDirective)
+          for (final configuration in directive.configurations)
+            configuration.uri,
+        if (directive is PartOfDirective && directive.uri != null)
+          directive.uri!,
+      ],
+    ]..sort((a, b) => b.offset.compareTo(a.offset));
+    for (final literal in literals) {
+      final value = literal.stringValue;
+      if (value == null) continue;
+      final uri = Uri.parse(value);
+      if (uri.hasScheme || uri.path.startsWith('/')) continue;
+      final physical = p.normalize(p.join(p.dirname(source), uri.toFilePath()));
+      if (p.isWithin(sourceRoot, physical)) continue;
+      final relative = p.relative(physical, from: p.dirname(target));
+      final rebased = Uri.file(relative).toString();
+      content = content.replaceRange(
+        literal.offset,
+        literal.end,
+        encodeDartString(rebased),
       );
     }
-    return;
-  }
-  if (type != FileSystemEntityType.file) {
-    throw FileSystemException('Unreadable theme resource.', source);
-  }
-  await File(target).parent.create(recursive: true);
-  if (source.endsWith('.dart') || source.endsWith('.scene.json')) {
-    await File(target).writeAsString(
-      _rewriteSelfReferences(
-        await File(source).readAsString(),
-        sourceName,
-        targetName,
-      ),
-    );
-  } else {
-    await File(source).copy(target);
+    return content;
   }
 }
 
-String _rewriteSelfReferences(
+String _getRenamedPackageReferences(
   String value,
   String sourceName,
   String targetName,
 ) => value
     .replaceAll('package:$sourceName/', 'package:$targetName/')
     .replaceAll('packages/$sourceName/', 'packages/$targetName/');
-
-Future<void> _copySourceProject(
-  String sourceRoot,
-  Directory staging,
-  Map manifest,
-  String sourceName,
-  String packageName,
-) async {
-  final roots = _getSourceRoots(manifest);
-  await for (final entry in Directory(sourceRoot).list(followLinks: false)) {
-    final name = p.basename(entry.path);
-    if (!roots.contains(name) &&
-        !name.startsWith('README') &&
-        !name.startsWith('LICENSE')) {
-      continue;
-    }
-    await _copyEntry(
-      entry.path,
-      p.join(staging.path, name),
-      sourceName,
-      packageName,
-      {},
-    );
-  }
-}
 
 Future<Map<String, String>> _copyReferencedAssets(
   SceneDocument validated,

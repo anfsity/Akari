@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
-import 'package:theme_project/theme_project.dart';
+import 'package:theme_project/project.dart';
 import 'package:yaml/yaml.dart';
 
 import 'model.dart';
 
-export 'package:theme_project/theme_project.dart' show findThemeSceneFiles;
+export 'package:theme_project/project.dart' show findThemeSceneFiles;
 
 class ThemePackage {
   const ThemePackage({

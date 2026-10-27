@@ -935,6 +935,7 @@ perf:
               ? containsAll(['run', 'perf/custom.dart'])
               : containsAll(['python3', 'trace with spaces.py']),
         );
+        expect(perf['environment']['AKARI_REPO_ROOT'], Directory.current.path);
         final output = plan['artifacts']['performance_output'];
         expect(output, '${plan['run_directory']}/perf');
         expect(

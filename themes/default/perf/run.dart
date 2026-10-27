@@ -20,7 +20,10 @@ Future<void> main(List<String> arguments) async {
     }
     final options = _getOptions(arguments);
     final themeDirectory = File.fromUri(Platform.script).parent.parent;
-    final repoRoot = themeDirectory.parent.parent;
+    final repoRoot = Directory(
+      Platform.environment['AKARI_REPO_ROOT'] ??
+          themeDirectory.parent.parent.path,
+    );
     final theme = getThemePackage(themeDirectory);
     final host = Directory(
       '${repoRoot.path}/${getThemeHostDirectory(theme, ThemeHostKind.preview)}-perf',

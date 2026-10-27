@@ -12,10 +12,10 @@ String generateSceneFromDocument(SceneDocument document) {
 import 'package:scene/scene.dart';
 
 SceneDocument get ${getSceneDocumentVariableName(document.id)} => SceneDocument(
-  id: ${_encodeDartString(document.id)},
+  id: ${encodeDartString(document.id)},
   version: ${document.version},
   themeProperties: <String, String>{
-${document.themeProperties.entries.map((entry) => '    ${_encodeDartString(entry.key)}: ${_encodeDartString(entry.value)},\n').join()}  },
+${document.themeProperties.entries.map((entry) => '    ${encodeDartString(entry.key)}: ${encodeDartString(entry.value)},\n').join()}  },
   canvas: const SceneCanvas(
     fit: SceneCanvasFit.${document.canvas.fit.name},
     useSafeArea: ${document.canvas.useSafeArea},
@@ -40,11 +40,11 @@ ${document.nodes.map(generateSceneNode).join()}  ],
 String generateSceneNode(SceneNode node) {
   final properties = [
     for (final entry in node.properties.entries)
-      '        ${_encodeDartString(entry.key)}: ${_encodeDartString(entry.value)},\n',
+      '        ${encodeDartString(entry.key)}: ${encodeDartString(entry.value)},\n',
   ].join();
   return '''    SceneNode(
-      id: ${_encodeDartString(node.id)},
-      componentId: ${_encodeDartString(node.componentId)},
+      id: ${encodeDartString(node.id)},
+      componentId: ${encodeDartString(node.componentId)},
       rect: const SceneRect(
         x: ${node.rect.x},
         y: ${node.rect.y},
@@ -104,7 +104,8 @@ String getSceneDocumentVariableName(String id) {
   return RegExp(r'^[0-9]').hasMatch(name) ? 'scene$name' : name;
 }
 
-String _encodeDartString(String value) {
+/// Encodes a single-quoted Dart literal without interpolation.
+String encodeDartString(String value) {
   final escaped = value
       .replaceAll(r'\', r'\\')
       .replaceAll("'", r"\'")
@@ -115,7 +116,7 @@ String _encodeDartString(String value) {
 }
 
 String _encodeDartNullableString(String? value) {
-  return value == null ? 'null' : _encodeDartString(value);
+  return value == null ? 'null' : encodeDartString(value);
 }
 
 String _encodeColorLiteral(int value) {

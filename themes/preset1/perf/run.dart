@@ -12,7 +12,9 @@ import '../../../tool/src/theme/project.dart';
 Future<void> main() async {
   final output = Directory(Platform.environment['AKARI_PERF_OUTPUT_DIR']!);
   final directory = File.fromUri(Platform.script).parent.parent;
-  final root = directory.parent.parent;
+  final root = Directory(
+    Platform.environment['AKARI_REPO_ROOT'] ?? directory.parent.parent.path,
+  );
   final theme = getThemePackage(directory);
   final host = Directory(
     '${root.path}/${getThemeHostDirectory(theme, ThemeHostKind.preview)}-perf',
