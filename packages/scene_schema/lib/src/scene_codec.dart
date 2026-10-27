@@ -233,6 +233,9 @@ SceneNode _decodeNode(
     componentId: component.id,
     rect: rect,
     styleToken: _findString(json, 'styleToken'),
+    motionTiming: _decodeMotionTiming(
+      _getMap(json, 'motionTiming', fallback: const {}),
+    ),
     parentId: _findString(json, 'parentId'),
     layout: json['layout'] == null
         ? null
@@ -362,11 +365,52 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
     if (node.renderOrder != 0) 'renderOrder': node.renderOrder,
     if (node.focusOrder != 0) 'focusOrder': node.focusOrder,
     if (node.motion != SceneMotionPreset.none) 'motion': node.motion.name,
+    if (!node.motionTiming.isDefault)
+      'motionTiming': {
+        if (node.motionTiming.durationMs != null)
+          'durationMs': node.motionTiming.durationMs,
+        'delayMs': node.motionTiming.delayMs,
+        if (node.motionTiming.curve case final curve?)
+          'curve': [curve.x1, curve.y1, curve.x2, curve.y2],
+      },
     if (node.visibleWhen != null)
       'visibleWhen': _encodeCondition(node.visibleWhen!),
     if (node.interactive) 'interactive': true,
     if (node.properties.isNotEmpty) 'properties': node.properties,
   };
+}
+
+SceneMotionTiming _decodeMotionTiming(Map<String, dynamic> json) {
+  final duration = json['durationMs'] == null
+      ? null
+      : _getInt(json, 'durationMs');
+  final delay = _getInt(json, 'delayMs', fallback: 0);
+  if ((duration != null && (duration < 0 || duration > 60000)) ||
+      delay < 0 ||
+      delay > 60000) {
+    throw const FormatException(
+      'Motion duration and delay must be in 0..60000 ms.',
+    );
+  }
+  SceneCubicBezier? curve;
+  if (json['curve'] != null) {
+    final values = _getList(json, 'curve');
+    if (values.length != 4 ||
+        values.any(
+          (value) => value is! num || !value.isFinite || value < 0 || value > 1,
+        )) {
+      throw const FormatException(
+        'Motion curve must contain four numbers in [0, 1].',
+      );
+    }
+    curve = SceneCubicBezier(
+      (values[0] as num).toDouble(),
+      (values[1] as num).toDouble(),
+      (values[2] as num).toDouble(),
+      (values[3] as num).toDouble(),
+    );
+  }
+  return SceneMotionTiming(durationMs: duration, delayMs: delay, curve: curve);
 }
 
 SceneStyle _decodeStyle(Map<String, dynamic> json) {

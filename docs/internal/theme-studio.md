@@ -147,6 +147,14 @@ Transform translations (`translateX`, `translateY`) remain in logical pixels as 
 
 ## Canvas tools & gestures
 
+**Timeline** opens a scrubber and play/pause controls for entrance, wake, sleep,
+and submit-to-success/error transitions. Scrubbing and scenario changes never
+modify the scene or history. The range starts at 1.5 seconds and expands to fit
+authored motion. **Advanced layout → Motion** accepts per-node duration, delay,
+and custom Bezier controls with a curve plot. Omitted values inherit theme
+timing/easing. With multiple layers selected, **Stagger 100 ms** assigns successive
+delays in paint order as one undo step.
+
 Drag a component row from **Compose** onto the canvas to place it at the pointer.
 Dragging an included slot moves that slot without duplicating it. Double-click
 a component with a `text` property to edit on the canvas; Enter or clicking

@@ -20,6 +20,30 @@ Map<String, Object> node(String id, {String? parent, bool frame = false}) => {
 };
 
 void main() {
+  test('motion timing validates before entering generated scenes', () {
+    for (final invalid in [
+      {'durationMs': -1},
+      {'delayMs': 60001},
+      {'durationMs': .5},
+      {
+        'curve': [0, 1, 2, 1],
+      },
+      {
+        'curve': [0, 1],
+      },
+    ]) {
+      expect(
+        () => decodeSceneDocument(
+          jsonEncode(
+            scene([
+              {...node('a'), 'motionTiming': invalid},
+            ]),
+          ),
+        ),
+        throwsFormatException,
+      );
+    }
+  });
   test('validates style tokens and preserves all visual values', () {
     final json = scene([
       {...node('a'), 'styleToken': 'glass'},

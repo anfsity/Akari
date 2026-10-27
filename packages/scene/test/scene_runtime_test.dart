@@ -7,6 +7,72 @@ import 'package:scene/scene.dart';
 
 void main() {
   testWidgets(
+    'timeline samples the same delayed Bezier motion as live playback',
+    (tester) async {
+      final document = _document(
+        nodes: const [
+          SceneNode(
+            id: 'motion',
+            componentId: 'text',
+            motion: SceneMotionPreset.fade,
+            motionTiming: SceneMotionTiming(
+              durationMs: 1000,
+              delayMs: 500,
+              curve: SceneCubicBezier(0, 0, 1, 1),
+            ),
+            rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+          ),
+        ],
+      );
+      Future<void> render(Duration? elapsed) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SceneRuntime(
+              key: ValueKey(elapsed == null),
+              document: document,
+              theme: ThemeBundle(
+                tokens: _tokens(),
+                motions: const {SceneMotionPreset.fade: FadeMotionBuilder()},
+              ),
+              playback: elapsed == null
+                  ? null
+                  : ScenePlayback(
+                      elapsed: elapsed,
+                      from: const {},
+                      enterAll: true,
+                    ),
+              nodeBuilder: (_, _) => const Text('Motion sample'),
+            ),
+          ),
+        ),
+      );
+      await render(const Duration(milliseconds: 1000));
+      final sampled = tester
+          .widget<FadeTransition>(find.byType(FadeTransition).last)
+          .opacity
+          .value;
+      expect(sampled, closeTo(.5, 1e-5));
+      await render(null);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(
+        tester
+            .widget<FadeTransition>(find.byType(FadeTransition).last)
+            .opacity
+            .value,
+        closeTo(0, 1e-5),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(
+        tester
+            .widget<FadeTransition>(find.byType(FadeTransition).last)
+            .opacity
+            .value,
+        closeTo(sampled, 1e-5),
+      );
+    },
+  );
+
+  testWidgets(
     'style tokens update typography without replacing component state',
     (tester) async {
       final controller = TextEditingController(text: 'retained');

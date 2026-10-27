@@ -36,6 +36,11 @@ void main() {
             'id': r'$node',
             'component': r'${component}',
             'styleToken': 'glass',
+            'motionTiming': {
+              'durationMs': 800,
+              'delayMs': 120,
+              'curve': [.2, 0, .4, 1],
+            },
             'layout': {'direction': 'column', 'gap': 12},
             'sizing': {'width': 320, 'flex': 1},
             'rect': {'x': 0, 'y': 0, 'width': 1, 'height': 1},
@@ -79,6 +84,8 @@ void main() {
     expect(document['styleTokens']['glass']['gradientEnd'], '#445566');
     expect(document['styleTokens']['glass']['radius'], 16);
     expect(document['nodes'][0]['styleToken'], 'glass');
+    expect(document['nodes'][0]['motionTiming']['delayMs'], 120);
+    expect(document['nodes'][0]['motionTiming']['curve'], [.2, 0, .4, 1]);
   });
 
   test('generates a typed document from a valid scene', () {

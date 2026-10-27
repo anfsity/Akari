@@ -31,6 +31,7 @@ class SceneRuntime extends StatelessWidget {
     required this.theme,
     required this.nodeBuilder,
     this.frameBuilder,
+    this.playback,
     this.activePredicates = const <ScenePredicate>{},
     this.activePredicatesListenable,
     this.backgroundBlurSigma,
@@ -42,6 +43,7 @@ class SceneRuntime extends StatelessWidget {
   final ThemeBundle theme;
   final SceneNodeBuilder nodeBuilder;
   final SceneFrameBuilder? frameBuilder;
+  final ScenePlayback? playback;
 
   /// Predicates currently true for the scene.
   ///
@@ -128,17 +130,51 @@ class SceneRuntime extends StatelessWidget {
     final reducedMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
     final layout = node.layout;
+    final duration = reducedMotion
+        ? Duration.zero
+        : Duration(
+            milliseconds:
+                node.motionTiming.durationMs ??
+                theme.tokens.mediumMotion.inMilliseconds,
+          );
+    final curve = getSceneMotionCurve(
+      node,
+      duration,
+      theme.tokens.standardCurve,
+    );
+    final motion = theme.motions[node.motion];
+    double? previewProgress;
+    if (playback case final playback?) {
+      final before =
+          !playback.enterAll &&
+          (visibleWhen == null ||
+              evaluateSceneCondition(visibleWhen, playback.from));
+      if (before == visible ||
+          reducedMotion ||
+          motion == null ||
+          !motion.animatesPresence ||
+          node.motion == SceneMotionPreset.none) {
+        previewProgress = visible ? 1 : 0;
+      } else {
+        final total = getSceneMotionDuration(node, duration).inMicroseconds;
+        final time = total == 0
+            ? 1.0
+            : (playback.elapsed.inMicroseconds / total).clamp(0.0, 1.0);
+        previewProgress = curve.transform(visible ? time : 1 - time);
+      }
+    }
     final content = _SceneNodeHost(
+      previewProgress: previewProgress,
       visible: visible,
       activePredicatesListenable: visibleWhen == null
           ? null
           : activePredicatesListenable,
       visibleWhen: visibleWhen,
       prewarmHiddenNodes: prewarmHiddenNodes,
-      motionBuilder: theme.motions[node.motion],
+      motionBuilder: motion,
       spec: (
         preset: node.motion,
-        duration: reducedMotion ? Duration.zero : theme.tokens.mediumMotion,
+        duration: duration,
         curve: theme.tokens.standardCurve,
         reducedMotion: reducedMotion,
       ),
@@ -214,6 +250,7 @@ class _SceneNodeHost extends StatefulWidget {
     required this.spec,
     required this.node,
     required this.style,
+    required this.previewProgress,
     required this.nodeBuilder,
   });
 
@@ -225,6 +262,7 @@ class _SceneNodeHost extends StatefulWidget {
   final SceneMotionSpec spec;
   final SceneNode node;
   final SceneStyle style;
+  final double? previewProgress;
   final SceneNodeBuilder nodeBuilder;
 
   @override
@@ -253,12 +291,20 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
     );
     _controller = AnimationController(
       vsync: this,
-      duration: widget.spec.duration,
+      duration: getSceneMotionDuration(widget.node, widget.spec.duration),
     );
-    _progress = _controller.drive(CurveTween(curve: widget.spec.curve));
+    _progress = _controller.drive(
+      CurveTween(
+        curve: getSceneMotionCurve(
+          widget.node,
+          widget.spec.duration,
+          widget.spec.curve,
+        ),
+      ),
+    );
     _controller.addStatusListener(_handleStatus);
     if (widget.visible) {
-      if (_animatesPresence) {
+      if (_animatesPresence && widget.previewProgress == null) {
         _controller.forward();
       } else {
         _controller.value = 1;
@@ -282,11 +328,24 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
         _handleActivePredicatesChanged,
       );
     }
-    if (widget.spec.curve != oldWidget.spec.curve) {
-      _progress = _controller.drive(CurveTween(curve: widget.spec.curve));
+    if (widget.spec.curve != oldWidget.spec.curve ||
+        widget.node.motionTiming != oldWidget.node.motionTiming) {
+      _progress = _controller.drive(
+        CurveTween(
+          curve: getSceneMotionCurve(
+            widget.node,
+            widget.spec.duration,
+            widget.spec.curve,
+          ),
+        ),
+      );
     }
-    if (widget.spec.duration != oldWidget.spec.duration) {
-      _controller.duration = widget.spec.duration;
+    if (widget.spec.duration != oldWidget.spec.duration ||
+        widget.node.motionTiming != oldWidget.node.motionTiming) {
+      _controller.duration = getSceneMotionDuration(
+        widget.node,
+        widget.spec.duration,
+      );
     }
     final predicates = widget.activePredicatesListenable;
     final condition = widget.visibleWhen;
@@ -322,7 +381,7 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
     _visible = visible;
     // Reuse the current controller value on reversal. Restarting at an endpoint
     // would jump when a new predicate update interrupts an enter or exit.
-    if (!_animatesPresence) {
+    if (!_animatesPresence || widget.previewProgress != null) {
       _controller.value = visible ? 1 : 0;
     } else if (visible) {
       _controller.forward();
@@ -357,6 +416,23 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.previewProgress case final progress?) {
+      if (progress == 0) return const SizedBox.shrink();
+      final child = _buildChild(context);
+      final motion = widget.motionBuilder;
+      return IgnorePointer(
+        child: ExcludeFocus(
+          child: motion != null && _animatesPresence
+              ? motion.build(
+                  context,
+                  widget.spec,
+                  AlwaysStoppedAnimation(progress),
+                  child,
+                )
+              : child,
+        ),
+      );
+    }
     if (!_visible &&
         !widget.prewarmHiddenNodes &&
         (!_animatesPresence ||

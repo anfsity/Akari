@@ -9,6 +9,7 @@ import 'studio_preview.dart';
 import 'studio_preview_host.dart';
 import 'studio_form.dart';
 import 'node_arrangement_toolbar.dart';
+import 'studio_timeline.dart';
 
 class StudioCanvas extends StatefulWidget {
   const StudioCanvas({
@@ -39,6 +40,8 @@ class _StudioCanvasState extends State<StudioCanvas> {
   bool _handTool = false;
   bool _spacePan = false;
   bool _previewing = false;
+  Duration? _elapsed;
+  StudioTransition _transition = StudioTransition.wake;
   StudioPreviewScenario _scenario = StudioPreviewScenario.password;
   double? _zoom;
   int _resetView = 0;
@@ -76,7 +79,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
   }
 
   KeyEventResult _handleKeyEvent(FocusNode focus, KeyEvent event) {
-    if (_previewing) return KeyEventResult.ignored;
+    if (_previewing || _elapsed != null) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.space) {
       setState(() => _spacePan = event is! KeyUpEvent);
@@ -172,7 +175,9 @@ class _StudioCanvasState extends State<StudioCanvas> {
                     SizedBox(
                       width: 150,
                       child: OutlineButton(
-                        onPressed: widget.onToggleDormant,
+                        onPressed: _elapsed == null
+                            ? widget.onToggleDormant
+                            : null,
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
@@ -181,10 +186,32 @@ class _StudioCanvasState extends State<StudioCanvas> {
                         ),
                       ),
                     ),
+                    Tooltip(
+                      tooltip: (_) => const Text('Timeline'),
+                      child: Button(
+                        key: const ValueKey('canvas-timeline'),
+                        style: _elapsed == null
+                            ? const ButtonStyle.outlineIcon()
+                            : const ButtonStyle.primaryIcon(),
+                        onPressed: session == null
+                            ? null
+                            : () {
+                                if (!session.applyDraft()) return;
+                                setState(() {
+                                  _elapsed = _elapsed == null
+                                      ? Duration.zero
+                                      : null;
+                                  _previewing = false;
+                                });
+                              },
+                        child: const Icon(LucideIcons.film, size: 16),
+                      ),
+                    ),
                     SizedBox(
                       width: 160,
                       child: StudioEnumSelect<StudioPreviewScenario>(
                         key: const ValueKey('preview-scenario'),
+                        enabled: _elapsed == null,
                         value: _scenario,
                         values: StudioPreviewScenario.values,
                         formatValue: (scenario) => scenario.label,
@@ -209,7 +236,10 @@ class _StudioCanvasState extends State<StudioCanvas> {
                                 if (!_previewing && !session.applyDraft()) {
                                   return;
                                 }
-                                setState(() => _previewing = !_previewing);
+                                setState(() {
+                                  _elapsed = null;
+                                  _previewing = !_previewing;
+                                });
                               },
                         child: Semantics(
                           label: _previewing ? 'Edit canvas' : 'Preview',
@@ -223,7 +253,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                         ),
                       ),
                     ),
-                    if (!widget.readOnly && !_previewing)
+                    if (!widget.readOnly && !_previewing && _elapsed == null)
                       for (final tool in StudioCanvasTool.values)
                         Tooltip(
                           tooltip: (_) =>
@@ -262,7 +292,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                         ),
                       ),
                     ),
-                    if (!widget.readOnly && !_previewing)
+                    if (!widget.readOnly && !_previewing && _elapsed == null)
                       Tooltip(
                         tooltip: (_) =>
                             const Text('Smart guides · Alt to bypass'),
@@ -276,7 +306,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                           child: const Icon(LucideIcons.magnet, size: 16),
                         ),
                       ),
-                    if (!widget.readOnly && !_previewing)
+                    if (!widget.readOnly && !_previewing && _elapsed == null)
                       Tooltip(
                         tooltip: (_) => const Text(
                           'Lock aspect ratio · Shift while resizing',
@@ -354,6 +384,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
               if (session != null &&
                   !widget.readOnly &&
                   !_previewing &&
+                  _elapsed == null &&
                   (session.selectedIds.length > 1 ||
                       session.selectedNode.layout != null))
                 NodeArrangementToolbar(editor: session),
@@ -373,8 +404,11 @@ class _StudioCanvasState extends State<StudioCanvas> {
                           child: StudioPreview(
                             key: ObjectKey(session),
                             theme: widget.theme,
-                            readOnly: widget.readOnly || _previewing,
-                            interactive: _previewing,
+                            readOnly:
+                                widget.readOnly ||
+                                _previewing ||
+                                _elapsed != null,
+                            interactive: _previewing || _elapsed != null,
                             document: session.previewDocument,
                             selectedId: session.selectedId,
                             selectedIds: session.selectedIds,
@@ -385,6 +419,8 @@ class _StudioCanvasState extends State<StudioCanvas> {
                             snapToGuides: _snapToGuides,
                             dormant: widget.dormant,
                             scenario: _scenario,
+                            playbackElapsed: _elapsed,
+                            transition: _transition,
                             preferences: widget.preferences,
                             tool: _tool,
                             lockAspectRatio: _lockAspectRatio,
@@ -453,10 +489,34 @@ class _StudioCanvasState extends State<StudioCanvas> {
                   ],
                 ),
               ),
+              if (session != null && _elapsed != null)
+                StudioTimeline(
+                  duration: _getTimelineDuration(session),
+                  elapsed: _elapsed!,
+                  transition: _transition,
+                  onTimeChanged: (elapsed) =>
+                      setState(() => _elapsed = elapsed),
+                  onTransitionChanged: (transition) => setState(() {
+                    _transition = transition;
+                    _elapsed = Duration.zero;
+                  }),
+                ),
             ],
           );
         },
       ),
     ),
   );
+
+  Duration _getTimelineDuration(SceneEditor session) {
+    var duration = const Duration(milliseconds: 1500);
+    for (final node in session.document.nodes) {
+      final timing = getSceneMotionDuration(
+        node,
+        widget.theme.tokens.mediumMotion,
+      );
+      if (timing > duration) duration = timing;
+    }
+    return duration;
+  }
 }

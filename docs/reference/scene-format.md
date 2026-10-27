@@ -99,6 +99,16 @@ preserve the theme's visuals. Explicit component typography can opt into authore
 overrides using `getSceneTextStyle(context, fallback)`; Terrace labels and clocks
 do so. Other components retain their own explicit text styles.
 
+## Motion timing
+
+Optional node `motionTiming` stores `durationMs` (omitted inherits the theme),
+`delayMs` (default `0`), and optional cubic Bezier `curve: [x1,y1,x2,y2]`.
+Duration and delay accept integer `0..60000` milliseconds; all four curve
+coordinates use `0..1`. Omitting the curve inherits theme easing. Delays are
+part of the presence controller, so reversing an in-flight transition stays
+continuous. Studio's timeline samples the same progress function used live.
+System and theme reduced-motion policies still take precedence.
+
 ## Frames and auto layout
 
 Set a node's `layout` to create a runtime-owned frame. Its `component` may be
