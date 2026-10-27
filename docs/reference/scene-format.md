@@ -14,7 +14,7 @@ Current schema version is `3`. The decoder accepts versions `1` and `2`, normali
 ```json
 {
   "id": "ocean",
-  "version": 2,
+  "version": 3,
   "canvas": {
     "fit": "contain",
     "useSafeArea": true,
@@ -79,10 +79,38 @@ parameter contracts.
 | `scrimOpacity` | `0.0..1.0` | `0.35` | Darkening scrim overlay opacity |
 | `blurSigma` | `>= 0` | `0` | Static canvas blur strength |
 | `rendererId` | `string` | Omit | Custom renderer key registered in `ThemeBundle` |
+| `shader` | Shader object | Omit | Runtime-owned fragment shader for `custom` backgrounds |
 
 :::caution
-Built-in renderers support `image` and `solid`. Using `video` or `custom` requires registering a matching renderer in the theme's `ThemeBundle`. Asset paths must not contain `..`.
+Built-in renderers support `image`, `solid`, and `custom` with a shader definition. Other `video` or `custom` backgrounds require a matching theme renderer. Asset paths must not contain `..`.
 :::
+
+### Portable fragment shaders
+
+For `kind: "custom"`, optional `shader` supplies `asset` (a portable `.frag`
+resource registered in `flutter.shaders`), `uniforms`, and optional `textures`.
+Float/vector components occupy consecutive slots in compiler reflection order;
+texture samplers use a separate ordered table. Binding names must be unique.
+
+```json
+{
+  "asset": "packages/theme_ocean/assets/background.frag",
+  "uniforms": [
+    {"name": "resolution.x", "source": "width"},
+    {"name": "resolution.y", "source": "height"},
+    {"name": "time", "source": "time", "scale": 0.5, "value": 0}
+  ],
+  "textures": [{"name": "image", "asset": "packages/theme_ocean/assets/texture.png"}]
+}
+```
+
+Sources are `constant`, `time` (seconds), `width`, `height`, `pointerX`,
+`pointerY` (logical pixels), `dormant`, or `authError` (0/1). The float is
+`source * scale + value`, with defaults `scale: 1`, `value: 0`; constants use a
+zero source. Numbers must be finite. The runtime owns shader/texture handles and
+the clock. Scrubbing supplies deterministic time; reduced motion fixes time at
+zero. Blur/scrim apply as they do to images. Studio reflects the compiler output
+and generates the binding order rather than parsing GLSL declarations itself.
 
 ## Nodes
 
@@ -166,6 +194,34 @@ part of the presence controller, so reversing an in-flight transition stays
 continuous. Studio's timeline samples the same progress function used live.
 System and theme reduced-motion policies still take precedence.
 
+### Property tracks
+
+Optional node `tracks` stores at most one track per property: `opacity`,
+`translateX`, `translateY`, `scale`, or `rotation` (degrees). Each track has one or
+more strictly increasing keyframes with integer `timeMs` in `0..60000`, a finite
+`value` in `-100000..100000` (opacity `0..1`), and optional `curve`: `linear`
+(default), `easeInOut`, or `hold`. A frame's curve governs the segment after it.
+Times are relative to the node's motion delay. Values clamp to endpoint frames
+outside their range. The existing presence controller also owns track playback;
+long tracks extend its duration without stretching the presence preset.
+
+```json
+{"property": "opacity", "keyframes": [
+  {"timeMs": 0, "value": 0},
+  {"timeMs": 800, "value": 1, "curve": "hold"}
+]}
+```
+
+### Visual transition edges
+
+Optional node `transitions` stores edges with required `from` and `to` conditions
+(the same All/Any/Not vocabulary as `visibleWhen`), `effect: "shake" | "pulse"`,
+and optional `timing` using the `motionTiming` format. An edge fires when its
+source matched the previous predicate snapshot and its target is newly true.
+The last matching explicit edge wins over simple `stateEffects` entries. Omitted
+timing inherits node timing. Edges control presentation only; they cannot change
+the authentication state machine.
+
 ## Frames and auto layout
 
 Set a node's `layout` to create a runtime-owned frame. Its `component` may be
@@ -195,6 +251,25 @@ Fixed content can overflow a small frame; clipping is an explicit frame policy.
              "crossAlignment": "stretch"}
 }
 ```
+
+### Constraints, content fitting, and breakpoints
+
+`sizing.widthMode` / `heightMode` accept `proportional` (default), `fill`, or
+`hug`. Fixed dimensions override proportional/fill dimensions; explicit `flex`
+owns distribution on a flow's main axis. Fill otherwise shares remaining main
+space, or fills available space on other axes. `minWidth` / `minHeight` default
+to 0; optional positive `maxWidth` / `maxHeight` must be at least the minimum.
+Interactive hit-target minimums take precedence over maxima. Hug is supported
+for frames and primitive text. Text uses actual font metrics; frames measure
+child bounds and wrapped flow lines. Set `layout.wrap: true` to wrap row/column
+children with the declared gap.
+
+Node `breakpoints` is a list of `{minWidth, layout?, sizing?}` overrides. Minimum
+widths must be unique within `0..16384`. Each rule must override layout or sizing;
+only frames can override layout. The widest matching rule wins. Matching uses
+the logical viewport supplied to `SceneRuntime`, independently of physical pixel
+density. The same calculator resolves production rectangles and Studio selection
+geometry.
 
 ## Transforms
 
