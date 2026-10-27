@@ -20,6 +20,10 @@ description: 场景 JSON 的字段、示例和校验规则，当前版本为 3�
 
 ## 动效时序
 
+`stateEffects` 可声明进入状态时的视觉响应，例如 `{"isAuthError": "shake"}`。
+支持 `shake` 和 `pulse`，使用节点时序；无关状态通知不会重播，减少动画策略仍生效。
+多个规则同时触发时，最后声明的规则优先。认证状态转移由认证模块负责。
+
 节点可通过 `motionTiming` 保存 `durationMs`、`delayMs` 与
 `curve: [x1,y1,x2,y2]`。时长与延迟为 0..60000 的整数毫秒，贝塞尔控制点为
 0..1。省略时长或曲线会继承主题设置。延迟纳入同一控制器，反向切换沿当前进度
@@ -27,6 +31,11 @@ description: 场景 JSON 的字段、示例和校验规则，当前版本为 3�
 策略优先。
 
 ## 容器与自动布局
+
+背景可通过 `parameters` 保存渲染器定义的有限数值参数。渲染器通过
+`BackgroundParameter` 声明标签、范围和默认值，Studio 显示对应滑块。
+Preset1 支持 refraction（0..3）、density（0..2）、speed（0.1..4）、
+dispersion（0..4）；省略参数保留原始效果。参数随 JSON 保存并生成生产 Dart。
 
 节点声明 `layout` 后成为运行时管理的 Frame，不调用主题组件工厂。
 子节点通过 `parentId` 引用容器，`rect` 相对父容器的内边距区域。

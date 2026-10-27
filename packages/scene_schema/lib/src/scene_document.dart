@@ -345,6 +345,7 @@ class SceneBackground {
     this.scrimOpacity = 0.35,
     this.blurSigma = 0,
     this.rendererId,
+    this.parameters = const {},
   });
 
   final SceneBackgroundKind kind;
@@ -361,6 +362,7 @@ class SceneBackground {
   /// legible; the blur is cached with the background repaint boundary.
   final double blurSigma;
   final String? rendererId;
+  final Map<String, double> parameters;
 
   SceneBackground copyWith({
     SceneBackgroundKind? kind,
@@ -369,6 +371,7 @@ class SceneBackground {
     double? scrimOpacity,
     double? blurSigma,
     String? rendererId,
+    Map<String, double>? parameters,
   }) {
     return SceneBackground(
       kind: kind ?? this.kind,
@@ -377,6 +380,7 @@ class SceneBackground {
       scrimOpacity: scrimOpacity ?? this.scrimOpacity,
       blurSigma: blurSigma ?? this.blurSigma,
       rendererId: rendererId ?? this.rendererId,
+      parameters: parameters ?? this.parameters,
     );
   }
 }

@@ -193,6 +193,7 @@ SceneBackground _decodeBackground(Map<String, dynamic> json) {
   if (blurSigma < 0) {
     throw FormatException('background.blurSigma must be >= 0.');
   }
+  final parameters = _getMap(json, 'parameters', fallback: const {});
   return SceneBackground(
     kind: kind,
     asset: asset,
@@ -202,6 +203,9 @@ SceneBackground _decodeBackground(Map<String, dynamic> json) {
     scrimOpacity: scrimOpacity,
     blurSigma: blurSigma,
     rendererId: _findString(json, 'rendererId'),
+    parameters: {
+      for (final key in parameters.keys) key: _getDouble(parameters, key),
+    },
   );
 }
 
@@ -213,6 +217,7 @@ Map<String, dynamic> _encodeBackground(SceneBackground background) {
     'scrimOpacity': background.scrimOpacity,
     'blurSigma': background.blurSigma,
     if (background.rendererId != null) 'rendererId': background.rendererId,
+    if (background.parameters.isNotEmpty) 'parameters': background.parameters,
   };
 }
 

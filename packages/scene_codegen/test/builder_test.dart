@@ -30,6 +30,7 @@ void main() {
           'kind': 'custom',
           'asset': r'assets/$wallpaper.png',
           'rendererId': r'${renderer}',
+          'parameters': {r'$rain': 1.5},
         },
         'nodes': [
           {
@@ -75,6 +76,7 @@ void main() {
     final document = jsonDecode(result.stdout as String);
     expect(document['background']['asset'], r'assets/$wallpaper.png');
     expect(document['background']['rendererId'], r'${renderer}');
+    expect(document['background']['parameters'], {r'$rain': 1.5});
     expect(document['nodes'][0]['id'], r'$node');
     expect(document['nodes'][0]['component'], r'${component}');
     expect(document['nodes'][0]['properties'], properties);

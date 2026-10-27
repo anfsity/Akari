@@ -20,6 +20,17 @@ Map<String, Object> node(String id, {String? parent, bool frame = false}) => {
 };
 
 void main() {
+  test('background parameters round trip and reject invalid external values', () {
+    final json = scene([node('a')]);
+    json['background'] = {'kind': 'solid', 'parameters': {'refraction': 1.5}};
+    final document = decodeSceneDocument(jsonEncode(json));
+    final updated = document.copyWith(background: document.background.copyWith(blurSigma: 8));
+    expect(decodeSceneDocument(encodeSceneDocument(updated)).background.parameters, {'refraction': 1.5});
+    for (final invalid in ['fast', {'speed': 'fast'}, {'speed': null}]) {
+      json['background'] = {'kind': 'solid', 'parameters': invalid};
+      expect(() => decodeSceneDocument(jsonEncode(json)), throwsFormatException);
+    }
+  });
   test('state responses accept only known triggers and effects', () {
     for (final effects in [
       {'isUnknown': 'shake'},

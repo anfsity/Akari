@@ -13,7 +13,6 @@ class NodeStyleInspector extends StatefulWidget {
 
 class _NodeStyleInspectorState extends State<NodeStyleInspector> {
   late SceneStyle _draft;
-  bool _hasSliderDraft = false;
   @override
   void initState() {
     super.initState();
@@ -36,7 +35,6 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
   }
 
   void _commit(SceneStyle style) {
-    _hasSliderDraft = false;
     widget.editor.updateSelectionStyle(style);
   }
 
@@ -75,27 +73,16 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
       children: [
         Text('$label  ${value.toStringAsFixed(1)}').small().muted(),
         const Gap(6),
-        Listener(
-          // shadcn omits onChangeEnd when a controlled slider already equals
-          // its final value. Pointer release still commits the live preview.
-          onPointerUp: (_) {
-            if (_hasSliderDraft) _commit(_draft);
-          },
-          onPointerCancel: (_) {
-            _hasSliderDraft = false;
+        StudioPreviewSlider(
+          key: ValueKey('style-$label'),
+          value: value,
+          maximum: maximum,
+          onCancel: () {
             widget.editor.cancelPreview();
             setState(_updateDraft);
           },
-          child: Slider(
-            key: ValueKey('style-$label'),
-            value: SliderValue.single(value.clamp(0, maximum)),
-            max: maximum,
-            onChanged: (value) {
-              _hasSliderDraft = true;
-              _preview(update(value.value));
-            },
-            onChangeEnd: (value) => _commit(update(value.value)),
-          ),
+          onPreview: (value) => _preview(update(value)),
+          onCommit: (value) => _commit(update(value)),
         ),
       ],
     ),
