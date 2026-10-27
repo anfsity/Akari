@@ -18,6 +18,8 @@ import 'package:theme_studio/src/node_inspector.dart';
 import 'package:theme_studio/src/studio_canvas.dart';
 import 'package:theme_studio/src/studio_theme.dart';
 import 'package:theme_studio/src/studio_timeline.dart';
+import 'package:theme_studio/src/studio_canvas_presets.dart';
+import 'package:theme_studio/src/studio_form.dart';
 
 const _document = SceneDocument(
   id: 'test',
@@ -567,6 +569,25 @@ void main() {
     expect(tester.state(field), same(state));
     expect(editor.inspector.getField('X').text, 'draft');
     expect(editor.canUndo, isFalse); expect(editor.isDirty, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('quick resolution saves one edit and comparison keeps the authored reference canvas', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    tester.widget<StudioSelect<StudioCanvasPreset>>(find.byKey(const ValueKey('quick-resolution'))).onChanged(StudioCanvasPreset.portrait);
+    await tester.pumpAndSettle();
+    expect(editor.document.canvas.referenceWidth, 1080); expect(editor.document.canvas.referenceHeight, 1920);
+    editor.undo(); await tester.pumpAndSettle(); expect(editor.canUndo, isFalse);
+    final reference = editor.document.canvas;
+    await tester.tap(find.byKey(const ValueKey('canvas-compare'))); await tester.pumpAndSettle();
+    final previews = tester.widgetList<StudioPreview>(find.byType(StudioPreview));
+    expect(previews.length, 4);
+    expect(previews.map((preview) => preview.viewportSize).toSet().length, 4);
+    expect(previews.every((preview) => identical(preview.document.canvas, reference)), isTrue);
+    expect(editor.canUndo, isFalse); expect(editor.isDirty, isFalse);
+    await tester.tap(find.byKey(const ValueKey('canvas-compare'))); await tester.pumpAndSettle();
+    expect(find.byType(StudioPreview), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

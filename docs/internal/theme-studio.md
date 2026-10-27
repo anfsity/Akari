@@ -140,6 +140,13 @@ authors can [declare their own slots](../reference/theme-package.md#declaring-la
 
 ### Coordinate units
 
+The resolution selector below the canvas applies HD, Full HD, QHD, 4K, portrait,
+16:10, and ultrawide reference dimensions immediately, with undo support.
+**Compare** displays Full HD, 4K, ultrawide, and portrait outputs together. These
+boards retain the same authored reference canvas and vary only output size, just
+as production does; entering comparison creates no document edit. **Single**
+returns to the original canvas and camera. Settings uses the same preset catalog.
+
 Scene JSON always stores normalized `[0, 1]` coordinates, while the inspector can display reference pixels or percentages. On a `1920x1080` reference canvas, these represent the same rectangle:
 
 | Field | Scene JSON | Reference Pixels | Percentage |

@@ -51,6 +51,7 @@ class StudioPreview extends StatefulWidget {
     this.playbackElapsed,
     this.transition = StudioTransition.wake,
     this.presenting = false,
+    this.viewportSize,
     this.readOnly = false,
     this.scenario = StudioPreviewScenario.password,
     this.interactive = false,
@@ -77,6 +78,7 @@ class StudioPreview extends StatefulWidget {
   final Duration? playbackElapsed;
   final StudioTransition transition;
   final bool presenting;
+  final Size? viewportSize;
   final bool dormant;
   final StudioPreferences preferences;
   final StudioCanvasTool tool;
@@ -113,10 +115,12 @@ class _StudioPreviewState extends State<StudioPreview>
   Map<String, SceneNodeGeometry> _getGeometry(SceneDocument document) =>
       calculateSceneLayout(
         document: document,
-        size: Size(
-          document.canvas.referenceWidth.toDouble(),
-          document.canvas.referenceHeight.toDouble(),
-        ),
+        size:
+            widget.viewportSize ??
+            Size(
+              document.canvas.referenceWidth.toDouble(),
+              document.canvas.referenceHeight.toDouble(),
+            ),
         minHitTarget: widget.theme.bundle.tokens.minHitTarget,
       );
 
@@ -466,10 +470,12 @@ class _StudioPreviewState extends State<StudioPreview>
   @override
   Widget build(BuildContext context) {
     final document = _getPreviewDocument();
-    final referenceSize = Size(
-      document.canvas.referenceWidth.toDouble(),
-      document.canvas.referenceHeight.toDouble(),
-    );
+    final referenceSize =
+        widget.viewportSize ??
+        Size(
+          document.canvas.referenceWidth.toDouble(),
+          document.canvas.referenceHeight.toDouble(),
+        );
     final geometry = _getGeometry(document);
     final predicates = _getPreviewPredicates(
       _simulation,
