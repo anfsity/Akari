@@ -375,7 +375,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                             theme: widget.theme,
                             readOnly: widget.readOnly || _previewing,
                             interactive: _previewing,
-                            document: session.document,
+                            document: session.previewDocument,
                             selectedId: session.selectedId,
                             selectedIds: session.selectedIds,
                             onSelectNodes: session.selectNodes,

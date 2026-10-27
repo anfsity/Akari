@@ -40,8 +40,10 @@ class SceneEditor extends ChangeNotifier {
   late _SceneRevision _revision;
   final _undo = <_SceneRevision>[];
   final _redo = <_SceneRevision>[];
+  SceneDocument? _previewDocument;
 
   SceneDocument get document => _revision.document;
+  SceneDocument get previewDocument => _previewDocument ?? document;
   String get encodedDocument => _revision.encoded;
   String get selectedId => _revision.selectedId;
   Set<String> get selectedIds => Set.unmodifiable(_revision.selectedIds);
@@ -81,6 +83,7 @@ class SceneEditor extends ChangeNotifier {
       selectedNode.layout?.direction == SceneLayoutDirection.absolute &&
       selectedNode.transform.isIdentity &&
       selectedNode.visibleWhen == null &&
+      selectedNode.styleToken == null &&
       selectedNode.motion == SceneMotionPreset.none &&
       !selectedNode.layout!.clip;
   ThemeComponentCatalog get componentCatalog => _componentCatalog;
@@ -469,6 +472,53 @@ class SceneEditor extends ChangeNotifier {
     updateNode(node.copyWith(properties: {...node.properties, 'text': text}));
   }
 
+  void updateSelectionStyle(SceneStyle style) {
+    if (!applyDraft() || selectedIds.isEmpty) return;
+    final token =
+        selectedNode.styleToken ??
+        _getUniqueId('$selectedId-style', document.styleTokens.keys.toSet());
+    _updateDocument(
+      document.copyWith(
+        styleTokens: {...document.styleTokens, token: style},
+        nodes: [
+          for (final node in document.nodes)
+            selectedIds.contains(node.id)
+                ? node.copyWith(styleToken: token)
+                : node,
+        ],
+      ),
+      selectedId: selectedId,
+    );
+  }
+
+  void previewSelectionStyle(SceneStyle style) {
+    if (selectedIds.isEmpty) return;
+    final token = selectedNode.styleToken ?? '$selectedId-style-preview';
+    _previewDocument = document.copyWith(
+      styleTokens: {...document.styleTokens, token: style},
+      nodes: [
+        for (final node in document.nodes)
+          selectedIds.contains(node.id)
+              ? node.copyWith(styleToken: token)
+              : node,
+      ],
+    );
+    notifyListeners();
+  }
+
+  void cancelPreview() {
+    if (_previewDocument == null) return;
+    _previewDocument = null;
+    notifyListeners();
+  }
+
+  void updateSelectionStyleToken(String? token) {
+    if (!applyDraft() || selectedIds.isEmpty) return;
+    updateNodes([
+      for (final node in selectedNodes) node.copyWith(styleToken: token),
+    ]);
+  }
+
   void duplicateSelectedNode() {
     if (!applyDraft()) return;
     if (!canDuplicateNode) {
@@ -544,7 +594,12 @@ class SceneEditor extends ChangeNotifier {
     // The codec is the same boundary used by code generation. Invalid edits
     // never replace the last working preview or create an undo entry.
     final encoded = encodeSceneDocument(document);
-    if (encoded == _revision.encoded) return;
+    final hadPreview = _previewDocument != null;
+    if (encoded == _revision.encoded) {
+      _previewDocument = null;
+      if (hadPreview) notifyListeners();
+      return;
+    }
     final updated = decodeSceneDocument(encoded);
     _componentCatalog.validateDocument(updated);
     _presetCatalog.validateDocument(updated);
@@ -562,6 +617,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void _applyRevision(_SceneRevision revision) {
+    _previewDocument = null;
     _revision = revision;
     inspector.resetNode(selectedNode, canvas: getInspectorCanvas());
     notifyListeners();

@@ -51,6 +51,46 @@ void main() {
     size: const Size(1920, 1080),
   );
 
+  test(
+    'style scrubbing stays transient and shared token edits undo atomically',
+    () {
+      editor.selectNodes({'a', 'b'});
+      editor.previewSelectionStyle(
+        const SceneStyle(fill: 0xff112233, radius: 12),
+      );
+      expect(editor.document.styleTokens, isEmpty);
+      expect(editor.isDirty, isFalse);
+      expect(editor.canUndo, isFalse);
+      expect(editor.previewDocument.styleTokens.values.single.radius, 12);
+      editor.updateSelectionStyle(
+        const SceneStyle(fill: 0xff112233, radius: 12),
+      );
+      final token = editor.selectedNode.styleToken!;
+      expect(
+        editor.selectedNodes.every((node) => node.styleToken == token),
+        isTrue,
+      );
+      editor.undo();
+      expect(editor.document.styleTokens, isEmpty);
+      expect(editor.canUndo, isFalse);
+      editor.redo();
+      editor.selectNode('a');
+      editor.updateSelectionStyle(
+        editor.document.styleTokens[token]!.copyWith(radius: 28),
+      );
+      expect(
+        editor.document.nodes.firstWhere((node) => node.id == 'b').styleToken,
+        token,
+      );
+      expect(editor.document.styleTokens[token]!.radius, 28);
+      editor.undo();
+      expect(editor.document.styleTokens[token]!.radius, 12);
+      editor.save();
+      editor.reload();
+      expect(editor.document.styleTokens[token]!.fill, 0xff112233);
+    },
+  );
+
   test('selection is transient; group and ungroup preserve rendered geometry and history', () {
     editor.selectNode('b', toggle: true);
     expect(editor.selectedIds, {'a', 'b'});

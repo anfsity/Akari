@@ -16,6 +16,15 @@ void main() {
         'id': '123 test',
         'version': 2,
         'themeProperties': properties,
+        'styleTokens': {
+          'glass': {
+            'fill': '#112233',
+            'gradientEnd': '#445566',
+            'radius': 16,
+            'textColor': '#ffffff',
+            'fontSize': 24,
+          },
+        },
         'canvas': {'fit': 'contain'},
         'background': {
           'kind': 'custom',
@@ -26,6 +35,7 @@ void main() {
           {
             'id': r'$node',
             'component': r'${component}',
+            'styleToken': 'glass',
             'layout': {'direction': 'column', 'gap': 12},
             'sizing': {'width': 320, 'flex': 1},
             'rect': {'x': 0, 'y': 0, 'width': 1, 'height': 1},
@@ -66,6 +76,9 @@ void main() {
     expect(document['nodes'][0]['sizing']['width'], 320);
     expect(document['nodes'][1]['parentId'], r'$node');
     expect(document['themeProperties'], properties);
+    expect(document['styleTokens']['glass']['gradientEnd'], '#445566');
+    expect(document['styleTokens']['glass']['radius'], 16);
+    expect(document['nodes'][0]['styleToken'], 'glass');
   });
 
   test('generates a typed document from a valid scene', () {
