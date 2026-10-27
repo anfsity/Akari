@@ -351,6 +351,7 @@ void main() {
     await tester.pumpAndSettle();
     final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
     expect(preview.viewportSize!.width, isNot(editor.document.canvas.referenceWidth));
+    expect(preview.readOnly, isTrue);
     expect(encodeSceneDocument(editor.document), original);
     expect(editor.canUndo, false);
     expect(tester.takeException(), isNull);
