@@ -3,6 +3,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import 'scene_editor.dart';
 import 'studio_form.dart';
+import 'studio_components.dart';
 
 class StudioComponentAssembly extends StatelessWidget {
   const StudioComponentAssembly({
@@ -19,12 +20,6 @@ class StudioComponentAssembly extends StatelessWidget {
     listenable: editor,
     builder: (context, _) {
       final layout = editor.layout;
-      if (layout == null && editor.presetCatalog.properties.isEmpty) {
-        return const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('Component assembly is unavailable for this scene.'),
-        );
-      }
       final ids = editor.document.nodes.map((node) => node.id).toSet();
       final slots =
           layout?.getSlots(editor.document) ?? const <ThemeLayoutSlot>[];
@@ -32,6 +27,41 @@ class StudioComponentAssembly extends StatelessWidget {
         key: const ValueKey('component-assembly'),
         padding: const EdgeInsets.all(12),
         children: [
+          const Text('Component library').semiBold(),
+          const Gap(8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final component in StudioComponent.values)
+                Draggable<StudioComponent>(
+                  data: component,
+                  affinity: Axis.horizontal,
+                  dragAnchorStrategy: pointerDragAnchorStrategy,
+                  maxSimultaneousDrags: readOnly ? 0 : 1,
+                  feedback: Container(
+                    padding: const EdgeInsets.all(12),
+                    color: Theme.of(context).colorScheme.background,
+                    child: Text(component.label),
+                  ),
+                  child: OutlineButton(
+                    key: ValueKey('add-component-${component.name}'),
+                    onPressed: readOnly
+                        ? null
+                        : () => editor.createComponent(component),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(component.icon, size: 14),
+                        const Gap(6),
+                        Text(component.label).small(),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const Gap(16),
           Text(layout?.label ?? 'Theme customization').semiBold(),
           const Gap(8),
           Text(
@@ -208,6 +238,7 @@ class _AssemblySlot extends StatelessWidget {
     if (readOnly) return row;
     return Draggable<SceneNode>(
       data: slot.defaultNode,
+      affinity: Axis.horizontal,
       dragAnchorStrategy: pointerDragAnchorStrategy,
       feedback: Container(
         padding: const EdgeInsets.all(12),

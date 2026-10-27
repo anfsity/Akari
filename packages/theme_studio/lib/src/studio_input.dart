@@ -161,7 +161,14 @@ enum StudioCommand {
     'Nudge down × 10',
     'Geometry',
     StudioKeyBinding(LogicalKeyboardKey.arrowDown, shift: true),
-  );
+  ),
+  addText('Add text', 'Create', StudioKeyBinding(LogicalKeyboardKey.keyT)),
+  addShape(
+    'Add rectangle',
+    'Create',
+    StudioKeyBinding(LogicalKeyboardKey.keyU),
+  ),
+  addFrame('Add frame', 'Create', StudioKeyBinding(LogicalKeyboardKey.keyF));
 
   const StudioCommand(this.label, this.category, this.defaultBinding);
   final String label;

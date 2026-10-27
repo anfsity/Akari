@@ -12,6 +12,8 @@ enum SceneGuideAxis { horizontal, vertical }
 
 enum SceneAssetKind { image, svg }
 
+enum ScenePrimitive { text, rectangle, circle }
+
 enum SceneAssetFit { contain, cover, fill }
 
 class SceneAsset {
@@ -438,6 +440,7 @@ class SceneNode {
     this.sizing = const SceneSizing(),
     this.styleToken,
     this.asset,
+    this.primitive,
     this.transform = const SceneTransform(),
     this.z = 0,
     this.renderOrder = 0,
@@ -460,6 +463,7 @@ class SceneNode {
   final SceneSizing sizing;
   final String? styleToken;
   final SceneAsset? asset;
+  final ScenePrimitive? primitive;
   final SceneTransform transform;
   final int z;
   final int renderOrder;
@@ -483,6 +487,7 @@ class SceneNode {
     SceneSizing? sizing,
     Object? styleToken = _unset,
     Object? asset = _unset,
+    Object? primitive = _unset,
     SceneTransform? transform,
     int? z,
     int? renderOrder,
@@ -507,6 +512,9 @@ class SceneNode {
           ? this.styleToken
           : styleToken as String?,
       asset: identical(asset, _unset) ? this.asset : asset as SceneAsset?,
+      primitive: identical(primitive, _unset)
+          ? this.primitive
+          : primitive as ScenePrimitive?,
       transform: transform ?? this.transform,
       z: z ?? this.z,
       renderOrder: renderOrder ?? this.renderOrder,

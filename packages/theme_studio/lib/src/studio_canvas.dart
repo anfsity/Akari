@@ -6,6 +6,7 @@ import 'node_geometry.dart';
 import 'scene_editor.dart';
 import 'studio_preferences.dart';
 import 'studio_input.dart';
+import 'studio_components.dart';
 import 'studio_preview.dart';
 import 'studio_preview_host.dart';
 import 'studio_form.dart';
@@ -175,6 +176,12 @@ class _StudioCanvasState extends State<StudioCanvas> {
           return KeyEventResult.ignored;
         }
         switch (command) {
+          case StudioCommand.addText:
+            session.createComponent(StudioComponent.text);
+          case StudioCommand.addShape:
+            session.createComponent(StudioComponent.rectangle);
+          case StudioCommand.addFrame:
+            session.createComponent(StudioComponent.frame);
           case StudioCommand.undo:
             session.undo();
           case StudioCommand.redo:
@@ -534,6 +541,12 @@ class _StudioCanvasState extends State<StudioCanvas> {
                                           onSelectNodes: session.selectNodes,
                                           onCommitNodes: session.updateNodes,
                                           onPlaceNode: session.placeNode,
+                                          onCreateComponent:
+                                              (component, position) =>
+                                                  session.createComponent(
+                                                    component,
+                                                    position: position,
+                                                  ),
                                           onUpdateText: session.updateNodeText,
                                           snapToGuides: _snapToGuides,
                                           showRulers: _showRulers,

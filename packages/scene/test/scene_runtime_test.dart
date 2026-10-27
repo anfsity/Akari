@@ -9,6 +9,43 @@ import 'package:scene/src/runtime/state_effects.dart';
 
 void main() {
   testWidgets(
+    'primitive text and shapes render without entering the theme factory',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SceneRuntime(
+              document: _document(
+                nodes: const [
+                  SceneNode(
+                    id: 'text',
+                    componentId: 'scenePrimitive',
+                    primitive: ScenePrimitive.text,
+                    properties: {'text': 'Portable text'},
+                    rect: SceneRect(x: 0, y: 0, width: .5, height: .2),
+                  ),
+                  SceneNode(
+                    id: 'circle',
+                    componentId: 'scenePrimitive',
+                    primitive: ScenePrimitive.circle,
+                    rect: SceneRect(x: .5, y: .5, width: .2, height: .2),
+                  ),
+                ],
+              ),
+              theme: ThemeBundle(tokens: _tokens()),
+              nodeBuilder: (_, _) =>
+                  throw StateError('Primitive entered the theme factory'),
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Portable text'), findsOneWidget);
+      expect(find.byType(ClipOval), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'SVG assets render independently of theme factories and retain their source across tint edits',
     (tester) async {
       var loads = 0;

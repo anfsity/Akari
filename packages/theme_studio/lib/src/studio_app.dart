@@ -472,6 +472,94 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     }
   }
 
+  Future<void> _createScene(BuildContext context) async {
+    if (!await _confirmSwitch(context) || !context.mounted) return;
+    final name = TextEditingController(text: 'new-scene');
+    String? error;
+    try {
+      final path = await showOverlay<String>(
+        context,
+        const DialogConfiguration(),
+        builder: (context) => StatefulBuilder(
+          builder: (context, update) => AlertDialog(
+            title: const Text('New scene'),
+            content: SizedBox(
+              width: 320,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Start with an empty artboard in the current theme.',
+                  ),
+                  const Gap(12),
+                  TextField(
+                    key: const ValueKey('new-scene-name'),
+                    controller: name,
+                  ),
+                  if (error != null) Text(error!).small(),
+                ],
+              ),
+            ),
+            actions: [
+              OutlineButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              PrimaryButton(
+                key: const ValueKey('confirm-new-scene'),
+                onPressed: () {
+                  final id = name.text.trim();
+                  if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(id)) {
+                    update(() => error = 'Use a lower-case scene name.');
+                    return;
+                  }
+                  final file = File(
+                    '${_assets.directory.path}/lib/$id.scene.json',
+                  );
+                  if (file.existsSync()) {
+                    update(() => error = 'This scene already exists.');
+                    return;
+                  }
+                  try {
+                    file.parent.createSync(recursive: true);
+                    file.writeAsStringSync(
+                      encodeSceneDocument(
+                        SceneDocument(
+                          id: id,
+                          version: currentSceneVersion,
+                          canvas: _editor!.document.canvas,
+                          background: const SceneBackground(
+                            kind: SceneBackgroundKind.solid,
+                          ),
+                          nodes: const [
+                            SceneNode(
+                              id: 'artboard',
+                              componentId: 'frame',
+                              layout: SceneLayout(),
+                              rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                    Navigator.of(context).pop(file.path);
+                  } on FileSystemException catch (failure) {
+                    update(() => error = failure.message);
+                  }
+                },
+                child: const Text('Create scene'),
+              ),
+            ],
+          ),
+        ),
+      ).future;
+      if (mounted && path != null) setState(() => _openScene(path));
+    } finally {
+      name.dispose();
+    }
+  }
+
   void _reload() {
     if (!_confirmReload && _editor != null) {
       setState(() => _confirmReload = true);
@@ -525,6 +613,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         onOpenSettings: () => _openSettings(context),
         onSave: _save,
         onCreateTheme: () => _openCreateTheme(context),
+        onCreateScene: () => _createScene(context),
       ),
       sidebar: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

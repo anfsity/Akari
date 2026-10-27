@@ -20,6 +20,47 @@ Map<String, Object> node(String id, {String? parent, bool frame = false}) => {
 };
 
 void main() {
+  test('primitive content validates once and round trips independently of theme components', () {
+    for (final kind in ScenePrimitive.values) {
+      final document = decodeSceneDocument(
+        jsonEncode(
+          scene([
+            {...node('primitive'), 'primitive': kind.name},
+          ]),
+        ),
+      );
+      expect(
+        decodeSceneDocument(encodeSceneDocument(document))
+            .nodes
+            .single
+            .primitive,
+        kind,
+      );
+    }
+    for (final content in [
+      {'primitive': 'unknown'},
+      {
+        'primitive': 'text',
+        'layout': {'direction': 'row'},
+      },
+      {
+        'primitive': 'text',
+        'asset': {'path': 'assets/photo.png'},
+      },
+    ]) {
+      expect(
+        () => decodeSceneDocument(
+          jsonEncode(
+            scene([
+              {...node('primitive'), ...content},
+            ]),
+          ),
+        ),
+        throwsFormatException,
+      );
+    }
+  });
+
   test('asset defaults and overrides survive unrelated node edits and JSON round trips', () {
     final document = decodeSceneDocument(
       jsonEncode(
