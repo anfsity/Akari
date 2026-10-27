@@ -225,6 +225,7 @@ class StudioAssets {
     return registerSceneFont(
       source: file?.absolute.path ?? asset,
       revision: key,
+      asset: asset,
       loadBytes: () => loadBytes(asset),
     );
   }

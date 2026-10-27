@@ -11,6 +11,124 @@ SceneDocument document(List<SceneNode> nodes) => SceneDocument(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'breakpoints, constraints, fill and wrapping share viewport geometry',
+    () {
+      final scene = document([
+        const SceneNode(
+          id: 'frame',
+          componentId: 'frame',
+          rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+          layout: SceneLayout(
+            direction: SceneLayoutDirection.row,
+            gap: 10,
+            wrap: true,
+          ),
+          breakpoints: [
+            SceneBreakpoint(
+              minWidth: 800,
+              layout: SceneLayout(
+                direction: SceneLayoutDirection.column,
+                gap: 5,
+              ),
+            ),
+          ],
+        ),
+        for (var i = 0; i < 3; i++)
+          SceneNode(
+            id: 'item$i',
+            componentId: 'shape',
+            parentId: 'frame',
+            rect: const SceneRect(x: 0, y: 0, width: .1, height: .1),
+            sizing: const SceneSizing(
+              width: 200,
+              height: 40,
+              minWidth: 100,
+              maxWidth: 240,
+            ),
+          ),
+      ]);
+      final narrow = calculateSceneLayout(
+        document: scene,
+        size: const Size(450, 300),
+      );
+      expect(narrow['item1']!.rect.top, 0);
+      expect(narrow['item2']!.rect, const Rect.fromLTWH(0, 50, 200, 40));
+      final wide = calculateSceneLayout(
+        document: scene,
+        size: const Size(900, 300),
+      );
+      expect(wide['item2']!.rect, const Rect.fromLTWH(0, 90, 200, 40));
+      final filled = scene.copyWith(
+        nodes: [
+          scene.nodes.first.copyWith(
+            breakpoints: [],
+            layout: const SceneLayout(direction: SceneLayoutDirection.row),
+          ),
+          scene.nodes[1].copyWith(
+            sizing: const SceneSizing(
+              widthMode: SceneSizeMode.fill,
+              minWidth: 100,
+              maxWidth: 300,
+              height: 40,
+            ),
+          ),
+        ],
+      );
+      expect(
+        calculateSceneLayout(
+          document: filled,
+          size: const Size(900, 300),
+        )['item0']!.rect.width,
+        300,
+      );
+    },
+  );
+  test('hug text and frames measure real content and constrain it', () {
+    final scene = document(const [
+      SceneNode(
+        id: 'frame',
+        componentId: 'frame',
+        rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+        layout: SceneLayout(
+          direction: SceneLayoutDirection.row,
+          padding: 10,
+          gap: 5,
+        ),
+        sizing: SceneSizing(
+          widthMode: SceneSizeMode.hug,
+          heightMode: SceneSizeMode.hug,
+        ),
+      ),
+      SceneNode(
+        id: 'label',
+        componentId: 'text',
+        parentId: 'frame',
+        primitive: ScenePrimitive.text,
+        rect: SceneRect(x: 0, y: 0, width: .1, height: .1),
+        properties: {'text': 'Measure me'},
+        sizing: SceneSizing(
+          widthMode: SceneSizeMode.hug,
+          heightMode: SceneSizeMode.hug,
+        ),
+      ),
+    ]);
+    final geometry = calculateSceneLayout(
+      document: scene,
+      size: const Size(600, 400),
+    );
+    expect(geometry['label']!.rect.width, greaterThan(60));
+    expect(
+      geometry['frame']!.rect.width,
+      closeTo(geometry['label']!.rect.width + 20, .001),
+    );
+    expect(
+      geometry['frame']!.rect.height,
+      closeTo(geometry['label']!.rect.height + 20, .001),
+    );
+  });
+
   test('nested frames resolve parent coordinates and ancestor transforms', () {
     final scene = document(const [
       SceneNode(

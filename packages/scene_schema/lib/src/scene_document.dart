@@ -2,6 +2,8 @@ enum SceneCanvasFit { cover, contain, reflow }
 
 const currentSceneVersion = 3;
 
+enum SceneSizeMode { proportional, hug, fill }
+
 enum SceneLayoutDirection { absolute, row, column }
 
 enum SceneMainAlignment { start, center, end, spaceBetween }
@@ -60,6 +62,7 @@ class SceneLayout {
     this.mainAlignment = SceneMainAlignment.start,
     this.crossAlignment = SceneCrossAlignment.start,
     this.clip = false,
+    this.wrap = false,
   });
 
   final SceneLayoutDirection direction;
@@ -68,16 +71,81 @@ class SceneLayout {
   final SceneMainAlignment mainAlignment;
   final SceneCrossAlignment crossAlignment;
   final bool clip;
+  final bool wrap;
 }
 
 /// Fixed logical dimensions override proportional rectangle dimensions. In a
 /// row/column, flex shares the remaining main-axis space with other flex items.
 class SceneSizing {
-  const SceneSizing({this.width, this.height, this.flex = 0});
-
+  const SceneSizing({
+    this.width,
+    this.height,
+    this.flex = 0,
+    this.widthMode = SceneSizeMode.proportional,
+    this.heightMode = SceneSizeMode.proportional,
+    this.minWidth = 0,
+    this.minHeight = 0,
+    this.maxWidth,
+    this.maxHeight,
+  });
   final double? width;
   final double? height;
   final double flex;
+  final SceneSizeMode widthMode;
+  final SceneSizeMode heightMode;
+  final double minWidth;
+  final double minHeight;
+  final double? maxWidth;
+  final double? maxHeight;
+
+  SceneSizing copyWith({
+    Object? width = _unset,
+    Object? height = _unset,
+    double? flex,
+    SceneSizeMode? widthMode,
+    SceneSizeMode? heightMode,
+    double? minWidth,
+    double? minHeight,
+    Object? maxWidth = _unset,
+    Object? maxHeight = _unset,
+  }) => SceneSizing(
+    width: identical(width, _unset) ? this.width : width as double?,
+    height: identical(height, _unset) ? this.height : height as double?,
+    flex: flex ?? this.flex,
+    widthMode: widthMode ?? this.widthMode,
+    heightMode: heightMode ?? this.heightMode,
+    minWidth: minWidth ?? this.minWidth,
+    minHeight: minHeight ?? this.minHeight,
+    maxWidth: identical(maxWidth, _unset) ? this.maxWidth : maxWidth as double?,
+    maxHeight: identical(maxHeight, _unset)
+        ? this.maxHeight
+        : maxHeight as double?,
+  );
+}
+
+/// The widest matching rule overrides base layout/sizing at logical viewport
+/// widths. Rules affect presentation only and survive reparenting and export.
+class SceneBreakpoint {
+  const SceneBreakpoint({required this.minWidth, this.layout, this.sizing});
+  final double minWidth;
+  final SceneLayout? layout;
+  final SceneSizing? sizing;
+}
+
+SceneNode getSceneNodeForWidth(SceneNode node, double width) {
+  SceneBreakpoint? match;
+  for (final rule in node.breakpoints) {
+    if (rule.minWidth <= width &&
+        (match == null || rule.minWidth > match.minWidth)) {
+      match = rule;
+    }
+  }
+  return match == null
+      ? node
+      : node.copyWith(
+          layout: match.layout ?? node.layout,
+          sizing: match.sizing ?? node.sizing,
+        );
 }
 
 /// Named, reusable visual values shared by Studio and the compiled runtime.
@@ -460,6 +528,7 @@ class SceneNode {
     this.parentId,
     this.layout,
     this.sizing = const SceneSizing(),
+    this.breakpoints = const [],
     this.styleToken,
     this.asset,
     this.primitive,
@@ -483,6 +552,7 @@ class SceneNode {
   /// Non-null marks a runtime-owned frame, independent of theme components.
   final SceneLayout? layout;
   final SceneSizing sizing;
+  final List<SceneBreakpoint> breakpoints;
   final String? styleToken;
   final SceneAsset? asset;
   final ScenePrimitive? primitive;
@@ -507,6 +577,7 @@ class SceneNode {
     Object? parentId = _unset,
     Object? layout = _unset,
     SceneSizing? sizing,
+    List<SceneBreakpoint>? breakpoints,
     Object? styleToken = _unset,
     Object? asset = _unset,
     Object? primitive = _unset,
@@ -530,6 +601,7 @@ class SceneNode {
           : parentId as String?,
       layout: identical(layout, _unset) ? this.layout : layout as SceneLayout?,
       sizing: sizing ?? this.sizing,
+      breakpoints: breakpoints ?? this.breakpoints,
       styleToken: identical(styleToken, _unset)
           ? this.styleToken
           : styleToken as String?,

@@ -57,17 +57,10 @@ String generateSceneNode(SceneNode node) {
       ${node.asset == null ? '' : '''asset: const SceneAsset(path: ${encodeDartString(node.asset!.path)},
         kind: SceneAssetKind.${node.asset!.kind.name}, fit: SceneAssetFit.${node.asset!.fit.name},
         tint: ${node.asset!.tint == null ? 'null' : _encodeColorLiteral(node.asset!.tint!)}),'''}
-      ${node.layout == null ? '' : '''layout: const SceneLayout(
-        direction: SceneLayoutDirection.${node.layout!.direction.name},
-        padding: ${node.layout!.padding},
-        gap: ${node.layout!.gap},
-        mainAlignment: SceneMainAlignment.${node.layout!.mainAlignment.name},
-        crossAlignment: SceneCrossAlignment.${node.layout!.crossAlignment.name},
-        clip: ${node.layout!.clip},
-      ),'''}
-      sizing: const SceneSizing(
-        width: ${node.sizing.width}, height: ${node.sizing.height}, flex: ${node.sizing.flex},
-      ),
+      ${node.layout == null ? '' : 'layout: ${_encodeLayout(node.layout!)},'}
+      sizing: ${_encodeSizing(node.sizing)},
+      breakpoints: <SceneBreakpoint>[
+${node.breakpoints.map((rule) => '        SceneBreakpoint(minWidth: ${rule.minWidth}, layout: ${rule.layout == null ? 'null' : _encodeLayout(rule.layout!)}, sizing: ${rule.sizing == null ? 'null' : _encodeSizing(rule.sizing!)}),\n').join()}      ],
       rect: const SceneRect(
         x: ${node.rect.x},
         y: ${node.rect.y},
@@ -101,6 +94,11 @@ $properties      },
     ),
 ''';
 }
+
+String _encodeLayout(SceneLayout layout) =>
+    'const SceneLayout(direction: SceneLayoutDirection.${layout.direction.name}, padding: ${layout.padding}, gap: ${layout.gap}, mainAlignment: SceneMainAlignment.${layout.mainAlignment.name}, crossAlignment: SceneCrossAlignment.${layout.crossAlignment.name}, clip: ${layout.clip}, wrap: ${layout.wrap})';
+String _encodeSizing(SceneSizing size) =>
+    'const SceneSizing(width: ${size.width}, height: ${size.height}, flex: ${size.flex}, widthMode: SceneSizeMode.${size.widthMode.name}, heightMode: SceneSizeMode.${size.heightMode.name}, minWidth: ${size.minWidth}, minHeight: ${size.minHeight}, maxWidth: ${size.maxWidth}, maxHeight: ${size.maxHeight})';
 
 String _encodeConditionLiteral(SceneCondition condition) {
   return switch (condition) {

@@ -278,7 +278,7 @@ SceneNode calculateResizedNode({
   }
   return source.copyWith(
     rect: resized,
-    sizing: SceneSizing(
+    sizing: source.sizing.copyWith(
       width: source.sizing.width == null
           ? null
           : resized.width * canvasSize.width,

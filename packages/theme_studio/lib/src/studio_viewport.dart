@@ -75,6 +75,9 @@ class _StudioViewportState extends State<StudioViewport> {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final viewport = constraints.biggest;
+      // A compact workspace can temporarily allocate no canvas area while its
+      // controls wrap. Selection handles require a nonzero camera scale.
+      if (viewport.isEmpty) return const SizedBox.shrink();
       final scale =
           widget.zoom ??
           calculateFitZoom(
