@@ -54,17 +54,23 @@ combines those designs. Code-owned widgets and shaders remain supported.
 - Terrace now declares wide, stacked and compact standby clock variants through
   the same typed component property used by its renderer. Existing scenes keep
   the original wide clock unless explicitly changed.
-- Remaining: final native reopen verification and the full repository audit.
+- End-to-end native verification is complete. A theme created in the VM from
+  pending edits was saved, undone/redone, independently compiled and reopened in
+  Studio, then run as a release bundle. Source hashes remained unchanged. Both
+  1440×900 and 1280×720 layouts were inspected; preview input retained focus
+  without changing the saved document. The full 31-step `akari verify` pipeline
+  passed against that external theme, including Studio's 113 tests and the
+  private D-Bus smoke check. The current default theme passed all 64 tests.
 
-## Next implementation: independent project synthesis
+## Independent project synthesis contract
 
 The export must work for the active edited document, including an imported scene
 whose ID differs from the source preset's generated default. It must also work
 when the source preset is later removed.
 
-- Introduce shared Flutter-free project operations for Studio and the CLI.
-  Package/builder naming is currently private in `tool/src/theme/project.dart`;
-  keep that business rule authoritative when Studio creates new package names.
+- Shared Flutter-free operations live in `packages/theme_project`. Naming and
+  primary-scene discovery have one public entrypoint in `lib/project.dart`;
+  source synthesis also parses Dart directives to preserve shared SDK imports.
 - Copy the source's own code and declared resources, preserving licenses and
   shaders. Exclude build caches and generated scene files. Rebase local SDK and
   development dependency paths from the source to the destination project.
@@ -80,8 +86,7 @@ when the source preset is later removed.
   whichever source scene happens to sort first.
 - Rewrite self-package asset/font/library references to the new namespace.
   Copy imported external resources into the new package and register them in
-  its manifest. Studio's current asset list is shallow and must list nested
-  imported resource paths too.
+  its manifest. Studio lists nested imported resource paths too.
 - Stage the complete project before publishing it. Refuse existing targets and
   source/destination nesting; failures must leave the source and target intact.
 - Add a Create theme flow for name and destination. It exports pending valid
@@ -96,5 +101,12 @@ Tests must cover source preservation, naming, path rebasing, resource/namespace
 rewriting, edited-document restoration, failed/existing destinations, UI
 creation and switching, and an actual build and VM run of the created project.
 
-Completion requires the entire end state above; a working property editor or
-project copy alone is not a completed composition workflow.
+Local review artifacts are in `build/studio-synthesis-review`: `verification.md`
+and `verification.json` record native actions, source hashes and screenshots;
+`final-verify.json` is the complete passing verification report. Release build
+runs are `1793061281448177-43359` (initial external composition) and
+`1793062512174284-48066` (project actually created through native Studio).
+
+The isolated release screenshot exercises theme rendering in the unavailable
+service state; it does not claim a new real PAM login. The existing login
+installation was kept separate from the test desktop.
