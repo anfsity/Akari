@@ -4,8 +4,74 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scene/scene.dart';
+import 'package:scene/src/runtime/state_effects.dart';
 
 void main() {
+  testWidgets(
+    'state-entry effects trigger once, reset and respect reduced motion',
+    (tester) async {
+      final predicates = ValueNotifier<Set<ScenePredicate>>({});
+      addTearDown(predicates.dispose);
+      final document = _document(
+        nodes: const [
+          SceneNode(
+            id: 'form',
+            componentId: 'form',
+            stateEffects: {ScenePredicate.isAuthError: SceneStateEffect.shake},
+            motionTiming: SceneMotionTiming(durationMs: 800),
+            rect: SceneRect(x: .1, y: .1, width: .8, height: .8),
+          ),
+        ],
+      );
+      Future<void> render(bool reduced) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SceneRuntime(
+              document: document,
+              theme: ThemeBundle(tokens: _tokens(disableAnimations: reduced)),
+              activePredicatesListenable: predicates,
+              nodeBuilder: (_, _) => const Text('Form'),
+            ),
+          ),
+        ),
+      );
+      double translation() => tester
+          .widget<Transform>(
+            find
+                .descendant(
+                  of: find.byType(SceneStateEffects),
+                  matching: find.byType(Transform),
+                )
+                .first,
+          )
+          .transform
+          .entry(0, 3);
+      await render(false);
+      predicates.value = {ScenePredicate.isAuthError};
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(translation().abs(), greaterThan(.1));
+      await tester.pumpAndSettle();
+      expect(translation(), closeTo(0, 1e-8));
+      predicates.value = {
+        ScenePredicate.isAuthError,
+        ScenePredicate.isServiceReady,
+      };
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(translation(), closeTo(0, 1e-8));
+      predicates.value = {};
+      await tester.pump();
+      predicates.value = {ScenePredicate.isAuthError};
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(translation().abs(), greaterThan(.1));
+      await render(true);
+      expect(translation(), closeTo(0, 1e-8));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     'timeline samples the same delayed Bezier motion as live playback',
     (tester) async {

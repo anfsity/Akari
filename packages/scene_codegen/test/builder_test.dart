@@ -36,6 +36,7 @@ void main() {
             'id': r'$node',
             'component': r'${component}',
             'styleToken': 'glass',
+            'stateEffects': {'isAuthError': 'shake'},
             'motionTiming': {
               'durationMs': 800,
               'delayMs': 120,
@@ -84,6 +85,7 @@ void main() {
     expect(document['styleTokens']['glass']['gradientEnd'], '#445566');
     expect(document['styleTokens']['glass']['radius'], 16);
     expect(document['nodes'][0]['styleToken'], 'glass');
+    expect(document['nodes'][0]['stateEffects'], {'isAuthError': 'shake'});
     expect(document['nodes'][0]['motionTiming']['delayMs'], 120);
     expect(document['nodes'][0]['motionTiming']['curve'], [.2, 0, .4, 1]);
   });

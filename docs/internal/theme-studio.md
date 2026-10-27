@@ -147,6 +147,14 @@ Transform translations (`translateX`, `translateY`) remain in logical pixels as 
 
 ## Canvas tools & gestures
 
+**State flow** displays the core dormant/login/submitting/success/error path.
+Click a state to preview it. **Design → State rules** edits visibility using
+readable state labels, inversion, and state-entry Shake/Pulse responses. Complex
+existing visibility expressions remain intact until explicitly replaced. Rules
+save with the scene, run in production, and use the same node timing on the
+timeline. The graph previews semantic authentication states; backend transitions
+remain owned by the authentication feature.
+
 **Timeline** opens a scrubber and play/pause controls for entrance, wake, sleep,
 and submit-to-success/error transitions. Scrubbing and scenario changes never
 modify the scene or history. The range starts at 1.5 seconds and expands to fit

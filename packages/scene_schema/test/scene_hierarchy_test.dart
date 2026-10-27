@@ -20,6 +20,24 @@ Map<String, Object> node(String id, {String? parent, bool frame = false}) => {
 };
 
 void main() {
+  test('state responses accept only known triggers and effects', () {
+    for (final effects in [
+      {'isUnknown': 'shake'},
+      {'isAuthError': 'execute'},
+      {'isAuthError': 42},
+    ]) {
+      expect(
+        () => decodeSceneDocument(
+          jsonEncode(
+            scene([
+              {...node('a'), 'stateEffects': effects},
+            ]),
+          ),
+        ),
+        throwsFormatException,
+      );
+    }
+  });
   test('motion timing validates before entering generated scenes', () {
     for (final invalid in [
       {'durationMs': -1},

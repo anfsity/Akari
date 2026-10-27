@@ -433,6 +433,23 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('state flow previews outcomes and authored state rules save with history', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.ensureVisible(find.text('State rules')); await tester.tap(find.text('State rules')); await tester.pumpAndSettle();
+    final add = find.byKey(const ValueKey('add-state-effect'));
+    await tester.ensureVisible(add); await tester.tap(add); await tester.pumpAndSettle();
+    expect(editor.selectedNode.stateEffects, {ScenePredicate.isAuthError: SceneStateEffect.shake});
+    editor.save();
+    expect(decodeSceneDocument(file.readAsStringSync()).nodes.first.stateEffects, editor.selectedNode.stateEffects);
+    await tester.tap(find.byKey(const ValueKey('canvas-state-graph'))); await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('graph-Error')));
+    await tester.tap(find.byKey(const ValueKey('graph-Error'))); await tester.pumpAndSettle();
+    expect(tester.widget<SceneRuntime>(find.byType(SceneRuntime)).activePredicates, contains(ScenePredicate.isAuthError));
+    editor.undo(); expect(editor.selectedNode.stateEffects, isEmpty); expect(editor.canUndo, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('preview scenarios wake the canvas without editing the scene', (
     tester,
   ) async {

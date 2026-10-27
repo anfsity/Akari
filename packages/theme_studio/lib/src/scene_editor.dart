@@ -84,6 +84,7 @@ class SceneEditor extends ChangeNotifier {
       selectedNode.transform.isIdentity &&
       selectedNode.visibleWhen == null &&
       selectedNode.styleToken == null &&
+      selectedNode.stateEffects.isEmpty &&
       selectedNode.motion == SceneMotionPreset.none &&
       !selectedNode.layout!.clip;
   ThemeComponentCatalog get componentCatalog => _componentCatalog;

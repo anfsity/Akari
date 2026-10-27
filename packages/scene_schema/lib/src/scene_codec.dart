@@ -233,6 +233,22 @@ SceneNode _decodeNode(
     componentId: component.id,
     rect: rect,
     styleToken: _findString(json, 'styleToken'),
+    stateEffects: {
+      for (final entry in _getMap(
+        json,
+        'stateEffects',
+        fallback: const {},
+      ).entries)
+        _getEnumValue(
+          ScenePredicate.values,
+          entry.key,
+          'stateEffects.trigger',
+        ): _getEnumValue(
+          SceneStateEffect.values,
+          _getStringValue(entry.value, 'stateEffects.effect'),
+          'stateEffects.effect',
+        ),
+    },
     motionTiming: _decodeMotionTiming(
       _getMap(json, 'motionTiming', fallback: const {}),
     ),
@@ -365,6 +381,11 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
     if (node.renderOrder != 0) 'renderOrder': node.renderOrder,
     if (node.focusOrder != 0) 'focusOrder': node.focusOrder,
     if (node.motion != SceneMotionPreset.none) 'motion': node.motion.name,
+    if (node.stateEffects.isNotEmpty)
+      'stateEffects': {
+        for (final entry in node.stateEffects.entries)
+          entry.key.name: entry.value.name,
+      },
     if (!node.motionTiming.isDefault)
       'motionTiming': {
         if (node.motionTiming.durationMs != null)
