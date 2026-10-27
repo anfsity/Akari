@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:theme_project/theme_project.dart';
 import 'package:yaml/yaml.dart';
 
 import 'model.dart';
 
-const _themePackagePrefix = 'theme_';
+export 'package:theme_project/theme_project.dart' show findThemeSceneFiles;
 
 class ThemePackage {
   const ThemePackage({
@@ -30,15 +31,10 @@ ThemePackage getThemePackage(Directory projectDirectory) {
   final manifest = File(_join(directory.path, 'pubspec.yaml'));
   final pubspec = loadYaml(manifest.readAsStringSync());
   final packageName = pubspec is YamlMap ? pubspec['name'] : null;
-  if (packageName is! String || !packageName.startsWith(_themePackagePrefix)) {
+  if (packageName is! String) {
     throw FormatException('Theme package names must start with theme_.');
   }
-  final themeName = packageName.substring(_themePackagePrefix.length);
-  if (!RegExp(r'^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$').hasMatch(themeName)) {
-    throw FormatException(
-      'Theme package $packageName must use a lowercase underscore name.',
-    );
-  }
+  final builderName = getThemeBuilderName(packageName);
   final libDirectory = Directory(_join(directory.path, 'lib'));
   final entrypoint = File(_join(libDirectory.path, 'theme.dart'));
   final sceneFiles = findThemeSceneFiles(directory);
@@ -47,29 +43,16 @@ ThemePackage getThemePackage(Directory projectDirectory) {
       '$packageName must contain lib/theme.dart and a .scene.json document.',
     );
   }
-  final builderName = _getBuilderName(themeName);
-  if (!RegExp(r'\b' + RegExp.escape(builderName) + r'\s*\(')
-      .hasMatch(entrypoint.readAsStringSync())) {
-    throw FormatException(
-      '$packageName must export $builderName() from lib/theme.dart.',
-    );
-  }
+  validateThemeEntrypoint(
+    entrypoint.readAsStringSync(),
+    builderName,
+    packageName,
+  );
   return ThemePackage(
     packageName: packageName,
     builderName: builderName,
     directory: directory,
   );
-}
-
-List<File> findThemeSceneFiles(Directory projectDirectory) {
-  final lib = Directory(_join(projectDirectory.path, 'lib'));
-  if (!lib.existsSync()) return [];
-  return lib
-      .listSync(recursive: true, followLinks: false)
-      .whereType<File>()
-      .where((file) => file.path.endsWith('.scene.json'))
-      .toList()
-    ..sort((left, right) => left.path.compareTo(right.path));
 }
 
 List<ThemePackage> findThemePackages(Directory repoRoot) {
@@ -103,14 +86,6 @@ List<ThemePackage> findStudioThemePackages(
   ...findThemePackages(repoRoot)
       .where((theme) => theme.packageName != selected.packageName),
 ]..sort((left, right) => left.packageName.compareTo(right.packageName));
-
-String _getBuilderName(String themeName) {
-  final words = themeName.split('_');
-  final pascalName = words
-      .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
-      .join();
-  return 'build${pascalName}Theme';
-}
 
 String _join(String base, String relative) {
   return '$base${Platform.pathSeparator}${relative.replaceAll('/', Platform.pathSeparator)}';

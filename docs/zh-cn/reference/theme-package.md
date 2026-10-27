@@ -21,6 +21,16 @@ my_theme/
 
 ### 命名与依赖规则
 
+项目可显式指定首次编辑的场景：
+
+```yaml
+akari:
+  scene: lib/composition.scene.json
+```
+
+该路径必须指向 `lib/` 内的场景。Studio 与 CLI 会将它排在场景列表首位；
+省略此字段时沿用路径的字母排序。合成主题通过此字段重新打开编辑后的作品。
+
 | 规则项 | 约定要求 |
 | --- | --- |
 | 包名与 Builder 命名 | 从 `pubspec.yaml` 读取（与目录名无关）。例如 `theme_ocean` 必须在 `lib/theme.dart` 中导出 `buildOceanTheme`。 |

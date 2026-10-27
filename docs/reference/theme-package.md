@@ -21,6 +21,17 @@ my_theme/
 
 ### Naming and dependency rules
 
+Projects may select their initial editing scene explicitly:
+
+```yaml
+akari:
+  scene: lib/composition.scene.json
+```
+
+The path must identify a scene inside `lib/`. Studio and the CLI list it first;
+without this field, scene paths retain their alphabetical order. Synthesized
+themes use this field to reopen the edited composition.
+
 | Rule | Requirement |
 | --- | --- |
 | Package & builder name | Read from `pubspec.yaml` (independent of folder name). `theme_ocean` must export `buildOceanTheme` from `lib/theme.dart`. |
