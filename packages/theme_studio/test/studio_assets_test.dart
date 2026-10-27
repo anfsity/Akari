@@ -6,6 +6,7 @@ import 'package:theme_studio/src/studio_assets.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
   late File manifest;
   late StudioAssets assets;
@@ -16,6 +17,63 @@ void main() {
     assets = StudioAssets(directory: directory, packageName: 'test');
   });
   tearDown(() => directory.deleteSync(recursive: true));
+
+  test('font preview registration is shared across panels and reloads after a source revision', () async {
+    final font = File('${directory.path}/assets/Preview.otf');
+    font.parent.createSync();
+    File('../../themes/default/assets/fonts/SpaceGrotesk-Regular.otf')
+        .copySync(font.path);
+    const path = 'packages/test/assets/Preview.otf';
+    final family = await assets.loadFontPreview(path);
+    expect(await assets.loadFontPreview(path), family);
+    final reopened = StudioAssets(directory: directory, packageName: 'test');
+    expect(await reopened.loadFontPreview(path), family);
+    font.setLastModifiedSync(DateTime(2000));
+    expect(await reopened.loadFontPreview(path), isNot(family));
+  });
+
+  test('resource discovery includes declared fonts shaders and external asset folders without duplicates', () {
+    for (final relative in [
+      'assets/icon.svg',
+      'type/font.otf',
+      'lib/effects/rain.frag',
+      'textures/stone.png',
+    ]) {
+      final file = File('${directory.path}/$relative');
+      file.parent.createSync(recursive: true);
+      file.writeAsString('resource');
+    }
+    manifest.writeAsStringSync('''name: test
+flutter:
+  assets:
+    - assets/
+    - textures/
+  shaders:
+    - lib/effects/rain.frag
+  fonts:
+    - family: Preview
+      fonts:
+        - asset: type/font.otf
+''');
+    expect(assets.getAssets(), [
+      'packages/test/assets/icon.svg',
+      'packages/test/lib/effects/rain.frag',
+      'packages/test/textures/stone.png',
+      'packages/test/type/font.otf',
+    ]);
+    expect(
+      getStudioAssetKind('packages/test/type/font.otf'),
+      StudioAssetKind.font,
+    );
+    expect(
+      getStudioAssetKind('packages/test/lib/effects/rain.frag'),
+      StudioAssetKind.shader,
+    );
+    expect(
+      getStudioAssetKind('packages/test/textures/stone.png'),
+      StudioAssetKind.material,
+    );
+  });
 
   test(
     'nested synthesized resources remain listed and resolve to their own files',

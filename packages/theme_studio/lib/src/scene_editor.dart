@@ -355,7 +355,7 @@ class SceneEditor extends ChangeNotifier {
     final bottom = nodes
         .map((node) => node.rect.y + node.rect.height)
         .reduce(math.max);
-    final id = _getUniqueId(
+    final id = _allocateId(
       'frame',
       document.nodes.map((node) => node.id).toSet(),
     );
@@ -437,7 +437,7 @@ class SceneEditor extends ChangeNotifier {
     );
   }
 
-  String _getUniqueId(String base, Set<String> ids) {
+  String _allocateId(String base, Set<String> ids) {
     var id = base;
     var suffix = 2;
     while (ids.contains(id)) {
@@ -489,11 +489,33 @@ class SceneEditor extends ChangeNotifier {
     updateNode(node.copyWith(properties: {...node.properties, 'text': text}));
   }
 
+  void createAssetNode(SceneAsset asset) {
+    if (!applyDraft()) return;
+    final name = asset.path.split('/').last;
+    final dot = name.lastIndexOf('.');
+    final id = _allocateId(dot > 0 ? name.substring(0, dot) : name, {
+      for (final node in document.nodes) node.id,
+      for (final slot in layout?.slots ?? const <ThemeLayoutSlot>[])
+        slot.defaultNode.id,
+    });
+    final node = SceneNode(
+      id: id,
+      componentId: 'sceneAsset',
+      asset: asset,
+      rect: const SceneRect(x: .35, y: .35, width: .3, height: .3),
+    );
+    _updateDocument(
+      document.copyWith(nodes: [...document.nodes, node]),
+      selectedId: id,
+      selectedIds: {id},
+    );
+  }
+
   void updateSelectionStyle(SceneStyle style) {
     if (!applyDraft() || selectedIds.isEmpty) return;
     final token =
         selectedNode.styleToken ??
-        _getUniqueId('$selectedId-style', document.styleTokens.keys.toSet());
+        _allocateId('$selectedId-style', document.styleTokens.keys.toSet());
     _updateDocument(
       document.copyWith(
         styleTokens: {...document.styleTokens, token: style},
@@ -510,7 +532,12 @@ class SceneEditor extends ChangeNotifier {
 
   void previewSelectionStyle(SceneStyle style) {
     if (selectedIds.isEmpty) return;
-    final token = selectedNode.styleToken ?? '$selectedId-style-preview';
+    final token =
+        selectedNode.styleToken ??
+        _allocateId(
+          '$selectedId-style-preview',
+          document.styleTokens.keys.toSet(),
+        );
     _previewDocument = document.copyWith(
       styleTokens: {...document.styleTokens, token: style},
       nodes: [
@@ -570,7 +597,7 @@ class SceneEditor extends ChangeNotifier {
     final ids = document.nodes.map((entry) => entry.id).toSet();
     final subtree = getSelectionSubtree();
     final copies = {
-      for (final node in subtree) node.id: _getUniqueId('${node.id}-copy', ids),
+      for (final node in subtree) node.id: _allocateId('${node.id}-copy', ids),
     };
     _updateDocument(
       document.copyWith(

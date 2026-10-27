@@ -32,6 +32,8 @@ class StudioThemeProject {
       if (document.background.asset != null) document.background.asset!,
       ...document.themeProperties.values,
       for (final node in document.nodes) ...node.properties.values,
+      for (final node in document.nodes)
+        if (node.asset != null) node.asset!.path,
     };
     final files = <String, File>{};
     for (final reference in references) {

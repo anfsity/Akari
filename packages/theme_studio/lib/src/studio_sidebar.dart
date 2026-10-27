@@ -4,9 +4,13 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:theme_sdk/theme_sdk.dart';
 
 import 'scene_editor.dart';
 import 'studio_component_assembly.dart';
+import 'studio_assets.dart';
+import 'studio_asset_preview.dart';
+import 'studio_form.dart';
 
 enum _SidebarTab {
   components('Compose'),
@@ -22,6 +26,9 @@ class StudioSidebar extends StatefulWidget {
     required this.scenePaths,
     required this.assetPaths,
     required this.resolveAssetImage,
+    required this.loadAssetText,
+    required this.loadFontPreview,
+    required this.onPlaceAsset,
     required this.editor,
     required this.loadingFile,
     required this.onLoadJson,
@@ -36,6 +43,9 @@ class StudioSidebar extends StatefulWidget {
   final List<String> scenePaths;
   final List<String> assetPaths;
   final ImageProvider Function(String) resolveAssetImage;
+  final SceneSvgLoader loadAssetText;
+  final Future<String> Function(String) loadFontPreview;
+  final ValueChanged<SceneAsset>? onPlaceAsset;
   final SceneEditor? editor;
   final bool loadingFile;
   final VoidCallback onLoadJson;
@@ -137,6 +147,9 @@ class _StudioSidebarState extends State<StudioSidebar> {
               ? _AssetList(
                   paths: widget.assetPaths,
                   resolveImage: widget.resolveAssetImage,
+                  loadText: widget.loadAssetText,
+                  loadFont: widget.loadFontPreview,
+                  onPlaceAsset: widget.readOnly ? null : widget.onPlaceAsset,
                   loading: widget.loadingFile,
                   onImport: widget.readOnly ? null : widget.onImportAsset,
                   onApplyBackground: editor == null || widget.readOnly
@@ -165,24 +178,32 @@ class _AssetList extends StatefulWidget {
   const _AssetList({
     required this.paths,
     required this.resolveImage,
+    required this.loadText,
+    required this.loadFont,
     required this.loading,
     required this.onImport,
     required this.onApplyBackground,
+    required this.onPlaceAsset,
   });
-
   final List<String> paths;
   final ImageProvider Function(String) resolveImage;
+  final SceneSvgLoader loadText;
+  final Future<String> Function(String) loadFont;
   final bool loading;
   final VoidCallback? onImport;
   final ValueChanged<String>? onApplyBackground;
-
+  final ValueChanged<SceneAsset>? onPlaceAsset;
   @override
   State<_AssetList> createState() => _AssetListState();
 }
 
 class _AssetListState extends State<_AssetList> {
+  final _search = TextEditingController();
+  final _scroll = ScrollController();
   String? _selected;
-
+  String _filter = 'all';
+  String _query = '';
+  int? _tint;
   @override
   void initState() {
     super.initState();
@@ -190,111 +211,266 @@ class _AssetListState extends State<_AssetList> {
   }
 
   @override
-  void didUpdateWidget(_AssetList oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (identical(widget.paths, oldWidget.paths) ||
-        listEquals(widget.paths, oldWidget.paths)) {
-      return;
+  void didUpdateWidget(_AssetList old) {
+    super.didUpdateWidget(old);
+    if (listEquals(widget.paths, old.paths)) return;
+    final added = widget.paths.where((path) => !old.paths.contains(path));
+    if (added.isNotEmpty) {
+      _filter = 'all';
+      _query = '';
+      _search.clear();
     }
-    final added = widget.paths.where((path) => !oldWidget.paths.contains(path));
     _selected =
         added.firstOrNull ??
         (widget.paths.contains(_selected)
             ? _selected
-            : widget.paths.firstOrNull);
+            : _getPaths().firstOrNull);
+    _tint = null;
+    _scroll.jumpTo(0);
+  }
+
+  List<String> _getPaths() => widget.paths
+      .where(
+        (path) =>
+            (_filter == 'all' || getStudioAssetKind(path).name == _filter) &&
+            path.toLowerCase().contains(_query.toLowerCase()),
+      )
+      .toList();
+  void _updateFilter(String filter) => setState(() {
+    _filter = filter;
+    _selected = _getPaths().firstOrNull;
+    _tint = null;
+  });
+  void _updateSearch(String query) {
+    if (query == _query) return;
+    setState(() {
+      _query = query;
+      _selected = _getPaths().firstOrNull;
+      _tint = null;
+    });
+  }
+
+  void _selectAsset(String path) {
+    setState(() {
+      _selected = path;
+      _tint = null;
+    });
+    _scroll.animateTo(
+      0,
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Widget _thumbnail(String path) {
+    final kind = getStudioAssetKind(path);
+    if (kind == StudioAssetKind.image ||
+        kind == StudioAssetKind.material ||
+        kind == StudioAssetKind.svg) {
+      return SizedBox(
+        width: 40,
+        height: 40,
+        child: SceneAssetView(
+          asset: SceneAsset(
+            path: path,
+            kind: kind == StudioAssetKind.svg
+                ? SceneAssetKind.svg
+                : SceneAssetKind.image,
+          ),
+          resolveImage: widget.resolveImage,
+          loadSvg: widget.loadText,
+        ),
+      );
+    }
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: Icon(switch (kind) {
+        StudioAssetKind.font => LucideIcons.type,
+        StudioAssetKind.audio => LucideIcons.volume2,
+        StudioAssetKind.shader => LucideIcons.sparkles,
+        _ => LucideIcons.file,
+      }, size: 20),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final selected = _selected;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          child: OutlineButton(
-            onPressed: widget.loading ? null : widget.onImport,
-            child: const Text('Import asset'),
-          ),
-        ),
-        Expanded(
-          child: widget.paths.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: const Text('Import images and files for this theme.')
-                      .small()
-                      .muted(),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  itemCount: widget.paths.length,
-                  itemBuilder: (context, index) {
-                    final asset = widget.paths[index];
-                    return Button(
-                      style: asset == selected
-                          ? const ButtonStyle.secondary()
-                          : const ButtonStyle.ghost(),
-                      onPressed: () => setState(() => _selected = asset),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: Image(
-                              image: widget.resolveImage(asset),
-                              width: 40,
-                              height: 40,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const SizedBox(
-                                    width: 40,
-                                    height: 40,
-                                    child: Icon(LucideIcons.file, size: 20),
-                                  ),
-                            ),
-                          ),
-                          const Gap(10),
-                          Expanded(
-                            child: Text(
-                              asset.split('/').last,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ).small(),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ),
-        if (selected != null) ...[
-          const Divider(),
-          Padding(
+    final kind = selected == null ? null : getStudioAssetKind(selected);
+    final raster =
+        kind == StudioAssetKind.image || kind == StudioAssetKind.material;
+    final paths = _getPaths();
+    return CustomScrollView(
+      controller: _scroll,
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  selected.split('/').last,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ).small().muted(),
-                const Gap(8),
                 OutlineButton(
-                  onPressed: () =>
-                      Clipboard.setData(ClipboardData(text: selected)),
-                  child: const Text('Copy path'),
+                  onPressed: widget.loading ? null : widget.onImport,
+                  child: const Text('Import asset'),
                 ),
                 const Gap(8),
-                PrimaryButton(
-                  onPressed: widget.onApplyBackground == null
-                      ? null
-                      : () => widget.onApplyBackground!(selected),
-                  child: const Text('Use image'),
+                TextField(
+                  key: const ValueKey('asset-search'),
+                  controller: _search,
+                  placeholder: const Text('Search assets'),
+                  onChanged: _updateSearch,
                 ),
+                const Gap(8),
+                StudioSelect<String>(
+                  key: const ValueKey('asset-category'),
+                  value: _filter,
+                  values: [
+                    'all',
+                    for (final kind in StudioAssetKind.values) kind.name,
+                  ],
+                  formatValue: (value) => switch (value) {
+                    'all' => 'All assets',
+                    'image' => 'Images',
+                    'svg' => 'SVG icons',
+                    'font' => 'Fonts',
+                    'material' => 'Materials & textures',
+                    'audio' => 'Audio',
+                    'shader' => 'Shaders',
+                    _ => 'Other files',
+                  },
+                  onChanged: _updateFilter,
+                ),
+                if (selected != null) ...[
+                  const Gap(12),
+                  Text(
+                    selected.split('/').last,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ).small().semiBold(),
+                  const Gap(8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      OutlineButton(
+                        onPressed: () =>
+                            Clipboard.setData(ClipboardData(text: selected)),
+                        child: const Text('Copy path').small(),
+                      ),
+                      if (raster)
+                        PrimaryButton(
+                          onPressed: widget.onApplyBackground == null
+                              ? null
+                              : () => widget.onApplyBackground!(selected),
+                          child: const Text('Use image').small(),
+                        ),
+                      if (raster || kind == StudioAssetKind.svg)
+                        OutlineButton(
+                          key: const ValueKey('place-asset'),
+                          onPressed: widget.onPlaceAsset == null
+                              ? null
+                              : () => widget.onPlaceAsset!(
+                                  SceneAsset(
+                                    path: selected,
+                                    kind: kind == StudioAssetKind.svg
+                                        ? SceneAssetKind.svg
+                                        : SceneAssetKind.image,
+                                    tint: _tint,
+                                  ),
+                                ),
+                          child: const Text('Add to canvas').small(),
+                        ),
+                    ],
+                  ),
+                  const Gap(12),
+                  if (kind == StudioAssetKind.svg) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: const Text('Override icon color').small(),
+                        ),
+                        Switch(
+                          value: _tint != null,
+                          onChanged: (enabled) => setState(
+                            () => _tint = enabled ? 0xffffffff : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_tint != null)
+                      ColorInput(
+                        key: const ValueKey('asset-tint'),
+                        value: ColorDerivative.fromColor(Color(_tint!)),
+                        onChanging: (value) =>
+                            setState(() => _tint = value.toColor().toARGB32()),
+                        onChanged: (value) =>
+                            setState(() => _tint = value.toColor().toARGB32()),
+                      ),
+                    const Gap(8),
+                  ],
+                  StudioAssetPreview(
+                    path: selected,
+                    resolveImage: widget.resolveImage,
+                    loadText: widget.loadText,
+                    loadFont: widget.loadFont,
+                    tint: _tint,
+                  ),
+                  const Gap(12),
+                  const Divider(),
+                ],
+                if (paths.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      widget.paths.isEmpty
+                          ? 'Import images, fonts and files for this theme.'
+                          : 'No matching assets.',
+                    ).small().muted(),
+                  ),
               ],
             ),
           ),
-        ],
+        ),
+        SliverList.builder(
+          itemCount: paths.length,
+          itemBuilder: (context, index) {
+            final path = paths[index];
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Button(
+                key: ValueKey('asset-$path'),
+                style: path == selected
+                    ? const ButtonStyle.secondary()
+                    : const ButtonStyle.ghost(),
+                onPressed: () => _selectAsset(path),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: _thumbnail(path),
+                    ),
+                    const Gap(10),
+                    Expanded(
+                      child: Text(
+                        path.split('/').last,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ).small(),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
       ],
     );
   }

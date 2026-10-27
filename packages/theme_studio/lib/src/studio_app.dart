@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show mapEquals;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
@@ -434,6 +435,29 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     }
   }
 
+  Future<void> _placeAsset(SceneAsset asset) async {
+    final editor = _editor;
+    if (editor == null || !editor.applyDraft()) return;
+    try {
+      if (asset.kind == SceneAssetKind.svg) {
+        final source = await _assets.loadTextAsset(asset.path);
+        final picture = await vg.loadPicture(SvgStringLoader(source), null);
+        picture.picture.dispose();
+      } else {
+        final bytes = await _assets.loadBytes(asset.path);
+        final codec = await ui.instantiateImageCodec(
+          bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
+        );
+        codec.dispose();
+      }
+      if (!mounted || !identical(editor, _editor)) return;
+      editor.createAssetNode(asset);
+      setState(() => _error = null);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = 'Cannot place asset: $error');
+    }
+  }
+
   void _save() {
     final editor = _editor;
     if (editor == null) return;
@@ -514,6 +538,9 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
               scenePaths: _scenePaths,
               assetPaths: _assetPaths,
               resolveAssetImage: _assets.getImageProvider,
+              loadAssetText: _assets.loadTextAsset,
+              loadFontPreview: _assets.loadFontPreview,
+              onPlaceAsset: _placeAsset,
               editor: editor,
               loadingFile: _loadingFile,
               readOnly: _inspect,
@@ -537,6 +564,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         dormant: _dormant,
         readOnly: _inspect,
         onToggleDormant: () => setState(() => _dormant = !_dormant),
+        assetImageResolver: _assets.getImageProvider,
+        assetSvgLoader: _assets.loadTextAsset,
       ),
       inspector: editor == null
           ? const SizedBox()

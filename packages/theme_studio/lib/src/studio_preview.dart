@@ -59,6 +59,8 @@ class StudioPreview extends StatefulWidget {
     this.onCreateGuide,
     this.onUpdateGuide,
     this.onDeleteGuide,
+    this.assetImageResolver,
+    this.assetSvgLoader,
     this.readOnly = false,
     this.scenario = StudioPreviewScenario.password,
     this.interactive = false,
@@ -91,6 +93,8 @@ class StudioPreview extends StatefulWidget {
   final ValueChanged<SceneGuide>? onCreateGuide;
   final void Function(int, SceneGuide)? onUpdateGuide;
   final ValueChanged<int>? onDeleteGuide;
+  final SceneImageProviderResolver? assetImageResolver;
+  final SceneSvgLoader? assetSvgLoader;
   final bool dormant;
   final StudioPreferences preferences;
   final StudioCanvasTool tool;
@@ -683,9 +687,16 @@ class _StudioPreviewState extends State<StudioPreview>
                     wakeProgress: wake,
                     playback: playback,
                     activePredicates: predicates,
-                    nodeBuilder: _buildInteractiveNode,
+                    nodeBuilder: (context, node) => _buildSelectableNode(
+                      node,
+                      _components.build(context, node),
+                    ),
                     frameBuilder: (context, node, child) =>
                         _buildInteractiveFrame(node, child),
+                    assetBuilder: (context, node, child) =>
+                        _buildSelectableNode(node, child),
+                    assetImageResolver: widget.assetImageResolver,
+                    assetSvgLoader: widget.assetSvgLoader,
                   ),
                 ),
                 for (final selected in document.nodes.where(
@@ -796,25 +807,24 @@ class _StudioPreviewState extends State<StudioPreview>
     );
   }
 
-  Widget _buildInteractiveNode(BuildContext context, SceneNode node) =>
-      _PreviewNode(
-        nodeId: node.id,
-        interactive: widget.interactive,
-        onSelect: () {
-          if (!_selectedIds.contains(node.id) ||
-              HardwareKeyboard.instance.isShiftPressed) {
-            widget.onSelect(node.id);
-          }
-        },
-        onDoubleTap: () => _startTextEditing(node),
-        onStartDrag: widget.readOnly || widget.interactive
-            ? null
-            : (details) => _startDrag(node.id, details),
-        onUpdateDrag: _updateDrag,
-        onStopDrag: (_) => _stopDrag(commit: true),
-        onCancelDrag: () => _stopDrag(commit: false),
-        child: _components.build(context, node),
-      );
+  Widget _buildSelectableNode(SceneNode node, Widget child) => _PreviewNode(
+    nodeId: node.id,
+    interactive: widget.interactive,
+    onSelect: () {
+      if (!_selectedIds.contains(node.id) ||
+          HardwareKeyboard.instance.isShiftPressed) {
+        widget.onSelect(node.id);
+      }
+    },
+    onDoubleTap: () => _startTextEditing(node),
+    onStartDrag: widget.readOnly || widget.interactive
+        ? null
+        : (details) => _startDrag(node.id, details),
+    onUpdateDrag: _updateDrag,
+    onStopDrag: (_) => _stopDrag(commit: true),
+    onCancelDrag: () => _stopDrag(commit: false),
+    child: child,
+  );
 
   Widget _buildInteractiveFrame(SceneNode node, Widget child) =>
       widget.interactive
@@ -958,6 +968,9 @@ class _PreviewScene extends StatelessWidget {
     required this.nodeBuilder,
     required this.frameBuilder,
     required this.playback,
+    required this.assetBuilder,
+    required this.assetImageResolver,
+    required this.assetSvgLoader,
   });
 
   final ThemeDefinition theme;
@@ -968,6 +981,9 @@ class _PreviewScene extends StatelessWidget {
   final SceneNodeBuilder nodeBuilder;
   final SceneFrameBuilder frameBuilder;
   final ScenePlayback? playback;
+  final SceneFrameBuilder assetBuilder;
+  final SceneImageProviderResolver? assetImageResolver;
+  final SceneSvgLoader? assetSvgLoader;
   final Size referenceSize;
 
   @override
@@ -992,6 +1008,9 @@ class _PreviewScene extends StatelessWidget {
           nodeBuilder: nodeBuilder,
           frameBuilder: frameBuilder,
           playback: playback,
+          assetBuilder: assetBuilder,
+          assetImageResolver: assetImageResolver,
+          assetSvgLoader: assetSvgLoader,
         ),
       ),
     ),

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:theme_sdk/theme_sdk.dart';
@@ -20,6 +21,7 @@ import 'package:theme_studio/src/studio_theme.dart';
 import 'package:theme_studio/src/studio_timeline.dart';
 import 'package:theme_studio/src/studio_canvas_presets.dart';
 import 'package:theme_studio/src/studio_form.dart';
+import 'package:theme_studio/src/studio_assets.dart';
 
 const _document = SceneDocument(
   id: 'test',
@@ -798,6 +800,56 @@ void main() {
     });
     await tester.pumpAndSettle();
   }
+
+  test(
+    'theme creation collects asset layers from the scene owning package',
+    () async {
+      await prepareSynthesisSource();
+      final destination = Directory.systemTemp.createTempSync(
+        'studio-assets-theme-',
+      );
+      addTearDown(() => destination.deleteSync(recursive: true));
+      final owner = directory.createTempSync('owner-');
+      final icon = File('${owner.path}/assets/logo.svg');
+      icon.parent.createSync();
+      icon.writeAsStringSync('<svg xmlns="http://www.w3.org/2000/svg"/>');
+      final source = StudioThemeProject(
+        packageName: 'theme_source',
+        directory: directory.path,
+        scenePaths: [file.path],
+        themeBuilder: _buildTheme,
+      );
+      final project = await source.createTheme(
+        packageName: 'theme_icons',
+        destination: '${destination.path}/icons',
+        document: _document.copyWith(
+          nodes: [
+            _document.nodes.first.copyWith(
+              asset: const SceneAsset(
+                path: 'packages/theme_owner/assets/logo.svg',
+                kind: SceneAssetKind.svg,
+                tint: 0xff123456,
+              ),
+            ),
+          ],
+        ),
+        assets: StudioAssets(directory: owner, packageName: 'theme_owner'),
+      );
+      final saved = decodeSceneDocument(
+        File(project.scenePaths.first).readAsStringSync(),
+      );
+      expect(
+        saved.nodes.single.asset!.path,
+        'packages/theme_icons/assets/composed/logo.svg',
+      );
+      expect(saved.nodes.single.asset!.tint, 0xff123456);
+      expect(
+        File('${project.directory}/assets/composed/logo.svg')
+            .readAsStringSync(),
+        icon.readAsStringSync(),
+      );
+    },
+  );
 
   testWidgets(
     'creating a theme preserves the source and opens its saved composition',
@@ -2590,6 +2642,200 @@ void main() {
       await tester.tap(find.text('Background: solid'));
       await tester.pumpAndSettle();
       expect(find.text('image'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'imported SVG layers preview tint, undo, save and reopen without restarting',
+    (tester) async {
+      final source = File('${directory.path}/badge.svg')
+        ..writeAsStringSync(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32"/></svg>',
+        );
+      await openStudio(tester);
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      picker.selected = _PickedFile(source);
+      await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Import asset'));
+        await tester.pumpAndSettle();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+      expect(find.byType(SvgPicture), findsWidgets);
+      expect(editor.canUndo, isFalse);
+      final toggle = find.ancestor(
+        of: find.text('Override icon color'),
+        matching: find.byType(Row),
+      );
+      await tester.tap(
+        find.descendant(of: toggle, matching: find.byType(Switch)),
+      );
+      await tester.pumpAndSettle();
+      tester
+          .widget<ColorInput>(find.byKey(const ValueKey('asset-tint')))
+          .onChanged!(ColorDerivative.fromColor(const Color(0xff123456)));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(const ValueKey('place-asset')));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await tester.pumpAndSettle();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+      expect(editor.document.nodes.length, 3);
+      expect(editor.selectedNode.asset!.path, 'packages/test/assets/badge.svg');
+      expect(editor.selectedNode.asset!.tint, 0xff123456);
+      final iconId = editor.selectedId;
+      expect(find.byKey(ValueKey('preview-$iconId')), findsOneWidget);
+      final previewIcon = find.descendant(
+        of: find.byKey(ValueKey('preview-$iconId')),
+        matching: find.byType(SvgPicture),
+      );
+      expect(
+        tester.widget<SvgPicture>(previewIcon).colorFilter,
+        const ColorFilter.mode(Color(0xff123456), BlendMode.srcIn),
+      );
+      editor.undo();
+      await tester.pumpAndSettle();
+      expect(editor.document.nodes.length, 2);
+      expect(editor.canUndo, isFalse);
+      editor.redo();
+      await tester.pumpAndSettle();
+      tester
+          .widget<ColorInput>(find.byKey(const ValueKey('node-asset-tint')))
+          .onChanged!(ColorDerivative.fromColor(const Color(0xffabcdef)));
+      await tester.pumpAndSettle();
+      expect(editor.selectedNode.asset!.tint, 0xffabcdef);
+      editor.undo();
+      await tester.pumpAndSettle();
+      expect(editor.selectedNode.asset!.tint, 0xff123456);
+      editor.redo();
+      expect(editor.save(), isTrue);
+      final saved = decodeSceneDocument(file.readAsStringSync());
+      expect(saved.nodes.last.asset!.tint, 0xffabcdef);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await openStudio(tester);
+      final reopened = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      expect(reopened.document.nodes.last.asset!.tint, 0xffabcdef);
+      expect(reopened.isDirty, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'invalid SVG assets and inspector drafts cannot replace the scene',
+    (tester) async {
+      final source = File('${directory.path}/broken.svg')
+        ..writeAsStringSync('not SVG content');
+      await openStudio(tester);
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      picker.selected = _PickedFile(source);
+      await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Import asset'));
+        await tester.pumpAndSettle();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+      editor.inspector.getField('Width').text = '-1';
+      await tester.tap(find.byKey(const ValueKey('place-asset')));
+      await tester.pumpAndSettle();
+      expect(editor.inspector.error, isNotNull);
+      expect(editor.document.nodes.length, 2);
+      editor.inspector.resetNode(editor.selectedNode);
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(const ValueKey('place-asset')));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Cannot place asset:'), findsOneWidget);
+      expect(editor.canUndo, isFalse);
+      expect(editor.isDirty, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'asset search and categories filter resources without changing scene history',
+    (tester) async {
+      final font = File('${directory.path}/assets/fonts/Preview.otf');
+      font.parent.createSync(recursive: true);
+      File('../../themes/default/assets/fonts/SpaceGrotesk-Regular.otf')
+          .copySync(font.path);
+      File('${directory.path}/assets/rain.frag')
+          .writeAsStringSync('void main() {}');
+      await openStudio(tester);
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
+        await tester.pumpAndSettle();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('font-preview-sample')), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('font-preview-text')),
+        'My font sample',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('font-preview-sample')))
+            .data,
+        'My font sample',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('asset-search')),
+        'RAIN',
+      );
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('asset-packages/test/assets/rain.frag')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('asset-packages/test/assets/fonts/Preview.otf'),
+        ),
+        findsNothing,
+      );
+      await tester.enterText(find.byKey(const ValueKey('asset-search')), '');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('asset-category')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Shaders').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Shaders').last);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(
+          const ValueKey('asset-packages/test/assets/fonts/Preview.otf'),
+        ),
+        findsNothing,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('asset-search')),
+        'nothing',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('No matching assets.'), findsOneWidget);
+      expect(editor.canUndo, isFalse);
+      expect(editor.isDirty, isFalse);
       expect(tester.takeException(), isNull);
     },
   );
