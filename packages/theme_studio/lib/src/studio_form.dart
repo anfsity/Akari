@@ -1,5 +1,59 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+/// Keeps preview updates separate from one final edit. shadcn can omit its
+/// onChangeEnd after a controlled value catches up, so pointer release owns
+/// the commit as well; keyboard and track taps still use onChangeEnd.
+class StudioPreviewSlider extends StatefulWidget {
+  const StudioPreviewSlider({
+    required this.value,
+    required this.maximum,
+    required this.onPreview,
+    required this.onCommit,
+    required this.onCancel,
+    this.minimum = 0,
+    super.key,
+  });
+  final double value;
+  final double minimum;
+  final double maximum;
+  final ValueChanged<double> onPreview;
+  final ValueChanged<double> onCommit;
+  final VoidCallback onCancel;
+  @override
+  State<StudioPreviewSlider> createState() => _StudioPreviewSliderState();
+}
+
+class _StudioPreviewSliderState extends State<StudioPreviewSlider> {
+  double? _draft;
+  void _commit(double value) {
+    _draft = null;
+    widget.onCommit(value);
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerUp: (_) {
+      if (_draft case final value?) _commit(value);
+    },
+    onPointerCancel: (_) {
+      _draft = null;
+      widget.onCancel();
+    },
+    child: Slider(
+      value: SliderValue.single(
+        widget.value.clamp(widget.minimum, widget.maximum),
+      ),
+      min: widget.minimum,
+      max: widget.maximum,
+      onChanged: (value) {
+        _draft = value.value;
+        widget.onPreview(value.value);
+      },
+      onChangeEnd: (value) => _commit(value.value),
+    ),
+  );
+}
+
 class StudioFormField extends StatelessWidget {
   const StudioFormField({
     required this.label,

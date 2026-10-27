@@ -31,6 +31,8 @@ ${document.themeProperties.entries.map((entry) => '    ${encodeDartString(entry.
     scrimOpacity: ${document.background.scrimOpacity},
     blurSigma: ${document.background.blurSigma},
     rendererId: ${_encodeDartNullableString(document.background.rendererId)},
+    parameters: <String, double>{
+${document.background.parameters.entries.map((entry) => '      ${encodeDartString(entry.key)}: ${entry.value},\n').join()}    },
   ),
   nodes: <SceneNode>[
 ${document.nodes.map(generateSceneNode).join()}  ],

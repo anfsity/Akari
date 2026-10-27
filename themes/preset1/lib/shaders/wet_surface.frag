@@ -1,6 +1,9 @@
 #include <flutter/runtime_effect.glsl>
 
 uniform float uProgress;
+uniform float uRefraction;
+uniform float uDensity;
+uniform float uDispersion;
 uniform sampler2D uSurface;
 
 out vec4 fragColor;
@@ -33,7 +36,7 @@ vec4 getCondensation(vec2 position) {
   vec2 center = (cell + 0.18 + seed.xy * 0.64) * grid;
   float radius = 0.6 + seed.z * 1.8;
   return getLens(position - center, vec2(radius, radius * 1.12))
-      * step(0.58, seed.x);
+      * step(clamp(1.0 - 0.42 * uDensity, 0.0, 1.0), seed.x);
 }
 
 vec4 getSlidingDrops(vec2 position) {
@@ -62,7 +65,7 @@ vec4 getSlidingDrops(vec2 position) {
   lens.x += delta.x * trail * beads * 2.5;
   lens.z += trail * beads * 0.035;
   lens.w += trail * 0.055;
-  return lens * step(0.22, seed.z);
+  return lens * step(clamp(1.0 - 0.78 * uDensity, 0.0, 1.0), seed.z);
 }
 
 vec2 getWaterDisplacement(vec2 position, float angle) {
@@ -79,10 +82,15 @@ void main() {
   float edge = position.y - (920.0 - position.x * 710.0 / 1920.0);
   float wet = smoothstep(0.0, 28.0, edge);
   vec4 glass = getCondensation(position) + getSlidingDrops(position);
-  vec2 refracted = position + glass.xy * wet;
-  vec2 flow = getWaterDisplacement(refracted, angle) * wet;
+  vec2 refracted = position + glass.xy * wet * uRefraction;
+  vec2 flow = getWaterDisplacement(refracted, angle) * wet * uRefraction;
   vec2 uv = clamp((refracted + flow) / artworkSize, vec2(0.001), vec2(0.999));
   vec3 color = texture(uSurface, uv).rgb;
+  if (uDispersion > 0.0) {
+    vec2 offset = vec2(uDispersion, 0.0) / artworkSize;
+    color.r = texture(uSurface, clamp(uv + offset, vec2(0.001), vec2(0.999))).r;
+    color.b = texture(uSurface, clamp(uv - offset, vec2(0.001), vec2(0.999))).b;
+  }
 
   // Traveling highlights follow the diagonal current, while the much slower
   // glass drops keep their gravity direction independent of the water.

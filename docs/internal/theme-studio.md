@@ -34,6 +34,12 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 
 ### Component customization
 
+The **Effects** inspector tab edits background blur and scrim without opening
+Settings. Renderers that declare parameters also expose live Shader sliders.
+Preset1 includes refraction strength, rain density, flow speed, and dispersion;
+use Preview to animate the flow. Slider drags commit one undo step on release,
+and saved values run through the same renderer in production.
+
 **Visual style** in the Design inspector provides color pickers, two-color
 gradients, borders, corner radius, shadows, backdrop blur, opacity, and typography.
 The first edit creates a scene style token; the token selector can reuse an

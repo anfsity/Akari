@@ -58,6 +58,14 @@ Studio appearance preferences. An omitted object uses the theme's defaults.
 
 ## Background
 
+`background.parameters` is an optional map of finite numbers owned by the
+compiled renderer. Theme renderers declare `BackgroundParameter` metadata for
+Studio sliders, including labels, bounds, and defaults. Values round-trip and
+compile with the scene. Preset1 exposes refraction (`0..3`), rain density
+(`0..2`), flow speed (`0.1..4`), and color dispersion (`0..4`); omitted values
+retain the original appearance. Renderers bound values when resolving their
+parameter contracts.
+
 | Field | Type / Values | Default | Description |
 | --- | --- | --- | --- |
 | `kind` | `"image"` \| `"solid"` \| `"video"` \| `"custom"` | Required | Background renderer category |

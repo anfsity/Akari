@@ -79,6 +79,28 @@ class _ThemedBackground extends BackgroundRenderer {
       const ColoredBox(color: Color(0xff123456));
 }
 
+class _ParameterizedBackground extends BackgroundRenderer {
+  @override
+  List<BackgroundParameter> get parameters => const [
+    BackgroundParameter(
+      id: 'intensity',
+      label: 'Intensity',
+      minimum: 0,
+      maximum: 1,
+      defaultValue: .5,
+    ),
+  ];
+  @override
+  Widget build(BuildContext context, SceneBackground background) => ColoredBox(
+    key: const ValueKey('parameterized-background'),
+    color: Color.lerp(
+      const Color(0xff000000),
+      const Color(0xffffffff),
+      parameters.single.getValue(background),
+    )!,
+  );
+}
+
 enum _PanelStyle { regular, large }
 
 enum _ThemePalette { ocean, rose }
@@ -449,6 +471,70 @@ void main() {
     editor.undo(); expect(editor.selectedNode.stateEffects, isEmpty); expect(editor.canUndo, isFalse);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'effect parameters preview through the renderer and save as one revision',
+    (tester) async {
+      await openStudio(
+        tester,
+        themeBuilder: ({Color? seed, SceneDocument? document}) {
+          final theme = _buildTheme(seed: seed, document: document);
+          return theme.copyWith(
+            bundle: theme.bundle.copyWith(
+              backgrounds: {
+                SceneBackgroundKind.solid: _ParameterizedBackground(),
+              },
+            ),
+          );
+        },
+      );
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      await tester.tap(find.text('Effects'));
+      await tester.pumpAndSettle();
+      final slider = find.byKey(const ValueKey('effect-intensity'));
+      await tester.ensureVisible(slider);
+      await tester.pumpAndSettle();
+      final original = tester
+          .widget<ColoredBox>(
+            find.byKey(const ValueKey('parameterized-background')),
+          )
+          .color;
+      final gesture = await tester.startGesture(tester.getCenter(slider));
+      await gesture.moveBy(const Offset(20, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(20, 0));
+      await tester.pump();
+      expect(editor.document.background.parameters, isEmpty);
+      expect(
+        tester
+            .widget<ColoredBox>(
+              find.byKey(const ValueKey('parameterized-background')),
+            )
+            .color,
+        isNot(original),
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(
+        editor.document.background.parameters['intensity'],
+        greaterThan(.5),
+      );
+      editor.undo();
+      expect(editor.document.background.parameters, isEmpty);
+      expect(editor.canUndo, isFalse);
+      editor.redo();
+      editor.save();
+      expect(
+        decodeSceneDocument(file.readAsStringSync())
+            .background
+            .parameters['intensity'],
+        greaterThan(.5),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('preview scenarios wake the canvas without editing the scene', (
     tester,

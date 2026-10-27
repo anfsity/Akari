@@ -9,16 +9,84 @@ import 'preset_style.dart';
 class PresetBackgroundRenderer extends BackgroundRenderer {
   const PresetBackgroundRenderer();
 
+  static const refraction = BackgroundParameter(
+    id: 'refraction',
+    label: 'Refraction strength',
+    minimum: 0,
+    maximum: 3,
+    defaultValue: 1,
+  );
+  static const density = BackgroundParameter(
+    id: 'density',
+    label: 'Raindrop density',
+    minimum: 0,
+    maximum: 2,
+    defaultValue: 1,
+  );
+  static const speed = BackgroundParameter(
+    id: 'speed',
+    label: 'Flow speed',
+    minimum: .1,
+    maximum: 4,
+    defaultValue: 1,
+  );
+  static const dispersion = BackgroundParameter(
+    id: 'dispersion',
+    label: 'Color dispersion',
+    minimum: 0,
+    maximum: 4,
+    defaultValue: 0,
+  );
   @override
-  Widget build(BuildContext context, SceneBackground background) =>
-      const PresetEnvironment();
+  List<BackgroundParameter> get parameters => const [
+    refraction,
+    density,
+    speed,
+    dispersion,
+  ];
+
+  @override
+  Widget build(BuildContext context, SceneBackground background) => ClipRect(
+    child: ImageFiltered(
+      enabled: background.blurSigma > 0,
+      imageFilter: ui.ImageFilter.blur(
+        sigmaX: background.blurSigma,
+        sigmaY: background.blurSigma,
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          PresetEnvironment(
+            refraction: refraction.getValue(background),
+            density: density.getValue(background),
+            speed: speed.getValue(background),
+            dispersion: dispersion.getValue(background),
+          ),
+          ColoredBox(
+            color: Color(background.color)
+                .withValues(alpha: background.scrimOpacity),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// The water samples a single raster of the artwork rather than blurring on
 /// each tick. Blossoms stay in their own raster boundary above the wet surface.
 /// All layers share the same authored 1920 x 1080 coordinates.
 class PresetEnvironment extends StatefulWidget {
-  const PresetEnvironment({super.key});
+  const PresetEnvironment({
+    this.refraction = 1,
+    this.density = 1,
+    this.speed = 1,
+    this.dispersion = 0,
+    super.key,
+  });
+  final double refraction;
+  final double density;
+  final double speed;
+  final double dispersion;
 
   @override
   State<PresetEnvironment> createState() => _PresetEnvironmentState();
@@ -37,12 +105,13 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
   void initState() {
     super.initState();
     final lifecycle = WidgetsBinding.instance.lifecycleState;
-    _visible = lifecycle == null ||
+    _visible =
+        lifecycle == null ||
         lifecycle == AppLifecycleState.resumed ||
         lifecycle == AppLifecycleState.inactive;
     _weather = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 120),
+      duration: Duration(milliseconds: (120000 / widget.speed).round()),
     );
     _painter = PresetWeatherPainter(_weather);
     WidgetsBinding.instance.addObserver(this);
@@ -55,10 +124,7 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
       'packages/theme_preset1/shaders/wet_surface.frag',
     );
     final recorder = ui.PictureRecorder();
-    const PresetArtworkPainter().paint(
-      Canvas(recorder),
-      presetCanvasSize,
-    );
+    const PresetArtworkPainter().paint(Canvas(recorder), presetCanvasSize);
     final picture = recorder.endRecording();
     final image = await picture.toImage(
       presetCanvasSize.width.toInt(),
@@ -74,8 +140,37 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
     setState(() {
       _surfaceImage = image;
       _surfaceShader = shader;
-      _surfacePainter = PresetSurfacePainter(_weather, shader);
+      _updateSurfacePainter();
     });
+  }
+
+  void _updateSurfacePainter() {
+    if (_surfaceShader case final shader?) {
+      _surfacePainter = PresetSurfacePainter(
+        _weather,
+        shader,
+        refraction: widget.refraction,
+        density: widget.density,
+        dispersion: widget.dispersion,
+      );
+    }
+  }
+
+  @override
+  void didUpdateWidget(PresetEnvironment old) {
+    super.didUpdateWidget(old);
+    if (old.speed != widget.speed) {
+      _weather.stop();
+      _weather.duration = Duration(
+        milliseconds: (120000 / widget.speed).round(),
+      );
+      _updateWeather();
+    }
+    if (old.refraction != widget.refraction ||
+        old.density != widget.density ||
+        old.dispersion != widget.dispersion) {
+      _updateSurfacePainter();
+    }
   }
 
   @override
@@ -421,31 +516,45 @@ class _PresetBranchPainter extends CustomPainter {
 }
 
 class PresetSurfacePainter extends CustomPainter {
-  PresetSurfacePainter(this.time, this.shader) : super(repaint: time);
+  PresetSurfacePainter(
+    this.time,
+    this.shader, {
+    this.refraction = 1,
+    this.density = 1,
+    this.dispersion = 0,
+  }) : super(repaint: time);
 
   final Animation<double> time;
   final ui.FragmentShader shader;
+  final double refraction;
+  final double density;
+  final double dispersion;
   static final _night = getPresetNightPath();
 
   @override
   void paint(Canvas canvas, Size size) {
-    shader.setFloat(0, time.value);
+    shader
+      ..setFloat(0, time.value)
+      ..setFloat(1, refraction)
+      ..setFloat(2, density)
+      ..setFloat(3, dispersion);
     canvas.save();
     canvas.scale(
       size.width / presetCanvasSize.width,
       size.height / presetCanvasSize.height,
     );
     canvas.clipPath(_night);
-    canvas.drawRect(
-      Offset.zero & presetCanvasSize,
-      Paint()..shader = shader,
-    );
+    canvas.drawRect(Offset.zero & presetCanvasSize, Paint()..shader = shader);
     canvas.restore();
   }
 
   @override
   bool shouldRepaint(PresetSurfacePainter oldDelegate) =>
-      time != oldDelegate.time || shader != oldDelegate.shader;
+      time != oldDelegate.time ||
+      shader != oldDelegate.shader ||
+      refraction != oldDelegate.refraction ||
+      density != oldDelegate.density ||
+      dispersion != oldDelegate.dispersion;
 }
 
 class PresetWeatherPainter extends CustomPainter {

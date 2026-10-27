@@ -13,6 +13,7 @@ import 'code_inspector.dart';
 import 'node_inspector.dart';
 import 'scene_editor.dart';
 import 'studio_canvas.dart';
+import 'studio_effects_inspector.dart';
 import 'studio_sidebar.dart';
 import 'studio_status_bar.dart';
 import 'studio_toolbar.dart';
@@ -54,6 +55,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   bool _preferencesReady = false;
   bool _dormant = false;
   bool _inspect = false;
+  bool _effects = false;
   bool _confirmReload = false;
   int _seedRevision = 0;
   String? _lastBackgroundAsset;
@@ -544,18 +546,25 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                 Padding(
                   padding: const EdgeInsets.all(8),
                   child: Tabs(
-                    index: _inspect ? 1 : 0,
+                    index: _inspect
+                        ? 2
+                        : _effects
+                        ? 1
+                        : 0,
                     expand: true,
                     padding: const EdgeInsets.all(8),
                     onChanged: (index) {
                       if (!editor.applyDraft()) return;
-                      setState(() => _inspect = index == 1);
+                      setState(() {
+                        _inspect = index == 2;
+                        _effects = index == 1;
+                      });
                     },
                     children: [
-                      for (final inspect in [false, true])
+                      for (final label in ['Design', 'Effects', 'Inspect code'])
                         TabItem(
                           child: Text(
-                            inspect ? 'Inspect code' : 'Design',
+                            label,
                             textAlign: TextAlign.center,
                             maxLines: 1,
                           ),
@@ -567,6 +576,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                 Expanded(
                   child: _inspect
                       ? CodeInspector(key: ObjectKey(editor), editor: editor)
+                      : _effects
+                      ? StudioEffectsInspector(editor: editor, theme: _theme)
                       : NodeInspector(
                           editor: editor,
                           controller: editor.inspector,

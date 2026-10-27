@@ -529,6 +529,11 @@ class SceneEditor extends ChangeNotifier {
     notifyListeners();
   }
 
+  void previewBackground(SceneBackground background) {
+    _previewDocument = document.copyWith(background: background);
+    notifyListeners();
+  }
+
   void updateSelectionStyleToken(String? token) {
     if (!applyDraft() || selectedIds.isEmpty) return;
     updateNodes([

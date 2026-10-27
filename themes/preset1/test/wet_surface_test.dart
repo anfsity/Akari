@@ -37,6 +37,29 @@ void main() {
     flatSurface.dispose();
   });
 
+  test('authored uniforms change refraction density and dispersion', () async {
+    final normal = await _renderSurfaceFrame(program, artwork, .25);
+    for (final parameters in [
+      (refraction: 0.0, density: 1.0, dispersion: 0.0),
+      (refraction: 1.0, density: 0.0, dispersion: 0.0),
+      (refraction: 1.0, density: 1.0, dispersion: 4.0),
+    ]) {
+      final changed = await _renderSurfaceFrame(
+        program,
+        artwork,
+        .25,
+        refraction: parameters.refraction,
+        density: parameters.density,
+        dispersion: parameters.dispersion,
+      );
+      var pixels = 0;
+      for (var offset = 0; offset < normal.length; offset += 4) {
+        if ((normal[offset] - changed[offset]).abs() > 2) pixels++;
+      }
+      expect(pixels, greaterThan(100));
+    }
+  });
+
   test('water flows while the diagonal pale field stays untouched', () async {
     final start = await _renderSurfaceFrame(program, artwork, 0);
     final flowing = await _renderSurfaceFrame(program, artwork, .5 / 120);
@@ -131,6 +154,9 @@ Future<Uint8List> _renderSurfaceFrame(
   ui.Image texture,
   double progress, {
   Size size = _frameSize,
+  double refraction = 1,
+  double density = 1,
+  double dispersion = 0,
 }) async {
   final shader = program.fragmentShader()
     ..setImageSampler(0, texture, filterQuality: FilterQuality.low);
@@ -138,6 +164,9 @@ Future<Uint8List> _renderSurfaceFrame(
   PresetSurfacePainter(
     AlwaysStoppedAnimation(progress),
     shader,
+    refraction: refraction,
+    density: density,
+    dispersion: dispersion,
   ).paint(Canvas(recorder), size);
   final picture = recorder.endRecording();
   final image = await picture.toImage(size.width.toInt(), size.height.toInt());
