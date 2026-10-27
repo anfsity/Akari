@@ -243,11 +243,15 @@ SceneNode _decodeNode(
 
   final rect = _decodeRect(_getMap(json, 'rect'), id);
   final component = _decodeComponent(json, id, version);
+  if (json['layout'] != null && json['asset'] != null) {
+    throw const FormatException('An asset node cannot also be a frame.');
+  }
   return SceneNode(
     id: id,
     componentId: component.id,
     rect: rect,
     styleToken: _findString(json, 'styleToken'),
+    asset: json['asset'] == null ? null : _decodeAsset(_getMap(json, 'asset')),
     stateEffects: {
       for (final entry in _getMap(
         json,
@@ -366,6 +370,13 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
     'id': node.id,
     'component': node.componentId,
     if (node.styleToken != null) 'styleToken': node.styleToken,
+    if (node.asset case final asset?)
+      'asset': {
+        'path': asset.path,
+        'kind': asset.kind.name,
+        'fit': asset.fit.name,
+        if (asset.tint != null) 'tint': encodeSceneColor(asset.tint!),
+      },
     if (node.parentId != null) 'parentId': node.parentId,
     if (node.layout case final layout?)
       'layout': {
@@ -414,6 +425,32 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
     if (node.interactive) 'interactive': true,
     if (node.properties.isNotEmpty) 'properties': node.properties,
   };
+}
+
+SceneAsset _decodeAsset(Map<String, dynamic> json) {
+  final path = _getString(json, 'path');
+  if (path.contains('..') ||
+      path.contains(r'\') ||
+      path.endsWith('/') ||
+      (!path.startsWith('assets/') && !path.startsWith('packages/'))) {
+    throw FormatException('Invalid scene asset path: $path');
+  }
+  return SceneAsset(
+    path: path,
+    kind: _getEnumValue(
+      SceneAssetKind.values,
+      _getString(json, 'kind', fallback: 'image'),
+      'asset.kind',
+    ),
+    fit: _getEnumValue(
+      SceneAssetFit.values,
+      _getString(json, 'fit', fallback: 'contain'),
+      'asset.fit',
+    ),
+    tint: json['tint'] == null
+        ? null
+        : decodeSceneColor(_getString(json, 'tint')),
+  );
 }
 
 SceneGuide _decodeGuide(Map<String, dynamic> json) {

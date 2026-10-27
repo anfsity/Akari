@@ -20,6 +20,80 @@ Map<String, Object> node(String id, {String? parent, bool frame = false}) => {
 };
 
 void main() {
+  test('asset defaults and overrides survive unrelated node edits and JSON round trips', () {
+    final document = decodeSceneDocument(
+      jsonEncode(
+        scene([
+          {
+            ...node('image'),
+            'asset': {'path': 'assets/photo.png'},
+          },
+          {
+            ...node('icon'),
+            'asset': {
+              'path': 'packages/theme_test/assets/icon.svg',
+              'kind': 'svg',
+              'fit': 'cover',
+              'tint': '#80112233',
+            },
+          },
+        ]),
+      ),
+    );
+    expect(document.nodes.first.asset!.kind, SceneAssetKind.image);
+    expect(document.nodes.first.asset!.fit, SceneAssetFit.contain);
+    final updated = document.nodes.last.copyWith(
+      renderOrder: 10,
+      asset: document.nodes.last.asset!.copyWith(fit: SceneAssetFit.fill),
+    );
+    final restored = decodeSceneDocument(
+      encodeSceneDocument(
+        document.copyWith(nodes: [document.nodes.first, updated]),
+      ),
+    ).nodes.last;
+    expect(restored.asset!.path, 'packages/theme_test/assets/icon.svg');
+    expect(restored.asset!.kind, SceneAssetKind.svg);
+    expect(restored.asset!.fit, SceneAssetFit.fill);
+    expect(restored.asset!.tint, 0x80112233);
+    expect(restored.asset!.copyWith(tint: null).tint, isNull);
+    expect(restored.copyWith(asset: null).asset, isNull);
+  });
+
+  test('asset nodes validate portable paths kinds fits and mutually exclusive frames', () {
+    for (final asset in [
+      {'path': '../icon.svg'},
+      {'path': '/tmp/icon.svg'},
+      {'path': r'assets/..\icon.svg'},
+      {'path': 'assets/'},
+      {'path': 'assets/icon.svg', 'kind': 'script'},
+      {'path': 'assets/icon.svg', 'fit': 'unknown'},
+      {'path': 'assets/icon.svg', 'tint': 'red'},
+    ]) {
+      expect(
+        () => decodeSceneDocument(
+          jsonEncode(
+            scene([
+              {...node('asset'), 'asset': asset},
+            ]),
+          ),
+        ),
+        throwsFormatException,
+      );
+    }
+    expect(
+      () => decodeSceneDocument(
+        jsonEncode(
+          scene([
+            {
+              ...node('frame', frame: true),
+              'asset': {'path': 'assets/icon.svg'},
+            },
+          ]),
+        ),
+      ),
+      throwsFormatException,
+    );
+  });
   test('guide coordinates validate at the authoring boundary', () {
     for (final guide in [
       {'axis': 'vertical', 'position': -1},

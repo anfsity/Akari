@@ -100,6 +100,30 @@ Built-in renderers support `image` and `solid`. Using `video` or `custom` requir
 | `properties` | `Record<string, string>` | `{}` | String key-value pairs interpreted by the component |
 | `transform` | Transform object | Identity | Node-local translation, scale, rotation, and pivot |
 
+## Image and SVG layers
+
+An optional node `asset` object renders an image or SVG directly through the
+scene runtime. These nodes bypass the theme's component factory; Studio uses
+`sceneAsset` as their component identifier. They support the same geometry,
+styles, motion, visibility, and frame nesting as other layers. A node cannot
+declare both `asset` and `layout`.
+
+| Field | Type / Values | Default | Description |
+| --- | --- | --- | --- |
+| `path` | `string` | Required | Bundled file under `assets/` or `packages/<package>/`; absolute paths, backslashes, `..`, and directory paths are rejected |
+| `kind` | `"image"` \| `"svg"` | `"image"` | Raster image or SVG content |
+| `fit` | `"contain"` \| `"cover"` \| `"fill"` | `"contain"` | How content fits the layer rectangle |
+| `tint` | `#RRGGBB` \| `#AARRGGBB` | Omit | Optional color override preserving source alpha |
+
+```json
+{
+  "id": "logo", "component": "sceneAsset",
+  "rect": {"x": 0.45, "y": 0.1, "width": 0.1, "height": 0.1},
+  "asset": {"path": "packages/theme_ocean/assets/logo.svg",
+            "kind": "svg", "fit": "contain", "tint": "#ffffff"}
+}
+```
+
 ## Visual style tokens
 
 The optional root `styleTokens` object maps names to `SceneStyle` values. A node
