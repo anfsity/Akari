@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'node_geometry.dart';
+import 'studio_input.dart';
 
 /// Owns the editor camera independently of scene geometry. Zooming keeps the
 /// point under the pointer stationary; wheel panning and the hand tool never
@@ -19,6 +19,7 @@ class StudioViewport extends StatefulWidget {
     required this.onZoom,
     required this.childBuilder,
     this.presenting = false,
+    this.input = const StudioInputBindings(),
     super.key,
   });
 
@@ -30,6 +31,7 @@ class StudioViewport extends StatefulWidget {
   final ValueChanged<double> onZoom;
   final Widget Function(double scale) childBuilder;
   final bool presenting;
+  final StudioInputBindings input;
 
   @override
   State<StudioViewport> createState() => _StudioViewportState();
@@ -41,6 +43,7 @@ class _StudioViewportState extends State<StudioViewport> {
   double? _scale;
   Size? _viewportSize;
   Offset? _zoomAnchor;
+  int? _panPointer;
 
   @override
   void didUpdateWidget(StudioViewport oldWidget) {
@@ -100,10 +103,30 @@ class _StudioViewportState extends State<StudioViewport> {
         child: Listener(
           key: const ValueKey('studio-viewport'),
           behavior: HitTestBehavior.opaque,
+          onPointerDown: (event) {
+            if (!widget.presenting && event.buttons == widget.input.panButton) {
+              setState(() => _panPointer = event.pointer);
+            }
+          },
+          onPointerMove: (event) {
+            if (event.pointer == _panPointer) {
+              setState(() => _pan += event.localDelta);
+            }
+          },
+          onPointerUp: (event) {
+            if (event.pointer == _panPointer) {
+              setState(() => _panPointer = null);
+            }
+          },
+          onPointerCancel: (event) {
+            if (event.pointer == _panPointer) {
+              setState(() => _panPointer = null);
+            }
+          },
           onPointerSignal: (event) {
             if (event is! PointerScrollEvent) return;
             GestureBinding.instance.pointerSignalResolver.register(event, (_) {
-              if (HardwareKeyboard.instance.isControlPressed) {
+              if (widget.input.isZoomGesture()) {
                 _zoomAnchor = event.localPosition;
                 widget.onZoom(
                   clampStudioZoom(
@@ -126,7 +149,7 @@ class _StudioViewportState extends State<StudioViewport> {
                   ? (details) => setState(() => _pan += details.delta)
                   : null,
               child: IgnorePointer(
-                ignoring: widget.panEnabled,
+                ignoring: widget.panEnabled || _panPointer != null,
                 child: OverflowBox(
                   alignment: Alignment.topLeft,
                   minWidth: widget.referenceSize.width,

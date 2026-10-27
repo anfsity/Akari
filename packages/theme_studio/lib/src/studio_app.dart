@@ -515,6 +515,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     final editor = _editor;
     return StudioWorkspace(
       onSave: _save,
+      onOpenSettings: () => _openSettings(context),
+      input: _preferences.input,
       toolbar: StudioToolbar(
         themeId: _theme.id,
         readOnly: _inspect,

@@ -4,6 +4,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' show ThemeMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'studio_theme.dart';
+import 'studio_input.dart';
 
 class StudioPreferences {
   const StudioPreferences({
@@ -12,6 +13,7 @@ class StudioPreferences {
     this.showGrid = false,
     this.snapToGrid = false,
     this.gridSize = 24,
+    this.input = const StudioInputBindings(),
   });
 
   static const storageKey = 'akari.studio.preferences';
@@ -21,6 +23,7 @@ class StudioPreferences {
   final bool showGrid;
   final bool snapToGrid;
   final int gridSize;
+  final StudioInputBindings input;
 
   static void validateGridSize(int size) {
     if (size < 4 || size > 512) {
@@ -70,6 +73,7 @@ class StudioPreferences {
       showGrid: json['showGrid'] as bool,
       snapToGrid: json['snapToGrid'] as bool,
       gridSize: json['gridSize'] as int,
+      input: StudioInputBindings.decode(json['input']),
     );
   }
 
@@ -83,6 +87,7 @@ class StudioPreferences {
         'showGrid': showGrid,
         'snapToGrid': snapToGrid,
         'gridSize': gridSize,
+        'input': input.encode(),
       }),
     );
     if (!saved) throw StateError('Unable to save Studio preferences.');

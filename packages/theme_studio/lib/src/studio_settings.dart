@@ -4,6 +4,8 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import 'studio_preferences.dart';
+import 'studio_input.dart';
+import 'studio_input_settings.dart';
 import 'studio_form.dart';
 import 'studio_form_values.dart';
 import 'studio_theme.dart';
@@ -43,6 +45,11 @@ enum _SettingsSection {
     'Grid & snapping',
     LucideIcons.grid2x2,
     'Precision while moving and resizing',
+  ),
+  input(
+    'Shortcuts',
+    LucideIcons.keyboard,
+    'Shortcuts, bindings, and navigation gestures',
   );
 
   const _SettingsSection(this.label, this.icon, this.description);
@@ -67,6 +74,7 @@ class _StudioSettingsState extends State<StudioSettings> {
   late StudioPalette _palette;
   late bool _showGrid;
   late bool _snapToGrid;
+  late StudioInputBindings _input;
   String? _error;
   _SettingsSection? _errorSection;
 
@@ -94,6 +102,7 @@ class _StudioSettingsState extends State<StudioSettings> {
     _palette = preferences.palette;
     _showGrid = preferences.showGrid;
     _snapToGrid = preferences.snapToGrid;
+    _input = preferences.input;
   }
 
   int _getInteger(String label) => getIntegerInput(label, _fields[label]!.text);
@@ -120,6 +129,7 @@ class _StudioSettingsState extends State<StudioSettings> {
       blurSigma: _getNumber('Background blur'),
       scrimOpacity: _getNumber('Scrim opacity'),
       rendererId: widget.document.background.rendererId,
+      parameters: widget.document.background.parameters,
     );
   }
 
@@ -132,6 +142,7 @@ class _StudioSettingsState extends State<StudioSettings> {
       showGrid: _showGrid,
       snapToGrid: _snapToGrid,
       gridSize: gridSize,
+      input: _input,
     );
   }
 
@@ -273,6 +284,11 @@ class _StudioSettingsState extends State<StudioSettings> {
                               _SettingsSection.appearance =>
                                 _buildAppearanceSection(),
                               _SettingsSection.grid => _buildGridSection(),
+                              _SettingsSection.input => StudioInputSettings(
+                                value: _input,
+                                onChanged: (value) =>
+                                    setState(() => _input = value),
+                              ),
                             },
                           ],
                         ),
