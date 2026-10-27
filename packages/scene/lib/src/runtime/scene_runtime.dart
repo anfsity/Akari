@@ -227,6 +227,7 @@ class SceneRuntime extends StatelessWidget {
     }
     final content = _SceneNodeHost(
       previewProgress: previewProgress,
+      playbackElapsed: playback?.elapsed,
       visible: visible,
       activePredicatesListenable: visibleWhen == null
           ? null
@@ -312,6 +313,7 @@ class _SceneNodeHost extends StatefulWidget {
     required this.node,
     required this.style,
     required this.previewProgress,
+    required this.playbackElapsed,
     required this.nodeBuilder,
     required this.loadFont,
   });
@@ -326,6 +328,7 @@ class _SceneNodeHost extends StatefulWidget {
   final SceneStyle style;
   final SceneFontLoader? loadFont;
   final double? previewProgress;
+  final Duration? playbackElapsed;
   final SceneNodeBuilder nodeBuilder;
 
   @override
@@ -340,10 +343,11 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
   Widget? _prewarmedChild;
 
   bool get _animatesPresence =>
-      widget.motionBuilder != null &&
-      widget.motionBuilder!.animatesPresence &&
-      widget.spec.preset != SceneMotionPreset.none &&
-      !widget.spec.reducedMotion;
+      !widget.spec.reducedMotion &&
+      (widget.node.tracks.isNotEmpty ||
+          (widget.motionBuilder != null &&
+              widget.motionBuilder!.animatesPresence &&
+              widget.spec.preset != SceneMotionPreset.none));
 
   @override
   void initState() {
@@ -392,7 +396,8 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
       );
     }
     if (widget.spec.curve != oldWidget.spec.curve ||
-        widget.node.motionTiming != oldWidget.node.motionTiming) {
+        (widget.node.motionTiming != oldWidget.node.motionTiming ||
+            widget.node.tracks != oldWidget.node.tracks)) {
       _progress = _controller.drive(
         CurveTween(
           curve: getSceneMotionCurve(
@@ -404,7 +409,8 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
       );
     }
     if (widget.spec.duration != oldWidget.spec.duration ||
-        widget.node.motionTiming != oldWidget.node.motionTiming) {
+        (widget.node.motionTiming != oldWidget.node.motionTiming ||
+            widget.node.tracks != oldWidget.node.tracks)) {
       _controller.duration = getSceneMotionDuration(
         widget.node,
         widget.spec.duration,
@@ -536,13 +542,62 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
     final child = widget.prewarmHiddenNodes
         ? (_prewarmedChild ??= widget.nodeBuilder(context, widget.node))
         : widget.nodeBuilder(context, widget.node);
-    return SceneStyleView(
+    final styled = SceneStyleView(
       style: widget.style,
       loadFont: widget.loadFont,
       shape: widget.node.primitive == ScenePrimitive.circle
           ? BoxShape.circle
           : BoxShape.rectangle,
       child: child,
+    );
+    if (widget.node.tracks.isEmpty) return styled;
+    return AnimatedBuilder(
+      animation: _controller,
+      child: styled,
+      builder: (context, child) {
+        final elapsed = widget.spec.reducedMotion
+            ? getSceneMotionDuration(widget.node, widget.spec.duration)
+            : widget.playbackElapsed ??
+                  Duration(
+                    microseconds:
+                        (_controller.value *
+                                _controller.duration!.inMicroseconds)
+                            .round(),
+                  );
+        final time =
+            elapsed - Duration(milliseconds: widget.node.motionTiming.delayMs);
+        var opacity = 1.0;
+        var x = 0.0;
+        var y = 0.0;
+        var scale = 1.0;
+        var rotation = 0.0;
+        for (final track in widget.node.tracks) {
+          final value = calculateSceneTrackValue(track, time);
+          switch (track.property) {
+            case SceneMotionProperty.opacity:
+              opacity = value;
+            case SceneMotionProperty.translateX:
+              x = value;
+            case SceneMotionProperty.translateY:
+              y = value;
+            case SceneMotionProperty.scale:
+              scale = value;
+            case SceneMotionProperty.rotation:
+              rotation = value;
+          }
+        }
+        return Opacity(
+          opacity: opacity,
+          child: Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()
+              ..translateByDouble(x, y, 0, 1)
+              ..rotateZ(rotation * 3.141592653589793 / 180)
+              ..scaleByDouble(scale, scale, 1, 1),
+            child: child,
+          ),
+        );
+      },
     );
   }
 }

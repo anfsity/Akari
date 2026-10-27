@@ -448,6 +448,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('timeline tracks drag once, edit keyframes and persist through undo and save', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.tap(find.byKey(const ValueKey('canvas-timeline'))); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('timeline-add-track'))); await tester.pumpAndSettle();
+    expect(editor.selectedNode.tracks.single.property, SceneMotionProperty.opacity);
+    final initial = encodeSceneDocument(editor.document);
+    final block = find.byKey(const ValueKey('timeline-block-panel'));
+    final gesture = await tester.startGesture(tester.getTopLeft(block) + const Offset(8,10));
+    await gesture.moveBy(const Offset(40,0)); await tester.pump();
+    expect(encodeSceneDocument(editor.document),initial);
+    expect(editor.previewDocument.nodes.first.motionTiming.delayMs,greaterThan(0));
+    await gesture.up(); await tester.pumpAndSettle();
+    expect(editor.document.nodes.first.motionTiming.delayMs,greaterThan(0));
+    editor.undo(); await tester.pumpAndSettle(); expect(encodeSceneDocument(editor.document),initial);
+    final frame = find.byKey(const ValueKey('keyframe-panel-0-1'));
+    await tester.tap(frame); await tester.pump(const Duration(milliseconds: 40)); await tester.tap(frame); await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('keyframe-value')),'.4');
+    await tester.tap(find.text('Apply').last); await tester.pumpAndSettle();
+    expect(editor.selectedNode.tracks.single.keyframes.last.value,.4);
+    await tester.tap(find.text('Save scene')); await tester.pumpAndSettle();
+    expect(decodeSceneDocument(file.readAsStringSync()).nodes.first.tracks.single.keyframes.last.value,.4);
+    expect(tester.takeException(),isNull);
+  });
+
   testWidgets('timeline scrubbing and state transitions never edit scene history', (tester) async {
     await openStudio(tester);
     final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;

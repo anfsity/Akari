@@ -339,6 +339,29 @@ class SceneMotionTiming {
   bool get isDefault => durationMs == null && delayMs == 0 && curve == null;
 }
 
+enum SceneMotionProperty { opacity, translateX, translateY, scale, rotation }
+
+enum SceneKeyframeCurve { linear, easeInOut, hold }
+
+class SceneKeyframe {
+  const SceneKeyframe({
+    required this.timeMs,
+    required this.value,
+    this.curve = SceneKeyframeCurve.linear,
+  });
+  final int timeMs;
+  final double value;
+
+  /// Easing from this frame to the next frame.
+  final SceneKeyframeCurve curve;
+}
+
+class SceneMotionTrack {
+  const SceneMotionTrack({required this.property, required this.keyframes});
+  final SceneMotionProperty property;
+  final List<SceneKeyframe> keyframes;
+}
+
 enum SceneBackgroundKind { image, solid, video, custom }
 
 /// Fractions of the available parent content area, independent of resolution.
@@ -538,6 +561,7 @@ class SceneNode {
     this.focusOrder = 0,
     this.motion = SceneMotionPreset.none,
     this.motionTiming = const SceneMotionTiming(),
+    this.tracks = const [],
     this.stateEffects = const {},
     this.visibleWhen,
     this.interactive = false,
@@ -562,6 +586,7 @@ class SceneNode {
   final int focusOrder;
   final SceneMotionPreset motion;
   final SceneMotionTiming motionTiming;
+  final List<SceneMotionTrack> tracks;
   final Map<ScenePredicate, SceneStateEffect> stateEffects;
 
   /// Condition controlling whether the node is present; null means always.
@@ -587,6 +612,7 @@ class SceneNode {
     int? focusOrder,
     SceneMotionPreset? motion,
     SceneMotionTiming? motionTiming,
+    List<SceneMotionTrack>? tracks,
     Map<ScenePredicate, SceneStateEffect>? stateEffects,
     Object? visibleWhen = _unset,
     bool? interactive,
@@ -615,6 +641,7 @@ class SceneNode {
       focusOrder: focusOrder ?? this.focusOrder,
       motion: motion ?? this.motion,
       motionTiming: motionTiming ?? this.motionTiming,
+      tracks: tracks ?? this.tracks,
       stateEffects: stateEffects ?? this.stateEffects,
       visibleWhen: identical(visibleWhen, _unset)
           ? this.visibleWhen

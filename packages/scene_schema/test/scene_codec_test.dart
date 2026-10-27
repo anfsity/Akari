@@ -32,6 +32,61 @@ const _scene = '''
 
 void main() {
   test(
+    'property tracks round trip and reject duplicate times and properties',
+    () {
+      final base = decodeSceneDocument(_scene);
+      const frames = [
+        SceneKeyframe(timeMs: 0, value: 0),
+        SceneKeyframe(
+          timeMs: 1000,
+          value: 1,
+          curve: SceneKeyframeCurve.easeInOut,
+        ),
+      ];
+      const track = SceneMotionTrack(
+        property: SceneMotionProperty.opacity,
+        keyframes: frames,
+      );
+      SceneDocument withTracks(List<SceneMotionTrack> tracks) =>
+          base.copyWith(nodes: [base.nodes.first.copyWith(tracks: tracks)]);
+      expect(
+        decodeSceneDocument(encodeSceneDocument(withTracks([track])))
+            .nodes
+            .single
+            .tracks
+            .single
+            .keyframes
+            .last
+            .curve,
+        SceneKeyframeCurve.easeInOut,
+      );
+      for (final tracks in [
+        [track, track],
+        [
+          const SceneMotionTrack(
+            property: SceneMotionProperty.opacity,
+            keyframes: [],
+          ),
+        ],
+        [
+          const SceneMotionTrack(
+            property: SceneMotionProperty.opacity,
+            keyframes: [
+              SceneKeyframe(timeMs: 100, value: 0),
+              SceneKeyframe(timeMs: 100, value: 1),
+            ],
+          ),
+        ],
+      ]) {
+        expect(
+          () => decodeSceneDocument(encodeSceneDocument(withTracks(tracks))),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+
+  test(
     'responsive rules round trip and reject ambiguous external constraints',
     () {
       final base = decodeSceneDocument(_scene);

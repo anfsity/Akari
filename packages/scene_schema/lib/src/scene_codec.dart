@@ -298,6 +298,7 @@ SceneNode _decodeNode(
           'stateEffects.effect',
         ),
     },
+    tracks: _decodeTracks(json),
     motionTiming: _decodeMotionTiming(
       _getMap(json, 'motionTiming', fallback: const {}),
     ),
@@ -438,6 +439,21 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
         for (final entry in node.stateEffects.entries)
           entry.key.name: entry.value.name,
       },
+    if (node.tracks.isNotEmpty)
+      'tracks': [
+        for (final track in node.tracks)
+          {
+            'property': track.property.name,
+            'keyframes': [
+              for (final frame in track.keyframes)
+                {
+                  'timeMs': frame.timeMs,
+                  'value': frame.value,
+                  'curve': frame.curve.name,
+                },
+            ],
+          },
+      ],
     if (!node.motionTiming.isDefault)
       'motionTiming': {
         if (node.motionTiming.durationMs != null)
@@ -451,6 +467,56 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
     if (node.interactive) 'interactive': true,
     if (node.properties.isNotEmpty) 'properties': node.properties,
   };
+}
+
+List<SceneMotionTrack> _decodeTracks(Map<String, dynamic> json) {
+  final properties = <SceneMotionProperty>{};
+  return [
+    for (final raw
+        in json['tracks'] == null ? const [] : _getList(json, 'tracks'))
+      (() {
+        final track = _getMapValue(raw, 'tracks[]');
+        final property = _getEnumValue(
+          SceneMotionProperty.values,
+          _getString(track, 'property'),
+          'track.property',
+        );
+        if (!properties.add(property))
+          throw const FormatException(
+            'Only one track per property is allowed.',
+          );
+        var previous = -1;
+        final frames = <SceneKeyframe>[];
+        for (final raw in _getList(track, 'keyframes')) {
+          final frame = _getMapValue(raw, 'keyframes[]');
+          final time = _getInt(frame, 'timeMs');
+          final value = _getDouble(frame, 'value');
+          if (time <= previous ||
+              time > 60000 ||
+              value.abs() > 100000 ||
+              (property == SceneMotionProperty.opacity &&
+                  (value < 0 || value > 1)))
+            throw const FormatException(
+              'Keyframes require increasing times in 0..60000 and valid property values.',
+            );
+          previous = time;
+          frames.add(
+            SceneKeyframe(
+              timeMs: time,
+              value: value,
+              curve: _getEnumValue(
+                SceneKeyframeCurve.values,
+                _getString(frame, 'curve', fallback: 'linear'),
+                'keyframe.curve',
+              ),
+            ),
+          );
+        }
+        if (frames.isEmpty)
+          throw const FormatException('A track requires a keyframe.');
+        return SceneMotionTrack(property: property, keyframes: frames);
+      })(),
+  ];
 }
 
 SceneAsset _decodeAsset(Map<String, dynamic> json) {

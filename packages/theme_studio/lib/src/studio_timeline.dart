@@ -1,6 +1,8 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import 'studio_form.dart';
+import 'scene_editor.dart';
+import 'studio_timeline_tracks.dart';
 import 'studio_preview_host.dart';
 
 enum StudioTransition {
@@ -56,6 +58,8 @@ enum StudioTransition {
 
 class StudioTimeline extends StatefulWidget {
   const StudioTimeline({
+    required this.editor,
+    required this.fallbackDuration,
     required this.duration,
     required this.elapsed,
     required this.transition,
@@ -63,6 +67,8 @@ class StudioTimeline extends StatefulWidget {
     required this.onTransitionChanged,
     super.key,
   });
+  final SceneEditor editor;
+  final Duration fallbackDuration;
   final Duration duration;
   final Duration elapsed;
   final StudioTransition transition;
@@ -174,6 +180,12 @@ class _StudioTimelineState extends State<StudioTimeline>
         Text(
           '${(widget.elapsed.inMilliseconds / 1000).toStringAsFixed(2)} s / ${(widget.duration.inMilliseconds / 1000).toStringAsFixed(2)} s',
         ).small().muted(),
+        StudioTimelineTracks(
+          editor: widget.editor,
+          duration: widget.duration,
+          elapsed: widget.elapsed,
+          fallbackDuration: widget.fallbackDuration,
+        ),
       ],
     ),
   );

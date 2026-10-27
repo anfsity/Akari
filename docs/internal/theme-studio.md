@@ -331,3 +331,5 @@ their own editing behavior.
 ```
 
 Responsive sizing supports min/max logical dimensions, proportional, fill and hug modes. Hug measures portable text with the registered font and frames from their child bounds; theme components require explicit/proportional dimensions. Fixed dimensions override proportional/fill dimensions. Row/column frames can wrap; fill distributes remaining line space, constrained by min/max. Viewport breakpoints override a node's layout and sizing; the widest matching minimum wins. The Responsive canvas control continuously changes preview width/height without changing the authored canvas or history.
+
+The Motion workspace shows per-layer timing blocks and property tracks. Drag a block to change delay, its right handle to change duration, or a diamond to change a keyframe time. Add property tracks for opacity, X/Y translation, scale and rotation; add frames at the playhead and double-click diamonds to edit time/value/easing or delete them. Edits preview continuously and commit one history entry on release. The node's shared runtime controller evaluates the same delayed keyframes as scrubbing; reduced motion settles to final values.
