@@ -25,6 +25,7 @@ import 'package:theme_studio/src/studio_assets.dart';
 import 'package:theme_studio/src/studio_input.dart';
 import 'package:theme_studio/src/studio_preferences.dart';
 import 'package:theme_studio/src/studio_components.dart';
+import 'package:theme_studio/src/studio_workspace_layout.dart';
 
 const _document = SceneDocument(
   id: 'test',
@@ -549,6 +550,56 @@ void main() {
     },
   );
 
+  testWidgets('canvas commands also work from layer rows without intercepting text edits', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.tap(find.byKey(const ValueKey('layer-label')));
+    await tester.pumpAndSettle();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(editor.document.nodes.length, 2);
+    expect(editor.selectedId, 'label');
+    await tester.enterText(find.byKey(const ValueKey('field-X')), 'draft');
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(editor.document.nodes.length, 2);
+    expect(editor.inspector.hasDraft, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('workspace docking groups preserve fields and restore the motion layout', (tester) async {
+    await openStudio(tester);
+    final field = find.byKey(const ValueKey('field-X'));
+    final state = tester.state(field);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.tap(find.byKey(const ValueKey('float-Sidebar')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('dock-right-Sidebar')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('dock-tab-Sidebar')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('dock-tab-Inspector')));
+    await tester.pumpAndSettle();
+    expect(tester.state(field), same(state));
+    tester.widget<StudioEnumSelect<StudioWorkspaceMode>>(find.byKey(const ValueKey('workspace-preset'))).onChanged(StudioWorkspaceMode.motion);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('timeline-scrubber')), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect((await StudioWorkspaceLayout.load()).sidebarDock, StudioDock.right);
+    expect((await StudioWorkspaceLayout.load()).mode, StudioWorkspaceMode.motion);
+    expect(editor.canUndo, isFalse);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await openStudio(tester);
+    expect(find.byKey(const ValueKey('dock-tab-Sidebar')), findsOneWidget);
+    expect(find.byKey(const ValueKey('timeline-scrubber')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('layer rows drag into frames and back to the root with atomic undo', (tester) async {
     await openStudio(tester);
     final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
@@ -775,7 +826,7 @@ void main() {
         scenario == StudioPreviewScenario.password ? -80 : 80,
         scrollable: find
             .descendant(
-              of: find.byType(SelectPopup),
+          of: find.byType(SelectPopup<StudioPreviewScenario>),
               matching: find.byType(Scrollable),
             )
             .last,
@@ -1588,6 +1639,8 @@ void main() {
       await openStudio(tester, themeBuilder: buildPresets);
       final source = file.readAsStringSync();
       final choice = find.byKey(const ValueKey('preset-palette'));
+      await tester.ensureVisible(choice);
+      await tester.pumpAndSettle();
       expect(choice, findsOneWidget);
       expect(find.text('Ocean'), findsOneWidget);
       expect(find.text('Optional components'), findsNothing);
@@ -1629,6 +1682,8 @@ void main() {
         matching: find.byType(Select<Enum>),
       );
       expect(tester.widget<Select<Enum>>(selector).enabled, isFalse);
+      await tester.ensureVisible(choice);
+      await tester.pumpAndSettle();
       await tester.tap(choice);
       await tester.pumpAndSettle();
       expect(find.text('Ocean'), findsNothing);
@@ -3001,7 +3056,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('asset-category')));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Shaders').last);
+      await tester.scrollUntilVisible(find.text('Shaders'), 60,
+        scrollable: find.descendant(of: find.byType(SelectPopup<String>), matching: find.byType(Scrollable)).first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Shaders').last);
       await tester.pumpAndSettle();

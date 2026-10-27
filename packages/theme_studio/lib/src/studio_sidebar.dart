@@ -382,7 +382,7 @@ class _AssetListState extends State<_AssetList> {
                           onPressed: widget.onApplyFont == null
                               ? null
                               : () => widget.onApplyFont!(selected),
-                          child: const Text('Apply to selection').small(),
+                          child: const Text('Apply font').small(),
                         ),
                       if (raster)
                         PrimaryButton(
