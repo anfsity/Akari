@@ -1,13 +1,29 @@
 ---
 title: 场景格式
-description: 场景 JSON 的字段、示例和校验规则，当前版本为 2。
+description: 场景 JSON 的字段、示例和校验规则，当前版本为 3。
 ---
 
 场景 JSON 文件（`*.scene.json`）定义主题的画布、背景、节点、几何变换与可见性条件。构建时由 `packages/scene_schema` 校验 JSON 并生成类型化 Dart 代码（`*.scene.g.dart`），正式应用直接运行生成代码，无需在登录时解析 JSON。
 
 :::note
-当前场景格式版本为 `2`。解码器仍兼容版本 `1`（会自动将旧版 `kind`/`action` 字段规范化为当前模型），新建场景请统一使用版本 `2`。
+当前场景格式版本为 `3`。解码器兼容版本 `1` 和 `2`，自动规范化旧版 `kind`/`action`，并保留已有扁平布局的行为。
 :::
+
+## 容器与自动布局
+
+节点声明 `layout` 后成为运行时管理的 Frame，不调用主题组件工厂。
+子节点通过 `parentId` 引用容器，`rect` 相对父容器的内边距区域。
+容器的变换与可见性作用于整棵子树，绘制顺序在同一父容器内比较。
+解码器拒绝不存在的父节点、非容器父节点和循环引用。
+
+`layout.direction` 支持 `absolute`、`row`、`column`；`padding`、`gap`
+采用非负逻辑像素。`mainAlignment` 支持 `start`、`center`、`end`、
+`spaceBetween`，`crossAlignment` 支持 `start`、`center`、`end`、`stretch`。
+`clip: true` 裁剪溢出内容。
+
+子节点可通过 `sizing.width/height` 设置正数固定逻辑尺寸，通过 `sizing.flex`
+分配主轴剩余空间。Row/Column 接管子节点的位置。隐藏节点保留布局占位，
+避免认证状态切换时邻近控件跳动。固定尺寸在小容器中可能溢出，裁剪策略显式配置。
 
 ## 最小示例
 
