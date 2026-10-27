@@ -86,6 +86,8 @@ class SceneEditor extends ChangeNotifier {
       selectedNode.visibleWhen == null &&
       selectedNode.styleToken == null &&
       selectedNode.stateEffects.isEmpty &&
+      selectedNode.tracks.isEmpty &&
+      selectedNode.breakpoints.isEmpty &&
       selectedNode.motion == SceneMotionPreset.none &&
       !selectedNode.layout!.clip;
   ThemeComponentCatalog get componentCatalog => _componentCatalog;
@@ -697,6 +699,16 @@ class SceneEditor extends ChangeNotifier {
   void cancelPreview() {
     if (_previewDocument == null) return;
     _previewDocument = null;
+    notifyListeners();
+  }
+
+  void previewNode(SceneNode node) {
+    _previewDocument = document.copyWith(
+      nodes: [
+        for (final current in document.nodes)
+          current.id == node.id ? node : current,
+      ],
+    );
     notifyListeners();
   }
 

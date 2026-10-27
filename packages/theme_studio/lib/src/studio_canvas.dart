@@ -827,6 +827,8 @@ class StudioCanvasState extends State<StudioCanvas> {
                   ),
                 if (session != null && _elapsed != null && !presenting)
                   StudioTimeline(
+                    editor: session,
+                    fallbackDuration: widget.theme.bundle.tokens.mediumMotion,
                     duration: _getTimelineDuration(session),
                     elapsed: _elapsed!,
                     transition: _transition,

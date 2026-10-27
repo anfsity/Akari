@@ -8,6 +8,106 @@ import 'package:scene/scene.dart';
 import 'package:scene/src/runtime/state_effects.dart';
 
 void main() {
+  test('keyframes interpolate holds, endpoints and preserve preset timing', () {
+    const track = SceneMotionTrack(
+      property: SceneMotionProperty.opacity,
+      keyframes: [
+        SceneKeyframe(timeMs: 100, value: 0),
+        SceneKeyframe(timeMs: 1100, value: 1, curve: SceneKeyframeCurve.hold),
+        SceneKeyframe(timeMs: 2000, value: .2),
+      ],
+    );
+    expect(
+      calculateSceneTrackValue(track, const Duration(milliseconds: 600)),
+      .5,
+    );
+    expect(
+      calculateSceneTrackValue(track, const Duration(milliseconds: 1500)),
+      1,
+    );
+    expect(
+      calculateSceneTrackValue(track, const Duration(milliseconds: 2000)),
+      .2,
+    );
+    final node =
+        const SceneNode(
+          id: 'track',
+          componentId: 'text',
+          rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+        ).copyWith(
+          tracks: [track],
+          motionTiming: const SceneMotionTiming(durationMs: 400, delayMs: 100),
+        );
+    expect(
+      getSceneMotionDuration(node, const Duration(milliseconds: 400)),
+      const Duration(milliseconds: 2100),
+    );
+    expect(
+      getSceneMotionCurve(
+        node,
+        const Duration(milliseconds: 400),
+        Curves.linear,
+      ).transform(500 / 2100),
+      1,
+    );
+  });
+
+  testWidgets(
+    'property tracks sample the same delayed values in live playback and scrubbing',
+    (tester) async {
+      const node = SceneNode(
+        id: 'track',
+        componentId: 'text',
+        rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+        motionTiming: SceneMotionTiming(delayMs: 100),
+        tracks: [
+          SceneMotionTrack(
+            property: SceneMotionProperty.opacity,
+            keyframes: [
+              SceneKeyframe(timeMs: 0, value: 0),
+              SceneKeyframe(timeMs: 1000, value: 1),
+            ],
+          ),
+        ],
+      );
+      Future<void> render(Duration? time) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SceneRuntime(
+              key: ValueKey(time == null),
+              document: _document(nodes: [node]),
+              theme: ThemeBundle(tokens: _tokens()),
+              playback: time == null
+                  ? null
+                  : ScenePlayback(
+                      elapsed: time,
+                      from: const {},
+                      enterAll: true,
+                    ),
+              nodeBuilder: (_, _) => const Text('Tracked'),
+            ),
+          ),
+        ),
+      );
+      double opacity() => tester
+          .widgetList<Opacity>(
+            find.ancestor(
+              of: find.text('Tracked'),
+              matching: find.byType(Opacity),
+            ),
+          )
+          .map((widget) => widget.opacity)
+          .reduce((a, b) => a * b);
+      await render(const Duration(milliseconds: 600));
+      expect(opacity(), closeTo(.5, 1e-5));
+      await render(null);
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(opacity(), closeTo(.5, 1e-5));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(opacity(), 1);
+    },
+  );
+
   testWidgets(
     'authored fonts and typography reach explicit text without reloading on style edits',
     (tester) async {
