@@ -129,6 +129,45 @@ void main() {
     );
   });
 
+  test(
+    'hug cross size includes wrapped lines and fixed sizes override fill',
+    () {
+      final scene = document([
+        const SceneNode(
+          id: 'frame',
+          componentId: 'frame',
+          rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+          sizing: SceneSizing(width: 250, heightMode: SceneSizeMode.hug),
+          layout: SceneLayout(
+            direction: SceneLayoutDirection.row,
+            wrap: true,
+            padding: 10,
+            gap: 10,
+          ),
+        ),
+        for (var i = 0; i < 2; i++)
+          SceneNode(
+            id: 'item$i',
+            componentId: 'item',
+            parentId: 'frame',
+            rect: const SceneRect(x: 0, y: 0, width: .1, height: .1),
+            sizing: const SceneSizing(
+              width: 150,
+              height: 50,
+              widthMode: SceneSizeMode.fill,
+            ),
+          ),
+      ]);
+      final geometry = calculateSceneLayout(
+        document: scene,
+        size: const Size(800, 600),
+      );
+      expect(geometry['frame']!.rect.size, const Size(250, 130));
+      expect(geometry['item0']!.rect, const Rect.fromLTWH(10, 10, 150, 50));
+      expect(geometry['item1']!.rect, const Rect.fromLTWH(10, 70, 150, 50));
+    },
+  );
+
   test('nested frames resolve parent coordinates and ancestor transforms', () {
     final scene = document(const [
       SceneNode(
