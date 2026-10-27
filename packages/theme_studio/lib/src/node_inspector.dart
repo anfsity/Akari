@@ -6,6 +6,7 @@ import 'studio_form.dart';
 import 'scene_editor.dart';
 import 'node_layout_inspector.dart';
 import 'node_style_inspector.dart';
+import 'node_motion_inspector.dart';
 
 class NodeInspector extends StatelessWidget {
   const NodeInspector({
@@ -194,6 +195,7 @@ class _InspectorForm extends StatelessWidget {
           onApply();
         },
       ),
+      if (editor case final session?) NodeMotionInspector(editor: session),
     ],
   );
 

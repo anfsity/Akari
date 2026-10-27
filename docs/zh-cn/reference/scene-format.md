@@ -18,6 +18,14 @@ description: 场景 JSON 的字段、示例和校验规则，当前版本为 3�
 尺寸采用逻辑像素。多个节点可共享一个 token。组件的显式文字样式可以通过
 `getSceneTextStyle(context, fallback)` 接入覆盖值；Terrace 标签与时钟已接入。
 
+## 动效时序
+
+节点可通过 `motionTiming` 保存 `durationMs`、`delayMs` 与
+`curve: [x1,y1,x2,y2]`。时长与延迟为 0..60000 的整数毫秒，贝塞尔控制点为
+0..1。省略时长或曲线会继承主题设置。延迟纳入同一控制器，反向切换沿当前进度
+连续播放；Studio 时间轴采样与实际 Greeter 使用相同计算。系统和主题的减少动画
+策略优先。
+
 ## 容器与自动布局
 
 节点声明 `layout` 后成为运行时管理的 Frame，不调用主题组件工厂。

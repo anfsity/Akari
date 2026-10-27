@@ -326,6 +326,22 @@ class SceneEditor extends ChangeNotifier {
     );
   }
 
+  void staggerSelection(int intervalMs) {
+    if (!applyDraft()) return;
+    var index = 0;
+    updateNodes([
+      for (final node in document.paintOrder)
+        if (selectedIds.contains(node.id))
+          node.copyWith(
+            motionTiming: SceneMotionTiming(
+              durationMs: node.motionTiming.durationMs,
+              delayMs: index++ * intervalMs,
+              curve: node.motionTiming.curve,
+            ),
+          ),
+    ]);
+  }
+
   void groupSelection() {
     if (!applyDraft() || !canGroup) return;
     final nodes = getSelectionLayoutNodes();

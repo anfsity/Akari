@@ -189,6 +189,22 @@ enum SceneMotionPreset {
   focusGlow,
 }
 
+class SceneCubicBezier {
+  const SceneCubicBezier(this.x1, this.y1, this.x2, this.y2);
+  final double x1;
+  final double y1;
+  final double x2;
+  final double y2;
+}
+
+class SceneMotionTiming {
+  const SceneMotionTiming({this.durationMs, this.delayMs = 0, this.curve});
+  final int? durationMs;
+  final int delayMs;
+  final SceneCubicBezier? curve;
+  bool get isDefault => durationMs == null && delayMs == 0 && curve == null;
+}
+
 enum SceneBackgroundKind { image, solid, video, custom }
 
 /// Fractions of the available canvas, independent of screen pixel dimensions.
@@ -380,6 +396,7 @@ class SceneNode {
     this.renderOrder = 0,
     this.focusOrder = 0,
     this.motion = SceneMotionPreset.none,
+    this.motionTiming = const SceneMotionTiming(),
     this.visibleWhen,
     this.interactive = false,
     this.properties = const <String, String>{},
@@ -399,6 +416,7 @@ class SceneNode {
   final int renderOrder;
   final int focusOrder;
   final SceneMotionPreset motion;
+  final SceneMotionTiming motionTiming;
 
   /// Condition controlling whether the node is present; null means always.
   final SceneCondition? visibleWhen;
@@ -419,6 +437,7 @@ class SceneNode {
     int? renderOrder,
     int? focusOrder,
     SceneMotionPreset? motion,
+    SceneMotionTiming? motionTiming,
     Object? visibleWhen = _unset,
     bool? interactive,
     Map<String, String>? properties,
@@ -440,6 +459,7 @@ class SceneNode {
       renderOrder: renderOrder ?? this.renderOrder,
       focusOrder: focusOrder ?? this.focusOrder,
       motion: motion ?? this.motion,
+      motionTiming: motionTiming ?? this.motionTiming,
       visibleWhen: identical(visibleWhen, _unset)
           ? this.visibleWhen
           : visibleWhen as SceneCondition?,

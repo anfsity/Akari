@@ -8,6 +8,7 @@ import 'studio_preferences.dart';
 import 'studio_preview_host.dart';
 import 'studio_viewport.dart';
 import 'smart_guides.dart';
+import 'studio_timeline.dart';
 
 enum StudioCanvasTool {
   move('Move', 'Drag to move', 'V'),
@@ -47,6 +48,8 @@ class StudioPreview extends StatefulWidget {
     this.onPlaceNode,
     this.onUpdateText,
     this.snapToGuides = true,
+    this.playbackElapsed,
+    this.transition = StudioTransition.wake,
     this.readOnly = false,
     this.scenario = StudioPreviewScenario.password,
     this.interactive = false,
@@ -70,6 +73,8 @@ class StudioPreview extends StatefulWidget {
   final void Function(SceneNode, Offset)? onPlaceNode;
   final void Function(String, String)? onUpdateText;
   final bool snapToGuides;
+  final Duration? playbackElapsed;
+  final StudioTransition transition;
   final bool dormant;
   final StudioPreferences preferences;
   final StudioCanvasTool tool;
@@ -294,7 +299,12 @@ class _StudioPreviewState extends State<StudioPreview>
     }
   }
 
-  late final _simulation = StudioPreviewHost(scenario: widget.scenario);
+  late final _simulation = StudioPreviewHost(
+    scenario: widget.playbackElapsed == null
+        ? widget.scenario
+        : widget.transition.toScenario,
+  );
+  StudioPreviewHost? _sourceSimulation;
 
   late GreeterThemeComponents _components;
   late final AnimationController _wake;
@@ -341,8 +351,20 @@ class _StudioPreviewState extends State<StudioPreview>
         oldWidget.theme.tokens != widget.theme.tokens) {
       _updateWake();
     }
-    if (oldWidget.scenario != widget.scenario) {
-      _simulation.updateScenario(widget.scenario);
+    if (oldWidget.scenario != widget.scenario ||
+        oldWidget.transition != widget.transition ||
+        (oldWidget.playbackElapsed == null) !=
+            (widget.playbackElapsed == null)) {
+      _simulation.updateScenario(
+        widget.playbackElapsed == null
+            ? widget.scenario
+            : widget.transition.toScenario,
+      );
+      _sourceSimulation?.updateScenario(widget.transition.fromScenario);
+      if (widget.playbackElapsed == null) {
+        _sourceSimulation?.dispose();
+        _sourceSimulation = null;
+      }
     }
     if (!identical(oldWidget.theme, widget.theme) ||
         _hasCanvasChanged(oldWidget.document.canvas, widget.document.canvas)) {
@@ -372,6 +394,7 @@ class _StudioPreviewState extends State<StudioPreview>
     _textFocus.dispose();
     _wake.dispose();
     _simulation.dispose();
+    _sourceSimulation?.dispose();
     super.dispose();
   }
 
@@ -389,7 +412,12 @@ class _StudioPreviewState extends State<StudioPreview>
   }
 
   bool _isVisible(SceneNode node) {
-    final predicates = _getPreviewPredicates(_simulation, widget.dormant);
+    final predicates = _getPreviewPredicates(
+      _simulation,
+      widget.playbackElapsed == null
+          ? widget.dormant
+          : widget.transition.toDormant,
+    );
     if (node.visibleWhen != null &&
         !evaluateSceneCondition(node.visibleWhen!, predicates)) {
       return false;
@@ -441,7 +469,40 @@ class _StudioPreviewState extends State<StudioPreview>
       document.canvas.referenceHeight.toDouble(),
     );
     final geometry = _getGeometry(document);
-    final predicates = _getPreviewPredicates(_simulation, widget.dormant);
+    final predicates = _getPreviewPredicates(
+      _simulation,
+      widget.playbackElapsed == null
+          ? widget.dormant
+          : widget.transition.toDormant,
+    );
+    final elapsed = widget.playbackElapsed;
+    final playback = elapsed == null
+        ? null
+        : ScenePlayback(
+            elapsed: elapsed,
+            from: _getPreviewPredicates(
+              _sourceSimulation ??= StudioPreviewHost(
+                scenario: widget.transition.fromScenario,
+              ),
+              widget.transition.fromDormant,
+            ),
+            enterAll: widget.transition == StudioTransition.entrance,
+          );
+    final duration = widget.theme.tokens.mediumMotion.inMicroseconds;
+    final time = elapsed == null
+        ? 0.0
+        : duration == 0
+        ? 1.0
+        : (elapsed.inMicroseconds / duration).clamp(0.0, 1.0);
+    final wake = elapsed == null
+        ? _wake
+        : AlwaysStoppedAnimation<double>(
+            widget.transition.fromDormant == widget.transition.toDormant
+                ? (widget.transition.toDormant ? 0 : 1)
+                : widget.transition.toDormant
+                ? 1 - time
+                : time,
+          );
     return StudioViewport(
       canvasKey: _canvas,
       referenceSize: referenceSize,
@@ -525,7 +586,8 @@ class _StudioPreviewState extends State<StudioPreview>
                     document: document,
                     referenceSize: referenceSize,
                     interactive: widget.interactive,
-                    wakeProgress: _wake,
+                    wakeProgress: wake,
+                    playback: playback,
                     activePredicates: predicates,
                     nodeBuilder: _buildInteractiveNode,
                     frameBuilder: (context, node, child) =>
@@ -786,6 +848,7 @@ class _PreviewScene extends StatelessWidget {
     required this.activePredicates,
     required this.nodeBuilder,
     required this.frameBuilder,
+    required this.playback,
   });
 
   final ThemeDefinition theme;
@@ -795,6 +858,7 @@ class _PreviewScene extends StatelessWidget {
   final Set<ScenePredicate> activePredicates;
   final SceneNodeBuilder nodeBuilder;
   final SceneFrameBuilder frameBuilder;
+  final ScenePlayback? playback;
   final Size referenceSize;
 
   @override
@@ -818,6 +882,7 @@ class _PreviewScene extends StatelessWidget {
           activePredicates: activePredicates,
           nodeBuilder: nodeBuilder,
           frameBuilder: frameBuilder,
+          playback: playback,
         ),
       ),
     ),

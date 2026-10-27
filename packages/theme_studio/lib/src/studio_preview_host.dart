@@ -5,6 +5,7 @@ enum StudioPreviewScenario {
   password('Password'),
   username('Username'),
   submitting('Signing in'),
+  success('Entering desktop'),
   rejectedPassword('Wrong password'),
   error('Authentication error'),
   userSelection('Choose account'),
@@ -98,6 +99,7 @@ class StudioPreviewHost {
     };
     final mode = switch (scenario) {
       StudioPreviewScenario.submitting => AuthMode.submitting,
+      StudioPreviewScenario.success => AuthMode.handingOff,
       StudioPreviewScenario.error => AuthMode.error,
       StudioPreviewScenario.sessionSelection => AuthMode.sessionSelection,
       StudioPreviewScenario.userSelection ||

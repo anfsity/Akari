@@ -17,6 +17,14 @@ class NodeArrangementToolbar extends StatelessWidget {
       children: [
         Text('${editor.selectedIds.length} selected').small().muted(),
         OutlineButton(
+          key: const ValueKey('stagger-selection'),
+          density: ButtonDensity.dense,
+          onPressed: editor.selectedIds.length > 1
+              ? () => editor.staggerSelection(100)
+              : null,
+          child: const Text('Stagger 100 ms'),
+        ),
+        OutlineButton(
           key: const ValueKey('group-selection'),
           density: ButtonDensity.dense,
           onPressed: editor.canGroup ? editor.groupSelection : null,

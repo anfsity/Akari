@@ -82,6 +82,8 @@ String generateSceneNode(SceneNode node) {
       renderOrder: ${node.renderOrder},
       focusOrder: ${node.focusOrder},
       motion: SceneMotionPreset.${node.motion.name},
+      motionTiming: const SceneMotionTiming(durationMs: ${node.motionTiming.durationMs}, delayMs: ${node.motionTiming.delayMs},
+        curve: ${node.motionTiming.curve == null ? 'null' : 'SceneCubicBezier(${node.motionTiming.curve!.x1}, ${node.motionTiming.curve!.y1}, ${node.motionTiming.curve!.x2}, ${node.motionTiming.curve!.y2})'}),
       visibleWhen: ${node.visibleWhen == null ? 'null' : 'const ${_encodeConditionLiteral(node.visibleWhen!)}'},
       interactive: ${node.interactive},
       properties: <String, String>{

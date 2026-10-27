@@ -17,6 +17,7 @@ import 'package:theme_studio/src/studio_preview_host.dart';
 import 'package:theme_studio/src/node_inspector.dart';
 import 'package:theme_studio/src/studio_canvas.dart';
 import 'package:theme_studio/src/studio_theme.dart';
+import 'package:theme_studio/src/studio_timeline.dart';
 
 const _document = SceneDocument(
   id: 'test',
@@ -393,6 +394,42 @@ void main() {
     expect(editor.document.styleTokens.values.single.radius, greaterThan(0));
     editor.undo(); expect(editor.canUndo, isFalse);
     expect(editor.document.styleTokens, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('timeline scrubbing and state transitions never edit scene history', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.tap(find.byKey(const ValueKey('canvas-timeline'))); await tester.pumpAndSettle();
+    final slider = tester.widget<Slider>(find.byKey(const ValueKey('timeline-scrubber')));
+    slider.onChanged!(const SliderValue.single(.5)); await tester.pump();
+    expect(tester.widget<SceneRuntime>(find.byType(SceneRuntime)).playback!.elapsed.inMilliseconds, 750);
+    tester.widget<StudioTimeline>(find.byType(StudioTimeline)).onTransitionChanged(StudioTransition.error);
+    await tester.pump();
+    final runtime = tester.widget<SceneRuntime>(find.byType(SceneRuntime));
+    expect(runtime.activePredicates, contains(ScenePredicate.isAuthError));
+    expect(runtime.playback!.from, contains(ScenePredicate.isAuthSubmitting));
+    await tester.tap(find.byKey(const ValueKey('timeline-play'))); await tester.pumpAndSettle();
+    expect(editor.canUndo, isFalse); expect(editor.isDirty, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('motion fields preserve inherited easing when editing duration and delay', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.ensureVisible(find.text('Advanced layout')); await tester.tap(find.text('Advanced layout'));
+    await tester.pumpAndSettle();
+    final duration = find.byKey(const ValueKey('motion-Duration ms'));
+    await tester.ensureVisible(duration); await tester.enterText(duration, '800');
+    await tester.testTextInput.receiveAction(TextInputAction.done); await tester.pumpAndSettle();
+    expect(editor.selectedNode.motionTiming.durationMs, 800);
+    expect(editor.selectedNode.motionTiming.curve, isNull);
+    final delay = find.byKey(const ValueKey('motion-Delay ms'));
+    await tester.ensureVisible(delay); await tester.enterText(delay, '160');
+    await tester.testTextInput.receiveAction(TextInputAction.done); await tester.pumpAndSettle();
+    expect(editor.selectedNode.motionTiming.delayMs, 160);
+    editor.undo(); expect(editor.selectedNode.motionTiming.durationMs, 800);
+    editor.undo(); expect(editor.canUndo, isFalse);
     expect(tester.takeException(), isNull);
   });
 
