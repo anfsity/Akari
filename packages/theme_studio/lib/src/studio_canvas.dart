@@ -816,8 +816,9 @@ class StudioCanvasState extends State<StudioCanvas> {
                       ],
                     ),
                   ),
-                if (_showStateGraph && !presenting)
+                if (session != null && _showStateGraph && !presenting)
                   StudioStateGraph(
+                    editor: session,
                     dormant: widget.dormant,
                     scenario: _scenario,
                     onSelect: (dormant, scenario) {
@@ -855,6 +856,18 @@ class StudioCanvasState extends State<StudioCanvas> {
         widget.theme.tokens.mediumMotion,
       );
       if (timing > duration) duration = timing;
+      for (final rule in node.transitions) {
+        final timing = getSceneMotionDuration(
+          node.copyWith(
+            tracks: const [],
+            motionTiming: rule.timing.isDefault
+                ? node.motionTiming
+                : rule.timing,
+          ),
+          widget.theme.tokens.mediumMotion,
+        );
+        if (timing > duration) duration = timing;
+      }
     }
     return duration;
   }

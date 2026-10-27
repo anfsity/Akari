@@ -32,6 +32,56 @@ const _scene = '''
 
 void main() {
   test(
+    'visual edges preserve compound conditions and require a source crossing',
+    () {
+      final base = decodeSceneDocument(_scene);
+      const rule = SceneStateTransition(
+        from: ScenePredicateCondition(ScenePredicate.isAuthSubmitting),
+        to: SceneAll([
+          ScenePredicateCondition(ScenePredicate.isAuthError),
+          ScenePredicateCondition(ScenePredicate.hasSelectedUser),
+        ]),
+        effect: SceneStateEffect.pulse,
+        timing: SceneMotionTiming(durationMs: 450, delayMs: 80),
+      );
+      final node = decodeSceneDocument(
+        encodeSceneDocument(
+          base.copyWith(
+            nodes: [
+              base.nodes.first.copyWith(transitions: [rule]),
+            ],
+          ),
+        ),
+      ).nodes.single;
+      expect(node.transitions.single.timing.durationMs, 450);
+      expect(
+        findSceneStateTransition(
+          node,
+          {ScenePredicate.isAuthSubmitting},
+          {ScenePredicate.isAuthError, ScenePredicate.hasSelectedUser},
+        )?.effect,
+        SceneStateEffect.pulse,
+      );
+      expect(
+        findSceneStateTransition(
+          node,
+          {ScenePredicate.isAuthPrompting},
+          {ScenePredicate.isAuthError, ScenePredicate.hasSelectedUser},
+        ),
+        null,
+      );
+      expect(
+        findSceneStateTransition(
+          node,
+          {ScenePredicate.isAuthSubmitting},
+          {ScenePredicate.isAuthError},
+        ),
+        null,
+      );
+    },
+  );
+
+  test(
     'property tracks round trip and reject duplicate times and properties',
     () {
       final base = decodeSceneDocument(_scene);

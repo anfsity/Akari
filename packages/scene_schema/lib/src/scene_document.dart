@@ -323,6 +323,44 @@ enum SceneMotionPreset {
 
 enum SceneStateEffect { shake, pulse }
 
+class SceneStateTransition {
+  const SceneStateTransition({
+    required this.from,
+    required this.to,
+    required this.effect,
+    this.timing = const SceneMotionTiming(),
+  });
+  final SceneCondition from;
+  final SceneCondition to;
+  final SceneStateEffect effect;
+  final SceneMotionTiming timing;
+}
+
+/// State-entry responses and authored edges use one crossing evaluator.
+/// Explicit edges take precedence, in authoring order, over simple entries.
+SceneStateTransition? findSceneStateTransition(
+  SceneNode node,
+  Set<ScenePredicate> previous,
+  Set<ScenePredicate> current,
+) {
+  SceneStateTransition? match;
+  for (final rule in [
+    for (final entry in node.stateEffects.entries)
+      SceneStateTransition(
+        from: SceneNot(ScenePredicateCondition(entry.key)),
+        to: ScenePredicateCondition(entry.key),
+        effect: entry.value,
+      ),
+    ...node.transitions,
+  ]) {
+    if (evaluateSceneCondition(rule.from, previous) &&
+        !evaluateSceneCondition(rule.to, previous) &&
+        evaluateSceneCondition(rule.to, current))
+      match = rule;
+  }
+  return match;
+}
+
 class SceneCubicBezier {
   const SceneCubicBezier(this.x1, this.y1, this.x2, this.y2);
   final double x1;
@@ -563,6 +601,7 @@ class SceneNode {
     this.motionTiming = const SceneMotionTiming(),
     this.tracks = const [],
     this.stateEffects = const {},
+    this.transitions = const [],
     this.visibleWhen,
     this.interactive = false,
     this.properties = const <String, String>{},
@@ -588,6 +627,7 @@ class SceneNode {
   final SceneMotionTiming motionTiming;
   final List<SceneMotionTrack> tracks;
   final Map<ScenePredicate, SceneStateEffect> stateEffects;
+  final List<SceneStateTransition> transitions;
 
   /// Condition controlling whether the node is present; null means always.
   final SceneCondition? visibleWhen;
@@ -614,6 +654,7 @@ class SceneNode {
     SceneMotionTiming? motionTiming,
     List<SceneMotionTrack>? tracks,
     Map<ScenePredicate, SceneStateEffect>? stateEffects,
+    List<SceneStateTransition>? transitions,
     Object? visibleWhen = _unset,
     bool? interactive,
     Map<String, String>? properties,
@@ -643,6 +684,7 @@ class SceneNode {
       motionTiming: motionTiming ?? this.motionTiming,
       tracks: tracks ?? this.tracks,
       stateEffects: stateEffects ?? this.stateEffects,
+      transitions: transitions ?? this.transitions,
       visibleWhen: identical(visibleWhen, _unset)
           ? this.visibleWhen
           : visibleWhen as SceneCondition?,

@@ -252,7 +252,8 @@ class SceneRuntime extends StatelessWidget {
       child: SceneStateEffects(
         node: node,
         activePredicates: activePredicates,
-        predicatesListenable: node.stateEffects.isEmpty
+        predicatesListenable:
+            node.stateEffects.isEmpty && node.transitions.isEmpty
             ? null
             : activePredicatesListenable,
         duration: duration,

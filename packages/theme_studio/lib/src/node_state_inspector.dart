@@ -3,6 +3,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import 'scene_editor.dart';
 import 'studio_form.dart';
+import 'studio_condition_editor.dart';
 import 'studio_state_labels.dart';
 
 class NodeStateInspector extends StatefulWidget {
@@ -56,6 +57,17 @@ class _NodeStateInspectorState extends State<NodeStateInspector> {
                     ),
             ),
           ),
+        ),
+        const Gap(8),
+        OutlineButton(
+          key: const ValueKey('edit-visibility-condition'),
+          onPressed: () async {
+            if (!widget.editor.applyDraft()) return;
+            final result = await editStudioCondition(context, condition);
+            if (!mounted || result == null) return;
+            _updateNode((node) => node.copyWith(visibleWhen: result.condition));
+          },
+          child: const Text('Edit compound condition').small(),
         ),
         if (predicate != null)
           Row(

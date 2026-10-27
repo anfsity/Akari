@@ -86,6 +86,7 @@ class SceneEditor extends ChangeNotifier {
       selectedNode.visibleWhen == null &&
       selectedNode.styleToken == null &&
       selectedNode.stateEffects.isEmpty &&
+      selectedNode.transitions.isEmpty &&
       selectedNode.tracks.isEmpty &&
       selectedNode.breakpoints.isEmpty &&
       selectedNode.motion == SceneMotionPreset.none &&

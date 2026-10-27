@@ -83,6 +83,8 @@ ${node.breakpoints.map((rule) => '        SceneBreakpoint(minWidth: ${rule.minWi
       renderOrder: ${node.renderOrder},
       focusOrder: ${node.focusOrder},
       motion: SceneMotionPreset.${node.motion.name},
+      transitions: <SceneStateTransition>[
+${node.transitions.map((rule) => '        SceneStateTransition(from: ${_encodeConditionLiteral(rule.from)}, to: ${_encodeConditionLiteral(rule.to)}, effect: SceneStateEffect.${rule.effect.name}, timing: ${_encodeMotionTiming(rule.timing)}),\n').join()}      ],
       stateEffects: <ScenePredicate, SceneStateEffect>{
 ${node.stateEffects.entries.map((entry) => '        ScenePredicate.${entry.key.name}: SceneStateEffect.${entry.value.name},\n').join()}      },
       tracks: <SceneMotionTrack>[
@@ -101,6 +103,9 @@ String _encodeLayout(SceneLayout layout) =>
     'const SceneLayout(direction: SceneLayoutDirection.${layout.direction.name}, padding: ${layout.padding}, gap: ${layout.gap}, mainAlignment: SceneMainAlignment.${layout.mainAlignment.name}, crossAlignment: SceneCrossAlignment.${layout.crossAlignment.name}, clip: ${layout.clip}, wrap: ${layout.wrap})';
 String _encodeSizing(SceneSizing size) =>
     'const SceneSizing(width: ${size.width}, height: ${size.height}, flex: ${size.flex}, widthMode: SceneSizeMode.${size.widthMode.name}, heightMode: SceneSizeMode.${size.heightMode.name}, minWidth: ${size.minWidth}, minHeight: ${size.minHeight}, maxWidth: ${size.maxWidth}, maxHeight: ${size.maxHeight})';
+
+String _encodeMotionTiming(SceneMotionTiming timing) =>
+    'const SceneMotionTiming(durationMs: ${timing.durationMs},delayMs: ${timing.delayMs},curve: ${timing.curve == null ? 'null' : 'SceneCubicBezier(${timing.curve!.x1},${timing.curve!.y1},${timing.curve!.x2},${timing.curve!.y2})'})';
 
 String _encodeConditionLiteral(SceneCondition condition) {
   return switch (condition) {
