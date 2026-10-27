@@ -7,6 +7,7 @@ import 'studio_preferences.dart';
 import 'studio_form.dart';
 import 'studio_form_values.dart';
 import 'studio_theme.dart';
+import 'studio_canvas_presets.dart';
 
 class StudioSettings extends StatefulWidget {
   const StudioSettings({
@@ -51,20 +52,6 @@ enum _SettingsSection {
   final String description;
 
   bool get isSceneSetting => this == canvas || this == background;
-}
-
-enum _CanvasPreset {
-  hd('HD', 1280, 720),
-  fullHd('Full HD', 1920, 1080),
-  qhd('QHD', 2560, 1440),
-  uhd('4K UHD', 3840, 2160),
-  portrait('Portrait', 1080, 1920);
-
-  const _CanvasPreset(this.label, this.width, this.height);
-
-  final String label;
-  final int width;
-  final int height;
 }
 
 /// Drafts live for the dialog, independently of the selected category. Apply
@@ -179,10 +166,10 @@ class _StudioSettingsState extends State<StudioSettings> {
     }
   }
 
-  _CanvasPreset? _findPreset() {
+  StudioCanvasPreset? _findPreset() {
     final width = int.tryParse(_fields['Canvas width']!.text);
     final height = int.tryParse(_fields['Canvas height']!.text);
-    return _CanvasPreset.values
+    return StudioCanvasPreset.values
         .where((preset) => preset.width == width && preset.height == height)
         .firstOrNull;
   }
@@ -400,7 +387,7 @@ class _StudioSettingsState extends State<StudioSettings> {
           _fields['Canvas width']!,
           _fields['Canvas height']!,
         ]),
-        builder: (context, _) => StudioSelect<_CanvasPreset>(
+        builder: (context, _) => StudioSelect<StudioCanvasPreset>(
           key: const ValueKey('canvas-resolution-preset'),
           value: _findPreset(),
           placeholder: const Text('Custom resolution'),
@@ -408,7 +395,7 @@ class _StudioSettingsState extends State<StudioSettings> {
             _fields['Canvas width']!.text = '${preset.width}';
             _fields['Canvas height']!.text = '${preset.height}';
           },
-          values: _CanvasPreset.values,
+          values: StudioCanvasPreset.values,
           formatValue: (preset) =>
               '${preset.label} · ${preset.width} × ${preset.height}',
         ),
