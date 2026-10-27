@@ -20,6 +20,29 @@ class SceneNodeGeometry {
       MatrixUtils.transformRect(worldTransform, Offset.zero & rect.size);
 }
 
+List<List<SceneNode>> _getFlowLines(
+  List<SceneNode> nodes,
+  SceneLayout layout,
+  double main,
+  double Function(SceneNode) extent,
+) {
+  final lines = <List<SceneNode>>[];
+  var line = <SceneNode>[];
+  var used = 0.0;
+  for (final node in nodes) {
+    final size = extent(node);
+    if (layout.wrap && line.isNotEmpty && used + layout.gap + size > main) {
+      lines.add(line);
+      line = [];
+      used = 0;
+    }
+    used += (line.isEmpty ? 0 : layout.gap) + size;
+    line.add(node);
+  }
+  if (line.isNotEmpty) lines.add(line);
+  return lines;
+}
+
 /// Shared by runtime and authoring. Hug frames measure children against the
 /// available space, then place those measured sizes without a percentage loop.
 /// Theme components have no portable intrinsic contract; hug is for frames and
@@ -32,6 +55,7 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
   Map<String, String>? fontFamilies,
 }) {
   final result = <String, SceneNodeGeometry>{};
+  final hugMeasurements = <String, Size>{};
   final children = <String?, List<SceneNode>>{};
   for (final original in document.paintOrder) {
     final node = getSceneNodeForWidth(original, size.width);
@@ -95,35 +119,68 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
         painter.dispose();
       } else {
         final layout = node.layout!;
-        final inner = Size(
-          math.max(0, available.width - layout.padding * 2),
-          math.max(0, available.height - layout.padding * 2),
+        final potential = constrain(
+          node,
+          Size(
+            s.widthMode == SceneSizeMode.hug ? available.width : width,
+            s.heightMode == SceneSizeMode.hug ? available.height : height,
+          ),
         );
+        final inner = Size(
+          math.max(0, potential.width - layout.padding * 2),
+          math.max(0, potential.height - layout.padding * 2),
+        );
+        hugMeasurements[node.id] = inner;
         final nodes = children[node.id] ?? const <SceneNode>[];
+        final sizes = {
+          for (final child in nodes) child.id: measure(child, inner),
+        };
         var w = 0.0;
         var h = 0.0;
-        for (final child in nodes) {
-          final measured = measure(child, inner);
-          if (layout.direction == SceneLayoutDirection.row) {
-            w += measured.width;
-            h = math.max(h, measured.height);
-          } else if (layout.direction == SceneLayoutDirection.column) {
-            h += measured.height;
-            w = math.max(w, measured.width);
-          } else {
+        if (layout.direction == SceneLayoutDirection.absolute) {
+          for (final child in nodes) {
+            final measured = sizes[child.id]!;
             w = math.max(w, inner.width * child.rect.x + measured.width);
             h = math.max(h, inner.height * child.rect.y + measured.height);
           }
+        } else {
+          final row = layout.direction == SceneLayoutDirection.row;
+          final lines = _getFlowLines(
+            nodes,
+            layout,
+            row ? inner.width : inner.height,
+            (child) => row ? sizes[child.id]!.width : sizes[child.id]!.height,
+          );
+          for (final line in lines) {
+            final main = line.fold<double>(
+              math.max(0, line.length - 1) * layout.gap,
+              (value, child) =>
+                  value +
+                  (row ? sizes[child.id]!.width : sizes[child.id]!.height),
+            );
+            final cross = line.fold<double>(
+              0,
+              (value, child) => math.max(
+                value,
+                row ? sizes[child.id]!.height : sizes[child.id]!.width,
+              ),
+            );
+            if (row) {
+              w = math.max(w, main);
+              h += cross;
+            } else {
+              h = math.max(h, main);
+              w += cross;
+            }
+          }
+          final gaps = math.max(0, lines.length - 1) * layout.gap;
+          if (row) {
+            h += gaps;
+          } else {
+            w += gaps;
+          }
         }
-        final gaps = math.max(0, nodes.length - 1) * layout.gap;
-        natural = Size(
-          w +
-              layout.padding * 2 +
-              (layout.direction == SceneLayoutDirection.row ? gaps : 0),
-          h +
-              layout.padding * 2 +
-              (layout.direction == SceneLayoutDirection.column ? gaps : 0),
-        );
+        natural = Size(w + layout.padding * 2, h + layout.padding * 2);
       }
       if (s.widthMode == SceneSizeMode.hug) width = natural.width;
       if (s.heightMode == SceneSizeMode.hug) height = natural.height;
@@ -152,12 +209,17 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
     final main = row ? content.width : content.height;
     double mainSize(Size value) => row ? value.width : value.height;
     double crossSize(Size value) => row ? value.height : value.width;
-    double flex(SceneNode node) => node.sizing.flex > 0
-        ? node.sizing.flex
-        : (row ? node.sizing.widthMode : node.sizing.heightMode) ==
-              SceneSizeMode.fill
-        ? 1
-        : 0;
+    double flex(SceneNode node) {
+      if (node.sizing.flex > 0) return node.sizing.flex;
+      final mode = row ? node.sizing.widthMode : node.sizing.heightMode;
+      final fixed = row ? node.sizing.width : node.sizing.height;
+      return mode == SceneSizeMode.fill && fixed == null ? 1 : 0;
+    }
+
+    double minimum(SceneNode node) => math.max(
+      row ? node.sizing.minWidth : node.sizing.minHeight,
+      node.interactive ? minHitTarget : 0,
+    );
     final positions = <String, Rect>{};
     if (layout.direction == SceneLayoutDirection.absolute) {
       for (final node in nodes) {
@@ -170,36 +232,19 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
             sizes[node.id]!;
       }
     } else {
-      final lines = <List<SceneNode>>[];
-      var line = <SceneNode>[];
-      var used = 0.0;
-      for (final node in nodes) {
-        final extent = flex(node) > 0
-            ? (node.interactive ? minHitTarget : 0.0)
-            : mainSize(sizes[node.id]!);
-        if (layout.wrap &&
-            line.isNotEmpty &&
-            used + layout.gap + extent > main) {
-          lines.add(line);
-          line = [];
-          used = 0;
-        }
-        used += (line.isEmpty ? 0 : layout.gap) + extent;
-        line.add(node);
-      }
-      if (line.isNotEmpty) lines.add(line);
+      final lines = _getFlowLines(
+        nodes,
+        layout,
+        main,
+        (node) => flex(node) > 0 ? minimum(node) : mainSize(sizes[node.id]!),
+      );
       var crossCursor = 0.0;
       for (final line in lines) {
         final fixed = line.fold<double>(
           math.max(0, line.length - 1) * layout.gap,
           (sum, node) =>
               sum +
-              (flex(node) > 0
-                  ? math.max(
-                      row ? node.sizing.minWidth : node.sizing.minHeight,
-                      node.interactive ? minHitTarget : 0,
-                    )
-                  : mainSize(sizes[node.id]!)),
+              (flex(node) > 0 ? minimum(node) : mainSize(sizes[node.id]!)),
         );
         final totalFlex = line.fold<double>(0, (sum, node) => sum + flex(node));
         final remaining = math.max(0.0, main - fixed);
@@ -224,11 +269,7 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
         for (final node in line) {
           final natural = sizes[node.id]!;
           final extent = flex(node) > 0
-              ? math.max(
-                      row ? node.sizing.minWidth : node.sizing.minHeight,
-                      node.interactive ? minHitTarget : 0,
-                    ) +
-                    remaining * flex(node) / totalFlex
+              ? minimum(node) + remaining * flex(node) / totalFlex
               : mainSize(natural);
           final across = layout.crossAlignment == SceneCrossAlignment.stretch
               ? cross
@@ -265,28 +306,13 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
       );
       if (node.layout case final childLayout?) {
         final insets = EdgeInsets.all(childLayout.padding);
-        final oldInner = Size(
-          math.max(0, available.width - insets.horizontal),
-          math.max(0, available.height - insets.vertical),
-        );
         place(
           node.id,
           rect.size,
           transform,
           childLayout,
           insets,
-          measurementSize:
-              node.sizing.widthMode == SceneSizeMode.hug ||
-                  node.sizing.heightMode == SceneSizeMode.hug
-              ? Size(
-                  node.sizing.widthMode == SceneSizeMode.hug
-                      ? oldInner.width
-                      : math.max(0, rect.width - insets.horizontal),
-                  node.sizing.heightMode == SceneSizeMode.hug
-                      ? oldInner.height
-                      : math.max(0, rect.height - insets.vertical),
-                )
-              : null,
+          measurementSize: hugMeasurements[node.id],
         );
       }
     }
