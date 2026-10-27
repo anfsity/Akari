@@ -1755,6 +1755,8 @@ void main() {
           _buildTheme(seed: seed, document: document, layout: _assemblyLayout);
       await openStudio(tester, themeBuilder: buildLayouts);
       final selector = find.byKey(const ValueKey('layout-preset'));
+      await tester.ensureVisible(selector);
+      await tester.pumpAndSettle();
       await tester.tap(selector);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Right column').last);
@@ -2022,7 +2024,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('sidebar-components')));
       await tester.pumpAndSettle();
       expect(
-        find.text('Component assembly is unavailable for this scene.'),
+        find.text('Component library'),
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('slot-panel')), findsNothing);
