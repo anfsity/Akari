@@ -445,7 +445,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                   children: [
                                     Expanded(child: widget.toolbar),
                                     SizedBox(
-                                      width: 136,
+                                      width: 168,
                                       child: StudioEnumSelect(
                                         key: const ValueKey('workspace-preset'),
                                         value: _mode,
