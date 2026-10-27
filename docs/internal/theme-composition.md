@@ -38,8 +38,17 @@ combines those designs. Code-owned widgets and shaders remain supported.
 - File-based previews now bind images through the theme's own background
   renderer, preserving its gradients, focal alignment, and custom atmosphere.
   Themes without an image renderer no longer offer wallpaper replacement.
-- Remaining: richer component variants, runtime state previews, independent
-  project synthesis, and end-to-end build/native verification.
+- Independent project synthesis and Studio's Create theme flow are implemented
+  (`821b045`, `4787227`, `cc65336`). Shared SDK Dart directives and performance
+  execution roots are retained when moving a project (`9f303d0`). An external
+  synthesized Terrace project passed analysis, all 63 copied theme tests, and
+  a release CLI build. Its VM screenshot shows the custom heading, centered
+  layout, Violet palette and frosted credential surface.
+- Lifecycle previews now cover typed prompt, submitting, rejection, failure,
+  account/session choice, connecting and unavailable states while retaining
+  preview controllers and keeping document/history untouched.
+- Remaining: richer component variants, optional motion/interaction preview,
+  native Studio create/save/reopen verification, and the final full audit.
 
 ## Next implementation: independent project synthesis
 
