@@ -23,123 +23,130 @@ class StudioComponentAssembly extends StatelessWidget {
       final ids = editor.document.nodes.map((node) => node.id).toSet();
       final slots =
           layout?.getSlots(editor.document) ?? const <ThemeLayoutSlot>[];
-      return ListView(
+      return SingleChildScrollView(
         key: const ValueKey('component-assembly'),
         padding: const EdgeInsets.all(12),
-        children: [
-          const Text('Component library').semiBold(),
-          const Gap(8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final component in StudioComponent.values)
-                Draggable<StudioComponent>(
-                  data: component,
-                  affinity: Axis.horizontal,
-                  dragAnchorStrategy: pointerDragAnchorStrategy,
-                  maxSimultaneousDrags: readOnly ? 0 : 1,
-                  feedback: Container(
-                    padding: const EdgeInsets.all(12),
-                    color: Theme.of(context).colorScheme.background,
-                    child: Text(component.label),
-                  ),
-                  child: OutlineButton(
-                    key: ValueKey('add-component-${component.name}'),
-                    onPressed: readOnly
-                        ? null
-                        : () => editor.createComponent(component),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(component.icon, size: 14),
-                        const Gap(6),
-                        Text(component.label).small(),
-                      ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Component library').semiBold(),
+            const Gap(8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final component in StudioComponent.values)
+                  Draggable<StudioComponent>(
+                    data: component,
+                    affinity: Axis.horizontal,
+                    dragAnchorStrategy: pointerDragAnchorStrategy,
+                    maxSimultaneousDrags: readOnly ? 0 : 1,
+                    feedback: Container(
+                      padding: const EdgeInsets.all(12),
+                      color: Theme.of(context).colorScheme.background,
+                      child: Text(component.label),
+                    ),
+                    child: OutlineButton(
+                      key: ValueKey('add-component-${component.name}'),
+                      onPressed: readOnly
+                          ? null
+                          : () => editor.createComponent(component),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(component.icon, size: 14),
+                          const Gap(6),
+                          Text(component.label).small(),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const Gap(16),
-          Text(layout?.label ?? 'Theme customization').semiBold(),
-          const Gap(8),
-          Text(
-            layout == null
-                ? 'Choose the presets provided by this theme.'
-                : 'Choose components, then select one to customize. '
-                      'The layout supplies its starting position.',
-          ).small().muted(),
-          const Gap(16),
-          if (layout != null && layout.presets.length > 1) ...[
-            const Text('Layout preset').small().muted(),
-            const Gap(6),
-            StudioSelect<String>(
-              key: const ValueKey('layout-preset'),
-              enabled: !readOnly,
-              value: layout.getPresetId(editor.document),
-              values: layout.presets.keys,
-              formatValue: (id) => layout.presets[id]!.label,
-              onChanged: editor.updateLayoutPreset,
+              ],
             ),
             const Gap(16),
-          ],
-          if (editor.presetCatalog.properties.isNotEmpty) ...[
-            const Text('Theme presets').small().semiBold(),
+            Text(layout?.label ?? 'Theme customization').semiBold(),
             const Gap(8),
-            for (final property in editor.presetCatalog.properties)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(property.label).small().muted(),
-                    const Gap(6),
-                    StudioEnumSelect<Enum>(
-                      enabled: !readOnly,
-                      key: ValueKey('preset-${property.name}'),
-                      value: property.getValue(editor.document.themeProperties),
-                      values: property.choices.keys,
-                      formatValue: (value) => property.choices[value]!,
-                      onChanged: (value) =>
-                          editor.updateThemeProperty(property.name, value.name),
-                    ),
-                  ],
-                ),
-              ),
-            const Divider(),
-            const Gap(12),
-          ],
-          if (layout != null)
-            for (final (label, slots) in [
-              (
-                'Optional components',
-                slots.where((slot) => !slot.isRequired).toList(),
-              ),
-              (
-                'Required controls',
-                slots.where((slot) => slot.isRequired).toList(),
-              ),
-            ])
-              if (slots.isNotEmpty) ...[
-                Text(label).small().semiBold(),
-                const Gap(8),
-                for (final slot in slots)
-                  _AssemblySlot(
-                    editor: editor,
-                    slot: slot,
-                    isPresent: ids.contains(slot.defaultNode.id),
-                    readOnly: readOnly,
-                  ),
-                const Gap(12),
-              ],
-          if (layout != null)
-            const Text(
-              'Use Login / Dormant to preview both states. '
-              'Turning a component back on restores its defaults; '
-              'Undo restores your edits.',
+            Text(
+              layout == null
+                  ? 'Choose the presets provided by this theme.'
+                  : 'Choose components, then select one to customize. '
+                        'The layout supplies its starting position.',
             ).small().muted(),
-        ],
+            const Gap(16),
+            if (layout != null && layout.presets.length > 1) ...[
+              const Text('Layout preset').small().muted(),
+              const Gap(6),
+              StudioSelect<String>(
+                key: const ValueKey('layout-preset'),
+                enabled: !readOnly,
+                value: layout.getPresetId(editor.document),
+                values: layout.presets.keys,
+                formatValue: (id) => layout.presets[id]!.label,
+                onChanged: editor.updateLayoutPreset,
+              ),
+              const Gap(16),
+            ],
+            if (editor.presetCatalog.properties.isNotEmpty) ...[
+              const Text('Theme presets').small().semiBold(),
+              const Gap(8),
+              for (final property in editor.presetCatalog.properties)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(property.label).small().muted(),
+                      const Gap(6),
+                      StudioEnumSelect<Enum>(
+                        enabled: !readOnly,
+                        key: ValueKey('preset-${property.name}'),
+                        value: property.getValue(
+                          editor.document.themeProperties,
+                        ),
+                        values: property.choices.keys,
+                        formatValue: (value) => property.choices[value]!,
+                        onChanged: (value) => editor.updateThemeProperty(
+                          property.name,
+                          value.name,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const Divider(),
+              const Gap(12),
+            ],
+            if (layout != null)
+              for (final (label, slots) in [
+                (
+                  'Optional components',
+                  slots.where((slot) => !slot.isRequired).toList(),
+                ),
+                (
+                  'Required controls',
+                  slots.where((slot) => slot.isRequired).toList(),
+                ),
+              ])
+                if (slots.isNotEmpty) ...[
+                  Text(label).small().semiBold(),
+                  const Gap(8),
+                  for (final slot in slots)
+                    _AssemblySlot(
+                      editor: editor,
+                      slot: slot,
+                      isPresent: ids.contains(slot.defaultNode.id),
+                      readOnly: readOnly,
+                    ),
+                  const Gap(12),
+                ],
+            if (layout != null)
+              const Text(
+                'Use Login / Dormant to preview both states. '
+                'Turning a component back on restores its defaults; '
+                'Undo restores your edits.',
+              ).small().muted(),
+          ],
+        ),
       );
     },
   );
