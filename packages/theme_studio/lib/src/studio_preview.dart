@@ -41,6 +41,7 @@ class StudioPreview extends StatefulWidget {
     required this.preferences,
     required this.tool,
     this.readOnly = false,
+    this.scenario = StudioPreviewScenario.password,
     this.lockAspectRatio = false,
     this.zoom,
     this.panEnabled = false,
@@ -50,6 +51,7 @@ class StudioPreview extends StatefulWidget {
   });
 
   final bool readOnly;
+  final StudioPreviewScenario scenario;
   final ThemeDefinition theme;
   final SceneDocument document;
   final String selectedId;
@@ -122,7 +124,7 @@ class _StudioPreviewState extends State<StudioPreview> {
     if (commit) widget.onCommitDrag(drag.preview);
   }
 
-  final _simulation = StudioPreviewHost();
+  late final _simulation = StudioPreviewHost(scenario: widget.scenario);
 
   late GreeterThemeComponents _components;
 
@@ -135,6 +137,9 @@ class _StudioPreviewState extends State<StudioPreview> {
   @override
   void didUpdateWidget(StudioPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.scenario != widget.scenario) {
+      _simulation.updateScenario(widget.scenario);
+    }
     if (!identical(oldWidget.theme, widget.theme) ||
         _hasCanvasChanged(oldWidget.document.canvas, widget.document.canvas)) {
       _updateComponents();
@@ -418,15 +423,14 @@ class _PreviewNode extends StatelessWidget {
 Set<ScenePredicate> _getPreviewPredicates(
   StudioPreviewHost simulation,
   bool dormant,
-) =>
-    getActiveScenePredicates(
-      service: simulation.host.serviceSlots.value,
-      auth: simulation.host.authPromptSlots.value,
-      account: simulation.host.accountPickerSlots.value,
-      session: simulation.host.sessionPickerSlots.value,
-      power: simulation.host.powerSlots.value,
-      dormant: dormant,
-    );
+) => getActiveScenePredicates(
+  service: simulation.host.serviceSlots.value,
+  auth: simulation.host.authPromptSlots.value,
+  account: simulation.host.accountPickerSlots.value,
+  session: simulation.host.sessionPickerSlots.value,
+  power: simulation.host.powerSlots.value,
+  dormant: dormant,
+);
 
 /// Selection belongs to the canvas, outside the component's paint transform.
 /// Handles keep their screen size and remain usable on small or scaled nodes.

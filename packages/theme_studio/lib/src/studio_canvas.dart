@@ -6,6 +6,8 @@ import 'node_geometry.dart';
 import 'scene_editor.dart';
 import 'studio_preferences.dart';
 import 'studio_preview.dart';
+import 'studio_preview_host.dart';
+import 'studio_form.dart';
 
 class StudioCanvas extends StatefulWidget {
   const StudioCanvas({
@@ -34,6 +36,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
   bool _lockAspectRatio = false;
   bool _handTool = false;
   bool _spacePan = false;
+  StudioPreviewScenario _scenario = StudioPreviewScenario.password;
   double? _zoom;
   int _resetView = 0;
   final _viewportKey = GlobalKey();
@@ -168,11 +171,30 @@ class _StudioCanvasState extends State<StudioCanvas> {
                   runSpacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    OutlineButton(
-                      onPressed: widget.onToggleDormant,
-                      child: Text(
-                        widget.dormant ? 'State: Dormant' : 'State: Login',
-                      ).small(),
+                    SizedBox(
+                      width: 150,
+                      child: OutlineButton(
+                        onPressed: widget.onToggleDormant,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            widget.dormant ? 'State: Dormant' : 'State: Login',
+                          ).small(),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 160,
+                      child: StudioEnumSelect<StudioPreviewScenario>(
+                        key: const ValueKey('preview-scenario'),
+                        value: _scenario,
+                        values: StudioPreviewScenario.values,
+                        formatValue: (scenario) => scenario.label,
+                        onChanged: (scenario) {
+                          if (widget.dormant) widget.onToggleDormant();
+                          setState(() => _scenario = scenario);
+                        },
+                      ),
                     ),
                     const SizedBox(width: 4),
                     if (!widget.readOnly)
@@ -239,56 +261,52 @@ class _StudioCanvasState extends State<StudioCanvas> {
                           ),
                         ),
                       ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Gap(8),
-                        OutlineButton(
-                          key: const ValueKey('zoom-out'),
-                          onPressed: session == null
-                              ? null
-                              : () => setState(
-                                  () => _zoom = clampStudioZoom(
-                                    _getEffectiveZoom() / 1.25,
-                                  ),
-                                ),
-                          child: const Icon(LucideIcons.minus, size: 16),
-                        ),
-                        const Gap(8),
-                        OutlineButton(
-                          key: const ValueKey('zoom-fit'),
-                          onPressed: _fitView,
-                          child: SizedBox(
-                            width: 44,
-                            child: Text(
-                              _zoom == null
-                                  ? 'Fit'
-                                  : '${(_zoom! * 100).round()}%',
-                              textAlign: TextAlign.center,
+
+                    OutlineButton(
+                      key: const ValueKey('zoom-out'),
+                      onPressed: session == null
+                          ? null
+                          : () => setState(
+                              () => _zoom = clampStudioZoom(
+                                _getEffectiveZoom() / 1.25,
+                              ),
                             ),
-                          ),
+                      child: const Icon(LucideIcons.minus, size: 16),
+                    ),
+                    OutlineButton(
+                      key: const ValueKey('zoom-fit'),
+                      onPressed: _fitView,
+                      child: SizedBox(
+                        width: 44,
+                        child: Text(
+                          _zoom == null ? 'Fit' : '${(_zoom! * 100).round()}%',
+                          textAlign: TextAlign.center,
+                        ).small(),
+                      ),
+                    ),
+                    OutlineButton(
+                      key: const ValueKey('zoom-in'),
+                      onPressed: session == null
+                          ? null
+                          : () => setState(
+                              () => _zoom = clampStudioZoom(
+                                _getEffectiveZoom() * 1.25,
+                              ),
+                            ),
+                      child: const Icon(LucideIcons.plus, size: 16),
+                    ),
+                    SizedBox(
+                      width: 72,
+                      child: OutlineButton(
+                        key: const ValueKey('zoom-actual-size'),
+                        onPressed: session == null
+                            ? null
+                            : () => setState(() => _zoom = 1),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: const Text('100%').small(),
                         ),
-                        const Gap(8),
-                        OutlineButton(
-                          key: const ValueKey('zoom-in'),
-                          onPressed: session == null
-                              ? null
-                              : () => setState(
-                                  () => _zoom = clampStudioZoom(
-                                    _getEffectiveZoom() * 1.25,
-                                  ),
-                                ),
-                          child: const Icon(LucideIcons.plus, size: 16),
-                        ),
-                        const Gap(8),
-                        OutlineButton(
-                          key: const ValueKey('zoom-actual-size'),
-                          onPressed: session == null
-                              ? null
-                              : () => setState(() => _zoom = 1),
-                          child: const Text('100%'),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -311,6 +329,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                             document: session.document,
                             selectedId: session.selectedId,
                             dormant: widget.dormant,
+                            scenario: _scenario,
                             preferences: widget.preferences,
                             tool: _tool,
                             lockAspectRatio: _lockAspectRatio,

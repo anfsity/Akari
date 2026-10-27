@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_studio/theme_studio.dart';
 import 'package:theme_studio/src/studio_preview.dart';
+import 'package:theme_studio/src/studio_preview_host.dart';
 import 'package:theme_studio/src/node_inspector.dart';
 import 'package:theme_studio/src/studio_canvas.dart';
 import 'package:theme_studio/src/studio_theme.dart';
@@ -284,6 +285,45 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('preview scenarios wake the canvas without editing the scene', (
+    tester,
+  ) async {
+    await openStudio(tester);
+    final editor = tester
+        .widget<StudioCanvas>(find.byType(StudioCanvas))
+        .editor!;
+    final original = encodeSceneDocument(editor.document);
+    await tester.tap(find.text('State: Login'));
+    await tester.pumpAndSettle();
+    for (final scenario in [
+      ...StudioPreviewScenario.values.skip(1),
+      StudioPreviewScenario.password,
+    ]) {
+      await tester.tap(find.byKey(const ValueKey('preview-scenario')));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text(scenario.label),
+        scenario == StudioPreviewScenario.password ? -80 : 80,
+        scrollable: find
+            .descendant(
+              of: find.byType(SelectPopup),
+              matching: find.byType(Scrollable),
+            )
+            .last,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(scenario.label).last);
+      await tester.pumpAndSettle();
+      final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(preview.scenario, scenario);
+      expect(preview.dormant, isFalse);
+      expect(encodeSceneDocument(editor.document), original);
+      expect(editor.canUndo, isFalse);
+      expect(editor.isDirty, isFalse);
+    }
+    expect(tester.takeException(), isNull);
+  });
 
   Future<void> prepareSynthesisSource() async {
     final lib = Directory('${directory.path}/lib')..createSync();

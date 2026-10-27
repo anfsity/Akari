@@ -138,7 +138,14 @@ Transform translations (`translateX`, `translateY`) remain in logical pixels as 
 
 ## Canvas tools & gestures
 
-Switch preview states with **State: Login / Dormant**, adjust zoom with **− / +**, **100%**, or **Fit**, and select a canvas tool:
+Switch preview states with **State: Login / Dormant**. The adjacent scenario menu
+previews password or username input, signing in, rejected credentials,
+authentication errors, account/session selection, connecting, and service
+unavailability. Choosing a different scenario wakes a dormant preview. These
+simulated states never change scene files or undo history; credentials are cleared
+on scenario changes.
+
+Adjust zoom with **− / +**, **100%**, or **Fit**, and select a canvas tool:
 
 | Tool | Shortcut | Behavior |
 | --- | --- | --- |
