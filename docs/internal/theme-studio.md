@@ -147,6 +147,25 @@ Insertion defaults survive saved removals and rebuilding. Layout rules apply
 only to their declared scene ID; other scenes remain freely editable. Theme
 authors can [declare their own slots](../reference/theme-package.md#declaring-layout-slots).
 
+### Responsive layout
+
+The layout inspector supports proportional, fill, and hug width/height modes,
+fixed sizes, min/max dimensions, and flex. Hug measures portable text using the
+registered font or fits a frame to child bounds, including wrapped lines.
+Theme-owned components use explicit/proportional dimensions. Row/column frames
+can wrap; fill shares remaining line space within size constraints. Fixed sizes
+override proportional/fill dimensions. Interactive minimum hit targets take
+precedence over authored maxima.
+
+Choose **Base layout** or add a viewport breakpoint in the inspector. The widest
+matching minimum width overrides that node's layout and sizing; removing the
+rule restores its base behavior. Rules use the logical viewport supplied to `SceneRuntime`; physical pixel
+density does not alter breakpoint matching.
+
+**Responsive** below the canvas continuously varies preview width/height without
+changing the authored canvas or history. Edit rules in the inspector while
+checking the preview. **Authored size** returns to geometry editing.
+
 ### Coordinate units
 
 The resolution selector below the canvas applies HD, Full HD, QHD, 4K, portrait,
@@ -175,21 +194,28 @@ horizontal guide. Drag a line to move it; double-click to remove it. Each gestur
 is one undo step and guides save with the scene. Smart snapping also targets
 visible guides and labels the nearest horizontal/vertical gap in reference pixels.
 
-**State flow** displays the core dormant/login/submitting/success/error path.
-Click a state to preview it. **Design → State rules** edits visibility using
-readable state labels, inversion, and state-entry Shake/Pulse responses. Complex
-existing visibility expressions remain intact until explicitly replaced. Rules
-save with the scene, run in production, and use the same node timing on the
-timeline. The graph previews semantic authentication states; backend transitions
-remain owned by the authentication feature.
+**State flow** previews Dormant, Login, Submitting, Success, and Error. It also
+edits the selected layer's visual transition edges: source condition, target
+condition, Shake/Pulse response, and optional duration/delay. The target must be
+newly true and the source must match the previous snapshot. Explicit edges take
+precedence over simple state-entry responses. **Design → State rules → Edit
+compound condition** uses the same nested All/Any/Not composer for visibility.
+These rules observe host state; authentication transitions remain backend-owned.
 
-**Timeline** opens a scrubber and play/pause controls for entrance, wake, sleep,
-and submit-to-success/error transitions. Scrubbing and scenario changes never
-modify the scene or history. The range starts at 1.5 seconds and expands to fit
-authored motion. **Advanced layout → Motion** accepts per-node duration, delay,
-and custom Bezier controls with a curve plot. Omitted values inherit theme
-timing/easing. With multiple layers selected, **Stagger 100 ms** assigns successive
-delays in paint order as one undo step.
+**Timeline** opens scrubbing and play/pause controls for entrance, wake, sleep,
+and submit-to-success/error transitions. Each layer has a timing block: drag it
+to change delay or its right handle to resize duration and its keyframe span.
+Add tracks for opacity, X/Y translation, scale, or rotation; add frames at the
+playhead. Drag diamonds to change time; double-click to edit time, value, easing,
+or delete a frame. Each drag previews continuously and commits one undo step.
+Scrubbing and scenario changes do not enter history. The range starts at 1.5 s
+and expands to include authored timing, tracks, and transition responses.
+
+**Advanced layout → Motion** also edits per-node duration, delay, and a custom
+Bezier curve. Omitted values inherit theme timing/easing. **Stagger 100 ms** on
+multiple selected layers assigns successive delays in paint order as one edit.
+The runtime and scrubber use the same evaluator; reduced motion settles tracks
+to their final values.
 
 Drag a component row from **Compose** onto the canvas to place it at the pointer.
 Dragging an included slot moves that slot without duplicating it. Double-click
@@ -293,7 +319,7 @@ their own editing behavior.
 
 - **Presets & projects**: Studio compiles all packages under `themes/` alongside `--theme`. Switching **THEME** (or loading a scene from a registered theme package) switches the component factory, tokens, background renderers, and assets together.
 - **Inspect code**: Switch the right panel from **Design** to **Inspect code** to view and copy validated **JSON** or generated **Dart** for the **Selection** or the entire **Scene**.
-- **Settings**: The dialog separates **Canvas**, **Background**, **Appearance**, and **Grid & snapping**. Drafts stay intact while switching categories; validation opens the category that needs correction.
+- **Settings**: The dialog separates **Canvas**, **Background**, **Appearance**, **Grid & snapping**, and **Shortcuts**. Drafts stay intact while switching categories; validation opens the category that needs correction.
   - **Canvas** offers HD, Full HD, QHD, 4K UHD, and portrait presets, custom dimensions, a dimension swap action, `fit`, and `useSafeArea`.
   - **Background** includes an image/color preview, a theme asset chooser, a hexadecimal color field, blur, and scrim opacity.
   - **Appearance** previews Light / Dark / System and the available color palettes. **Grid & snapping** offers common spacing presets and custom `4..512` px spacing. Each editor category can be reset to its defaults.
@@ -306,9 +332,29 @@ their own editing behavior.
 - **Add to canvas**: Images, textures, and SVGs become independent layers after decoding succeeds. Move, resize, group, style, animate, duplicate, and delete them through the usual canvas tools. The inspector edits fitting and color overrides; SVG color can also be chosen before placement. Layer creation and edits use scene undo/redo and **Save scene**.
 - **Use image**: For raster images, validates the file and sets it as the scene background (requires **Save scene** to persist to JSON).
 - **Fonts**: The sidebar keeps a one-line sample and single-line filenames. Expand the preview for a larger sample with an adjustable size. **Apply font** saves the font asset on the selection's style token, with undo/redo and independent-theme copying. The typography controls also edit weight, letter spacing, and line height. Font registration is shared between previews and rendering and cached by file revision; previewing alone does not modify the scene.
-- **Shader & audio files**: Shaders show a source excerpt; audio files have a dedicated category. Shader parameters remain in **Effects** for renderers that declare them.
+- **Shader & audio files**: Shaders show a source excerpt; audio files have a dedicated category. Open **Effects → Shader Playground** to edit and compile shader sources. Existing renderer parameter sliders remain available in Effects.
 - **Independent themes**: Image/SVG layers retain their fitting and tint when creating a theme. Referenced files from another scene-owning package are copied into the new project.
 - **Package resolution**: When opening a scene via **Load JSON**, Studio locates the nearest `theme_*` package boundary to own asset imports. For an unregistered external theme, restart Studio with `--theme /path/to/theme_other` to compile its custom widgets and bundle assets.
+
+## Shader Playground
+
+**Effects → Shader Playground** loads a theme fragment shader or starts with a
+working GLSL example. **Compile and preview** invokes the workspace SDK's
+`impellerc`, displays diagnostics, and reflects float/vector components and
+`sampler2D` slots. Bind floats to constants, time, logical viewport size, pointer
+coordinates, Dormant, or Authentication error, with scale and offset. Texture
+samplers select theme images. Source edits require recompilation before applying.
+
+**Apply as new shader** preserves the loaded source, creates a new source asset
+in its directory, registers `flutter.shaders`, and commits the background reference
+and bindings in one undo step. Undo restores the prior background; imported
+resources remain available. **Save scene** persists the scene. Independent theme
+creation copies/rewrites shader and texture references and registers compilation.
+The saved scene uses the same runtime painter, with a stable reduced-motion clock.
+
+Live compilation requires a Flutter SDK (`.fvm/flutter_sdk` in a workspace or
+`FLUTTER_ROOT`) and a writable desktop bundle asset cache. Deployed themes consume
+Flutter-compiled shaders and do not need Studio or its compiler.
 
 ## Troubleshooting
 
@@ -330,10 +376,13 @@ their own editing behavior.
 ../../.fvm/flutter_sdk/bin/flutter test
 ```
 
-Responsive sizing supports min/max logical dimensions, proportional, fill and hug modes. Hug measures portable text with the registered font and frames from their child bounds; theme components require explicit/proportional dimensions. Fixed dimensions override proportional/fill dimensions. Row/column frames can wrap; fill distributes remaining line space, constrained by min/max. Viewport breakpoints override a node's layout and sizing; the widest matching minimum wins. The Responsive canvas control continuously changes preview width/height without changing the authored canvas or history.
-
-The Motion workspace shows per-layer timing blocks and property tracks. Drag a block to change delay, its right handle to change duration, or a diamond to change a keyframe time. Add property tracks for opacity, X/Y translation, scale and rotation; add frames at the playhead and double-click diamonds to edit time/value/easing or delete them. Edits preview continuously and commit one history entry on release. The node's shared runtime controller evaluates the same delayed keyframes as scrubbing; reduced motion settles to final values.
-
-State flow retains the semantic preview state palette and edits selected-layer visual edges. Edges declare a source condition, a target condition, shake/pulse response and optional timing. The target must be newly true, and the source must have matched the previous snapshot; explicit edges take precedence over simple entry responses. The shared condition composer supports nested All/Any/Not for edge endpoints and visibility. These rules observe host state and never issue authentication commands.
-
-Shader Playground (Effects) loads or edits Flutter fragment GLSL, invokes the workspace SDK's impellerc, shows compiler diagnostics and reflects float/vector components and sampler2D slots. Each float binds to a constant, time, logical viewport size, pointer coordinates, Dormant or Authentication error, with scale and offset. Texture samplers use theme images. Apply creates a new source asset (preserving the loaded source), registers flutter.shaders and commits its scene reference/bindings once. Undo restores the prior background; imported resources remain available. Theme synthesis copies/rewrites shader and texture references and registers shader compilation. Saved scenes use the same runtime painter and reduced-motion clock. Live compilation needs a Flutter SDK (workspace .fvm/flutter_sdk or FLUTTER_ROOT) and a writable desktop bundle asset cache; deployed themes consume Flutter-compiled shader assets and do not need the compiler.
+The 2026-10-28 workspace regression passed 157 Studio, 42 scene runtime, 37 schema,
+6 code generation, and 9 theme synthesis tests. Static analysis and Linux debug
+builds passed. An isolated Arch/Sway VM verified native JSON loading and asset
+picker display, continuous floating-panel dragging, 150% and 200% scaling on two
+outputs, retained panel state after returning from a removed output, the shortcut
+settings page, compact font previews, and real shader compile/apply/save.
+A separate app depending only on `scene` rendered the saved shader after normal
+Flutter shader compilation. VM checks use headless outputs and software graphics;
+physical GPU/monitor behavior is outside this run. Local screenshots are under
+`build/tool/qa/studio-workspace/`.
