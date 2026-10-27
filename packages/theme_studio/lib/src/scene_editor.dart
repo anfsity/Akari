@@ -556,6 +556,105 @@ class SceneEditor extends ChangeNotifier {
     );
   }
 
+  String? getLayerMoveBlockReason(String id, String? parentId) {
+    var ancestor = parentId;
+    while (ancestor != null) {
+      if (ancestor == id) {
+        return 'A frame cannot contain itself or its ancestors.';
+      }
+      final parent = document.nodes.firstWhere((node) => node.id == ancestor);
+      if (parent.layout == null) return 'Drop inside a frame to nest a layer.';
+      ancestor = parent.parentId;
+    }
+    return null;
+  }
+
+  void moveLayer(String id, {required String? parentId, String? beforeId}) {
+    if (!applyDraft()) return;
+    final reason = getLayerMoveBlockReason(id, parentId);
+    if (reason != null) {
+      inspector.showError(reason);
+      return;
+    }
+    var node = document.nodes.firstWhere((node) => node.id == id);
+    if (node.parentId != parentId) {
+      final geometry = calculateSceneLayout(
+        document: document,
+        size: Size(
+          document.canvas.referenceWidth.toDouble(),
+          document.canvas.referenceHeight.toDouble(),
+        ),
+      );
+      final parent = parentId == null
+          ? null
+          : document.nodes.firstWhere((node) => node.id == parentId);
+      final content = parent == null
+          ? Size(
+              document.canvas.referenceWidth.toDouble(),
+              document.canvas.referenceHeight.toDouble(),
+            )
+          : Size(
+              math.max(
+                1,
+                geometry[parent.id]!.rect.width - parent.layout!.padding * 2,
+              ),
+              math.max(
+                1,
+                geometry[parent.id]!.rect.height - parent.layout!.padding * 2,
+              ),
+            );
+      final oldParent = node.parentId == null
+          ? Matrix4.identity()
+          : geometry[node.parentId]!.worldTransform;
+      final newParent = parent == null
+          ? Matrix4.identity()
+          : geometry[parent.id]!.worldTransform;
+      final origin = MatrixUtils.transformPoint(
+        Matrix4.inverted(newParent),
+        MatrixUtils.transformPoint(oldParent, geometry[id]!.rect.topLeft),
+      );
+      final width = math.min(geometry[id]!.rect.width / content.width, 1.0);
+      final height = math.min(geometry[id]!.rect.height / content.height, 1.0);
+      final padding = parent?.layout?.padding ?? 0;
+      node = node.copyWith(
+        parentId: parentId,
+        rect: SceneRect(
+          x: ((origin.dx - padding) / content.width).clamp(0, 1 - width),
+          y: ((origin.dy - padding) / content.height).clamp(0, 1 - height),
+          width: width,
+          height: height,
+        ),
+      );
+    }
+    final siblings = document
+        .getChildren(parentId)
+        .reversed
+        .where((node) => node.id != id)
+        .toList();
+    final index = beforeId == null
+        ? siblings.length
+        : siblings.indexWhere((node) => node.id == beforeId);
+    siblings.insert(index, node);
+    final ranks = {
+      for (final (index, node) in siblings.reversed.indexed) node.id: index,
+    };
+    _updateDocument(
+      document.copyWith(
+        nodes: [
+          for (final current in document.nodes)
+            if (ranks.containsKey(current.id))
+              (current.id == id ? node : current).copyWith(
+                renderOrder: ranks[current.id],
+              )
+            else
+              current,
+        ],
+      ),
+      selectedId: id,
+      selectedIds: {id},
+    );
+  }
+
   void updateSelectionStyle(SceneStyle style) {
     if (!applyDraft() || selectedIds.isEmpty) return;
     final token =

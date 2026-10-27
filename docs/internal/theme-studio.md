@@ -211,6 +211,14 @@ size. Batch edits, subtree duplication, and deletion each use one undo step;
 required layout controls remain protected inside frames. Plain absolute frames
 can be ungrouped with `Ctrl+Shift+G` while preserving their children's positions.
 
+Drag a layer row horizontally to reorder it in the hierarchy. Drop near another
+row's top/bottom edge to place it before/after that sibling, or in a frame row's
+center to nest it. **Move to scene root** removes its parent. Drop indicators
+show the insertion edge or destination frame. Moves include the subtree and
+use one undo step; cycles are rejected. Reparenting preserves reference geometry
+where it fits, bounds it to the destination content, and inherits the new
+parent's layout and transforms.
+
 Switch preview states with **State: Login / Dormant**. The adjacent scenario menu
 previews password or username input, signing in, rejected credentials,
 authentication errors, account/session selection, connecting, and service

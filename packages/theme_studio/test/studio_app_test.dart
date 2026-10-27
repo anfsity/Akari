@@ -549,6 +549,34 @@ void main() {
     },
   );
 
+  testWidgets('layer rows drag into frames and back to the root with atomic undo', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    editor.createComponent(StudioComponent.frame);
+    await tester.pumpAndSettle();
+    final source = find.byKey(const ValueKey('layer-label'));
+    final target = find.byKey(const ValueKey('layer-frame'));
+    final drag = await tester.startGesture(tester.getCenter(source));
+    await drag.moveBy(const Offset(40, 0));
+    await tester.pump();
+    await drag.moveTo(tester.getCenter(target));
+    await tester.pump();
+    await drag.up();
+    await tester.pumpAndSettle();
+    expect(editor.document.nodes.firstWhere((node) => node.id == 'label').parentId, 'frame');
+    final unnest = await tester.startGesture(tester.getCenter(find.byKey(const ValueKey('layer-label'))));
+    await unnest.moveBy(const Offset(40, 0));
+    await tester.pump();
+    await unnest.moveTo(tester.getCenter(find.byKey(const ValueKey('layer-root-drop'))));
+    await tester.pump();
+    await unnest.up();
+    await tester.pumpAndSettle();
+    expect(editor.selectedNode.parentId, isNull);
+    editor.undo();
+    expect(editor.selectedNode.parentId, 'frame');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('blank scenes and reusable primitives author independently of layout slots', (tester) async {
     await openStudio(tester);
     final original = file.readAsStringSync();
