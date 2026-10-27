@@ -87,24 +87,28 @@ class SceneRuntime extends StatelessWidget {
             theme.tokens.disableAnimations ||
             MediaQuery.disableAnimationsOf(context),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final size = Size(constraints.maxWidth, constraints.maxHeight);
-          final geometry = calculateSceneLayout(
-            document: document,
-            size: size,
-            safeArea: MediaQuery.paddingOf(context),
-            minHitTarget: theme.tokens.minHitTarget,
-          );
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              _buildBackground(context),
-              for (final node in document.getChildren(null))
-                _buildNode(context, geometry, node),
-            ],
-          );
-        },
+      child: ValueListenableBuilder<Map<String, String>>(
+        valueListenable: sceneFontFamilies,
+        builder: (context, fonts, _) => LayoutBuilder(
+          builder: (context, constraints) {
+            final size = Size(constraints.maxWidth, constraints.maxHeight);
+            final geometry = calculateSceneLayout(
+              document: document,
+              size: size,
+              fontFamilies: fonts,
+              safeArea: MediaQuery.paddingOf(context),
+              minHitTarget: theme.tokens.minHitTarget,
+            );
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                _buildBackground(context),
+                for (final node in document.getChildren(null))
+                  _buildNode(context, geometry, node),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -135,6 +139,7 @@ class SceneRuntime extends StatelessWidget {
     Map<String, SceneNodeGeometry> geometry,
     SceneNode node,
   ) {
+    node = geometry[node.id]!.node;
     final visibleWhen = node.visibleWhen;
     final visible =
         visibleWhen == null ||
@@ -203,7 +208,16 @@ class SceneRuntime extends StatelessWidget {
         final child = primitive == ScenePrimitive.text
             ? Align(
                 alignment: Alignment.topLeft,
-                child: Text(node.properties['text'] ?? 'Text'),
+                child: Text(
+                  node.properties['text'] ?? 'Text',
+                  style: TextStyle(
+                    fontSize:
+                        document.styleTokens[node.styleToken]?.fontSize == 0 ||
+                            document.styleTokens[node.styleToken] == null
+                        ? 14
+                        : document.styleTokens[node.styleToken]!.fontSize,
+                  ),
+                ),
               )
             : const SizedBox.expand();
         return contentDecorator?.call(context, node, child) ?? child;

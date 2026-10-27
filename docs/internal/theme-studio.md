@@ -329,3 +329,5 @@ their own editing behavior.
 ../../.fvm/flutter_sdk/bin/flutter analyze
 ../../.fvm/flutter_sdk/bin/flutter test
 ```
+
+Responsive sizing supports min/max logical dimensions, proportional, fill and hug modes. Hug measures portable text with the registered font and frames from their child bounds; theme components require explicit/proportional dimensions. Fixed dimensions override proportional/fill dimensions. Row/column frames can wrap; fill distributes remaining line space, constrained by min/max. Viewport breakpoints override a node's layout and sizing; the widest matching minimum wins. The Responsive canvas control continuously changes preview width/height without changing the authored canvas or history.

@@ -360,6 +360,7 @@ class _StudioPreviewState extends State<StudioPreview>
   @override
   void initState() {
     super.initState();
+    sceneFontFamilies.addListener(_refreshFontGeometry);
     _wake = AnimationController(
       vsync: this,
       duration: Duration.zero,
@@ -440,8 +441,11 @@ class _StudioPreviewState extends State<StudioPreview>
     );
   }
 
+  void _refreshFontGeometry() => setState(() {});
+
   @override
   void dispose() {
+    sceneFontFamilies.removeListener(_refreshFontGeometry);
     _text.dispose();
     _textFocus.dispose();
     _wake.dispose();

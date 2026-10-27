@@ -31,6 +31,70 @@ const _scene = '''
 ''';
 
 void main() {
+  test(
+    'responsive rules round trip and reject ambiguous external constraints',
+    () {
+      final base = decodeSceneDocument(_scene);
+      final doc = base.copyWith(
+        nodes: [
+          base.nodes.first.copyWith(
+            layout: const SceneLayout(wrap: true),
+            sizing: const SceneSizing(
+              minWidth: 100,
+              maxWidth: 500,
+              widthMode: SceneSizeMode.fill,
+            ),
+            breakpoints: const [
+              SceneBreakpoint(
+                minWidth: 800,
+                layout: SceneLayout(direction: SceneLayoutDirection.row),
+                sizing: SceneSizing(width: 300),
+              ),
+            ],
+          ),
+        ],
+      );
+      final decoded = decodeSceneDocument(encodeSceneDocument(doc));
+      expect(decoded.nodes.single.layout!.wrap, true);
+      expect(decoded.nodes.single.sizing.minWidth, 100);
+      expect(getSceneNodeForWidth(decoded.nodes.single, 900).sizing.width, 300);
+      expect(
+        getSceneNodeForWidth(decoded.nodes.single, 500).sizing.widthMode,
+        SceneSizeMode.fill,
+      );
+      for (final sizing in [
+        const SceneSizing(minWidth: 300, maxWidth: 100),
+        const SceneSizing(maxWidth: 0),
+      ]) {
+        expect(
+          () => decodeSceneDocument(
+            encodeSceneDocument(
+              doc.copyWith(nodes: [doc.nodes.single.copyWith(sizing: sizing)]),
+            ),
+          ),
+          throwsFormatException,
+        );
+      }
+      expect(
+        () => decodeSceneDocument(
+          encodeSceneDocument(
+            doc.copyWith(
+              nodes: [
+                doc.nodes.single.copyWith(
+                  breakpoints: [
+                    ...doc.nodes.single.breakpoints,
+                    ...doc.nodes.single.breakpoints,
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        throwsFormatException,
+      );
+    },
+  );
+
   test('theme selections survive edits and JSON round trips', () {
     final original = decodeSceneDocument(_scene);
     expect(original.themeProperties, isEmpty);

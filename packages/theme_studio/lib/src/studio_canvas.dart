@@ -56,6 +56,7 @@ class StudioCanvasState extends State<StudioCanvas> {
   Duration? _elapsed;
   StudioTransition _transition = StudioTransition.wake;
   bool _showStateGraph = false;
+  Size? _responsiveSize;
   bool _comparing = false;
   bool _showRulers = false;
   StudioWorkspaceMode _workspaceMode = StudioWorkspaceMode.design;
@@ -590,6 +591,9 @@ class StudioCanvasState extends State<StudioCanvas> {
                                           tool: _tool,
                                           lockAspectRatio: _lockAspectRatio,
                                           zoom: presenting ? null : _zoom,
+                                          viewportSize: presenting
+                                              ? null
+                                              : _responsiveSize,
                                           presenting: presenting,
                                           panEnabled:
                                               !presenting &&
@@ -703,6 +707,32 @@ class StudioCanvasState extends State<StudioCanvas> {
                                   },
                                 ),
                               ),
+                            OutlineButton(
+                              key: const ValueKey('canvas-responsive'),
+                              onPressed: session == null
+                                  ? null
+                                  : () => setState(() {
+                                      _responsiveSize = _responsiveSize == null
+                                          ? Size(
+                                              session
+                                                  .document
+                                                  .canvas
+                                                  .referenceWidth
+                                                  .toDouble(),
+                                              session
+                                                  .document
+                                                  .canvas
+                                                  .referenceHeight
+                                                  .toDouble(),
+                                            )
+                                          : null;
+                                    }),
+                              child: Text(
+                                _responsiveSize == null
+                                    ? 'Responsive'
+                                    : 'Authored size',
+                              ).small(),
+                            ),
                             const Gap(8),
                             OutlineButton(
                               key: const ValueKey('canvas-compare'),
@@ -731,6 +761,58 @@ class StudioCanvasState extends State<StudioCanvas> {
                           ],
                         ),
                         Wrap(spacing: 4, runSpacing: 4, children: zoomControls),
+                      ],
+                    ),
+                  ),
+                if (_responsiveSize != null && !presenting)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Wrap(
+                      spacing: 16,
+                      runSpacing: 8,
+                      children: [
+                        for (final horizontal in [true, false])
+                          SizedBox(
+                            width: 240,
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 90,
+                                  child: Text(
+                                    '${horizontal ? 'W' : 'H'} ${(horizontal ? _responsiveSize!.width : _responsiveSize!.height).round()} px',
+                                  ).small(),
+                                ),
+                                Expanded(
+                                  child: Slider(
+                                    key: ValueKey(
+                                      horizontal
+                                          ? 'responsive-width'
+                                          : 'responsive-height',
+                                    ),
+                                    min: 240,
+                                    max: 3840,
+                                    value: SliderValue.single(
+                                      (horizontal
+                                              ? _responsiveSize!.width
+                                              : _responsiveSize!.height)
+                                          .clamp(240, 3840),
+                                    ),
+                                    onChanged: (value) => setState(
+                                      () => _responsiveSize = horizontal
+                                          ? Size(
+                                              value.value.roundToDouble(),
+                                              _responsiveSize!.height,
+                                            )
+                                          : Size(
+                                              _responsiveSize!.width,
+                                              value.value.roundToDouble(),
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),

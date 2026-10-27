@@ -341,6 +341,21 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('responsive viewport resizes continuously without editing the authored canvas', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    final original = encodeSceneDocument(editor.document);
+    await tester.tap(find.byKey(const ValueKey('canvas-responsive')));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byKey(const ValueKey('responsive-width')), const Offset(-55,0));
+    await tester.pumpAndSettle();
+    final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+    expect(preview.viewportSize!.width, isNot(editor.document.canvas.referenceWidth));
+    expect(encodeSceneDocument(editor.document), original);
+    expect(editor.canUndo, false);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Shift selection, marquee, grouping and frame layout work on canvas', (tester) async {
     await openStudio(tester);
     final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;

@@ -66,6 +66,22 @@ SceneDocument decodeSceneDocument(String source) {
     );
   }
   _validateHierarchy(nodes);
+  for (final node in nodes) {
+    for (final sizing in [
+      node.sizing,
+      ...node.breakpoints.map((rule) => rule.sizing).whereType<SceneSizing>(),
+    ]) {
+      if ((sizing.widthMode == SceneSizeMode.hug ||
+              sizing.heightMode == SceneSizeMode.hug) &&
+          node.layout == null &&
+          node.primitive != ScenePrimitive.text) {
+        throw const FormatException(
+          'Hug sizing requires a frame or primitive text.',
+        );
+      }
+    }
+  }
+
   final styles = {
     for (final entry in _getMap(
       decoded,
@@ -290,6 +306,7 @@ SceneNode _decodeNode(
         ? null
         : _decodeLayout(_getMap(json, 'layout')),
     sizing: _decodeSizing(_getMap(json, 'sizing', fallback: const {})),
+    breakpoints: _decodeBreakpoints(json),
     transform: json['transform'] == null
         ? const SceneTransform()
         : _decodeTransform(_getMap(json, 'transform')),
@@ -393,23 +410,17 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
         if (asset.tint != null) 'tint': encodeSceneColor(asset.tint!),
       },
     if (node.parentId != null) 'parentId': node.parentId,
-    if (node.layout case final layout?)
-      'layout': {
-        'direction': layout.direction.name,
-        'padding': layout.padding,
-        'gap': layout.gap,
-        'mainAlignment': layout.mainAlignment.name,
-        'crossAlignment': layout.crossAlignment.name,
-        'clip': layout.clip,
-      },
-    if (node.sizing.width != null ||
-        node.sizing.height != null ||
-        node.sizing.flex != 0)
-      'sizing': {
-        if (node.sizing.width != null) 'width': node.sizing.width,
-        if (node.sizing.height != null) 'height': node.sizing.height,
-        if (node.sizing.flex != 0) 'flex': node.sizing.flex,
-      },
+    if (node.layout case final layout?) 'layout': _encodeLayout(layout),
+    'sizing': _encodeSizing(node.sizing),
+    if (node.breakpoints.isNotEmpty)
+      'breakpoints': [
+        for (final rule in node.breakpoints)
+          {
+            'minWidth': rule.minWidth,
+            if (rule.layout != null) 'layout': _encodeLayout(rule.layout!),
+            if (rule.sizing != null) 'sizing': _encodeSizing(rule.sizing!),
+          },
+      ],
     'rect': {
       'x': node.rect.x,
       'y': node.rect.y,
@@ -607,6 +618,7 @@ SceneLayout _decodeLayout(Map<String, dynamic> json) => SceneLayout(
     'layout.crossAlignment',
   ),
   clip: _getBool(json, 'clip', fallback: false),
+  wrap: _getBool(json, 'wrap', fallback: false),
 );
 
 SceneSizing _decodeSizing(Map<String, dynamic> json) {
@@ -617,11 +629,94 @@ SceneSizing _decodeSizing(Map<String, dynamic> json) {
   if (width == 0 || height == 0) {
     throw const FormatException('Fixed dimensions must be greater than zero.');
   }
+  final minWidth = _getNonNegative(json, 'minWidth');
+  final minHeight = _getNonNegative(json, 'minHeight');
+  final maxWidth = json['maxWidth'] == null
+      ? null
+      : _getNonNegative(json, 'maxWidth');
+  final maxHeight = json['maxHeight'] == null
+      ? null
+      : _getNonNegative(json, 'maxHeight');
+  if ((maxWidth != null && (maxWidth == 0 || maxWidth < minWidth)) ||
+      (maxHeight != null && (maxHeight == 0 || maxHeight < minHeight))) {
+    throw const FormatException(
+      'Maximum size must be positive and at least the minimum.',
+    );
+  }
   return SceneSizing(
     width: width,
     height: height,
     flex: _getNonNegative(json, 'flex'),
+    minWidth: minWidth,
+    minHeight: minHeight,
+    maxWidth: maxWidth,
+    maxHeight: maxHeight,
+    widthMode: _getEnumValue(
+      SceneSizeMode.values,
+      _getString(json, 'widthMode', fallback: 'proportional'),
+      'sizing.widthMode',
+    ),
+    heightMode: _getEnumValue(
+      SceneSizeMode.values,
+      _getString(json, 'heightMode', fallback: 'proportional'),
+      'sizing.heightMode',
+    ),
   );
+}
+
+Map<String, dynamic> _encodeLayout(SceneLayout layout) => {
+  'direction': layout.direction.name,
+  'padding': layout.padding,
+  'gap': layout.gap,
+  'mainAlignment': layout.mainAlignment.name,
+  'crossAlignment': layout.crossAlignment.name,
+  'clip': layout.clip,
+  'wrap': layout.wrap,
+};
+
+Map<String, dynamic> _encodeSizing(SceneSizing sizing) => {
+  if (sizing.width != null) 'width': sizing.width,
+  if (sizing.height != null) 'height': sizing.height,
+  'flex': sizing.flex,
+  'widthMode': sizing.widthMode.name,
+  'heightMode': sizing.heightMode.name,
+  'minWidth': sizing.minWidth,
+  'minHeight': sizing.minHeight,
+  if (sizing.maxWidth != null) 'maxWidth': sizing.maxWidth,
+  if (sizing.maxHeight != null) 'maxHeight': sizing.maxHeight,
+};
+
+List<SceneBreakpoint> _decodeBreakpoints(Map<String, dynamic> json) {
+  final widths = <double>{};
+  return [
+    for (final value
+        in json['breakpoints'] == null
+            ? const []
+            : _getList(json, 'breakpoints'))
+      (() {
+        final rule = _getMapValue(value, 'breakpoints[]');
+        final width = _getNonNegative(rule, 'minWidth');
+        if (width > 16384 || !widths.add(width))
+          throw const FormatException(
+            'Breakpoints require unique widths in 0..16384.',
+          );
+        if (rule['layout'] != null && json['layout'] == null)
+          throw const FormatException('Only frames can override layout.');
+        if (rule['layout'] == null && rule['sizing'] == null)
+          throw const FormatException(
+            'A breakpoint must override layout or sizing.',
+          );
+        return SceneBreakpoint(
+          minWidth: width,
+          layout: rule['layout'] == null
+              ? null
+              : _decodeLayout(_getMap(rule, 'layout')),
+          sizing: rule['sizing'] == null
+              ? null
+              : _decodeSizing(_getMap(rule, 'sizing')),
+        );
+      })(),
+  ];
 }
 
 double _getNonNegative(Map<String, dynamic> json, String key) {
