@@ -545,6 +545,20 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('shader playground keeps drafts out of history and reports compiler setup errors', (tester) async {
+    await openStudio(tester);
+    final editor=tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    final original=encodeSceneDocument(editor.document);
+    await tester.tap(find.text('Effects'));await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('open-shader-playground')));await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('shader-source')),'invalid shader');
+    await tester.runAsync(() async {await tester.tap(find.byKey(const ValueKey('shader-compile')));await tester.pump();await Future<void>.delayed(const Duration(milliseconds:500));});await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('shader-diagnostic')),findsOneWidget);
+    expect(encodeSceneDocument(editor.document),original);expect(editor.canUndo,false);
+    await tester.tap(find.text('Cancel').last);await tester.pumpAndSettle();
+    expect(tester.takeException(),isNull);
+  });
+
   testWidgets(
     'effect parameters preview through the renderer and save as one revision',
     (tester) async {

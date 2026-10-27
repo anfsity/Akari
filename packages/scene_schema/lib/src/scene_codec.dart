@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'scene_document.dart';
+import 'scene_shader.dart';
 
 const _legacyComponentIds = <String>{
   'background',
@@ -229,15 +230,80 @@ SceneBackground _decodeBackground(Map<String, dynamic> json) {
     scrimOpacity: scrimOpacity,
     blurSigma: blurSigma,
     rendererId: _findString(json, 'rendererId'),
+    shader: json['shader'] == null
+        ? null
+        : _decodeShader(_getMap(json, 'shader')),
     parameters: {
       for (final key in parameters.keys) key: _getDouble(parameters, key),
     },
   );
 }
 
+SceneShader _decodeShader(Map<String, dynamic> json) {
+  final asset = _getString(json, 'asset');
+  _validateAssetPath(asset);
+  final names = <String>{};
+  String name(Map<String, dynamic> value) {
+    final name = _getString(value, 'name');
+    if (name.trim().isEmpty || !names.add(name))
+      throw const FormatException(
+        'Shader binding names must be nonempty and unique.',
+      );
+    return name;
+  }
+
+  return SceneShader(
+    asset: asset,
+    uniforms: [
+      for (final raw in _getList(json, 'uniforms'))
+        (() {
+          final value = _getMapValue(raw, 'uniforms[]');
+          return SceneShaderUniform(
+            name: name(value),
+            source: _getEnumValue(
+              SceneUniformSource.values,
+              _getString(value, 'source', fallback: 'constant'),
+              'uniform.source',
+            ),
+            value: _getDouble(value, 'value', fallback: 0),
+            scale: _getDouble(value, 'scale', fallback: 1),
+          );
+        })(),
+    ],
+    textures: [
+      for (final raw
+          in json['textures'] == null ? const [] : _getList(json, 'textures'))
+        (() {
+          final value = _getMapValue(raw, 'textures[]');
+          final asset = _getString(value, 'asset');
+          _validateAssetPath(asset);
+          return SceneShaderTexture(name: name(value), asset: asset);
+        })(),
+    ],
+  );
+}
+
+Map<String, dynamic> _encodeShader(SceneShader shader) => {
+  'asset': shader.asset,
+  'uniforms': [
+    for (final uniform in shader.uniforms)
+      {
+        'name': uniform.name,
+        'source': uniform.source.name,
+        'value': uniform.value,
+        'scale': uniform.scale,
+      },
+  ],
+  'textures': [
+    for (final texture in shader.textures)
+      {'name': texture.name, 'asset': texture.asset},
+  ],
+};
+
 Map<String, dynamic> _encodeBackground(SceneBackground background) {
   return {
     'kind': background.kind.name,
+    if (background.shader != null) 'shader': _encodeShader(background.shader!),
     if (background.asset != null) 'asset': background.asset,
     'color': encodeSceneColor(background.color),
     'scrimOpacity': background.scrimOpacity,

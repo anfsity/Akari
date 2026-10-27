@@ -11,6 +11,7 @@ import 'node_style.dart';
 import 'state_effects.dart';
 import 'scene_asset.dart';
 import 'scene_font.dart';
+import 'shader_background.dart';
 import 'background_renderer.dart';
 
 typedef SceneNodeBuilder = Widget Function(
@@ -40,6 +41,7 @@ class SceneRuntime extends StatelessWidget {
     this.assetImageResolver,
     this.assetSvgLoader,
     this.assetFontLoader,
+    this.shaderLoader,
     this.activePredicates = const <ScenePredicate>{},
     this.activePredicatesListenable,
     this.backgroundBlurSigma,
@@ -56,6 +58,7 @@ class SceneRuntime extends StatelessWidget {
   final SceneImageProviderResolver? assetImageResolver;
   final SceneSvgLoader? assetSvgLoader;
   final SceneFontLoader? assetFontLoader;
+  final SceneShaderLoader? shaderLoader;
 
   /// Predicates currently true for the scene.
   ///
@@ -117,17 +120,32 @@ class SceneRuntime extends StatelessWidget {
     final renderer =
         theme.backgrounds[document.background.kind] ??
         const SolidBackgroundRenderer();
+    Widget buildBackground(SceneBackground background) {
+      final shader = background.shader;
+      if (background.kind == SceneBackgroundKind.custom && shader != null) {
+        return SceneBackgroundEffects(
+          background: background,
+          child: SceneShaderBackground(
+            shader: shader,
+            loadProgram: shaderLoader,
+            resolveImage: assetImageResolver,
+            elapsed: playback?.elapsed,
+            activePredicates: activePredicates,
+            predicatesListenable: activePredicatesListenable,
+          ),
+        );
+      }
+      return renderer.build(context, background);
+    }
+
     final blur = backgroundBlurSigma;
     if (blur == null) {
-      return RepaintBoundary(
-        child: renderer.build(context, document.background),
-      );
+      return RepaintBoundary(child: buildBackground(document.background));
     }
     return RepaintBoundary(
       child: AnimatedBuilder(
         animation: blur,
-        builder: (context, child) => renderer.build(
-          context,
+        builder: (context, child) => buildBackground(
           document.background.copyWith(blurSigma: blur.value),
         ),
       ),

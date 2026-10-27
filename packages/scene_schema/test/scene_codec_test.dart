@@ -32,6 +32,60 @@ const _scene = '''
 
 void main() {
   test(
+    'portable shaders preserve uniform sources and validate resource paths',
+    () {
+      final base = decodeSceneDocument(_scene);
+      const shader = SceneShader(
+        asset: 'assets/background.frag',
+        uniforms: [
+          SceneShaderUniform(
+            name: 'time',
+            source: SceneUniformSource.time,
+            scale: 2,
+          ),
+          SceneShaderUniform(
+            name: 'resolution.x',
+            source: SceneUniformSource.width,
+          ),
+        ],
+        textures: [
+          SceneShaderTexture(name: 'image', asset: 'assets/image.png'),
+        ],
+      );
+      final doc = base.copyWith(
+        background: base.background.copyWith(
+          kind: SceneBackgroundKind.custom,
+          shader: shader,
+        ),
+      );
+      final restored = decodeSceneDocument(encodeSceneDocument(doc))
+          .background
+          .shader!;
+      expect(restored.uniforms.first.scale, 2);
+      expect(restored.uniforms.first.source, SceneUniformSource.time);
+      expect(restored.textures.single.asset, 'assets/image.png');
+      expect(doc.background.copyWith(shader: null).shader, null);
+      for (final invalid in [
+        shader.copyWith(asset: '../escape.frag'),
+        shader.copyWith(
+          uniforms: [shader.uniforms.first, shader.uniforms.first],
+        ),
+      ]) {
+        expect(
+          () => decodeSceneDocument(
+            encodeSceneDocument(
+              doc.copyWith(
+                background: doc.background.copyWith(shader: invalid),
+              ),
+            ),
+          ),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+
+  test(
     'visual edges preserve compound conditions and require a source crossing',
     () {
       final base = decodeSceneDocument(_scene);

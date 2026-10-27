@@ -113,6 +113,54 @@ ThemeDefinition buildOriginalTheme({Color? seed, SceneDocument? document}) => th
   });
   tearDown(() => root.delete(recursive: true));
 
+  test('shader sources and textures are rewritten and registered for production compilation', () async {
+    final shader = File('${root.path}/external/effect.frag')
+      ..writeAsStringSync('void main() {}');
+    final result = await createThemeProject(
+      source: source,
+      destination: target,
+      packageName: 'theme_neon',
+      document: _document.copyWith(
+        background: const SceneBackground(
+          kind: SceneBackgroundKind.custom,
+          shader: SceneShader(
+            asset: 'packages/external/effect.frag',
+            uniforms: [
+              SceneShaderUniform(name: 'time', source: SceneUniformSource.time),
+            ],
+            textures: [
+              SceneShaderTexture(
+                name: 'image',
+                asset: 'packages/external/assets/wallpaper.png',
+              ),
+            ],
+          ),
+        ),
+      ),
+      assetFiles: {
+        'packages/external/effect.frag': shader,
+        'packages/external/assets/wallpaper.png': wallpaper,
+      },
+    );
+    final definition = result.document.background.shader!;
+    expect(definition.asset, 'packages/theme_neon/assets/composed/effect.frag');
+    expect(
+      definition.textures.single.asset,
+      'packages/theme_neon/assets/composed/wallpaper.png',
+    );
+    final manifest = loadYaml(
+      await File('${target.path}/pubspec.yaml').readAsString(),
+    ) as Map;
+    expect(
+      (manifest['flutter'] as Map)['shaders'],
+      contains('assets/composed/effect.frag'),
+    );
+    expect(
+      await File('${target.path}/assets/composed/effect.frag').readAsString(),
+      'void main() {}',
+    );
+  });
+
   test(
     'copies typed SVG assets and preserves their tint in an independent theme',
     () async {

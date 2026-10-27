@@ -29,6 +29,7 @@ class StudioCanvas extends StatefulWidget {
     this.assetImageResolver,
     this.assetSvgLoader,
     this.assetFontLoader,
+    this.shaderLoader,
     super.key,
   });
 
@@ -41,6 +42,7 @@ class StudioCanvas extends StatefulWidget {
   final SceneImageProviderResolver? assetImageResolver;
   final SceneSvgLoader? assetSvgLoader;
   final SceneFontLoader? assetFontLoader;
+  final SceneShaderLoader? shaderLoader;
 
   @override
   State<StudioCanvas> createState() => StudioCanvasState();
@@ -581,6 +583,7 @@ class StudioCanvasState extends State<StudioCanvas> {
                                           assetSvgLoader: widget.assetSvgLoader,
                                           assetFontLoader:
                                               widget.assetFontLoader,
+                                          shaderLoader: widget.shaderLoader,
                                           dormant: widget.dormant,
                                           scenario: _scenario,
                                           playbackElapsed: presenting
@@ -645,6 +648,7 @@ class StudioCanvasState extends State<StudioCanvas> {
                                           assetSvgLoader: widget.assetSvgLoader,
                                           assetFontLoader:
                                               widget.assetFontLoader,
+                                          shaderLoader: widget.shaderLoader,
                                         ),
                                     ],
                                   ),
