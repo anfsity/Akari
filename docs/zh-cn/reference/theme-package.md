@@ -34,7 +34,7 @@ akari:
 | 规则项 | 约定要求 |
 | --- | --- |
 | 包名与 Builder 命名 | 从 `pubspec.yaml` 读取（与目录名无关）。例如 `theme_ocean` 必须在 `lib/theme.dart` 中导出 `buildOceanTheme`。 |
-| 必需依赖 | `dependencies` 包含 `theme_sdk` 与 `scene`；`dev_dependencies` 包含 `scene_codegen` 与 `build_runner`。 |
+| 必需依赖 | `dependencies` 包含 `theme_sdk` 与 `scene`；`dev_dependencies` 包含 `scene_codegen` 与 `build_runner: ^2.16.2`。 |
 | 组件复用边界 | 可显式依赖 `greeter_components`，但**不得**直接导入另一个具体主题包。 |
 | 资源引用路径 | 统一使用 Flutter 包路径格式（如 `packages/theme_ocean/assets/wallpaper.jpg`）。 |
 | 返回值契约 | `build<Name>Theme` 返回 `ThemeDefinition`，内含生成的 `SceneDocument`、`ThemeBundle` 与组件工厂。 |
