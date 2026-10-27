@@ -198,6 +198,17 @@ final class _PickedFile extends PlatformFile {
 
 class _FilePicker extends FilePickerPlatform {
   PlatformFile? selected;
+  String? selectedDirectory;
+
+  @override
+  Future<String?> getDirectoryPath({
+    String? dialogTitle,
+    String? initialDirectory,
+    AndroidOptions androidOptions = const AndroidOptions(),
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions(),
+  }) async => selectedDirectory;
 
   @override
   Future<PlatformFile?> pickFile({
@@ -251,6 +262,7 @@ void main() {
     WidgetTester tester, {
     ThemeBuilder themeBuilder = _buildTheme,
     List<StudioThemeProject> additionalProjects = const [],
+    String packageName = 'test',
   }) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
@@ -258,13 +270,13 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       ThemeStudioApp(
-        initialThemePackageName: 'test',
+        initialThemePackageName: packageName,
         projects: [
           StudioThemeProject(
             themeBuilder: themeBuilder,
             scenePaths: [file.path],
             directory: directory.path,
-            packageName: 'test',
+            packageName: packageName,
           ),
           ...additionalProjects,
         ],
@@ -272,6 +284,155 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  Future<void> prepareSynthesisSource() async {
+    final lib = Directory('${directory.path}/lib')..createSync();
+    File(
+      '${directory.path}/pubspec.yaml',
+    ).writeAsStringSync('name: theme_source\nenvironment:\n  sdk: ^3.13.2\n');
+    File('${lib.path}/theme.dart').writeAsStringSync(
+      'ThemeDefinition buildSourceTheme({Color? seed, SceneDocument? document}) => throw UnimplementedError();\n',
+    );
+    file = File('${lib.path}/template.scene.json')
+      ..writeAsStringSync(encodeSceneDocument(_document));
+  }
+
+  Future<void> finishCreation(WidgetTester tester) async {
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const ValueKey('create-theme-confirm')));
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (DateTime.now().isBefore(deadline)) {
+        await tester.pump();
+        final button = find.byKey(const ValueKey('create-theme-confirm'));
+        if (button.evaluate().isEmpty ||
+            tester.widget<PrimaryButton>(button).onPressed != null) {
+          return;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      fail('Theme creation did not settle.');
+    });
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'creating a theme preserves the source and opens its saved composition',
+    (tester) async {
+      await prepareSynthesisSource();
+      final destination = Directory.systemTemp.createTempSync(
+        'studio-created-',
+      );
+      addTearDown(() => destination.deleteSync(recursive: true));
+      final original = file.readAsStringSync();
+      ThemeDefinition buildSource({Color? seed, SceneDocument? document}) =>
+          _buildTheme(
+            seed:
+                _palette.getValue(document?.themeProperties ?? {}) ==
+                    _ThemePalette.rose
+                ? material.Colors.red
+                : material.Colors.blue,
+            document: document,
+            componentCatalog: _editableCatalog,
+            presetCatalog: _presets,
+            layout: _assemblyLayout,
+          );
+      await openStudio(
+        tester,
+        themeBuilder: buildSource,
+        packageName: 'theme_source',
+      );
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      editor.updateLayoutPreset('right');
+      editor.updateThemeProperty('palette', 'rose');
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('property-text')),
+        'My synthesized desktop',
+      );
+      await tester.tap(find.byKey(const ValueKey('create-theme')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('create-theme-name')),
+        'neon',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('create-theme-location')),
+        destination.path,
+      );
+      await finishCreation(tester);
+      expect(find.byKey(const ValueKey('studio-create-theme')), findsNothing);
+      expect(file.readAsStringSync(), original);
+      final newScene = File(
+        '${destination.path}/neon/lib/composition.scene.json',
+      );
+      final saved = decodeSceneDocument(newScene.readAsStringSync());
+      expect(saved.themeProperties, {'layout': 'right', 'palette': 'rose'});
+      expect(saved.nodes.first.properties['text'], 'My synthesized desktop');
+      expect(saved.nodes.first.rect.x, 0.5);
+      final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+      expect(preview.theme.id, 'neon');
+      expect(encodeSceneDocument(preview.document), encodeSceneDocument(saved));
+      expect(find.text('Saved'), findsOneWidget);
+      expect(find.text('theme_neon'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('studio-theme-select')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('theme_source').last);
+      await tester.pumpAndSettle();
+      expect(
+        encodeSceneDocument(
+          tester.widget<StudioPreview>(find.byType(StudioPreview)).document,
+        ),
+        encodeSceneDocument(_document),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'creation validates names, refuses existing folders and fits compact windows',
+    (tester) async {
+      await prepareSynthesisSource();
+      final destination = Directory.systemTemp.createTempSync(
+        'studio-existing-',
+      );
+      addTearDown(() => destination.deleteSync(recursive: true));
+      final existing = Directory('${destination.path}/neon')..createSync();
+      File('${existing.path}/marker').writeAsStringSync('untouched');
+      await openStudio(tester, packageName: 'theme_source');
+      tester.view.physicalSize = const Size(600, 480);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('create-theme')));
+      await tester.pumpAndSettle();
+      final dialog = tester.getRect(
+        find.byKey(const ValueKey('studio-create-theme')),
+      );
+      expect(dialog.top, greaterThanOrEqualTo(0));
+      expect(dialog.bottom, lessThanOrEqualTo(480));
+      await tester.enterText(
+        find.byKey(const ValueKey('create-theme-name')),
+        'Invalid Name',
+      );
+      await finishCreation(tester);
+      expect(find.textContaining('lowercase underscore'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('create-theme-name')),
+        'neon',
+      );
+      picker.selectedDirectory = destination.path;
+      await tester.ensureVisible(find.text('Choose folder'));
+      await tester.tap(find.text('Choose folder'));
+      await tester.pumpAndSettle();
+      await finishCreation(tester);
+      expect(find.text('Destination already exists.'), findsOneWidget);
+      expect(File('${existing.path}/marker').readAsStringSync(), 'untouched');
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('studio-create-theme')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'theme switching guards drafts and switches compiled components and asset ownership',
