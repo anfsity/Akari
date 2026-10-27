@@ -50,6 +50,7 @@ class StudioPreview extends StatefulWidget {
     this.snapToGuides = true,
     this.playbackElapsed,
     this.transition = StudioTransition.wake,
+    this.presenting = false,
     this.readOnly = false,
     this.scenario = StudioPreviewScenario.password,
     this.interactive = false,
@@ -75,6 +76,7 @@ class StudioPreview extends StatefulWidget {
   final bool snapToGuides;
   final Duration? playbackElapsed;
   final StudioTransition transition;
+  final bool presenting;
   final bool dormant;
   final StudioPreferences preferences;
   final StudioCanvasTool tool;
@@ -504,6 +506,7 @@ class _StudioPreviewState extends State<StudioPreview>
                 : time,
           );
     return StudioViewport(
+      presenting: widget.presenting,
       canvasKey: _canvas,
       referenceSize: referenceSize,
       zoom: widget.zoom,

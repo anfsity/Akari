@@ -228,6 +228,15 @@ Adjust zoom with **− / +**, **100%**, or **Fit**, and select a canvas tool:
 
 ## Presets, code inspection, and settings
 
+Workspace controls toggle the sidebar (`Ctrl+B`), inspector (`Ctrl+Shift+B`),
+and presentation (`Ctrl+Shift+P`, Escape to exit). Double-click a panel header
+to collapse it, or use its float button to detach it inside the workspace.
+Floating panels can be moved by their header, resized from the lower-right grip,
+and returned with **Dock**. Panel contents, drafts, and selection stay mounted
+through these operations. Presentation hides authoring controls, fits the scene,
+and restores the editor camera on exit. Smaller windows can reclaim space by
+collapsing panels instead of keeping a fixed three-column minimum width.
+
 - **Presets & projects**: Studio compiles all packages under `themes/` alongside `--theme`. Switching **THEME** (or loading a scene from a registered theme package) switches the component factory, tokens, background renderers, and assets together.
 - **Inspect code**: Switch the right panel from **Design** to **Inspect code** to view and copy validated **JSON** or generated **Dart** for the **Selection** or the entire **Scene**.
 - **Settings**: The dialog separates **Canvas**, **Background**, **Appearance**, and **Grid & snapping**. Drafts stay intact while switching categories; validation opens the category that needs correction.
