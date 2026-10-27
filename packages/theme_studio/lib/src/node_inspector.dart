@@ -8,6 +8,7 @@ import 'node_layout_inspector.dart';
 import 'node_style_inspector.dart';
 import 'node_motion_inspector.dart';
 import 'node_state_inspector.dart';
+import 'node_asset_inspector.dart';
 
 class NodeInspector extends StatelessWidget {
   const NodeInspector({
@@ -96,11 +97,14 @@ class _InspectorForm extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _InspectorProperties(
-          controller: controller,
-          definition: definition,
-          onApply: onApply,
-        ),
+        if (editor case final session? when controller.node.asset != null)
+          NodeAssetInspector(editor: session)
+        else
+          _InspectorProperties(
+            controller: controller,
+            definition: definition,
+            onApply: onApply,
+          ),
         const Divider(),
         const Gap(12),
         _buildLayoutSection(),

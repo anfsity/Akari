@@ -1,7 +1,36 @@
 import 'dart:io';
 
 import 'package:flutter/painting.dart';
+import 'package:flutter/services.dart';
 import 'package:yaml_edit/yaml_edit.dart';
+
+enum StudioAssetKind { image, svg, font, material, audio, shader, other }
+
+StudioAssetKind getStudioAssetKind(String path) {
+  final lower = path.toLowerCase();
+  final extension = lower.split('.').last;
+  if (const {'ttf', 'otf', 'woff', 'woff2'}.contains(extension)) {
+    return StudioAssetKind.font;
+  }
+  if (extension == 'svg') return StudioAssetKind.svg;
+  if (const {'frag', 'vert', 'glsl'}.contains(extension)) {
+    return StudioAssetKind.shader;
+  }
+  if (const {'wav', 'ogg', 'mp3', 'flac', 'aac'}.contains(extension)) {
+    return StudioAssetKind.audio;
+  }
+  if (const {'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'}.contains(extension)) {
+    return lower.contains('/textures/') || lower.contains('/materials/')
+        ? StudioAssetKind.material
+        : StudioAssetKind.image;
+  }
+  return StudioAssetKind.other;
+}
+
+// Flutter retains dynamically registered fonts for the engine's lifetime.
+// Match that ownership with a cache keyed by source revision, avoiding another
+// native font registration each time the user selects the same preview.
+final _fontPreviewLoads = <String, Future<String>>{};
 
 /// Imports into the scene's theme package so saved scene references remain
 /// portable. The manifest keeps its comments and existing asset declarations.
@@ -114,19 +143,54 @@ class StudioAssets {
   }
 
   List<String> getAssets() {
-    final assets = Directory('${directory.path}/assets');
-    if (!assets.existsSync()) return [];
-    return assets
-        .listSync(recursive: true, followLinks: false)
-        .whereType<File>()
-        .map((file) {
-          final relative = file.path
-              .substring(directory.path.length + 1)
-              .replaceAll(Platform.pathSeparator, '/');
-          return 'packages/$packageName/$relative';
-        })
-        .toList()
-      ..sort();
+    final files = <String>{};
+    final directories = <String>{'assets/'};
+    final root =
+        YamlEditor(File('${directory.path}/pubspec.yaml').readAsStringSync())
+                .parseAt([])
+                .value
+            as Map;
+    final flutter = root['flutter'] as Map?;
+    final declared = <String>[
+      for (final entry in flutter?['assets'] as List? ?? const [])
+        if (entry is String)
+          entry
+        else if (entry is Map && entry['path'] is String)
+          entry['path'] as String,
+      for (final shader in flutter?['shaders'] as List? ?? const [])
+        if (shader is String) shader,
+      for (final family in flutter?['fonts'] as List? ?? const [])
+        for (final font in (family as Map)['fonts'] as List)
+          (font as Map)['asset'] as String,
+    ];
+    for (final path in declared) {
+      if (path.contains('..') || path.startsWith('/')) continue;
+      if (path.endsWith('/')) {
+        directories.add(path);
+      } else {
+        final file = File('${directory.path}/$path');
+        if (file.existsSync()) files.add(file.path);
+      }
+    }
+    for (final path in directories) {
+      final folder = Directory(
+        '${directory.path}/${path.replaceFirst(RegExp(r'/+$'), '')}',
+      );
+      if (folder.existsSync()) {
+        files.addAll(
+          folder
+              .listSync(recursive: true, followLinks: false)
+              .whereType<File>()
+              .map((file) => file.path),
+        );
+      }
+    }
+    return files.map((path) {
+      final relative = path
+          .substring(directory.path.length + 1)
+          .replaceAll(Platform.pathSeparator, '/');
+      return 'packages/$packageName/$relative';
+    }).toList()..sort();
   }
 
   File? findFile(String asset) {
@@ -144,5 +208,29 @@ class StudioAssets {
     final file = findFile(asset);
     if (file != null) return FileImage(file);
     return AssetImage(asset);
+  }
+
+  Future<String> loadTextAsset(String asset) {
+    final file = findFile(asset);
+    return file == null ? rootBundle.loadString(asset) : file.readAsString();
+  }
+
+  Future<ByteData> loadBytes(String asset) async {
+    final file = findFile(asset);
+    if (file == null) return rootBundle.load(asset);
+    return ByteData.sublistView(await file.readAsBytes());
+  }
+
+  Future<String> loadFontPreview(String asset) async {
+    final file = findFile(asset);
+    final stat = await file?.stat();
+    final key =
+        '${file?.absolute.path ?? asset}:${stat?.modified.microsecondsSinceEpoch}:${stat?.size}';
+    return _fontPreviewLoads.putIfAbsent(key, () async {
+      final family = 'studio-preview-${_fontPreviewLoads.length}';
+      final loader = FontLoader(family)..addFont(loadBytes(asset));
+      await loader.load();
+      return family;
+    });
   }
 }

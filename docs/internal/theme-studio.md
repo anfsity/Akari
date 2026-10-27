@@ -260,8 +260,13 @@ collapsing panels instead of keeping a fixed three-column minimum width.
 
 ## Importing assets
 
-- **Import asset** (in **Assets**): Copies a file into the owning theme's `assets/` directory, registers it in `pubspec.yaml`, and copies its `packages/<theme>/assets/...` path to the clipboard.
-- **Use image**: Select an asset thumbnail, then use the action below the list. Validates that an imported image decodes cleanly and sets it as the scene background (requires **Save scene** to persist to JSON).
+- **Search & categories**: Filter by path or choose images, SVG icons, fonts, materials/textures, audio, shaders, or other files. Discovery includes declared fonts, shaders, and asset folders outside `assets/`. Selecting a file reveals its preview and actions above the list.
+- **Import asset** (in **Assets**): Copies a file into the owning theme's `assets/` directory, registers it in `pubspec.yaml`, and copies its `packages/<theme>/assets/...` path to the clipboard. The imported file becomes selected and clears existing filters.
+- **Add to canvas**: Images, textures, and SVGs become independent layers after decoding succeeds. Move, resize, group, style, animate, duplicate, and delete them through the usual canvas tools. The inspector edits fitting and color overrides; SVG color can also be chosen before placement. Layer creation and edits use scene undo/redo and **Save scene**.
+- **Use image**: For raster images, validates the file and sets it as the scene background (requires **Save scene** to persist to JSON).
+- **Font preview**: Select a font and type a sample to see it in that face. Registration is cached by file revision across panels and theme switches. Previewing a font does not assign it to scene text or modify history.
+- **Shader & audio files**: Shaders show a source excerpt; audio files have a dedicated category. Shader parameters remain in **Effects** for renderers that declare them.
+- **Independent themes**: Image/SVG layers retain their fitting and tint when creating a theme. Referenced files from another scene-owning package are copied into the new project.
 - **Package resolution**: When opening a scene via **Load JSON**, Studio locates the nearest `theme_*` package boundary to own asset imports. For an unregistered external theme, restart Studio with `--theme /path/to/theme_other` to compile its custom widgets and bundle assets.
 
 ## Troubleshooting
@@ -272,7 +277,7 @@ collapsing panels instead of keeping a fixed three-column minimum width.
 | Interactive node stops shrinking | It reached the theme's `minHitTarget` (44 px in built-in themes). |
 | Canvas drag or command is blocked | Fix the validation error highlighted in the inspector first. |
 | External JSON renders with the wrong components | Launch Studio with `--theme /path/to/theme` so its component factory is compiled in. |
-| Imported component image does not appear | Background images load directly from disk, but component bundle assets require restarting Studio. |
+| Imported image or SVG layer does not appear | Use **Add to canvas**; these layers and backgrounds load directly from disk. Theme-authored widgets that load their own bundle assets may still require restarting Studio. |
 | Save refuses due to external file modification | Copy any needed values, then click **Reload from disk** before editing again. |
 
 ## Verification

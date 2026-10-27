@@ -23,6 +23,8 @@ class StudioCanvas extends StatefulWidget {
     required this.dormant,
     required this.onToggleDormant,
     this.readOnly = false,
+    this.assetImageResolver,
+    this.assetSvgLoader,
     super.key,
   });
 
@@ -32,6 +34,8 @@ class StudioCanvas extends StatefulWidget {
   final StudioPreferences preferences;
   final bool dormant;
   final VoidCallback onToggleDormant;
+  final SceneImageProviderResolver? assetImageResolver;
+  final SceneSvgLoader? assetSvgLoader;
 
   @override
   State<StudioCanvas> createState() => _StudioCanvasState();
@@ -494,6 +498,9 @@ class _StudioCanvasState extends State<StudioCanvas> {
                                     onCreateGuide: session.createGuide,
                                     onUpdateGuide: session.updateGuide,
                                     onDeleteGuide: session.deleteGuide,
+                                    assetImageResolver:
+                                        widget.assetImageResolver,
+                                    assetSvgLoader: widget.assetSvgLoader,
                                     dormant: widget.dormant,
                                     scenario: _scenario,
                                     playbackElapsed: presenting
@@ -543,6 +550,9 @@ class _StudioCanvasState extends State<StudioCanvas> {
                                     preferences: widget.preferences,
                                     dormant: widget.dormant,
                                     scenario: _scenario,
+                                    assetImageResolver:
+                                        widget.assetImageResolver,
+                                    assetSvgLoader: widget.assetSvgLoader,
                                   ),
                               ],
                             ),
