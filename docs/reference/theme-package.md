@@ -35,7 +35,7 @@ themes use this field to reopen the edited composition.
 | Rule | Requirement |
 | --- | --- |
 | Package & builder name | Read from `pubspec.yaml` (independent of folder name). `theme_ocean` must export `buildOceanTheme` from `lib/theme.dart`. |
-| Required dependencies | `theme_sdk` and `scene` in `dependencies`; `scene_codegen` and `build_runner` in `dev_dependencies`. |
+| Required dependencies | `theme_sdk` and `scene` in `dependencies`; `scene_codegen` and `build_runner: ^2.16.2` in `dev_dependencies`. |
 | Component sharing | May depend on `greeter_components`, but **must not** import another concrete theme package. |
 | Asset paths | Must use Flutter package paths (`packages/theme_ocean/assets/wallpaper.jpg`). |
 | Return contract | `build<Name>Theme` returns a `ThemeDefinition` bundling the generated `SceneDocument`, `ThemeBundle`, and component factory. |
