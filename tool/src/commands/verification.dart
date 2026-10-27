@@ -105,6 +105,21 @@ RunPlan createVerificationPlan(
         workingDirectory: 'packages/scene_codegen',
       ),
       RunStep(
+        id: 'theme_project.pub_get',
+        command: [...getDartCommand(repoRoot), 'pub', 'get'],
+        workingDirectory: 'packages/theme_project',
+      ),
+      RunStep(
+        id: 'theme_project.analyze',
+        command: [...getDartCommand(repoRoot), 'analyze'],
+        workingDirectory: 'packages/theme_project',
+      ),
+      RunStep(
+        id: 'theme_project.test',
+        command: [...getDartCommand(repoRoot), 'test'],
+        workingDirectory: 'packages/theme_project',
+      ),
+      RunStep(
         id: 'scene.analyze',
         command: [...getFlutterCommand(repoRoot), 'analyze'],
         workingDirectory: 'packages/scene',

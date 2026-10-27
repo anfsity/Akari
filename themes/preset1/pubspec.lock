@@ -537,6 +537,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.12"
+  theme_project:
+    dependency: transitive
+    description:
+      path: "../../packages/theme_project"
+      relative: true
+    source: path
+    version: "0.0.0"
   theme_sdk:
     dependency: "direct main"
     description:
@@ -624,6 +631,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.4"
+  yaml_edit:
+    dependency: transitive
+    description:
+      name: yaml_edit
+      sha256: "07c9e63ba42519745182b88ca12264a7ba2484d8239958778dfe4d44fe760488"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.4"
 sdks:
   dart: ">=3.13.2 <4.0.0"
   flutter: ">=3.18.0-18.0.pre.54"

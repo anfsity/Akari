@@ -180,6 +180,40 @@ runDirectory: 'run',
     },
   );
 
+  test('explicit project scene is selected first by generated Studio hosts', () async {
+    final project = await _createThemeProject(tempRoot);
+    await File('${project.path}/lib/aaa.scene.json').writeAsString('{}');
+    final manifest = File('${project.path}/pubspec.yaml');
+    await manifest.writeAsString(
+      '${await manifest.readAsString()}\nakari:\n  scene: lib/ocean.scene.json\n',
+    );
+    final theme = getThemePackage(project);
+    expect(
+      findThemeSceneFiles(project).first.path,
+      '${project.path}/lib/ocean.scene.json',
+    );
+    final host = Directory('${tempRoot.path}/primary-scene-host');
+    createThemeHost(
+      repoRoot: Directory.current,
+      theme: theme,
+      output: host,
+      kind: ThemeHostKind.studio,
+      studioThemes: [theme],
+    );
+    final entrypoint = await File('${host.path}/lib/main.dart').readAsString();
+    expect(
+      entrypoint.indexOf('/lib/ocean.scene.json'),
+      lessThan(entrypoint.indexOf('/lib/aaa.scene.json')),
+    );
+    await manifest.writeAsString(
+      (await manifest.readAsString()).replaceFirst(
+        'scene: lib/ocean.scene.json',
+        'scene: ../outside.scene.json',
+      ),
+    );
+    expect(() => getThemePackage(project), throwsFormatException);
+  });
+
   test(
     'short options reach native build steps and command help is scoped',
     () async {
@@ -557,6 +591,7 @@ sys.exit(1)
         'flutter.analyze',
         'scene_schema.analyze',
         'scene_codegen.analyze',
+        'theme_project.analyze',
         'scene.analyze',
         'greeter_ui.analyze',
         'greeter_components.analyze',
