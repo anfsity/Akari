@@ -54,6 +54,11 @@ void main() {
           {
             'id': 'child',
             'component': 'text',
+            'asset': {
+              'kind': 'svg',
+              'path': 'packages/test/assets/icon.svg',
+              'tint': '#112233',
+            },
             'parentId': r'$node',
             'rect': {'x': 0, 'y': 0, 'width': 1, 'height': 1},
           },
@@ -86,6 +91,11 @@ void main() {
     expect(document['nodes'][0]['layout']['direction'], 'column');
     expect(document['nodes'][0]['sizing']['width'], 320);
     expect(document['nodes'][1]['parentId'], r'$node');
+    expect(
+      document['nodes'][1]['asset']['path'],
+      'packages/test/assets/icon.svg',
+    );
+    expect(document['nodes'][1]['asset']['tint'], '#112233');
     expect(document['themeProperties'], properties);
     expect(document['guides'], [
       {'axis': 'vertical', 'position': .4},

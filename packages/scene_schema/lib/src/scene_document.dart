@@ -10,6 +10,33 @@ enum SceneCrossAlignment { start, center, end, stretch }
 
 enum SceneGuideAxis { horizontal, vertical }
 
+enum SceneAssetKind { image, svg }
+
+enum SceneAssetFit { contain, cover, fill }
+
+class SceneAsset {
+  const SceneAsset({
+    required this.path,
+    this.kind = SceneAssetKind.image,
+    this.fit = SceneAssetFit.contain,
+    this.tint,
+  });
+  final String path;
+  final SceneAssetKind kind;
+  final SceneAssetFit fit;
+  final int? tint;
+  SceneAsset copyWith({
+    String? path,
+    SceneAssetFit? fit,
+    Object? tint = _unset,
+  }) => SceneAsset(
+    path: path ?? this.path,
+    kind: kind,
+    fit: fit ?? this.fit,
+    tint: identical(tint, _unset) ? this.tint : tint as int?,
+  );
+}
+
 class SceneGuide {
   const SceneGuide({required this.axis, required this.position});
   final SceneGuideAxis axis;
@@ -410,6 +437,7 @@ class SceneNode {
     this.layout,
     this.sizing = const SceneSizing(),
     this.styleToken,
+    this.asset,
     this.transform = const SceneTransform(),
     this.z = 0,
     this.renderOrder = 0,
@@ -431,6 +459,7 @@ class SceneNode {
   final SceneLayout? layout;
   final SceneSizing sizing;
   final String? styleToken;
+  final SceneAsset? asset;
   final SceneTransform transform;
   final int z;
   final int renderOrder;
@@ -453,6 +482,7 @@ class SceneNode {
     Object? layout = _unset,
     SceneSizing? sizing,
     Object? styleToken = _unset,
+    Object? asset = _unset,
     SceneTransform? transform,
     int? z,
     int? renderOrder,
@@ -476,6 +506,7 @@ class SceneNode {
       styleToken: identical(styleToken, _unset)
           ? this.styleToken
           : styleToken as String?,
+      asset: identical(asset, _unset) ? this.asset : asset as SceneAsset?,
       transform: transform ?? this.transform,
       z: z ?? this.z,
       renderOrder: renderOrder ?? this.renderOrder,
