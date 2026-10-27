@@ -16,6 +16,7 @@ import 'studio_canvas.dart';
 import 'studio_sidebar.dart';
 import 'studio_status_bar.dart';
 import 'studio_toolbar.dart';
+import 'studio_create_theme.dart';
 import 'studio_workspace.dart';
 import 'studio_assets.dart';
 import 'studio_preferences.dart';
@@ -43,6 +44,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   late String _path;
   late List<String> _scenePaths;
   late StudioThemeProject _project;
+  late final List<StudioThemeProject> _projects;
   bool _loadingFile = false;
   late StudioAssets _compiledAssets;
   late StudioAssets _assets;
@@ -61,7 +63,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   @override
   void initState() {
     super.initState();
-    _project = widget.projects.firstWhere(
+    _projects = [...widget.projects];
+    _project = _projects.firstWhere(
       (project) => project.packageName == widget.initialThemePackageName,
     );
     _compiledAssets = StudioAssets(
@@ -254,33 +257,64 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     if (!await _confirmSwitch(context)) return;
     if (!mounted) return;
     try {
-      // Prepare the entire target before releasing the current session. A bad
-      // preset file must leave the working document and its renderer intact.
-      final assets = StudioAssets(
-        directory: Directory(project.directory),
-        packageName: project.packageName,
-      );
-      final assetPaths = assets.getAssets();
-      final session = project.createSceneSession(
-        scenePath ?? project.scenePaths.first,
-      );
-      setState(() {
-        _setEditor(session.editor);
-        _project = project;
-        _compiledAssets = assets;
-        _assets = assets;
-        _assetPaths = assetPaths;
-        _scenePaths = [...project.scenePaths];
-        _path = session.editor.file.path;
-        if (!_scenePaths.contains(_path)) _scenePaths.add(_path);
-        _updateTheme(session.theme);
-        _error = null;
-        _confirmReload = false;
-      });
-      unawaited(_loadSeed());
+      _openProject(project, scenePath: scenePath);
     } on Object catch (error) {
       setState(() => _error = 'Cannot open theme: $error');
     }
+  }
+
+  void _openProject(StudioThemeProject project, {String? scenePath}) {
+    // Prepare the entire target before releasing the current session.
+    final assets = StudioAssets(
+      directory: Directory(project.directory),
+      packageName: project.packageName,
+    );
+    final assetPaths = assets.getAssets();
+    final session = project.createSceneSession(
+      scenePath ?? project.scenePaths.first,
+    );
+    setState(() {
+      if (!_projects.contains(project)) _projects.add(project);
+      _setEditor(session.editor);
+      _project = project;
+      _compiledAssets = assets;
+      _assets = assets;
+      _assetPaths = assetPaths;
+      _scenePaths = [...project.scenePaths];
+      _path = session.editor.file.path;
+      if (!_scenePaths.contains(_path)) _scenePaths.add(_path);
+      _updateTheme(session.theme);
+      _error = null;
+      _confirmReload = false;
+    });
+    unawaited(_loadSeed());
+  }
+
+  void _openCreateTheme(BuildContext context) {
+    final editor = _editor;
+    if (editor == null || !editor.applyDraft()) return;
+    final source = _project;
+    final document = editor.document;
+    final assets = _assets;
+    showOverlay<void>(
+      context,
+      const DialogConfiguration(barrierDismissible: false),
+      builder: (context) => StudioCreateTheme(
+        sourceLabel: _theme.id,
+        initialLocation: Directory(source.directory).parent.path,
+        existingNames: _projects.map((project) => project.packageName).toSet(),
+        onCreate: (packageName, destination) async {
+          final project = await source.createTheme(
+            packageName: packageName,
+            destination: destination,
+            document: document,
+            assets: assets,
+          );
+          if (!mounted) return;
+          _openProject(project);
+        },
+      ),
+    );
   }
 
   Future<bool> _confirmSwitch(BuildContext context) async {
@@ -327,7 +361,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       setState(() => _error = '$error');
       return;
     }
-    for (final project in widget.projects) {
+    for (final project in _projects) {
       if (!identical(project, _project) &&
           project.directory == assets?.directory.path) {
         await _switchTheme(project, context, scenePath: path);
@@ -462,12 +496,13 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         preferencesReady: _preferencesReady,
         onOpenSettings: () => _openSettings(context),
         onSave: _save,
+        onCreateTheme: () => _openCreateTheme(context),
       ),
       sidebar: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           StudioThemeSelector(
-            projects: widget.projects,
+            projects: _projects,
             selected: _project,
             onChanged: (project) => unawaited(_switchTheme(project, context)),
           ),

@@ -74,6 +74,28 @@ save. They are stored in `themeProperties` and resolved by the same theme builde
 used in production. **Inspect code** disables these selectors, including keyboard
 interaction. Themes may expose presets without declaring layout slots.
 
+### Create an independent theme
+
+Click **Create theme**, enter a lower-case name and a parent folder, then confirm.
+Studio copies the current valid design, including pending inspector edits, into a
+new theme project and opens its saved composition. You do not need to save over
+the source preset first. The new project stays available in **THEME** while Studio
+is open. Existing destinations are refused.
+
+The project owns copied scene files, implementation, assets, fonts, shaders, and
+licenses. Referenced images from other packages are imported into its assets;
+shared SDK path dependencies are rebased. **Assets** lists nested imported files.
+To compile the new package identity and reopen it independently, run:
+
+```sh
+akari run studio --theme /path/to/new_theme
+akari run --theme /path/to/new_theme
+akari build --theme /path/to/new_theme
+```
+
+**Inspect code** disables creation. Invalid inspector drafts must be corrected
+before creating a project.
+
 ### Adding and removing layout components
 
 The left sidebar's **Compose** tab opens by default for scenes with a declared layout.

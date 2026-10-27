@@ -116,9 +116,17 @@ class StudioAssets {
   List<String> getAssets() {
     final assets = Directory('${directory.path}/assets');
     if (!assets.existsSync()) return [];
-    return assets.listSync(followLinks: false).whereType<File>().map((file) {
-      return 'packages/$packageName/assets/${file.uri.pathSegments.last}';
-    }).toList()..sort();
+    return assets
+        .listSync(recursive: true, followLinks: false)
+        .whereType<File>()
+        .map((file) {
+          final relative = file.path
+              .substring(directory.path.length + 1)
+              .replaceAll(Platform.pathSeparator, '/');
+          return 'packages/$packageName/$relative';
+        })
+        .toList()
+      ..sort();
   }
 
   File? findFile(String asset) {

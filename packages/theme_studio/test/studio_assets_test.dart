@@ -18,6 +18,24 @@ void main() {
   tearDown(() => directory.deleteSync(recursive: true));
 
   test(
+    'nested synthesized resources remain listed and resolve to their own files',
+    () {
+      final file = File('${directory.path}/assets/composed/wallpaper.png');
+      file.parent.createSync(recursive: true);
+      file.writeAsBytesSync([1, 2]);
+      expect(assets.getAssets(), [
+        'packages/test/assets/composed/wallpaper.png',
+      ]);
+      expect(
+        (assets.getImageProvider(
+          assets.getAssets().single,
+        ) as FileImage).file.path,
+        file.path,
+      );
+    },
+  );
+
+  test(
     'finds a scene theme by its manifest through nested paths and symlinks',
     () {
       final theme = Directory('${directory.path}/different-folder')
