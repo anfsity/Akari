@@ -377,8 +377,9 @@ Flutter-compiled shaders and do not need Studio or its compiler.
 ```
 
 The 2026-10-28 workspace regression passed 157 Studio, 42 scene runtime, 37 schema,
-6 code generation, and 9 theme synthesis tests. Static analysis and Linux debug
-builds passed. An isolated Arch/Sway VM verified native JSON loading and asset
+6 code generation, and 9 theme synthesis tests. Compatibility checks also passed
+15 theme SDK and 42 greeter UI tests. Static analysis and Linux debug builds
+passed. An isolated Arch/Sway VM verified native JSON loading and asset
 picker display, continuous floating-panel dragging, 150% and 200% scaling on two
 outputs, retained panel state after returning from a removed output, the shortcut
 settings page, compact font previews, and real shader compile/apply/save.
