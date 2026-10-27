@@ -38,6 +38,73 @@ class SceneSizing {
   final double flex;
 }
 
+/// Named, reusable visual values shared by Studio and the compiled runtime.
+class SceneStyle {
+  const SceneStyle({
+    this.fill = 0x00000000,
+    this.gradientEnd,
+    this.gradientAngle = 90,
+    this.border = 0x00000000,
+    this.borderWidth = 0,
+    this.radius = 0,
+    this.shadow = 0x66000000,
+    this.shadowBlur = 0,
+    this.shadowY = 4,
+    this.backgroundBlur = 0,
+    this.textColor,
+    this.fontSize = 0,
+    this.opacity = 1,
+  });
+
+  final int fill;
+  final int? gradientEnd;
+  final double gradientAngle;
+  final int border;
+  final double borderWidth;
+  final double radius;
+  final int shadow;
+  final double shadowBlur;
+  final double shadowY;
+  final double backgroundBlur;
+  final int? textColor;
+  final double fontSize;
+  final double opacity;
+
+  SceneStyle copyWith({
+    int? fill,
+    Object? gradientEnd = _unset,
+    double? gradientAngle,
+    int? border,
+    double? borderWidth,
+    double? radius,
+    int? shadow,
+    double? shadowBlur,
+    double? shadowY,
+    double? backgroundBlur,
+    Object? textColor = _unset,
+    double? fontSize,
+    double? opacity,
+  }) => SceneStyle(
+    fill: fill ?? this.fill,
+    gradientEnd: identical(gradientEnd, _unset)
+        ? this.gradientEnd
+        : gradientEnd as int?,
+    gradientAngle: gradientAngle ?? this.gradientAngle,
+    border: border ?? this.border,
+    borderWidth: borderWidth ?? this.borderWidth,
+    radius: radius ?? this.radius,
+    shadow: shadow ?? this.shadow,
+    shadowBlur: shadowBlur ?? this.shadowBlur,
+    shadowY: shadowY ?? this.shadowY,
+    backgroundBlur: backgroundBlur ?? this.backgroundBlur,
+    textColor: identical(textColor, _unset)
+        ? this.textColor
+        : textColor as int?,
+    fontSize: fontSize ?? this.fontSize,
+    opacity: opacity ?? this.opacity,
+  );
+}
+
 /// Boolean questions about semantic greeter state used by [SceneCondition].
 ///
 /// The vocabulary is closed so a theme or editor can only reference known
@@ -307,6 +374,7 @@ class SceneNode {
     this.parentId,
     this.layout,
     this.sizing = const SceneSizing(),
+    this.styleToken,
     this.transform = const SceneTransform(),
     this.z = 0,
     this.renderOrder = 0,
@@ -325,6 +393,7 @@ class SceneNode {
   /// Non-null marks a runtime-owned frame, independent of theme components.
   final SceneLayout? layout;
   final SceneSizing sizing;
+  final String? styleToken;
   final SceneTransform transform;
   final int z;
   final int renderOrder;
@@ -344,6 +413,7 @@ class SceneNode {
     Object? parentId = _unset,
     Object? layout = _unset,
     SceneSizing? sizing,
+    Object? styleToken = _unset,
     SceneTransform? transform,
     int? z,
     int? renderOrder,
@@ -362,6 +432,9 @@ class SceneNode {
           : parentId as String?,
       layout: identical(layout, _unset) ? this.layout : layout as SceneLayout?,
       sizing: sizing ?? this.sizing,
+      styleToken: identical(styleToken, _unset)
+          ? this.styleToken
+          : styleToken as String?,
       transform: transform ?? this.transform,
       z: z ?? this.z,
       renderOrder: renderOrder ?? this.renderOrder,
@@ -384,6 +457,7 @@ class SceneDocument {
     required this.background,
     required this.nodes,
     this.themeProperties = const {},
+    this.styleTokens = const {},
   });
 
   final String id;
@@ -395,6 +469,7 @@ class SceneDocument {
   /// Theme-owned preset selections, compiled with the scene so Studio and the
   /// greeter resolve the same layout, palette, material and motion choices.
   final Map<String, String> themeProperties;
+  final Map<String, SceneStyle> styleTokens;
 
   /// Draw order uses renderOrder first and z as its tie-breaker. Focus order is
   /// independent. Sorting a copy preserves the original authoring order.
@@ -432,6 +507,7 @@ class SceneDocument {
     SceneBackground? background,
     List<SceneNode>? nodes,
     Map<String, String>? themeProperties,
+    Map<String, SceneStyle>? styleTokens,
   }) {
     return SceneDocument(
       id: id ?? this.id,
@@ -440,6 +516,7 @@ class SceneDocument {
       background: background ?? this.background,
       nodes: nodes ?? this.nodes,
       themeProperties: themeProperties ?? this.themeProperties,
+      styleTokens: styleTokens ?? this.styleTokens,
     );
   }
 }

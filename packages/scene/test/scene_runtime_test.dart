@@ -6,6 +6,73 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scene/scene.dart';
 
 void main() {
+  testWidgets(
+    'style tokens update typography without replacing component state',
+    (tester) async {
+      final controller = TextEditingController(text: 'retained');
+      addTearDown(controller.dispose);
+      final document = _document(
+        nodes: const [
+          SceneNode(
+            id: 'label',
+            componentId: 'text',
+            styleToken: 'type',
+            rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+          ),
+        ],
+      );
+      Future<void> render(SceneStyle style) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SceneRuntime(
+              document: document.copyWith(styleTokens: {'type': style}),
+              theme: ThemeBundle(tokens: _tokens()),
+              nodeBuilder: (context, node) => Builder(
+                builder: (context) => TextField(
+                  key: const ValueKey('styled-input'),
+                  controller: controller,
+                  style: getSceneTextStyle(
+                    context,
+                    const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await render(const SceneStyle(fontSize: 24, textColor: 0xff112233));
+      final state = tester.state(find.byKey(const ValueKey('styled-input')));
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('styled-input')))
+            .style!
+            .fontSize,
+        24,
+      );
+      await render(
+        const SceneStyle(
+          fontSize: 32,
+          textColor: 0xff445566,
+          radius: 20,
+          backgroundBlur: 8,
+        ),
+      );
+      expect(
+        tester.state(find.byKey(const ValueKey('styled-input'))),
+        same(state),
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('styled-input')))
+            .style!
+            .color,
+        const Color(0xff445566),
+      );
+      expect(controller.text, 'retained');
+    },
+  );
+
   testWidgets('frames own child layout, transforms and presence', (
     tester,
   ) async {

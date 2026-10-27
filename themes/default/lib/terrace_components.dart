@@ -107,12 +107,15 @@ class _TerraceLabel extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Text(
         text,
-        style: TextStyle(
-          fontSize: large ? 48 : 11,
-          fontWeight: large ? FontWeight.w300 : FontWeight.w500,
-          letterSpacing: large ? -1.8 : 2,
-          height: 1.15,
-          color: Colors.white.withValues(alpha: large ? 0.96 : 0.72),
+        style: getSceneTextStyle(
+          context,
+          TextStyle(
+            fontSize: large ? 48 : 11,
+            fontWeight: large ? FontWeight.w300 : FontWeight.w500,
+            letterSpacing: large ? -1.8 : 2,
+            height: 1.15,
+            color: Colors.white.withValues(alpha: large ? 0.96 : 0.72),
+          ),
         ),
       ),
     ),
@@ -135,13 +138,16 @@ class _TerraceClock extends StatelessWidget {
           variant == TerraceClockVariant.stacked
               ? formatClockTime(now).replaceFirst(':', '\n')
               : formatClockTime(now),
-          style: TextStyle(
-            fontSize: variant == TerraceClockVariant.compact ? 72 : 132,
-            fontWeight: FontWeight.w300,
-            letterSpacing: variant == TerraceClockVariant.compact ? -2 : -6,
-            height: 1,
-            color: Color(0xffeefaff),
-            fontFeatures: const [FontFeature.tabularFigures()],
+          style: getSceneTextStyle(
+            context,
+            TextStyle(
+              fontSize: variant == TerraceClockVariant.compact ? 72 : 132,
+              fontWeight: FontWeight.w300,
+              letterSpacing: variant == TerraceClockVariant.compact ? -2 : -6,
+              height: 1,
+              color: Color(0xffeefaff),
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
         ),
       ),

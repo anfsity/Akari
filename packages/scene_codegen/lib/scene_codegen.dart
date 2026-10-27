@@ -14,6 +14,8 @@ import 'package:scene/scene.dart';
 SceneDocument get ${getSceneDocumentVariableName(document.id)} => SceneDocument(
   id: ${encodeDartString(document.id)},
   version: ${document.version},
+  styleTokens: <String, SceneStyle>{
+${document.styleTokens.entries.map((entry) => '    ${encodeDartString(entry.key)}: ${_encodeStyle(entry.value)},\n').join()}  },
   themeProperties: <String, String>{
 ${document.themeProperties.entries.map((entry) => '    ${encodeDartString(entry.key)}: ${encodeDartString(entry.value)},\n').join()}  },
   canvas: const SceneCanvas(
@@ -46,6 +48,7 @@ String generateSceneNode(SceneNode node) {
       id: ${encodeDartString(node.id)},
       componentId: ${encodeDartString(node.componentId)},
       parentId: ${_encodeDartNullableString(node.parentId)},
+      styleToken: ${_encodeDartNullableString(node.styleToken)},
       ${node.layout == null ? '' : '''layout: const SceneLayout(
         direction: SceneLayoutDirection.${node.layout!.direction.name},
         padding: ${node.layout!.padding},
@@ -99,6 +102,15 @@ String _encodeConditionLiteral(SceneCondition condition) {
       'SceneNot(${_encodeConditionLiteral(condition)})',
   };
 }
+
+String _encodeStyle(SceneStyle style) =>
+    '''const SceneStyle(
+    fill: ${_encodeColorLiteral(style.fill)}, gradientEnd: ${style.gradientEnd == null ? 'null' : _encodeColorLiteral(style.gradientEnd!)},
+    gradientAngle: ${style.gradientAngle}, border: ${_encodeColorLiteral(style.border)}, borderWidth: ${style.borderWidth},
+    radius: ${style.radius}, shadow: ${_encodeColorLiteral(style.shadow)}, shadowBlur: ${style.shadowBlur}, shadowY: ${style.shadowY},
+    backgroundBlur: ${style.backgroundBlur}, textColor: ${style.textColor == null ? 'null' : _encodeColorLiteral(style.textColor!)},
+    fontSize: ${style.fontSize}, opacity: ${style.opacity},
+  )''';
 
 /// Stable getter name shared by generated scenes and synthesized entrypoints.
 String getSceneDocumentVariableName(String id) {

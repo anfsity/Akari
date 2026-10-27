@@ -87,6 +87,18 @@ Built-in renderers support `image` and `solid`. Using `video` or `custom` requir
 | `properties` | `Record<string, string>` | `{}` | String key-value pairs interpreted by the component |
 | `transform` | Transform object | Identity | Node-local translation, scale, rotation, and pivot |
 
+## Visual style tokens
+
+The optional root `styleTokens` object maps names to `SceneStyle` values. A node
+references a style with `styleToken`; missing references are rejected. Styles
+support ARGB `fill`, optional `gradientEnd`, `gradientAngle` in degrees, `border`,
+`borderWidth`, `radius`, `shadow`, `shadowBlur`, `shadowY`, `backgroundBlur`,
+optional `textColor`, `fontSize` (`0` inherits), and `opacity` (`0..1`). Dimensions
+are logical pixels. Nodes sharing a token update together. Omitted style tokens
+preserve the theme's visuals. Explicit component typography can opt into authored
+overrides using `getSceneTextStyle(context, fallback)`; Terrace labels and clocks
+do so. Other components retain their own explicit text styles.
+
 ## Frames and auto layout
 
 Set a node's `layout` to create a runtime-owned frame. Its `component` may be

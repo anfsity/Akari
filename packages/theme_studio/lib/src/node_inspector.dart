@@ -5,6 +5,7 @@ import 'node_inspector_controller.dart';
 import 'studio_form.dart';
 import 'scene_editor.dart';
 import 'node_layout_inspector.dart';
+import 'node_style_inspector.dart';
 
 class NodeInspector extends StatelessWidget {
   const NodeInspector({
@@ -23,27 +24,30 @@ class NodeInspector extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller,
-    builder: (context, _) => Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _InspectorHeader(
-          node: controller.node,
-          definition: componentCatalog.components[controller.node.componentId],
-        ),
-        const Divider(),
-        Expanded(
-          child: _InspectorForm(
-            controller: controller,
-            definition:
-                componentCatalog.components[controller.node.componentId],
-            onApply: onApply,
-            editor: editor,
+    builder: (context, _) => editor?.selectedIds.isEmpty == true
+        ? const Center(child: Text('Select a layer to edit.'))
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _InspectorHeader(
+                node: controller.node,
+                definition:
+                    componentCatalog.components[controller.node.componentId],
+              ),
+              const Divider(),
+              Expanded(
+                child: _InspectorForm(
+                  controller: controller,
+                  definition:
+                      componentCatalog.components[controller.node.componentId],
+                  onApply: onApply,
+                  editor: editor,
+                ),
+              ),
+              const Divider(),
+              _InspectorActions(error: controller.error, onApply: onApply),
+            ],
           ),
-        ),
-        const Divider(),
-        _InspectorActions(error: controller.error, onApply: onApply),
-      ],
-    ),
   );
 }
 
@@ -99,6 +103,11 @@ class _InspectorForm extends StatelessWidget {
         const Gap(12),
         _buildLayoutSection(),
         if (editor case final session?) NodeLayoutInspector(editor: session),
+        if (editor case final session?)
+          _InspectorDisclosure(
+            title: 'Visual style',
+            child: NodeStyleInspector(editor: session),
+          ),
         const Divider(),
         const Gap(12),
         _InspectorDisclosure(

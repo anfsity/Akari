@@ -14,12 +14,47 @@ Map<String, Object> scene(List<Map<String, Object>> nodes) => {
 Map<String, Object> node(String id, {String? parent, bool frame = false}) => {
   'id': id,
   'component': frame ? 'frame' : 'text',
-  if (parent != null) 'parentId': parent,
+  'parentId': ?parent,
   if (frame) 'layout': {'direction': 'column', 'padding': 24, 'gap': 12},
   'rect': {'x': 0, 'y': 0, 'width': 1, 'height': 1},
 };
 
 void main() {
+  test('validates style tokens and preserves all visual values', () {
+    final json = scene([
+      {...node('a'), 'styleToken': 'glass'},
+    ]);
+    json['styleTokens'] = {
+      'glass': {
+        'fill': '#112233',
+        'gradientEnd': '#445566',
+        'radius': 20,
+        'shadowBlur': 12,
+        'backgroundBlur': 8,
+        'textColor': '#ffffff',
+        'fontSize': 24,
+      },
+    };
+    final original = decodeSceneDocument(jsonEncode(json));
+    final restored = decodeSceneDocument(encodeSceneDocument(original));
+    expect(restored.styleTokens['glass']!.gradientEnd, 0xff445566);
+    expect(restored.styleTokens['glass']!.backgroundBlur, 8);
+    for (final invalid in [
+      {
+        'glass': {'radius': -1},
+      },
+      {
+        'glass': {'opacity': 2},
+      },
+      <String, Object>{},
+    ]) {
+      json['styleTokens'] = invalid;
+      expect(
+        () => decodeSceneDocument(jsonEncode(json)),
+        throwsFormatException,
+      );
+    }
+  });
   test('round trips nested layout and fixed/flexible sizing', () {
     final json = scene([
       node('frame', frame: true),

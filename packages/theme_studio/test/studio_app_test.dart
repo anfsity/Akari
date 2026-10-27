@@ -376,6 +376,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('style sliders preview live and create one shared-token revision', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.ensureVisible(find.text('Visual style')); await tester.tap(find.text('Visual style'));
+    await tester.pumpAndSettle();
+    final slider = find.byKey(const ValueKey('style-Corner radius'));
+    await tester.ensureVisible(slider); await tester.pumpAndSettle();
+    final gesture = await tester.startGesture(tester.getCenter(slider));
+    await gesture.moveBy(const Offset(20, 0)); await tester.pump();
+    await gesture.moveBy(const Offset(20, 0)); await tester.pump();
+    expect(editor.document.styleTokens, isEmpty);
+    expect(editor.previewDocument.styleTokens.values.single.radius, greaterThan(0));
+    expect(tester.widget<SceneRuntime>(find.byType(SceneRuntime)).document.styleTokens, isNotEmpty);
+    await gesture.up(); await tester.pumpAndSettle();
+    expect(editor.document.styleTokens.values.single.radius, greaterThan(0));
+    editor.undo(); expect(editor.canUndo, isFalse);
+    expect(editor.document.styleTokens, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('preview scenarios wake the canvas without editing the scene', (
     tester,
   ) async {

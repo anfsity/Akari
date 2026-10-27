@@ -7,6 +7,7 @@ import 'builtin_backgrounds.dart';
 import 'motion.dart';
 import 'node_transform.dart';
 import 'scene_layout.dart';
+import 'node_style.dart';
 
 typedef SceneNodeBuilder = Widget Function(
   BuildContext context,
@@ -142,6 +143,7 @@ class SceneRuntime extends StatelessWidget {
         reducedMotion: reducedMotion,
       ),
       node: node,
+      style: document.styleTokens[node.styleToken] ?? const SceneStyle(),
       nodeBuilder: layout == null
           ? nodeBuilder
           : (context, node) {
@@ -211,6 +213,7 @@ class _SceneNodeHost extends StatefulWidget {
     required this.motionBuilder,
     required this.spec,
     required this.node,
+    required this.style,
     required this.nodeBuilder,
   });
 
@@ -221,6 +224,7 @@ class _SceneNodeHost extends StatefulWidget {
   final SceneMotionBuilder? motionBuilder;
   final SceneMotionSpec spec;
   final SceneNode node;
+  final SceneStyle style;
   final SceneNodeBuilder nodeBuilder;
 
   @override
@@ -387,12 +391,12 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
   }
 
   Widget _buildChild(BuildContext context) {
-    if (!widget.prewarmHiddenNodes) {
-      return widget.nodeBuilder(context, widget.node);
-    }
     // Cache the widget configuration across presence changes. Its own slot
     // listeners still rebuild content; builder or inherited dependency changes
     // invalidate this cache in the lifecycle hooks above.
-    return _prewarmedChild ??= widget.nodeBuilder(context, widget.node);
+    final child = widget.prewarmHiddenNodes
+        ? (_prewarmedChild ??= widget.nodeBuilder(context, widget.node))
+        : widget.nodeBuilder(context, widget.node);
+    return SceneStyleView(style: widget.style, child: child);
   }
 }

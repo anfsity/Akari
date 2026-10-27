@@ -34,6 +34,14 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 
 ### Component customization
 
+**Visual style** in the Design inspector provides color pickers, two-color
+gradients, borders, corner radius, shadows, backdrop blur, opacity, and typography.
+The first edit creates a scene style token; the token selector can reuse an
+existing style. Editing a shared token changes every referencing layer.
+Sliders preview continuously and commit one history entry on release. These
+tokens save in scene JSON and compile into production. Explicit typography needs
+component support; Terrace labels and clocks accept the authored text overrides.
+
 Themes can declare editable component properties through their
 [`componentCatalog`](../reference/theme-package.md#declaring-editable-component-properties).
 Studio shows the author's component and property labels, text inputs, and choice

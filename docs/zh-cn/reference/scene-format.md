@@ -9,6 +9,15 @@ description: 场景 JSON 的字段、示例和校验规则，当前版本为 3�
 当前场景格式版本为 `3`。解码器兼容版本 `1` 和 `2`，自动规范化旧版 `kind`/`action`，并保留已有扁平布局的行为。
 :::
 
+## 可复用视觉样式
+
+根字段 `styleTokens` 按名称保存样式，节点通过 `styleToken` 引用；不存在的引用
+会被拒绝。支持 `fill`、可选 `gradientEnd`、`gradientAngle`、`border`、
+`borderWidth`、`radius`、`shadow`、`shadowBlur`、`shadowY`、`backgroundBlur`、
+可选 `textColor`、`fontSize`（0 表示继承）和 `opacity`（0..1）。颜色采用 ARGB，
+尺寸采用逻辑像素。多个节点可共享一个 token。组件的显式文字样式可以通过
+`getSceneTextStyle(context, fallback)` 接入覆盖值；Terrace 标签与时钟已接入。
+
 ## 容器与自动布局
 
 节点声明 `layout` 后成为运行时管理的 Frame，不调用主题组件工厂。

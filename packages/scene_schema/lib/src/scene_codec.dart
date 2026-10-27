@@ -66,6 +66,23 @@ SceneDocument decodeSceneDocument(String source) {
     );
   }
   _validateHierarchy(nodes);
+  final styles = {
+    for (final entry in _getMap(
+      decoded,
+      'styleTokens',
+      fallback: const {},
+    ).entries)
+      entry.key: _decodeStyle(
+        _getMapValue(entry.value, 'styleTokens.${entry.key}'),
+      ),
+  };
+  for (final node in nodes) {
+    if (node.styleToken != null && !styles.containsKey(node.styleToken)) {
+      throw FormatException(
+        'Node ${node.id} references missing style token ${node.styleToken}.',
+      );
+    }
+  }
 
   return SceneDocument(
     id: _getString(decoded, 'id'),
@@ -73,6 +90,7 @@ SceneDocument decodeSceneDocument(String source) {
     canvas: _decodeCanvas(_getMap(decoded, 'canvas')),
     background: _decodeBackground(_getMap(decoded, 'background')),
     nodes: nodes,
+    styleTokens: styles,
     themeProperties: {
       for (final entry in _getMap(
         decoded,
@@ -130,6 +148,11 @@ Map<String, dynamic> _encodeDocument(SceneDocument document) {
   return {
     'id': document.id,
     'version': document.version,
+    if (document.styleTokens.isNotEmpty)
+      'styleTokens': {
+        for (final entry in document.styleTokens.entries)
+          entry.key: _encodeStyle(entry.value),
+      },
     if (document.themeProperties.isNotEmpty)
       'themeProperties': document.themeProperties,
     'canvas': {
@@ -209,6 +232,7 @@ SceneNode _decodeNode(
     id: id,
     componentId: component.id,
     rect: rect,
+    styleToken: _findString(json, 'styleToken'),
     parentId: _findString(json, 'parentId'),
     layout: json['layout'] == null
         ? null
@@ -307,6 +331,7 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
   return {
     'id': node.id,
     'component': node.componentId,
+    if (node.styleToken != null) 'styleToken': node.styleToken,
     if (node.parentId != null) 'parentId': node.parentId,
     if (node.layout case final layout?)
       'layout': {
@@ -343,6 +368,52 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
     if (node.properties.isNotEmpty) 'properties': node.properties,
   };
 }
+
+SceneStyle _decodeStyle(Map<String, dynamic> json) {
+  const defaults = SceneStyle();
+  int color(String key, int fallback) =>
+      json[key] == null ? fallback : decodeSceneColor(_getString(json, key));
+  final opacity = _getDouble(json, 'opacity', fallback: 1);
+  if (opacity < 0 || opacity > 1) {
+    throw const FormatException('Style opacity must be in [0, 1].');
+  }
+  return SceneStyle(
+    fill: color('fill', defaults.fill),
+    gradientEnd: json['gradientEnd'] == null ? null : color('gradientEnd', 0),
+    gradientAngle: _getDouble(
+      json,
+      'gradientAngle',
+      fallback: defaults.gradientAngle,
+    ),
+    border: color('border', defaults.border),
+    borderWidth: _getNonNegative(json, 'borderWidth'),
+    radius: _getNonNegative(json, 'radius'),
+    shadow: color('shadow', defaults.shadow),
+    shadowBlur: _getNonNegative(json, 'shadowBlur'),
+    shadowY: _getDouble(json, 'shadowY', fallback: defaults.shadowY),
+    backgroundBlur: _getNonNegative(json, 'backgroundBlur'),
+    textColor: json['textColor'] == null ? null : color('textColor', 0),
+    fontSize: _getNonNegative(json, 'fontSize'),
+    opacity: opacity,
+  );
+}
+
+Map<String, dynamic> _encodeStyle(SceneStyle style) => {
+  'fill': encodeSceneColor(style.fill),
+  if (style.gradientEnd != null)
+    'gradientEnd': encodeSceneColor(style.gradientEnd!),
+  'gradientAngle': style.gradientAngle,
+  'border': encodeSceneColor(style.border),
+  'borderWidth': style.borderWidth,
+  'radius': style.radius,
+  'shadow': encodeSceneColor(style.shadow),
+  'shadowBlur': style.shadowBlur,
+  'shadowY': style.shadowY,
+  'backgroundBlur': style.backgroundBlur,
+  if (style.textColor != null) 'textColor': encodeSceneColor(style.textColor!),
+  'fontSize': style.fontSize,
+  'opacity': style.opacity,
+};
 
 SceneLayout _decodeLayout(Map<String, dynamic> json) => SceneLayout(
   direction: _getEnumValue(
@@ -382,8 +453,9 @@ SceneSizing _decodeSizing(Map<String, dynamic> json) {
 
 double _getNonNegative(Map<String, dynamic> json, String key) {
   final value = _getDouble(json, key, fallback: 0);
-  if (!value.isFinite || value < 0)
+  if (value < 0) {
     throw FormatException('$key must be finite and >= 0.');
+  }
   return value;
 }
 
@@ -569,7 +641,7 @@ double _getDouble(Map<String, dynamic> json, String key, {double? fallback}) {
   if (value == null && fallback != null) {
     return fallback;
   }
-  if (value is num) {
+  if (value is num && value.isFinite) {
     return value.toDouble();
   }
   throw FormatException('$key must be a number.');
