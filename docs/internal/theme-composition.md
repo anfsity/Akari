@@ -47,8 +47,12 @@ combines those designs. Code-owned widgets and shaders remain supported.
 - Lifecycle previews now cover typed prompt, submitting, rejection, failure,
   account/session choice, connecting and unavailable states while retaining
   preview controllers and keeping document/history untouched.
-- Remaining: richer component variants, optional motion/interaction preview,
-  native Studio create/save/reopen verification, and the final full audit.
+- Preview mode enables focus, menus and authored motion while isolating canvas
+  geometry/keyboard edits. Wake blur uses the production helper, supports reversal,
+  and respects theme/system reduced motion. Leaving preview retains borrowed
+  controllers and restores selection.
+- Remaining: richer component variants, native Studio create/save/reopen
+  verification, and the final full audit.
 
 ## Next implementation: independent project synthesis
 

@@ -42,6 +42,7 @@ class StudioPreview extends StatefulWidget {
     required this.tool,
     this.readOnly = false,
     this.scenario = StudioPreviewScenario.password,
+    this.interactive = false,
     this.lockAspectRatio = false,
     this.zoom,
     this.panEnabled = false,
@@ -52,6 +53,7 @@ class StudioPreview extends StatefulWidget {
 
   final bool readOnly;
   final StudioPreviewScenario scenario;
+  final bool interactive;
   final ThemeDefinition theme;
   final SceneDocument document;
   final String selectedId;
@@ -72,7 +74,8 @@ class StudioPreview extends StatefulWidget {
   State<StudioPreview> createState() => _StudioPreviewState();
 }
 
-class _StudioPreviewState extends State<StudioPreview> {
+class _StudioPreviewState extends State<StudioPreview>
+    with SingleTickerProviderStateMixin {
   final _canvas = GlobalKey();
   _NodeDrag? _drag;
 
@@ -127,16 +130,50 @@ class _StudioPreviewState extends State<StudioPreview> {
   late final _simulation = StudioPreviewHost(scenario: widget.scenario);
 
   late GreeterThemeComponents _components;
+  late final AnimationController _wake;
 
   @override
   void initState() {
     super.initState();
+    _wake = AnimationController(
+      vsync: this,
+      duration: Duration.zero,
+      value: widget.dormant ? 0 : 1,
+    );
     _updateComponents();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateWake();
+  }
+
+  void _updateWake() {
+    final disabled =
+        !widget.interactive ||
+        widget.theme.tokens.disableAnimations ||
+        MediaQuery.disableAnimationsOf(context);
+    _wake.duration = disabled
+        ? Duration.zero
+        : widget.theme.tokens.mediumMotion;
+    if (disabled) {
+      _wake.value = widget.dormant ? 0 : 1;
+    } else if (widget.dormant) {
+      _wake.reverse();
+    } else {
+      _wake.forward();
+    }
   }
 
   @override
   void didUpdateWidget(StudioPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.dormant != widget.dormant ||
+        oldWidget.interactive != widget.interactive ||
+        oldWidget.theme.tokens != widget.theme.tokens) {
+      _updateWake();
+    }
     if (oldWidget.scenario != widget.scenario) {
       _simulation.updateScenario(widget.scenario);
     }
@@ -164,6 +201,7 @@ class _StudioPreviewState extends State<StudioPreview> {
 
   @override
   void dispose() {
+    _wake.dispose();
     _simulation.dispose();
     super.dispose();
   }
@@ -211,11 +249,12 @@ class _StudioPreviewState extends State<StudioPreview> {
               theme: widget.theme,
               document: document,
               referenceSize: referenceSize,
-              dormant: widget.dormant,
+              interactive: widget.interactive,
+              wakeProgress: _wake,
               activePredicates: predicates,
               nodeBuilder: _buildInteractiveNode,
             ),
-            if (visible)
+            if (visible && !widget.interactive)
               _NodeSelectionOverlay(
                 node: selected,
                 canvasSize: referenceSize,
@@ -238,8 +277,9 @@ class _StudioPreviewState extends State<StudioPreview> {
   Widget _buildInteractiveNode(BuildContext context, SceneNode node) =>
       _PreviewNode(
         nodeId: node.id,
+        interactive: widget.interactive,
         onSelect: () => widget.onSelect(node.id),
-        onStartDrag: widget.readOnly
+        onStartDrag: widget.readOnly || widget.interactive
             ? null
             : (details) => _startDrag(node.id, details),
         onUpdateDrag: _updateDrag,
@@ -343,20 +383,22 @@ class _NodeDrag {
 }
 
 /// Material and localization belong to the compiled theme preview. Editor
-/// controls keep using shadcn; reduced motion keeps authoring hit tests stable.
+/// controls keep using shadcn; design mode keeps authoring hit tests stable.
 class _PreviewScene extends StatelessWidget {
   const _PreviewScene({
     required this.theme,
     required this.document,
     required this.referenceSize,
-    required this.dormant,
+    required this.interactive,
+    required this.wakeProgress,
     required this.activePredicates,
     required this.nodeBuilder,
   });
 
   final ThemeDefinition theme;
   final SceneDocument document;
-  final bool dormant;
+  final bool interactive;
+  final Animation<double> wakeProgress;
   final Set<ScenePredicate> activePredicates;
   final SceneNodeBuilder nodeBuilder;
   final Size referenceSize;
@@ -366,13 +408,18 @@ class _PreviewScene extends StatelessWidget {
     debugShowCheckedModeBanner: false,
     theme: theme.materialTheme,
     home: MediaQuery(
-      data: MediaQueryData(size: referenceSize, disableAnimations: true),
+      data: MediaQuery.of(context).copyWith(
+        size: referenceSize,
+        disableAnimations:
+            !interactive || MediaQuery.disableAnimationsOf(context),
+      ),
       child: Scaffold(
         body: SceneRuntime(
           document: document,
           theme: theme.bundle,
-          backgroundBlurSigma: AlwaysStoppedAnimation(
-            dormant ? 0 : document.background.blurSigma,
+          backgroundBlurSigma: getBackgroundBlurAnimation(
+            document.background,
+            wakeProgress,
           ),
           activePredicates: activePredicates,
           nodeBuilder: nodeBuilder,
@@ -385,6 +432,7 @@ class _PreviewScene extends StatelessWidget {
 class _PreviewNode extends StatelessWidget {
   const _PreviewNode({
     required this.nodeId,
+    required this.interactive,
     required this.onSelect,
     required this.onStartDrag,
     required this.onUpdateDrag,
@@ -394,6 +442,7 @@ class _PreviewNode extends StatelessWidget {
   });
 
   final String nodeId;
+  final bool interactive;
   final VoidCallback onSelect;
   final GestureDragStartCallback? onStartDrag;
   final GestureDragUpdateCallback onUpdateDrag;
@@ -405,17 +454,20 @@ class _PreviewNode extends StatelessWidget {
   Widget build(BuildContext context) => Listener(
     // Flutter reports an accepted pan's pointer cancellation as onPanEnd.
     // Clear the draft first so a cancelled pointer cannot commit a move.
-    onPointerCancel: (_) => onCancelDrag(),
+    onPointerCancel: interactive ? null : (_) => onCancelDrag(),
     child: GestureDetector(
       key: ValueKey('preview-$nodeId'),
       behavior: HitTestBehavior.opaque,
-      onTap: onSelect,
+      onTap: interactive ? null : onSelect,
       dragStartBehavior: DragStartBehavior.down,
       onPanStart: onStartDrag,
-      onPanUpdate: onUpdateDrag,
-      onPanEnd: onStopDrag,
-      onPanCancel: onCancelDrag,
-      child: ExcludeFocus(child: IgnorePointer(child: child)),
+      onPanUpdate: interactive ? null : onUpdateDrag,
+      onPanEnd: interactive ? null : onStopDrag,
+      onPanCancel: interactive ? null : onCancelDrag,
+      child: ExcludeFocus(
+        excluding: !interactive,
+        child: IgnorePointer(ignoring: !interactive, child: child),
+      ),
     ),
   );
 }

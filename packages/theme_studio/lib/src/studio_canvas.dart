@@ -36,6 +36,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
   bool _lockAspectRatio = false;
   bool _handTool = false;
   bool _spacePan = false;
+  bool _previewing = false;
   StudioPreviewScenario _scenario = StudioPreviewScenario.password;
   double? _zoom;
   int _resetView = 0;
@@ -73,6 +74,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
   }
 
   KeyEventResult _handleKeyEvent(FocusNode focus, KeyEvent event) {
+    if (_previewing) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.space) {
       setState(() => _spacePan = event is! KeyUpEvent);
@@ -197,7 +199,35 @@ class _StudioCanvasState extends State<StudioCanvas> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    if (!widget.readOnly)
+                    Tooltip(
+                      tooltip: (_) =>
+                          Text(_previewing ? 'Edit canvas' : 'Preview'),
+                      child: Button(
+                        key: const ValueKey('canvas-preview'),
+                        style: _previewing
+                            ? const ButtonStyle.primaryIcon()
+                            : const ButtonStyle.outlineIcon(),
+                        onPressed: session == null
+                            ? null
+                            : () {
+                                if (!_previewing && !session.applyDraft()) {
+                                  return;
+                                }
+                                setState(() => _previewing = !_previewing);
+                              },
+                        child: Semantics(
+                          label: _previewing ? 'Edit canvas' : 'Preview',
+                          toggled: _previewing,
+                          child: Icon(
+                            _previewing
+                                ? LucideIcons.mousePointer2
+                                : LucideIcons.play,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (!widget.readOnly && !_previewing)
                       for (final tool in StudioCanvasTool.values)
                         Tooltip(
                           tooltip: (_) =>
@@ -236,7 +266,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                         ),
                       ),
                     ),
-                    if (!widget.readOnly)
+                    if (!widget.readOnly && !_previewing)
                       Tooltip(
                         tooltip: (_) => const Text(
                           'Lock aspect ratio · Shift while resizing',
@@ -321,11 +351,14 @@ class _StudioCanvasState extends State<StudioCanvas> {
                       ? const Center(child: Text('Unable to open scene'))
                       : Listener(
                           key: _viewportKey,
-                          onPointerDown: (_) => _focus.requestFocus(),
+                          onPointerDown: _previewing
+                              ? null
+                              : (_) => _focus.requestFocus(),
                           child: StudioPreview(
                             key: ObjectKey(session),
                             theme: widget.theme,
-                            readOnly: widget.readOnly,
+                            readOnly: widget.readOnly || _previewing,
+                            interactive: _previewing,
                             document: session.document,
                             selectedId: session.selectedId,
                             dormant: widget.dormant,
@@ -361,6 +394,8 @@ class _StudioCanvasState extends State<StudioCanvas> {
                       child: Text(
                         session == null
                             ? 'Choose a valid scene document.'
+                            : _previewing
+                            ? 'Preview focus, menus and motion · Choose scenarios for outcomes'
                             : widget.readOnly
                             ? 'Select a layer to inspect code'
                             : _handTool || _spacePan
