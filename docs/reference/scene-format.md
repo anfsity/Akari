@@ -101,6 +101,13 @@ do so. Other components retain their own explicit text styles.
 
 ## Motion timing
 
+Nodes may also declare `stateEffects`, for example
+`{"isAuthError": "shake"}`. Known semantic predicates trigger `shake` or `pulse`
+once on entry; unrelated updates do not restart them. Responses use node timing,
+work on entire frames, honor reduced motion, and can be sampled on the timeline.
+When several rules enter together, the last authored rule wins. These are visual
+responses; the authentication feature continues to own the actual state machine.
+
 Optional node `motionTiming` stores `durationMs` (omitted inherits the theme),
 `delayMs` (default `0`), and optional cubic Bezier `curve: [x1,y1,x2,y2]`.
 Duration and delay accept integer `0..60000` milliseconds; all four curve

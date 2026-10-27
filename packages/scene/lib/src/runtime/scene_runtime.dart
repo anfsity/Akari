@@ -8,6 +8,7 @@ import 'motion.dart';
 import 'node_transform.dart';
 import 'scene_layout.dart';
 import 'node_style.dart';
+import 'state_effects.dart';
 
 typedef SceneNodeBuilder = Widget Function(
   BuildContext context,
@@ -197,14 +198,24 @@ class SceneRuntime extends StatelessWidget {
 
     final rect = geometry[node.id]!.rect;
     final contentBoundary = RepaintBoundary(
-      child: node.interactive
-          // Keyboard order is authored separately from paint order; raising a
-          // visual layer must not silently reorder navigation between controls.
-          ? FocusTraversalOrder(
-              order: NumericFocusOrder(node.focusOrder.toDouble()),
-              child: content,
-            )
-          : content,
+      child: SceneStateEffects(
+        node: node,
+        activePredicates: activePredicates,
+        predicatesListenable: node.stateEffects.isEmpty
+            ? null
+            : activePredicatesListenable,
+        duration: duration,
+        curve: theme.tokens.standardCurve,
+        playback: playback,
+        child: node.interactive
+            // Keyboard order is authored separately from paint order; raising a
+            // visual layer must not silently reorder navigation between controls.
+            ? FocusTraversalOrder(
+                order: NumericFocusOrder(node.focusOrder.toDouble()),
+                child: content,
+              )
+            : content,
+      ),
     );
     // Keep the subtree mounted when a live edit leaves or returns to identity.
     // Adding/removing this wrapper would reset component state and active drags.

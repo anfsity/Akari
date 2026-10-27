@@ -189,6 +189,8 @@ enum SceneMotionPreset {
   focusGlow,
 }
 
+enum SceneStateEffect { shake, pulse }
+
 class SceneCubicBezier {
   const SceneCubicBezier(this.x1, this.y1, this.x2, this.y2);
   final double x1;
@@ -397,6 +399,7 @@ class SceneNode {
     this.focusOrder = 0,
     this.motion = SceneMotionPreset.none,
     this.motionTiming = const SceneMotionTiming(),
+    this.stateEffects = const {},
     this.visibleWhen,
     this.interactive = false,
     this.properties = const <String, String>{},
@@ -417,6 +420,7 @@ class SceneNode {
   final int focusOrder;
   final SceneMotionPreset motion;
   final SceneMotionTiming motionTiming;
+  final Map<ScenePredicate, SceneStateEffect> stateEffects;
 
   /// Condition controlling whether the node is present; null means always.
   final SceneCondition? visibleWhen;
@@ -438,6 +442,7 @@ class SceneNode {
     int? focusOrder,
     SceneMotionPreset? motion,
     SceneMotionTiming? motionTiming,
+    Map<ScenePredicate, SceneStateEffect>? stateEffects,
     Object? visibleWhen = _unset,
     bool? interactive,
     Map<String, String>? properties,
@@ -460,6 +465,7 @@ class SceneNode {
       focusOrder: focusOrder ?? this.focusOrder,
       motion: motion ?? this.motion,
       motionTiming: motionTiming ?? this.motionTiming,
+      stateEffects: stateEffects ?? this.stateEffects,
       visibleWhen: identical(visibleWhen, _unset)
           ? this.visibleWhen
           : visibleWhen as SceneCondition?,

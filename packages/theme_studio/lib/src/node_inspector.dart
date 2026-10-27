@@ -7,6 +7,7 @@ import 'scene_editor.dart';
 import 'node_layout_inspector.dart';
 import 'node_style_inspector.dart';
 import 'node_motion_inspector.dart';
+import 'node_state_inspector.dart';
 
 class NodeInspector extends StatelessWidget {
   const NodeInspector({
@@ -108,6 +109,11 @@ class _InspectorForm extends StatelessWidget {
           _InspectorDisclosure(
             title: 'Visual style',
             child: NodeStyleInspector(editor: session),
+          ),
+        if (editor case final session?)
+          _InspectorDisclosure(
+            title: 'State rules',
+            child: NodeStateInspector(editor: session),
           ),
         const Divider(),
         const Gap(12),

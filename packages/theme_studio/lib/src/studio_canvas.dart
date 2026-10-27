@@ -10,6 +10,7 @@ import 'studio_preview_host.dart';
 import 'studio_form.dart';
 import 'node_arrangement_toolbar.dart';
 import 'studio_timeline.dart';
+import 'studio_state_graph.dart';
 
 class StudioCanvas extends StatefulWidget {
   const StudioCanvas({
@@ -42,6 +43,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
   bool _previewing = false;
   Duration? _elapsed;
   StudioTransition _transition = StudioTransition.wake;
+  bool _showStateGraph = false;
   StudioPreviewScenario _scenario = StudioPreviewScenario.password;
   double? _zoom;
   int _resetView = 0;
@@ -166,10 +168,10 @@ class _StudioCanvasState extends State<StudioCanvas> {
             children: [
               Padding(
                 key: const ValueKey('canvas-toolbar'),
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 child: Wrap(
                   spacing: 4,
-                  runSpacing: 8,
+                  runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     SizedBox(
@@ -202,6 +204,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                                       ? Duration.zero
                                       : null;
                                   _previewing = false;
+                                  _showStateGraph = false;
                                 });
                               },
                         child: const Icon(LucideIcons.film, size: 16),
@@ -221,6 +224,26 @@ class _StudioCanvasState extends State<StudioCanvas> {
                         },
                       ),
                     ),
+                    Tooltip(
+                      tooltip: (_) => const Text('State flow'),
+                      child: Button(
+                        key: const ValueKey('canvas-state-graph'),
+                        style: _showStateGraph
+                            ? const ButtonStyle.primaryIcon()
+                            : const ButtonStyle.outlineIcon(),
+                        onPressed: session == null
+                            ? null
+                            : () {
+                                if (!session.applyDraft()) return;
+                                setState(() {
+                                  _showStateGraph = !_showStateGraph;
+                                  _elapsed = null;
+                                  _previewing = _showStateGraph;
+                                });
+                              },
+                        child: const Icon(LucideIcons.gitBranch, size: 16),
+                      ),
+                    ),
                     const SizedBox(width: 4),
                     Tooltip(
                       tooltip: (_) =>
@@ -238,6 +261,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                                 }
                                 setState(() {
                                   _elapsed = null;
+                                  _showStateGraph = false;
                                   _previewing = !_previewing;
                                 });
                               },
@@ -489,6 +513,15 @@ class _StudioCanvasState extends State<StudioCanvas> {
                   ],
                 ),
               ),
+              if (_showStateGraph)
+                StudioStateGraph(
+                  dormant: widget.dormant,
+                  scenario: _scenario,
+                  onSelect: (dormant, scenario) {
+                    if (dormant != widget.dormant) widget.onToggleDormant();
+                    setState(() => _scenario = scenario);
+                  },
+                ),
               if (session != null && _elapsed != null)
                 StudioTimeline(
                   duration: _getTimelineDuration(session),
