@@ -509,6 +509,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('state graph adds edits undoes and saves visual transition edges', (tester) async {
+    await openStudio(tester);
+    final editor=tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.tap(find.byKey(const ValueKey('canvas-state-graph')));await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('graph-add-transition')));await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('transition-duration')),'450');
+    await tester.tap(find.byKey(const ValueKey('save-transition')));await tester.pumpAndSettle();
+    expect(editor.selectedNode.transitions.single.timing.durationMs,450);
+    expect(find.byKey(const ValueKey('graph-edge-0')),findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('graph-edge-0')));await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('transition-duration')),'700');
+    await tester.tap(find.byKey(const ValueKey('save-transition')));await tester.pumpAndSettle();
+    expect(editor.selectedNode.transitions.single.timing.durationMs,700);
+    editor.undo();await tester.pumpAndSettle();expect(editor.selectedNode.transitions.single.timing.durationMs,450);
+    await tester.tap(find.text('Save scene'));await tester.pumpAndSettle();
+    expect(decodeSceneDocument(file.readAsStringSync()).nodes.first.transitions.single.timing.durationMs,450);
+    expect(tester.takeException(),isNull);
+  });
+
   testWidgets('state flow previews outcomes and authored state rules save with history', (tester) async {
     await openStudio(tester);
     final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;

@@ -282,6 +282,33 @@ SceneNode _decodeNode(
             'primitive',
           ),
     asset: json['asset'] == null ? null : _decodeAsset(_getMap(json, 'asset')),
+    transitions: [
+      for (final raw
+          in json['transitions'] == null
+              ? const []
+              : _getList(json, 'transitions'))
+        (() {
+          final rule = _getMapValue(raw, 'transitions[]');
+          final from = _decodeCondition(rule['from'], 'transition.from');
+          final to = _decodeCondition(rule['to'], 'transition.to');
+          if (from == null || to == null)
+            throw const FormatException(
+              'Transitions require source and target conditions.',
+            );
+          return SceneStateTransition(
+            from: from,
+            to: to,
+            effect: _getEnumValue(
+              SceneStateEffect.values,
+              _getString(rule, 'effect'),
+              'transition.effect',
+            ),
+            timing: _decodeMotionTiming(
+              _getMap(rule, 'timing', fallback: const {}),
+            ),
+          );
+        })(),
+    ],
     stateEffects: {
       for (final entry in _getMap(
         json,
@@ -454,14 +481,19 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
             ],
           },
       ],
+    if (node.transitions.isNotEmpty)
+      'transitions': [
+        for (final rule in node.transitions)
+          {
+            'from': _encodeCondition(rule.from),
+            'to': _encodeCondition(rule.to),
+            'effect': rule.effect.name,
+            if (!rule.timing.isDefault)
+              'timing': _encodeMotionTiming(rule.timing),
+          },
+      ],
     if (!node.motionTiming.isDefault)
-      'motionTiming': {
-        if (node.motionTiming.durationMs != null)
-          'durationMs': node.motionTiming.durationMs,
-        'delayMs': node.motionTiming.delayMs,
-        if (node.motionTiming.curve case final curve?)
-          'curve': [curve.x1, curve.y1, curve.x2, curve.y2],
-      },
+      'motionTiming': _encodeMotionTiming(node.motionTiming),
     if (node.visibleWhen != null)
       'visibleWhen': _encodeCondition(node.visibleWhen!),
     if (node.interactive) 'interactive': true,
@@ -563,6 +595,13 @@ SceneGuide _decodeGuide(Map<String, dynamic> json) {
     position: position,
   );
 }
+
+Map<String, dynamic> _encodeMotionTiming(SceneMotionTiming timing) => {
+  if (timing.durationMs != null) 'durationMs': timing.durationMs,
+  'delayMs': timing.delayMs,
+  if (timing.curve case final curve?)
+    'curve': [curve.x1, curve.y1, curve.x2, curve.y2],
+};
 
 SceneMotionTiming _decodeMotionTiming(Map<String, dynamic> json) {
   final duration = json['durationMs'] == null
@@ -849,16 +888,20 @@ SceneCondition? _decodeCondition(Object? value, String field) {
   return switch (entry.key) {
     'all' => SceneAll(_decodeConditionList(entry.value, '$field.all')),
     'any' => SceneAny(_decodeConditionList(entry.value, '$field.any')),
-    'not' => SceneNot(_decodeCondition(entry.value, '$field.not')!),
+    'not' => SceneNot(_decodeRequiredCondition(entry.value, '$field.not')),
     _ => throw FormatException('Invalid $field operator: ${entry.key}'),
   };
 }
+
+SceneCondition _decodeRequiredCondition(Object? value, String field) =>
+    _decodeCondition(value, field) ??
+    (throw FormatException('$field requires a condition.'));
 
 List<SceneCondition> _decodeConditionList(Object? value, String field) {
   if (value is! List || value.isEmpty) {
     throw FormatException('$field must be a non-empty list.');
   }
-  return [for (final item in value) _decodeCondition(item, field)!];
+  return [for (final item in value) _decodeRequiredCondition(item, field)];
 }
 
 Object _encodeCondition(SceneCondition condition) {

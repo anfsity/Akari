@@ -33,7 +33,7 @@ class SceneStateEffects extends StatefulWidget {
 class _SceneStateEffectsState extends State<SceneStateEffects>
     with SingleTickerProviderStateMixin {
   AnimationController? _controller;
-  SceneStateEffect _effect = SceneStateEffect.shake;
+  SceneStateTransition? _rule;
   Set<ScenePredicate> _previous = {};
   bool _reduced = false;
 
@@ -57,11 +57,12 @@ class _SceneStateEffectsState extends State<SceneStateEffects>
       old.predicatesListenable?.removeListener(_updatePredicates);
       widget.predicatesListenable?.addListener(_updatePredicates);
     }
-    if (!mapEquals(old.node.stateEffects, widget.node.stateEffects)) {
+    if (!mapEquals(old.node.stateEffects, widget.node.stateEffects) ||
+        !listEquals(old.node.transitions, widget.node.transitions)) {
       _previous = {};
     }
     _controller?.duration = getSceneMotionDuration(
-      widget.node,
+      _getEffectNode(_rule),
       widget.duration,
     );
     _updatePredicates();
@@ -72,22 +73,21 @@ class _SceneStateEffectsState extends State<SceneStateEffects>
         widget.predicatesListenable?.value ?? widget.activePredicates;
     if (_reduced ||
         widget.playback != null ||
-        widget.node.stateEffects.isEmpty) {
+        (widget.node.stateEffects.isEmpty && widget.node.transitions.isEmpty)) {
       _controller?.stop();
       _controller?.value = 1;
     } else {
-      final triggered = widget.node.stateEffects.entries
-          .where(
-            (rule) =>
-                predicates.contains(rule.key) && !_previous.contains(rule.key),
-          )
-          .lastOrNull;
+      final triggered = findSceneStateTransition(
+        widget.node,
+        _previous,
+        predicates,
+      );
       if (triggered != null) {
-        _effect = triggered.value;
+        _rule = triggered;
         final needsListener = _controller == null;
         final controller = _controller ??= AnimationController(vsync: this);
         controller.duration = getSceneMotionDuration(
-          widget.node,
+          _getEffectNode(triggered),
           widget.duration,
         );
         controller.forward(from: 0);
@@ -96,6 +96,13 @@ class _SceneStateEffectsState extends State<SceneStateEffects>
     }
     _previous = Set.of(predicates);
   }
+
+  SceneNode _getEffectNode(SceneStateTransition? rule) => widget.node.copyWith(
+    tracks: const [],
+    motionTiming: rule == null || rule.timing.isDefault
+        ? widget.node.motionTiming
+        : rule.timing,
+  );
 
   @override
   void dispose() {
@@ -110,19 +117,17 @@ class _SceneStateEffectsState extends State<SceneStateEffects>
     child: widget.child,
     builder: (context, child) {
       var progress = _reduced ? 1.0 : _controller?.value ?? 1.0;
-      var effect = _effect;
+      var rule = _rule;
       if (widget.playback case final playback?) {
-        final triggered = widget.node.stateEffects.entries
-            .where(
-              (rule) =>
-                  widget.activePredicates.contains(rule.key) &&
-                  !playback.from.contains(rule.key),
-            )
-            .lastOrNull;
+        final triggered = findSceneStateTransition(
+          widget.node,
+          playback.from,
+          widget.activePredicates,
+        );
         if (!_reduced && triggered != null) {
-          effect = triggered.value;
+          rule = triggered;
           final duration = getSceneMotionDuration(
-            widget.node,
+            _getEffectNode(triggered),
             widget.duration,
           ).inMicroseconds;
           progress = duration == 0
@@ -133,12 +138,12 @@ class _SceneStateEffectsState extends State<SceneStateEffects>
         }
       }
       progress = getSceneMotionCurve(
-        widget.node,
+        _getEffectNode(rule),
         widget.duration,
         widget.curve,
       ).transform(progress);
       final matrix = Matrix4.identity();
-      if (effect == SceneStateEffect.shake) {
+      if (rule?.effect == SceneStateEffect.shake) {
         matrix.translateByDouble(
           math.sin(progress * math.pi * 8) * (1 - progress) * 12,
           0,
