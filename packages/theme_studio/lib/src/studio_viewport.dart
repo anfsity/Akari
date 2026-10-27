@@ -18,6 +18,7 @@ class StudioViewport extends StatefulWidget {
     required this.panEnabled,
     required this.onZoom,
     required this.childBuilder,
+    this.presenting = false,
     super.key,
   });
 
@@ -28,6 +29,7 @@ class StudioViewport extends StatefulWidget {
   final bool panEnabled;
   final ValueChanged<double> onZoom;
   final Widget Function(double scale) childBuilder;
+  final bool presenting;
 
   @override
   State<StudioViewport> createState() => _StudioViewportState();
@@ -35,6 +37,7 @@ class StudioViewport extends StatefulWidget {
 
 class _StudioViewportState extends State<StudioViewport> {
   Offset _pan = Offset.zero;
+  Offset _savedPan = Offset.zero;
   double? _scale;
   Size? _viewportSize;
   Offset? _zoomAnchor;
@@ -42,6 +45,16 @@ class _StudioViewportState extends State<StudioViewport> {
   @override
   void didUpdateWidget(StudioViewport oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.presenting != widget.presenting) {
+      if (widget.presenting) {
+        _savedPan = _pan;
+        _pan = Offset.zero;
+      } else {
+        _pan = _savedPan;
+      }
+      _scale = null;
+      _zoomAnchor = null;
+    }
     if (widget.resetView != oldWidget.resetView ||
         widget.referenceSize != oldWidget.referenceSize) {
       _pan = Offset.zero;
@@ -93,7 +106,9 @@ class _StudioViewportState extends State<StudioViewport> {
               if (HardwareKeyboard.instance.isControlPressed) {
                 _zoomAnchor = event.localPosition;
                 widget.onZoom(
-                  clampStudioZoom(scale * math.exp(-event.scrollDelta.dy / 400)),
+                  clampStudioZoom(
+                    scale * math.exp(-event.scrollDelta.dy / 400),
+                  ),
                 );
               } else {
                 setState(() => _pan -= event.scrollDelta);

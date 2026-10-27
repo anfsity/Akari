@@ -327,6 +327,12 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> revealAssemblyControl(WidgetTester tester, Finder target) async {
+    await tester.scrollUntilVisible(target, 120, scrollable: find.descendant(
+      of: find.byKey(const ValueKey('component-assembly')), matching: find.byType(Scrollable)).first);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('Shift selection, marquee, grouping and frame layout work on canvas', (tester) async {
     await openStudio(tester);
     final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
@@ -356,7 +362,7 @@ void main() {
     await openStudio(tester, themeBuilder: ({Color? seed, SceneDocument? document}) =>
       _buildTheme(seed: seed, document: document, layout: _assemblyLayout));
     final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
-    await tester.ensureVisible(find.byKey(const ValueKey('select-slot-badge')));
+    await revealAssemblyControl(tester, find.byKey(const ValueKey('select-slot-badge')));
     await tester.pumpAndSettle();
     final canvas = tester.getRect(find.byType(SceneRuntime));
     final target = canvas.topLeft + Offset(canvas.width * .6, canvas.height * .6);
@@ -535,6 +541,34 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('floating panels and presentation retain drafts and component state', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    final field = find.byKey(const ValueKey('field-X'));
+    await tester.enterText(field, 'draft');
+    final state = tester.state(field);
+    await tester.tap(find.byKey(const ValueKey('float-Inspector'))); await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('floating-Inspector')), findsOneWidget);
+    expect(tester.state(field), same(state));
+    expect(editor.inspector.getField('X').text, 'draft');
+    await tester.drag(find.byKey(const ValueKey('float-drag-Inspector')), const Offset(60, 20)); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('dock-Inspector'))); await tester.pumpAndSettle();
+    expect(tester.state(field), same(state));
+    await tester.tap(find.byKey(const ValueKey('toggle-inspector'))); await tester.pumpAndSettle();
+    expect(field, findsNothing);
+    await tester.tap(find.byKey(const ValueKey('toggle-inspector'))); await tester.pumpAndSettle();
+    expect(tester.state(field), same(state));
+    await tester.tap(find.byKey(const ValueKey('presentation-mode'))); await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('canvas-toolbar')), findsNothing);
+    expect(find.byKey(const ValueKey('exit-presentation')), findsOneWidget);
+    expect(tester.widget<StudioPreview>(find.byType(StudioPreview)).interactive, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape); await tester.pumpAndSettle();
+    expect(tester.state(field), same(state));
+    expect(editor.inspector.getField('X').text, 'draft');
+    expect(editor.canUndo, isFalse); expect(editor.isDirty, isFalse);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('preview scenarios wake the canvas without editing the scene', (
     tester,
@@ -1544,6 +1578,7 @@ void main() {
       expect(find.byKey(const ValueKey('component-assembly')), findsOneWidget);
       expect(find.text('Optional components'), findsOneWidget);
       final add = find.byKey(const ValueKey('slot-badge'));
+      await revealAssemblyControl(tester, add);
       expect(tester.widget<Switch>(add).value, isFalse);
       await tester.ensureVisible(add);
       await tester.pumpAndSettle();
@@ -1570,6 +1605,7 @@ void main() {
       await openStudio(tester, themeBuilder: buildAssembly);
       await tester.tap(find.byKey(const ValueKey('sidebar-components')));
       await tester.pumpAndSettle();
+      await revealAssemblyControl(tester, add);
       expect(tester.widget<Switch>(add).value, isTrue);
       await tester.ensureVisible(add);
       await tester.pumpAndSettle();
@@ -1693,7 +1729,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('sidebar-components')));
     await tester.pumpAndSettle();
     final add = find.byKey(const ValueKey('slot-badge'));
-    await tester.ensureVisible(add);
+    await revealAssemblyControl(tester, add);
     await tester.pumpAndSettle();
     await tester.tap(add);
     await tester.pumpAndSettle();
