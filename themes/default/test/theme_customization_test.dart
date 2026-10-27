@@ -19,12 +19,13 @@ void main() {
     expect(theme.componentCatalog.components.keys, [
       'terraceLabel',
       'dateTime',
+      'terraceClock',
     ]);
   });
 
   test('unsupported variants fail at the theme document boundary', () {
     final theme = buildDefaultTheme();
-    for (final component in ['terraceLabel', 'dateTime']) {
+    for (final component in ['terraceLabel', 'dateTime', 'terraceClock']) {
       final node = theme.document.nodes.firstWhere(
         (node) => node.componentId == component,
       );
@@ -87,6 +88,60 @@ void main() {
     await renderProperties({'text': 'My desktop', 'variant': 'regular'});
     expect(tester.widget<Text>(find.text('My desktop')).style!.fontSize, 11);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('standby clock styles reopen through the compiled renderer', (
+    tester,
+  ) async {
+    final original = buildDefaultTheme();
+    final clock = original.document.nodes.firstWhere(
+      (node) => node.componentId == 'terraceClock',
+    );
+    for (final variant in [null, 'display', 'stacked', 'compact']) {
+      final theme = buildDefaultTheme(
+        document: decodeSceneDocument(
+          encodeSceneDocument(
+            original.document.copyWith(
+              nodes: [
+                clock.copyWith(properties: {'variant': ?variant}),
+              ],
+            ),
+          ),
+        ),
+      );
+      final components = theme.components(
+        GreeterThemeContext(
+          host: _UnusedHost(),
+          tokens: theme.tokens,
+          canvas: theme.document.canvas,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme.materialTheme,
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 300,
+                height: 160,
+                child: Builder(
+                  builder: (context) =>
+                      components.build(context, theme.document.nodes.single),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final text = tester.widget<Text>(find.byType(Text));
+      expect(
+        text.data,
+        matches(variant == 'stacked' ? r'^\d{2}\n\d{2}$' : r'^\d{2}:\d{2}$'),
+      );
+      expect(text.style!.fontSize, variant == 'compact' ? 72 : 132);
+      expect(tester.takeException(), isNull);
+    }
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets(

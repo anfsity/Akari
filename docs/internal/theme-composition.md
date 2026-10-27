@@ -51,8 +51,10 @@ combines those designs. Code-owned widgets and shaders remain supported.
   geometry/keyboard edits. Wake blur uses the production helper, supports reversal,
   and respects theme/system reduced motion. Leaving preview retains borrowed
   controllers and restores selection.
-- Remaining: richer component variants, native Studio create/save/reopen
-  verification, and the final full audit.
+- Terrace now declares wide, stacked and compact standby clock variants through
+  the same typed component property used by its renderer. Existing scenes keep
+  the original wide clock unless explicitly changed.
+- Remaining: final native reopen verification and the full repository audit.
 
 ## Next implementation: independent project synthesis
 

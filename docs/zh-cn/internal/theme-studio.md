@@ -42,6 +42,7 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 | --- | --- |
 | 标题与说明（`terraceLabel`） | **Text** 文本、**Text style: Regular / Large** 文字样式 |
 | 日期与时间（`dateTime`） | **Display: Date / Time** 显示内容 |
+| 待机时钟（`terraceClock`） | **Clock style: Wide display / Stacked digits / Compact** 三种时钟排版 |
 
 选项修改后立即在画布生效；文本修改在按 `Enter`、失去焦点或点击 **Apply to preview** 时生效。两者均完全支持撤销重做（`Ctrl+Z` / `Ctrl+Shift+Z`）与快捷键保存（`Ctrl+S`）。若输入了未声明的无效选项（例如在高级属性中手动修改），该值无法替换当前工作预览或写入历史记录；此时可通过选项菜单重新选取有效值来修复草稿。
 

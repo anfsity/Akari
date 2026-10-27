@@ -23,7 +23,9 @@ class TerraceComponents implements GreeterThemeComponents {
   @override
   Widget build(BuildContext context, SceneNode node) {
     final component = switch (node.componentId) {
-      'terraceClock' => const _TerraceClock(),
+      'terraceClock' => _TerraceClock(
+        variant: terraceClockVariant.getValue(node.properties),
+      ),
       'terraceLabel' => _TerraceLabel(
         text: terraceLabelText.getValue(node.properties),
         large:
@@ -118,7 +120,9 @@ class _TerraceLabel extends StatelessWidget {
 }
 
 class _TerraceClock extends StatelessWidget {
-  const _TerraceClock();
+  const _TerraceClock({required this.variant});
+
+  final TerraceClockVariant variant;
 
   @override
   Widget build(BuildContext context) => MinuteClockBuilder(
@@ -128,14 +132,16 @@ class _TerraceClock extends StatelessWidget {
         fit: BoxFit.scaleDown,
         alignment: Alignment.centerLeft,
         child: Text(
-          formatClockTime(now),
-          style: const TextStyle(
-            fontSize: 132,
+          variant == TerraceClockVariant.stacked
+              ? formatClockTime(now).replaceFirst(':', '\n')
+              : formatClockTime(now),
+          style: TextStyle(
+            fontSize: variant == TerraceClockVariant.compact ? 72 : 132,
             fontWeight: FontWeight.w300,
-            letterSpacing: -6,
+            letterSpacing: variant == TerraceClockVariant.compact ? -2 : -6,
             height: 1,
             color: Color(0xffeefaff),
-            fontFeatures: [FontFeature.tabularFigures()],
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
       ),
