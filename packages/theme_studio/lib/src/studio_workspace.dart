@@ -451,7 +451,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                         value: _mode,
                                         values: StudioWorkspaceMode.values,
                                         formatValue: (value) =>
-                                            '${value.name[0].toUpperCase()}${value.name.substring(1)} workspace',
+                                            '${value.name[0].toUpperCase()}${value.name.substring(1)} layout',
                                         onChanged: _applyPreset,
                                       ),
                                     ),

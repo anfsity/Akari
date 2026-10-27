@@ -135,10 +135,13 @@ class _StudioSidebarState extends State<StudioSidebar> {
               for (final item in _SidebarTab.values)
                 TabItem(
                   key: ValueKey('sidebar-${item.name}'),
-                  child: Text(
-                    item.label,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      item.label,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                    ),
                   ),
                 ),
             ],
