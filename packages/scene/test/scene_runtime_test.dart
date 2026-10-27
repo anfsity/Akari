@@ -3,10 +3,66 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:scene/scene.dart';
 import 'package:scene/src/runtime/state_effects.dart';
 
 void main() {
+  testWidgets(
+    'SVG assets render independently of theme factories and retain their source across tint edits',
+    (tester) async {
+      var loads = 0;
+      Future<String> loadSvg(String asset) async {
+        loads++;
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#000000"/></svg>';
+      }
+
+      Future<void> render(int tint) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SceneRuntime(
+              document: _document(
+                nodes: [
+                  SceneNode(
+                    id: 'icon',
+                    componentId: 'sceneAsset',
+                    asset: SceneAsset(
+                      path: 'assets/icon.svg',
+                      kind: SceneAssetKind.svg,
+                      tint: tint,
+                    ),
+                    rect: const SceneRect(x: 0, y: 0, width: 1, height: 1),
+                  ),
+                ],
+              ),
+              theme: ThemeBundle(tokens: _tokens()),
+              assetSvgLoader: loadSvg,
+              nodeBuilder: (_, _) => throw StateError(
+                'Asset nodes must not enter the component factory',
+              ),
+            ),
+          ),
+        ),
+      );
+      await render(0xffff0000);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<SvgPicture>(find.byType(SvgPicture)).colorFilter,
+        const ColorFilter.mode(Color(0xffff0000), BlendMode.srcIn),
+      );
+      final state = tester.state(find.byType(SceneAssetView));
+      await render(0xff00ff00);
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(SceneAssetView)), same(state));
+      expect(loads, 1);
+      expect(
+        tester.widget<SvgPicture>(find.byType(SvgPicture)).colorFilter,
+        const ColorFilter.mode(Color(0xff00ff00), BlendMode.srcIn),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     'state-entry effects trigger once, reset and respect reduced motion',
     (tester) async {

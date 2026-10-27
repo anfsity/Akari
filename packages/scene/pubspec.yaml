@@ -8,6 +8,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_svg: ^2.3.0
   scene_schema:
     path: ../scene_schema
 

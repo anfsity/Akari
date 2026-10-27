@@ -9,6 +9,8 @@ import 'node_transform.dart';
 import 'scene_layout.dart';
 import 'node_style.dart';
 import 'state_effects.dart';
+import 'scene_asset.dart';
+import 'background_renderer.dart';
 
 typedef SceneNodeBuilder = Widget Function(
   BuildContext context,
@@ -33,6 +35,9 @@ class SceneRuntime extends StatelessWidget {
     required this.nodeBuilder,
     this.frameBuilder,
     this.playback,
+    this.assetBuilder,
+    this.assetImageResolver,
+    this.assetSvgLoader,
     this.activePredicates = const <ScenePredicate>{},
     this.activePredicatesListenable,
     this.backgroundBlurSigma,
@@ -45,6 +50,9 @@ class SceneRuntime extends StatelessWidget {
   final SceneNodeBuilder nodeBuilder;
   final SceneFrameBuilder? frameBuilder;
   final ScenePlayback? playback;
+  final SceneFrameBuilder? assetBuilder;
+  final SceneImageProviderResolver? assetImageResolver;
+  final SceneSvgLoader? assetSvgLoader;
 
   /// Predicates currently true for the scene.
   ///
@@ -131,6 +139,7 @@ class SceneRuntime extends StatelessWidget {
     final reducedMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
     final layout = node.layout;
+    final asset = node.asset;
     final duration = reducedMotion
         ? Duration.zero
         : Duration(
@@ -164,6 +173,31 @@ class SceneRuntime extends StatelessWidget {
         previewProgress = curve.transform(visible ? time : 1 - time);
       }
     }
+    final SceneNodeBuilder contentBuilder;
+    if (layout != null) {
+      contentBuilder = (context, node) {
+        final child = Stack(
+          fit: StackFit.expand,
+          clipBehavior: layout.clip ? Clip.hardEdge : Clip.none,
+          children: [
+            for (final child in document.getChildren(node.id))
+              _buildNode(context, geometry, child),
+          ],
+        );
+        return frameBuilder?.call(context, node, child) ?? child;
+      };
+    } else if (asset != null) {
+      contentBuilder = (context, node) {
+        final child = SceneAssetView(
+          asset: asset,
+          resolveImage: assetImageResolver,
+          loadSvg: assetSvgLoader,
+        );
+        return assetBuilder?.call(context, node, child) ?? child;
+      };
+    } else {
+      contentBuilder = nodeBuilder;
+    }
     final content = _SceneNodeHost(
       previewProgress: previewProgress,
       visible: visible,
@@ -181,19 +215,7 @@ class SceneRuntime extends StatelessWidget {
       ),
       node: node,
       style: document.styleTokens[node.styleToken] ?? const SceneStyle(),
-      nodeBuilder: layout == null
-          ? nodeBuilder
-          : (context, node) {
-              final child = Stack(
-                fit: StackFit.expand,
-                clipBehavior: layout.clip ? Clip.hardEdge : Clip.none,
-                children: [
-                  for (final child in document.getChildren(node.id))
-                    _buildNode(context, geometry, child),
-                ],
-              );
-              return frameBuilder?.call(context, node, child) ?? child;
-            },
+      nodeBuilder: contentBuilder,
     );
 
     final rect = geometry[node.id]!.rect;

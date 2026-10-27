@@ -17,3 +17,4 @@ export 'src/runtime/node_transform.dart';
 export 'src/runtime/scene_runtime.dart';
 export 'src/runtime/scene_layout.dart';
 export 'src/runtime/node_style.dart' show getSceneTextStyle;
+export 'src/runtime/scene_asset.dart';
