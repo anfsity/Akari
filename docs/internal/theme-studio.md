@@ -280,6 +280,17 @@ through these operations. Presentation hides authoring controls, fits the scene,
 and restores the editor camera on exit. Smaller windows can reclaim space by
 collapsing panels instead of keeping a fixed three-column minimum width.
 
+Panels can dock on either edge, using **Dock left/right** in a floating header
+or by dragging the window against an edge. Panels on the same edge become a
+tab group; switching tabs retains their fields and scroll state. The workspace
+selector offers **Design**, **Motion** (right-side tabs and the timeline), and
+**Focus** (hidden side panels). Dock positions, visibility, widths, floating
+bounds, and workspace mode restore on the next launch. These are user preferences
+and do not create scene history. Collapse and restore controls stay on the
+corresponding outer edge, and camera controls occupy a separate footer group.
+Canvas shortcuts also work while a layer row is focused; text fields retain
+their own editing behavior.
+
 - **Presets & projects**: Studio compiles all packages under `themes/` alongside `--theme`. Switching **THEME** (or loading a scene from a registered theme package) switches the component factory, tokens, background renderers, and assets together.
 - **Inspect code**: Switch the right panel from **Design** to **Inspect code** to view and copy validated **JSON** or generated **Dart** for the **Selection** or the entire **Scene**.
 - **Settings**: The dialog separates **Canvas**, **Background**, **Appearance**, and **Grid & snapping**. Drafts stay intact while switching categories; validation opens the category that needs correction.
@@ -294,7 +305,7 @@ collapsing panels instead of keeping a fixed three-column minimum width.
 - **Import asset** (in **Assets**): Copies a file into the owning theme's `assets/` directory, registers it in `pubspec.yaml`, and copies its `packages/<theme>/assets/...` path to the clipboard. The imported file becomes selected and clears existing filters.
 - **Add to canvas**: Images, textures, and SVGs become independent layers after decoding succeeds. Move, resize, group, style, animate, duplicate, and delete them through the usual canvas tools. The inspector edits fitting and color overrides; SVG color can also be chosen before placement. Layer creation and edits use scene undo/redo and **Save scene**.
 - **Use image**: For raster images, validates the file and sets it as the scene background (requires **Save scene** to persist to JSON).
-- **Fonts**: The sidebar keeps a one-line sample and single-line filenames. Expand the preview for a larger sample with an adjustable size. **Apply to selection** saves the font asset on the selection's style token, with undo/redo and independent-theme copying. The typography controls also edit weight, letter spacing, and line height. Font registration is shared between previews and rendering and cached by file revision; previewing alone does not modify the scene.
+- **Fonts**: The sidebar keeps a one-line sample and single-line filenames. Expand the preview for a larger sample with an adjustable size. **Apply font** saves the font asset on the selection's style token, with undo/redo and independent-theme copying. The typography controls also edit weight, letter spacing, and line height. Font registration is shared between previews and rendering and cached by file revision; previewing alone does not modify the scene.
 - **Shader & audio files**: Shaders show a source excerpt; audio files have a dedicated category. Shader parameters remain in **Effects** for renderers that declare them.
 - **Independent themes**: Image/SVG layers retain their fitting and tint when creating a theme. Referenced files from another scene-owning package are copied into the new project.
 - **Package resolution**: When opening a scene via **Load JSON**, Studio locates the nearest `theme_*` package boundary to own asset imports. For an unregistered external theme, restart Studio with `--theme /path/to/theme_other` to compile its custom widgets and bundle assets.

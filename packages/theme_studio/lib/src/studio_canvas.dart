@@ -14,6 +14,7 @@ import 'node_arrangement_toolbar.dart';
 import 'studio_timeline.dart';
 import 'studio_state_graph.dart';
 import 'studio_workspace.dart';
+import 'studio_workspace_layout.dart';
 import 'studio_canvas_presets.dart';
 import 'studio_comparison.dart';
 
@@ -42,10 +43,10 @@ class StudioCanvas extends StatefulWidget {
   final SceneFontLoader? assetFontLoader;
 
   @override
-  State<StudioCanvas> createState() => _StudioCanvasState();
+  State<StudioCanvas> createState() => StudioCanvasState();
 }
 
-class _StudioCanvasState extends State<StudioCanvas> {
+class StudioCanvasState extends State<StudioCanvas> {
   StudioCanvasTool _tool = StudioCanvasTool.move;
   bool _lockAspectRatio = false;
   bool _snapToGuides = true;
@@ -57,11 +58,29 @@ class _StudioCanvasState extends State<StudioCanvas> {
   bool _showStateGraph = false;
   bool _comparing = false;
   bool _showRulers = false;
+  StudioWorkspaceMode _workspaceMode = StudioWorkspaceMode.design;
   StudioPreviewScenario _scenario = StudioPreviewScenario.password;
   double? _zoom;
   int _resetView = 0;
   final _viewportKey = GlobalKey();
   final _focus = FocusNode(debugLabel: 'Studio canvas');
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final mode =
+        context
+            .dependOnInheritedWidgetOfExactType<StudioWorkspaceScope>()
+            ?.mode ??
+        StudioWorkspaceMode.design;
+    if (mode != _workspaceMode) {
+      _workspaceMode = mode;
+      _elapsed = mode == StudioWorkspaceMode.motion ? Duration.zero : null;
+      _previewing = false;
+      _comparing = false;
+      _showStateGraph = false;
+    }
+  }
 
   @override
   void dispose() {
@@ -134,7 +153,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
     });
   }
 
-  KeyEventResult _handleKeyEvent(FocusNode focus, KeyEvent event) {
+  KeyEventResult handleKeyEvent(KeyEvent event) {
     if (context
             .getInheritedWidgetOfExactType<StudioWorkspaceScope>()
             ?.presenting ??
@@ -240,7 +259,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
         false;
     return Focus(
       focusNode: _focus,
-      onKeyEvent: _handleKeyEvent,
+      onKeyEvent: (_, event) => handleKeyEvent(event),
       onFocusChange: (focused) {
         if (!focused && _spacePan) setState(() => _spacePan = false);
       },
@@ -638,70 +657,80 @@ class _StudioCanvasState extends State<StudioCanvas> {
                       spacing: 8,
                       runSpacing: 8,
                       crossAxisAlignment: WrapCrossAlignment.center,
+                      alignment: WrapAlignment.spaceBetween,
                       children: [
-                        if (session != null)
-                          SizedBox(
-                            width: 170,
-                            child: StudioSelect<StudioCanvasPreset>(
-                              key: const ValueKey('quick-resolution'),
-                              enabled: !widget.readOnly,
-                              value: StudioCanvasPreset.values
-                                  .where(
-                                    (preset) =>
-                                        preset.width ==
-                                            session
-                                                .document
-                                                .canvas
-                                                .referenceWidth &&
-                                        preset.height ==
-                                            session
-                                                .document
-                                                .canvas
-                                                .referenceHeight,
-                                  )
-                                  .firstOrNull,
-                              values: StudioCanvasPreset.values,
-                              placeholder: Text(
-                                '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}',
-                              ).small(),
-                              formatValue: (preset) =>
-                                  '${preset.width} × ${preset.height}',
-                              onChanged: (preset) {
-                                if (!session.applyDraft()) return;
-                                session.updateScene(
-                                  canvas: session.document.canvas.copyWith(
-                                    referenceWidth: preset.width,
-                                    referenceHeight: preset.height,
-                                  ),
-                                );
-                                _fitView();
-                              },
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (session != null)
+                              SizedBox(
+                                width: 170,
+                                child: StudioSelect<StudioCanvasPreset>(
+                                  key: const ValueKey('quick-resolution'),
+                                  enabled: !widget.readOnly,
+                                  value: StudioCanvasPreset.values
+                                      .where(
+                                        (preset) =>
+                                            preset.width ==
+                                                session
+                                                    .document
+                                                    .canvas
+                                                    .referenceWidth &&
+                                            preset.height ==
+                                                session
+                                                    .document
+                                                    .canvas
+                                                    .referenceHeight,
+                                      )
+                                      .firstOrNull,
+                                  values: StudioCanvasPreset.values,
+                                  placeholder: Text(
+                                    '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}',
+                                  ).small(),
+                                  formatValue: (preset) =>
+                                      '${preset.width} × ${preset.height}',
+                                  onChanged: (preset) {
+                                    if (!session.applyDraft()) return;
+                                    session.updateScene(
+                                      canvas: session.document.canvas.copyWith(
+                                        referenceWidth: preset.width,
+                                        referenceHeight: preset.height,
+                                      ),
+                                    );
+                                    _fitView();
+                                  },
+                                ),
+                              ),
+                            const Gap(8),
+                            OutlineButton(
+                              key: const ValueKey('canvas-compare'),
+                              density: ButtonDensity.compact,
+                              onPressed: session == null
+                                  ? null
+                                  : _toggleComparison,
+                              child: Text(_comparing ? 'Single' : 'Compare')
+                                  .small(),
                             ),
-                          ),
-                        const Gap(8),
-                        OutlineButton(
-                          key: const ValueKey('canvas-compare'),
-                          density: ButtonDensity.compact,
-                          onPressed: session == null ? null : _toggleComparison,
-                          child: Text(_comparing ? 'Single' : 'Compare')
-                              .small(),
+                            const Gap(8),
+                            Tooltip(
+                              tooltip: (_) => const Text(
+                                'Rulers · Drag from a ruler to create a guide',
+                              ),
+                              child: Button(
+                                key: const ValueKey('canvas-rulers'),
+                                style: _showRulers
+                                    ? const ButtonStyle.primaryIcon()
+                                    : const ButtonStyle.outlineIcon(),
+                                onPressed: () =>
+                                    setState(() => _showRulers = !_showRulers),
+                                child: const Icon(LucideIcons.ruler, size: 16),
+                              ),
+                            ),
+                          ],
                         ),
-                        const Gap(8),
-                        Tooltip(
-                          tooltip: (_) => const Text(
-                            'Rulers · Drag from a ruler to create a guide',
-                          ),
-                          child: Button(
-                            key: const ValueKey('canvas-rulers'),
-                            style: _showRulers
-                                ? const ButtonStyle.primaryIcon()
-                                : const ButtonStyle.outlineIcon(),
-                            onPressed: () =>
-                                setState(() => _showRulers = !_showRulers),
-                            child: const Icon(LucideIcons.ruler, size: 16),
-                          ),
-                        ),
-                        ...zoomControls,
+                        Wrap(spacing: 4, runSpacing: 4, children: zoomControls),
                       ],
                     ),
                   ),

@@ -136,11 +136,7 @@ class StudioFormSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Text(title).small().semiBold(),
-      Gap(headerSpacing),
-      ...children,
-    ],
+    children: [Text(title).small().semiBold(), Gap(headerSpacing), ...children],
   );
 }
 
@@ -226,7 +222,7 @@ class _StudioSelectState<T> extends State<StudioSelect<T>> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      popup: SelectPopup(
+      popup: SelectPopup<T>(
         items: SelectItemList(
           children: [
             for (final value in widget.values)

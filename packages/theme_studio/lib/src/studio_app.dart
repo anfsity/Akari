@@ -42,6 +42,7 @@ class ThemeStudioApp extends StatefulWidget {
 
 class _ThemeStudioAppState extends State<ThemeStudioApp> {
   SceneEditor? _editor;
+  final _canvasKey = GlobalKey<StudioCanvasState>();
   late ThemeDefinition _theme;
   late String _path;
   late List<String> _scenePaths;
@@ -621,6 +622,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       onSave: _save,
       onOpenSettings: () => _openSettings(context),
       input: _preferences.input,
+      onCanvasKeyEvent: (event) =>
+          _canvasKey.currentState!.handleKeyEvent(event),
       toolbar: StudioToolbar(
         themeId: _theme.id,
         readOnly: _inspect,
@@ -666,6 +669,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         ],
       ),
       canvas: StudioCanvas(
+        key: _canvasKey,
         editor: editor,
         theme: _theme,
         preferences: _preferences,
@@ -701,10 +705,13 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                     children: [
                       for (final label in ['Design', 'Effects', 'Inspect code'])
                         TabItem(
-                          child: Text(
-                            label,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              label,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                            ),
                           ),
                         ),
                     ],
