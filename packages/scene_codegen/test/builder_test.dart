@@ -26,6 +26,10 @@ void main() {
             'radius': 16,
             'textColor': '#ffffff',
             'fontSize': 24,
+            'fontAsset': 'assets/type.otf',
+            'fontWeight': 700,
+            'letterSpacing': 1.5,
+            'lineHeight': 1.4,
           },
         },
         'canvas': {'fit': 'contain'},
@@ -104,6 +108,10 @@ void main() {
     );
     expect(document['nodes'][1]['asset']['tint'], '#112233');
     expect(document['nodes'][2]['primitive'], 'text');
+    expect(document['styleTokens']['glass']['fontAsset'], 'assets/type.otf');
+    expect(document['styleTokens']['glass']['fontWeight'], 700);
+    expect(document['styleTokens']['glass']['letterSpacing'], 1.5);
+    expect(document['styleTokens']['glass']['lineHeight'], 1.4);
     expect(document['nodes'][2]['properties']['text'], 'Portable text');
     expect(document['themeProperties'], properties);
     expect(document['guides'], [

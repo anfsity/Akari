@@ -444,12 +444,7 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
 
 SceneAsset _decodeAsset(Map<String, dynamic> json) {
   final path = _getString(json, 'path');
-  if (path.contains('..') ||
-      path.contains(r'\') ||
-      path.endsWith('/') ||
-      (!path.startsWith('assets/') && !path.startsWith('packages/'))) {
-    throw FormatException('Invalid scene asset path: $path');
-  }
+  _validateAssetPath(path);
   return SceneAsset(
     path: path,
     kind: _getEnumValue(
@@ -466,6 +461,15 @@ SceneAsset _decodeAsset(Map<String, dynamic> json) {
         ? null
         : decodeSceneColor(_getString(json, 'tint')),
   );
+}
+
+void _validateAssetPath(String path) {
+  if (path.contains('..') ||
+      path.contains(r'\') ||
+      path.endsWith('/') ||
+      (!path.startsWith('assets/') && !path.startsWith('packages/'))) {
+    throw FormatException('Invalid scene asset path: $path');
+  }
 }
 
 SceneGuide _decodeGuide(Map<String, dynamic> json) {
@@ -524,6 +528,18 @@ SceneStyle _decodeStyle(Map<String, dynamic> json) {
   if (opacity < 0 || opacity > 1) {
     throw const FormatException('Style opacity must be in [0, 1].');
   }
+  final fontAsset = _findString(json, 'fontAsset');
+  if (fontAsset != null) _validateAssetPath(fontAsset);
+  final weight = _getInt(json, 'fontWeight', fallback: 0);
+  final height = json['lineHeight'] == null
+      ? null
+      : _getDouble(json, 'lineHeight');
+  if ((weight != 0 && (weight < 100 || weight > 900 || weight % 100 != 0)) ||
+      (height != null && height <= 0)) {
+    throw const FormatException(
+      'Typography requires a weight of 100..900 or 0 to inherit, and a positive line height.',
+    );
+  }
   return SceneStyle(
     fill: color('fill', defaults.fill),
     gradientEnd: json['gradientEnd'] == null ? null : color('gradientEnd', 0),
@@ -541,6 +557,12 @@ SceneStyle _decodeStyle(Map<String, dynamic> json) {
     backgroundBlur: _getNonNegative(json, 'backgroundBlur'),
     textColor: json['textColor'] == null ? null : color('textColor', 0),
     fontSize: _getNonNegative(json, 'fontSize'),
+    fontAsset: fontAsset,
+    fontWeight: weight,
+    lineHeight: height,
+    letterSpacing: json['letterSpacing'] == null
+        ? null
+        : _getDouble(json, 'letterSpacing'),
     opacity: opacity,
   );
 }
@@ -559,6 +581,10 @@ Map<String, dynamic> _encodeStyle(SceneStyle style) => {
   'backgroundBlur': style.backgroundBlur,
   if (style.textColor != null) 'textColor': encodeSceneColor(style.textColor!),
   'fontSize': style.fontSize,
+  if (style.fontAsset != null) 'fontAsset': style.fontAsset,
+  'fontWeight': style.fontWeight,
+  if (style.letterSpacing != null) 'letterSpacing': style.letterSpacing,
+  if (style.lineHeight != null) 'lineHeight': style.lineHeight,
   'opacity': style.opacity,
 };
 

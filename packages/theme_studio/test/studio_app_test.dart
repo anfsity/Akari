@@ -2906,6 +2906,48 @@ void main() {
     },
   );
 
+  testWidgets('font previews expand and apply the selected face as an undoable scene style', (tester) async {
+    final font = File('${directory.path}/assets/Preview.otf');
+    font.parent.createSync();
+    File('../../themes/default/assets/fonts/SpaceGrotesk-Regular.otf').copySync(font.path);
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    editor.createComponent(StudioComponent.text);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const ValueKey('sidebar-assets')));
+      await tester.pumpAndSettle();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pumpAndSettle();
+    final sample = tester.widget<Text>(find.byKey(const ValueKey('font-preview-sample')));
+    expect(sample.maxLines, 1);
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const ValueKey('expand-font-preview')));
+      await tester.pumpAndSettle();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pumpAndSettle();
+    expect(tester.widgetList<Text>(find.byKey(const ValueKey('font-preview-sample'))).any((sample) => sample.maxLines == 3), isTrue);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const ValueKey('apply-asset-font')));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pumpAndSettle();
+    final token = editor.selectedNode.styleToken!;
+    expect(editor.document.styleTokens[token]!.fontAsset, 'packages/test/assets/Preview.otf');
+    editor.undo();
+    expect(editor.document.styleTokens[token]!.fontAsset, isNull);
+    editor.redo();
+    expect(editor.save(), isTrue);
+    expect(decodeSceneDocument(file.readAsStringSync()).styleTokens[token]!.fontAsset, 'packages/test/assets/Preview.otf');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'asset search and categories filter resources without changing scene history',
     (tester) async {

@@ -435,6 +435,22 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     }
   }
 
+  Future<void> _applyFont(String asset) async {
+    final editor = _editor;
+    if (editor == null || !editor.applyDraft()) return;
+    try {
+      await _assets.loadFontPreview(asset);
+      if (!mounted || !identical(editor, _editor)) return;
+      final style =
+          editor.document.styleTokens[editor.selectedNode.styleToken] ??
+          const SceneStyle();
+      editor.updateSelectionStyle(style.copyWith(fontAsset: asset));
+      setState(() => _error = null);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = 'Cannot apply font: $error');
+    }
+  }
+
   Future<void> _placeAsset(SceneAsset asset) async {
     final editor = _editor;
     if (editor == null || !editor.applyDraft()) return;
@@ -632,6 +648,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
               loadAssetText: _assets.loadTextAsset,
               loadFontPreview: _assets.loadFontPreview,
               onPlaceAsset: _placeAsset,
+              onApplyFont: _applyFont,
               editor: editor,
               loadingFile: _loadingFile,
               readOnly: _inspect,
@@ -657,6 +674,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         onToggleDormant: () => setState(() => _dormant = !_dormant),
         assetImageResolver: _assets.getImageProvider,
         assetSvgLoader: _assets.loadTextAsset,
+        assetFontLoader: _assets.loadFontPreview,
       ),
       inspector: editor == null
           ? const SizedBox()

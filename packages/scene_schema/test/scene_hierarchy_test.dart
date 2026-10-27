@@ -20,6 +20,28 @@ Map<String, Object> node(String id, {String? parent, bool frame = false}) => {
 };
 
 void main() {
+  test(
+    'typography paths weights and dimensions reject invalid authoring values',
+    () {
+      for (final style in [
+        {'fontAsset': '/tmp/font.otf'},
+        {'fontAsset': 'assets/../font.otf'},
+        {'fontWeight': 450},
+        {'fontWeight': 1000},
+        {'lineHeight': 0},
+        {'letterSpacing': 'wide'},
+      ]) {
+        final json = scene([
+          {...node('a'), 'styleToken': 'type'},
+        ])..['styleTokens'] = {'type': style};
+        expect(
+          () => decodeSceneDocument(jsonEncode(json)),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+
   test('primitive content validates once and round trips independently of theme components', () {
     for (final kind in ScenePrimitive.values) {
       final document = decodeSceneDocument(

@@ -10,6 +10,7 @@ import 'scene_layout.dart';
 import 'node_style.dart';
 import 'state_effects.dart';
 import 'scene_asset.dart';
+import 'scene_font.dart';
 import 'background_renderer.dart';
 
 typedef SceneNodeBuilder = Widget Function(
@@ -38,6 +39,7 @@ class SceneRuntime extends StatelessWidget {
     this.contentDecorator,
     this.assetImageResolver,
     this.assetSvgLoader,
+    this.assetFontLoader,
     this.activePredicates = const <ScenePredicate>{},
     this.activePredicatesListenable,
     this.backgroundBlurSigma,
@@ -53,6 +55,7 @@ class SceneRuntime extends StatelessWidget {
   final SceneFrameBuilder? contentDecorator;
   final SceneImageProviderResolver? assetImageResolver;
   final SceneSvgLoader? assetSvgLoader;
+  final SceneFontLoader? assetFontLoader;
 
   /// Predicates currently true for the scene.
   ///
@@ -226,6 +229,7 @@ class SceneRuntime extends StatelessWidget {
       node: node,
       style: document.styleTokens[node.styleToken] ?? const SceneStyle(),
       nodeBuilder: contentBuilder,
+      loadFont: assetFontLoader,
     );
 
     final rect = geometry[node.id]!.rect;
@@ -295,6 +299,7 @@ class _SceneNodeHost extends StatefulWidget {
     required this.style,
     required this.previewProgress,
     required this.nodeBuilder,
+    required this.loadFont,
   });
 
   final bool visible;
@@ -305,6 +310,7 @@ class _SceneNodeHost extends StatefulWidget {
   final SceneMotionSpec spec;
   final SceneNode node;
   final SceneStyle style;
+  final SceneFontLoader? loadFont;
   final double? previewProgress;
   final SceneNodeBuilder nodeBuilder;
 
@@ -518,6 +524,7 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
         : widget.nodeBuilder(context, widget.node);
     return SceneStyleView(
       style: widget.style,
+      loadFont: widget.loadFont,
       shape: widget.node.primitive == ScenePrimitive.circle
           ? BoxShape.circle
           : BoxShape.rectangle,

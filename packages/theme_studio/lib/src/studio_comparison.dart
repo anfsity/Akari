@@ -17,6 +17,7 @@ class StudioComparison extends StatelessWidget {
     required this.scenario,
     this.assetImageResolver,
     this.assetSvgLoader,
+    this.assetFontLoader,
     super.key,
   });
   final ThemeDefinition theme;
@@ -26,6 +27,7 @@ class StudioComparison extends StatelessWidget {
   final StudioPreviewScenario scenario;
   final SceneImageProviderResolver? assetImageResolver;
   final SceneSvgLoader? assetSvgLoader;
+  final SceneFontLoader? assetFontLoader;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -67,6 +69,7 @@ class StudioComparison extends StatelessWidget {
                     ),
                     assetImageResolver: assetImageResolver,
                     assetSvgLoader: assetSvgLoader,
+                    assetFontLoader: assetFontLoader,
                     selectedId: document.nodes.first.id,
                     selectedIds: const {},
                     dormant: dormant,

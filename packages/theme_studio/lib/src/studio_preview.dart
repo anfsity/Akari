@@ -68,6 +68,7 @@ class StudioPreview extends StatefulWidget {
     this.onDeleteGuide,
     this.assetImageResolver,
     this.assetSvgLoader,
+    this.assetFontLoader,
     this.readOnly = false,
     this.scenario = StudioPreviewScenario.password,
     this.interactive = false,
@@ -103,6 +104,7 @@ class StudioPreview extends StatefulWidget {
   final ValueChanged<int>? onDeleteGuide;
   final SceneImageProviderResolver? assetImageResolver;
   final SceneSvgLoader? assetSvgLoader;
+  final SceneFontLoader? assetFontLoader;
   final bool dormant;
   final StudioPreferences preferences;
   final StudioCanvasTool tool;
@@ -722,6 +724,7 @@ class _StudioPreviewState extends State<StudioPreview>
                           _buildSelectableNode(node, child),
                       assetImageResolver: widget.assetImageResolver,
                       assetSvgLoader: widget.assetSvgLoader,
+                      assetFontLoader: widget.assetFontLoader,
                     ),
                   ),
                   for (final selected in document.nodes.where(
@@ -1001,6 +1004,7 @@ class _PreviewScene extends StatelessWidget {
     required this.contentDecorator,
     required this.assetImageResolver,
     required this.assetSvgLoader,
+    required this.assetFontLoader,
   });
 
   final ThemeDefinition theme;
@@ -1014,6 +1018,7 @@ class _PreviewScene extends StatelessWidget {
   final SceneFrameBuilder contentDecorator;
   final SceneImageProviderResolver? assetImageResolver;
   final SceneSvgLoader? assetSvgLoader;
+  final SceneFontLoader? assetFontLoader;
   final Size referenceSize;
 
   @override
@@ -1041,6 +1046,7 @@ class _PreviewScene extends StatelessWidget {
           contentDecorator: contentDecorator,
           assetImageResolver: assetImageResolver,
           assetSvgLoader: assetSvgLoader,
+          assetFontLoader: assetFontLoader,
         ),
       ),
     ),

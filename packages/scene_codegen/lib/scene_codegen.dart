@@ -121,7 +121,8 @@ String _encodeStyle(SceneStyle style) =>
     gradientAngle: ${style.gradientAngle}, border: ${_encodeColorLiteral(style.border)}, borderWidth: ${style.borderWidth},
     radius: ${style.radius}, shadow: ${_encodeColorLiteral(style.shadow)}, shadowBlur: ${style.shadowBlur}, shadowY: ${style.shadowY},
     backgroundBlur: ${style.backgroundBlur}, textColor: ${style.textColor == null ? 'null' : _encodeColorLiteral(style.textColor!)},
-    fontSize: ${style.fontSize}, opacity: ${style.opacity},
+    fontSize: ${style.fontSize}, fontAsset: ${_encodeDartNullableString(style.fontAsset)},
+    fontWeight: ${style.fontWeight}, letterSpacing: ${style.letterSpacing}, lineHeight: ${style.lineHeight}, opacity: ${style.opacity},
   )''';
 
 /// Stable getter name shared by generated scenes and synthesized entrypoints.
