@@ -102,6 +102,12 @@ Built-in renderers support `image` and `solid`. Using `video` or `custom` requir
 
 ## Image and SVG layers
 
+Nodes can declare `primitive: "text" | "rectangle" | "circle"` for portable
+runtime-owned content. Text uses `properties.text`; all primitives use the same
+style tokens, layout, visibility, and motion as theme components. A primitive,
+asset, and frame layout are mutually exclusive. Studio can add primitives
+repeatedly and drag them into scenes without a theme-declared layout slot.
+
 An optional node `asset` object renders an image or SVG directly through the
 scene runtime. These nodes bypass the theme's component factory; Studio uses
 `sceneAsset` as their component identifier. They support the same geometry,

@@ -5,9 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:scene_schema/scene_schema.dart';
 
 class SceneStyleView extends StatelessWidget {
-  const SceneStyleView({required this.style, required this.child, super.key});
+  const SceneStyleView({
+    required this.style,
+    required this.child,
+    this.shape = BoxShape.rectangle,
+    super.key,
+  });
   final SceneStyle style;
   final Widget child;
+  final BoxShape shape;
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +40,8 @@ class SceneStyleView extends StatelessWidget {
         opacity: style.opacity,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: radius,
+            shape: shape,
+            borderRadius: shape == BoxShape.circle ? null : radius,
             color: Color(style.fill),
             gradient: style.gradientEnd == null
                 ? null
@@ -56,13 +63,15 @@ class SceneStyleView extends StatelessWidget {
                 ),
             ],
           ),
-          child: ClipRRect(
-            borderRadius: radius,
-            clipBehavior: style.radius > 0 || style.backgroundBlur > 0
-                ? Clip.antiAlias
-                : Clip.none,
-            child: content,
-          ),
+          child: shape == BoxShape.circle
+              ? ClipOval(child: content)
+              : ClipRRect(
+                  borderRadius: radius,
+                  clipBehavior: style.radius > 0 || style.backgroundBlur > 0
+                      ? Clip.antiAlias
+                      : Clip.none,
+                  child: content,
+                ),
         ),
       ),
     );

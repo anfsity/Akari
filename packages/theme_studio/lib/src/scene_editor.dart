@@ -7,6 +7,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import 'node_inspector_controller.dart';
 import 'node_geometry.dart';
+import 'studio_components.dart';
 
 // Store canonical JSON with history so status queries and undo/redo do not
 // serialize the entire scene again. Selection changes reuse the same encoding.
@@ -487,6 +488,50 @@ class SceneEditor extends ChangeNotifier {
       return;
     }
     updateNode(node.copyWith(properties: {...node.properties, 'text': text}));
+  }
+
+  void createComponent(
+    StudioComponent component, {
+    Offset position = const Offset(.3, .3),
+  }) {
+    final primitive = component.primitive;
+    if (!applyDraft()) return;
+    final base = primitive?.name ?? 'frame';
+    final id = _allocateId(base, {
+      for (final node in document.nodes) node.id,
+      for (final slot in layout?.slots ?? const <ThemeLayoutSlot>[])
+        slot.defaultNode.id,
+    });
+    final token = _allocateId('$id-style', document.styleTokens.keys.toSet());
+    final node = SceneNode(
+      id: id,
+      componentId: primitive == null ? 'frame' : 'scenePrimitive',
+      primitive: primitive,
+      layout: primitive == null ? const SceneLayout() : null,
+      styleToken: token,
+      rect: SceneRect(
+        x: position.dx.clamp(0, .7),
+        y: position.dy.clamp(0, .7),
+        width: .3,
+        height: primitive == ScenePrimitive.text ? .08 : .3,
+      ),
+      properties: primitive == ScenePrimitive.text
+          ? const {'text': 'New text'}
+          : const {},
+    );
+    _updateDocument(
+      document.copyWith(
+        nodes: [...document.nodes, node],
+        styleTokens: {
+          ...document.styleTokens,
+          token: primitive == ScenePrimitive.text
+              ? const SceneStyle(textColor: 0xffffffff, fontSize: 32)
+              : SceneStyle(fill: primitive == null ? 0x00000000 : 0xffa1a1aa),
+        },
+      ),
+      selectedId: id,
+      selectedIds: {id},
+    );
   }
 
   void createAssetNode(SceneAsset asset) {

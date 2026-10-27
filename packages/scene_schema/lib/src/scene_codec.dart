@@ -243,14 +243,28 @@ SceneNode _decodeNode(
 
   final rect = _decodeRect(_getMap(json, 'rect'), id);
   final component = _decodeComponent(json, id, version);
-  if (json['layout'] != null && json['asset'] != null) {
-    throw const FormatException('An asset node cannot also be a frame.');
+  if ([
+        'layout',
+        'asset',
+        'primitive',
+      ].where((key) => json[key] != null).length >
+      1) {
+    throw const FormatException(
+      'A node can contain one of layout, asset, or primitive.',
+    );
   }
   return SceneNode(
     id: id,
     componentId: component.id,
     rect: rect,
     styleToken: _findString(json, 'styleToken'),
+    primitive: json['primitive'] == null
+        ? null
+        : _getEnumValue(
+            ScenePrimitive.values,
+            _getString(json, 'primitive'),
+            'primitive',
+          ),
     asset: json['asset'] == null ? null : _decodeAsset(_getMap(json, 'asset')),
     stateEffects: {
       for (final entry in _getMap(
@@ -370,6 +384,7 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
     'id': node.id,
     'component': node.componentId,
     if (node.styleToken != null) 'styleToken': node.styleToken,
+    if (node.primitive != null) 'primitive': node.primitive!.name,
     if (node.asset case final asset?)
       'asset': {
         'path': asset.path,

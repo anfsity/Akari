@@ -7,6 +7,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'node_geometry.dart';
 import 'studio_preferences.dart';
 import 'studio_input.dart';
+import 'studio_components.dart';
 import 'studio_preview_host.dart';
 import 'studio_viewport.dart';
 import 'smart_guides.dart';
@@ -53,6 +54,7 @@ class StudioPreview extends StatefulWidget {
     this.onSelectNodes,
     this.onCommitNodes,
     this.onPlaceNode,
+    this.onCreateComponent,
     this.onUpdateText,
     this.snapToGuides = true,
     this.playbackElapsed,
@@ -87,6 +89,7 @@ class StudioPreview extends StatefulWidget {
   final ValueChanged<Set<String>>? onSelectNodes;
   final ValueChanged<List<SceneNode>>? onCommitNodes;
   final void Function(SceneNode, Offset)? onPlaceNode;
+  final void Function(StudioComponent, Offset)? onCreateComponent;
   final void Function(String, String)? onUpdateText;
   final bool snapToGuides;
   final Duration? playbackElapsed;
@@ -616,14 +619,14 @@ class _StudioPreviewState extends State<StudioPreview>
       onZoom: widget.onZoom ?? (_) {},
       childBuilder: (viewportScale) {
         _viewportScale = viewportScale;
-        return DragTarget<SceneNode>(
+        return DragTarget<StudioComponent>(
           onWillAcceptWithDetails: (_) =>
               !widget.readOnly && !widget.interactive,
           onAcceptWithDetails: (details) {
             final canvas =
                 _canvas.currentContext!.findRenderObject()! as RenderBox;
             final position = canvas.globalToLocal(details.offset);
-            widget.onPlaceNode?.call(
+            widget.onCreateComponent?.call(
               details.data,
               Offset(
                 position.dx / referenceSize.width,
@@ -631,181 +634,202 @@ class _StudioPreviewState extends State<StudioPreview>
               ),
             );
           },
-          builder: (context, candidates, rejected) => CustomPaint(
-            foregroundPainter: widget.preferences.showGrid
-                ? _GridPainter(widget.preferences.gridSize)
-                : null,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                GestureDetector(
-                  key: const ValueKey('canvas-marquee'),
-                  behavior: HitTestBehavior.opaque,
-                  dragStartBehavior: DragStartBehavior.down,
-                  onTap: widget.interactive
-                      ? null
-                      : () => widget.onSelectNodes?.call({}),
-                  onPanStart: widget.readOnly || widget.interactive
-                      ? null
-                      : (details) => setState(() {
-                          _marqueeStart = details.localPosition;
-                          _marqueeEnd = details.localPosition;
-                          _marqueeSelection =
-                              HardwareKeyboard.instance.isShiftPressed
-                              ? {..._selectedIds}
-                              : {};
-                        }),
-                  onPanUpdate: widget.readOnly || widget.interactive
-                      ? null
-                      : (details) =>
-                            setState(() => _marqueeEnd = details.localPosition),
-                  onPanEnd: widget.readOnly || widget.interactive
-                      ? null
-                      : (_) {
-                          final rect = Rect.fromPoints(
-                            _marqueeStart!,
-                            _marqueeEnd!,
-                          );
-                          final ids = {
-                            ..._marqueeSelection,
-                            for (final node in document.nodes)
-                              if (_isVisible(node) &&
-                                  rect.overlaps(geometry[node.id]!.bounds))
-                                node.id,
-                          };
-                          setState(() {
+          builder: (context, _, _) => DragTarget<SceneNode>(
+            onWillAcceptWithDetails: (_) =>
+                !widget.readOnly && !widget.interactive,
+            onAcceptWithDetails: (details) {
+              final canvas =
+                  _canvas.currentContext!.findRenderObject()! as RenderBox;
+              final position = canvas.globalToLocal(details.offset);
+              widget.onPlaceNode?.call(
+                details.data,
+                Offset(
+                  position.dx / referenceSize.width,
+                  position.dy / referenceSize.height,
+                ),
+              );
+            },
+            builder: (context, candidates, rejected) => CustomPaint(
+              foregroundPainter: widget.preferences.showGrid
+                  ? _GridPainter(widget.preferences.gridSize)
+                  : null,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  GestureDetector(
+                    key: const ValueKey('canvas-marquee'),
+                    behavior: HitTestBehavior.opaque,
+                    dragStartBehavior: DragStartBehavior.down,
+                    onTap: widget.interactive
+                        ? null
+                        : () => widget.onSelectNodes?.call({}),
+                    onPanStart: widget.readOnly || widget.interactive
+                        ? null
+                        : (details) => setState(() {
+                            _marqueeStart = details.localPosition;
+                            _marqueeEnd = details.localPosition;
+                            _marqueeSelection =
+                                HardwareKeyboard.instance.isShiftPressed
+                                ? {..._selectedIds}
+                                : {};
+                          }),
+                    onPanUpdate: widget.readOnly || widget.interactive
+                        ? null
+                        : (details) => setState(
+                            () => _marqueeEnd = details.localPosition,
+                          ),
+                    onPanEnd: widget.readOnly || widget.interactive
+                        ? null
+                        : (_) {
+                            final rect = Rect.fromPoints(
+                              _marqueeStart!,
+                              _marqueeEnd!,
+                            );
+                            final ids = {
+                              ..._marqueeSelection,
+                              for (final node in document.nodes)
+                                if (_isVisible(node) &&
+                                    rect.overlaps(geometry[node.id]!.bounds))
+                                  node.id,
+                            };
+                            setState(() {
+                              _marqueeStart = null;
+                              _marqueeEnd = null;
+                            });
+                            widget.onSelectNodes?.call(ids);
+                          },
+                    onPanCancel: widget.readOnly || widget.interactive
+                        ? null
+                        : () => setState(() {
                             _marqueeStart = null;
                             _marqueeEnd = null;
-                          });
-                          widget.onSelectNodes?.call(ids);
-                        },
-                  onPanCancel: widget.readOnly || widget.interactive
-                      ? null
-                      : () => setState(() {
-                          _marqueeStart = null;
-                          _marqueeEnd = null;
-                        }),
-                  child: _PreviewScene(
-                    theme: widget.theme,
-                    document: document,
-                    referenceSize: referenceSize,
-                    interactive: widget.interactive,
-                    wakeProgress: wake,
-                    playback: playback,
-                    activePredicates: predicates,
-                    nodeBuilder: (context, node) => _buildSelectableNode(
-                      node,
-                      _components.build(context, node),
+                          }),
+                    child: _PreviewScene(
+                      theme: widget.theme,
+                      document: document,
+                      referenceSize: referenceSize,
+                      interactive: widget.interactive,
+                      wakeProgress: wake,
+                      playback: playback,
+                      activePredicates: predicates,
+                      nodeBuilder: (context, node) => _buildSelectableNode(
+                        node,
+                        _components.build(context, node),
+                      ),
+                      frameBuilder: (context, node, child) =>
+                          _buildInteractiveFrame(node, child),
+                      contentDecorator: (context, node, child) =>
+                          _buildSelectableNode(node, child),
+                      assetImageResolver: widget.assetImageResolver,
+                      assetSvgLoader: widget.assetSvgLoader,
                     ),
-                    frameBuilder: (context, node, child) =>
-                        _buildInteractiveFrame(node, child),
-                    assetBuilder: (context, node, child) =>
-                        _buildSelectableNode(node, child),
-                    assetImageResolver: widget.assetImageResolver,
-                    assetSvgLoader: widget.assetSvgLoader,
                   ),
-                ),
-                for (final selected in document.nodes.where(
-                  (node) => _selectedIds.contains(node.id),
-                ))
-                  if (_isVisible(selected) && !widget.interactive)
-                    _NodeSelectionOverlay(
-                      viewportScale: viewportScale,
-                      geometry: geometry[selected.id]!,
-                      showHandles:
-                          !widget.readOnly &&
-                          _selectedIds.length == 1 &&
-                          widget.tool == StudioCanvasTool.move &&
-                          (selected.parentId == null ||
-                              document.nodes
-                                      .firstWhere(
-                                        (node) => node.id == selected.parentId,
-                                      )
-                                      .layout!
-                                      .direction ==
-                                  SceneLayoutDirection.absolute),
-                      onStart: (handle, details) =>
-                          _startDrag(selected.id, details, handle: handle),
-                      onUpdate: _updateDrag,
-                      onStop: (_) => _stopDrag(commit: true),
-                      onCancel: () => _stopDrag(commit: false),
+                  for (final selected in document.nodes.where(
+                    (node) => _selectedIds.contains(node.id),
+                  ))
+                    if (_isVisible(selected) && !widget.interactive)
+                      _NodeSelectionOverlay(
+                        viewportScale: viewportScale,
+                        geometry: geometry[selected.id]!,
+                        showHandles:
+                            !widget.readOnly &&
+                            _selectedIds.length == 1 &&
+                            widget.tool == StudioCanvasTool.move &&
+                            (selected.parentId == null ||
+                                document.nodes
+                                        .firstWhere(
+                                          (node) =>
+                                              node.id == selected.parentId,
+                                        )
+                                        .layout!
+                                        .direction ==
+                                    SceneLayoutDirection.absolute),
+                        onStart: (handle, details) =>
+                            _startDrag(selected.id, details, handle: handle),
+                        onUpdate: _updateDrag,
+                        onStop: (_) => _stopDrag(commit: true),
+                        onCancel: () => _stopDrag(commit: false),
+                      ),
+                  if (_marqueeStart != null)
+                    Positioned.fromRect(
+                      rect: Rect.fromPoints(_marqueeStart!, _marqueeEnd!),
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0x208b5cf6),
+                            border: Border.all(color: const Color(0xff8b5cf6)),
+                          ),
+                        ),
+                      ),
                     ),
-                if (_marqueeStart != null)
-                  Positioned.fromRect(
-                    rect: Rect.fromPoints(_marqueeStart!, _marqueeEnd!),
+                  Positioned.fill(
                     child: IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0x208b5cf6),
-                          border: Border.all(color: const Color(0xff8b5cf6)),
+                      child: CustomPaint(
+                        painter: SmartGuidePainter(
+                          vertical: _verticalGuides,
+                          horizontal: _horizontalGuides,
+                          measurements: _measurements,
+                          scale: viewportScale,
                         ),
                       ),
                     ),
                   ),
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(
-                      painter: SmartGuidePainter(
-                        vertical: _verticalGuides,
-                        horizontal: _horizontalGuides,
-                        measurements: _measurements,
+                  if (widget.showRulers && !widget.interactive)
+                    Positioned.fill(
+                      child: StudioRulers(
+                        size: referenceSize,
                         scale: viewportScale,
+                        guides: _getRulerGuides(),
+                        readOnly: widget.readOnly,
+                        onStart: _startGuide,
+                        onUpdate: _updateGuide,
+                        onStop: () => _stopGuide(commit: true),
+                        onCancel: () => _stopGuide(commit: false),
+                        onDelete: (index) => widget.onDeleteGuide?.call(index),
                       ),
                     ),
-                  ),
-                ),
-                if (widget.showRulers && !widget.interactive)
-                  Positioned.fill(
-                    child: StudioRulers(
-                      size: referenceSize,
-                      scale: viewportScale,
-                      guides: _getRulerGuides(),
-                      readOnly: widget.readOnly,
-                      onStart: _startGuide,
-                      onUpdate: _updateGuide,
-                      onStop: () => _stopGuide(commit: true),
-                      onCancel: () => _stopGuide(commit: false),
-                      onDelete: (index) => widget.onDeleteGuide?.call(index),
-                    ),
-                  ),
-                if (_editingText case final node?)
-                  Positioned.fromRect(
-                    rect: geometry[node.id]!.bounds,
-                    child: Localizations.override(
-                      context: context,
-                      delegates: const [DefaultMaterialLocalizations.delegate],
-                      child: Material(
-                        color: Colors.transparent,
-                        child: Focus(
-                          onKeyEvent: (_, event) {
-                            if (event is KeyDownEvent &&
-                                event.logicalKey == LogicalKeyboardKey.escape) {
-                              setState(() => _editingText = null);
-                              return KeyEventResult.handled;
-                            }
-                            return KeyEventResult.ignored;
-                          },
-                          child: TextField(
-                            key: const ValueKey('canvas-text-editor'),
-                            controller: _text,
-                            focusNode: _textFocus,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                            ),
-                            onSubmitted: (_) => _commitText(),
-                            onTapOutside: (_) => _commitText(),
-                            decoration: const InputDecoration(
-                              filled: true,
-                              fillColor: Color(0xee18181b),
-                              border: OutlineInputBorder(),
+                  if (_editingText case final node?)
+                    Positioned.fromRect(
+                      rect: geometry[node.id]!.bounds,
+                      child: Localizations.override(
+                        context: context,
+                        delegates: const [
+                          DefaultMaterialLocalizations.delegate,
+                        ],
+                        child: Material(
+                          color: Colors.transparent,
+                          child: Focus(
+                            onKeyEvent: (_, event) {
+                              if (event is KeyDownEvent &&
+                                  event.logicalKey ==
+                                      LogicalKeyboardKey.escape) {
+                                setState(() => _editingText = null);
+                                return KeyEventResult.handled;
+                              }
+                              return KeyEventResult.ignored;
+                            },
+                            child: TextField(
+                              key: const ValueKey('canvas-text-editor'),
+                              controller: _text,
+                              focusNode: _textFocus,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                              ),
+                              onSubmitted: (_) => _commitText(),
+                              onTapOutside: (_) => _commitText(),
+                              decoration: const InputDecoration(
+                                filled: true,
+                                fillColor: Color(0xee18181b),
+                                border: OutlineInputBorder(),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -974,7 +998,7 @@ class _PreviewScene extends StatelessWidget {
     required this.nodeBuilder,
     required this.frameBuilder,
     required this.playback,
-    required this.assetBuilder,
+    required this.contentDecorator,
     required this.assetImageResolver,
     required this.assetSvgLoader,
   });
@@ -987,7 +1011,7 @@ class _PreviewScene extends StatelessWidget {
   final SceneNodeBuilder nodeBuilder;
   final SceneFrameBuilder frameBuilder;
   final ScenePlayback? playback;
-  final SceneFrameBuilder assetBuilder;
+  final SceneFrameBuilder contentDecorator;
   final SceneImageProviderResolver? assetImageResolver;
   final SceneSvgLoader? assetSvgLoader;
   final Size referenceSize;
@@ -1014,7 +1038,7 @@ class _PreviewScene extends StatelessWidget {
           nodeBuilder: nodeBuilder,
           frameBuilder: frameBuilder,
           playback: playback,
-          assetBuilder: assetBuilder,
+          contentDecorator: contentDecorator,
           assetImageResolver: assetImageResolver,
           assetSvgLoader: assetSvgLoader,
         ),

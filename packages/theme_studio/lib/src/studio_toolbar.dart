@@ -10,6 +10,7 @@ class StudioToolbar extends StatelessWidget {
     required this.onOpenSettings,
     required this.onSave,
     required this.onCreateTheme,
+    required this.onCreateScene,
     this.readOnly = false,
     super.key,
   });
@@ -21,6 +22,7 @@ class StudioToolbar extends StatelessWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback onSave;
   final VoidCallback onCreateTheme;
+  final VoidCallback onCreateScene;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -66,6 +68,14 @@ class StudioToolbar extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      OutlineButton(
+                        key: const ValueKey('new-scene'),
+                        onPressed: !readOnly && session != null
+                            ? onCreateScene
+                            : null,
+                        child: const Text('New scene'),
+                      ),
+                      const Gap(8),
                       OutlineButton(
                         key: const ValueKey('create-theme'),
                         onPressed: !readOnly && session != null

@@ -35,7 +35,7 @@ class SceneRuntime extends StatelessWidget {
     required this.nodeBuilder,
     this.frameBuilder,
     this.playback,
-    this.assetBuilder,
+    this.contentDecorator,
     this.assetImageResolver,
     this.assetSvgLoader,
     this.activePredicates = const <ScenePredicate>{},
@@ -50,7 +50,7 @@ class SceneRuntime extends StatelessWidget {
   final SceneNodeBuilder nodeBuilder;
   final SceneFrameBuilder? frameBuilder;
   final ScenePlayback? playback;
-  final SceneFrameBuilder? assetBuilder;
+  final SceneFrameBuilder? contentDecorator;
   final SceneImageProviderResolver? assetImageResolver;
   final SceneSvgLoader? assetSvgLoader;
 
@@ -193,7 +193,17 @@ class SceneRuntime extends StatelessWidget {
           resolveImage: assetImageResolver,
           loadSvg: assetSvgLoader,
         );
-        return assetBuilder?.call(context, node, child) ?? child;
+        return contentDecorator?.call(context, node, child) ?? child;
+      };
+    } else if (node.primitive case final primitive?) {
+      contentBuilder = (context, node) {
+        final child = primitive == ScenePrimitive.text
+            ? Align(
+                alignment: Alignment.topLeft,
+                child: Text(node.properties['text'] ?? 'Text'),
+              )
+            : const SizedBox.expand();
+        return contentDecorator?.call(context, node, child) ?? child;
       };
     } else {
       contentBuilder = nodeBuilder;
@@ -506,6 +516,12 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
     final child = widget.prewarmHiddenNodes
         ? (_prewarmedChild ??= widget.nodeBuilder(context, widget.node))
         : widget.nodeBuilder(context, widget.node);
-    return SceneStyleView(style: widget.style, child: child);
+    return SceneStyleView(
+      style: widget.style,
+      shape: widget.node.primitive == ScenePrimitive.circle
+          ? BoxShape.circle
+          : BoxShape.rectangle,
+      child: child,
+    );
   }
 }

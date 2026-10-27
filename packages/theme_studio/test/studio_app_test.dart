@@ -24,6 +24,7 @@ import 'package:theme_studio/src/studio_form.dart';
 import 'package:theme_studio/src/studio_assets.dart';
 import 'package:theme_studio/src/studio_input.dart';
 import 'package:theme_studio/src/studio_preferences.dart';
+import 'package:theme_studio/src/studio_components.dart';
 
 const _document = SceneDocument(
   id: 'test',
@@ -547,6 +548,38 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('blank scenes and reusable primitives author independently of layout slots', (tester) async {
+    await openStudio(tester);
+    final original = file.readAsStringSync();
+    await tester.tap(find.byKey(const ValueKey('new-scene')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('new-scene-name')), 'free-canvas');
+    await tester.tap(find.byKey(const ValueKey('confirm-new-scene')));
+    await tester.pumpAndSettle();
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    expect(editor.document.id, 'free-canvas');
+    expect(editor.layout, isNull);
+    expect(file.readAsStringSync(), original);
+    await tester.tap(find.byKey(const ValueKey('sidebar-components')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-component-text')));
+    await tester.pumpAndSettle();
+    expect(editor.selectedNode.primitive, ScenePrimitive.text);
+    expect(find.text('New text'), findsWidgets);
+    await tester.tap(find.byKey(const ValueKey('add-component-text')));
+    await tester.pumpAndSettle();
+    expect(editor.selectedId, 'text-2');
+    editor.createComponent(StudioComponent.rectangle);
+    editor.createComponent(StudioComponent.circle);
+    editor.undo();
+    expect(editor.document.nodes.any((node) => node.primitive == ScenePrimitive.circle), isFalse);
+    editor.redo();
+    expect(editor.save(), isTrue);
+    expect(decodeSceneDocument(editor.file.readAsStringSync()).nodes.last.primitive, ScenePrimitive.circle);
+    expect(file.readAsStringSync(), original);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('shortcut recorder rejects collisions and applies persistent canvas and workspace bindings', (tester) async {
     await openStudio(tester);

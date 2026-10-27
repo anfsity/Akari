@@ -53,6 +53,7 @@ String generateSceneNode(SceneNode node) {
       componentId: ${encodeDartString(node.componentId)},
       parentId: ${_encodeDartNullableString(node.parentId)},
       styleToken: ${_encodeDartNullableString(node.styleToken)},
+      primitive: ${node.primitive == null ? 'null' : 'ScenePrimitive.${node.primitive!.name}'},
       ${node.asset == null ? '' : '''asset: const SceneAsset(path: ${encodeDartString(node.asset!.path)},
         kind: SceneAssetKind.${node.asset!.kind.name}, fit: SceneAssetFit.${node.asset!.fit.name},
         tint: ${node.asset!.tint == null ? 'null' : _encodeColorLiteral(node.asset!.tint!)}),'''}

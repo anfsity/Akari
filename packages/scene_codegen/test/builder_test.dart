@@ -62,6 +62,13 @@ void main() {
             'parentId': r'$node',
             'rect': {'x': 0, 'y': 0, 'width': 1, 'height': 1},
           },
+          {
+            'id': 'primitive',
+            'component': 'scenePrimitive',
+            'primitive': 'text',
+            'properties': {'text': 'Portable text'},
+            'rect': {'x': 0, 'y': 0, 'width': 1, 'height': 1},
+          },
         ],
       }),
     );
@@ -96,6 +103,8 @@ void main() {
       'packages/test/assets/icon.svg',
     );
     expect(document['nodes'][1]['asset']['tint'], '#112233');
+    expect(document['nodes'][2]['primitive'], 'text');
+    expect(document['nodes'][2]['properties']['text'], 'Portable text');
     expect(document['themeProperties'], properties);
     expect(document['guides'], [
       {'axis': 'vertical', 'position': .4},

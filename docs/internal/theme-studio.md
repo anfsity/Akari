@@ -113,6 +113,15 @@ before creating a project.
 
 ### Adding and removing layout components
 
+**New scene** creates a separate scene file containing an empty artboard in the
+current theme. It refuses existing names and leaves the source scene intact.
+**Compose → Component library** adds reusable Text, Rectangle, Circle, and Frame
+layers; these work without layout declarations and may be added repeatedly.
+Drag horizontally from the library to place a layer at the canvas pointer;
+vertical drags scroll the library. Text supports the same inline editing and
+style inspector as other text layers. Default create shortcuts are `T`, `U`,
+and `F` for text, rectangle, and frame, configurable in Settings.
+
 The left sidebar's **Compose** tab opens by default for scenes with a declared layout.
 The default theme's **Terrace** layout offers date, signature, standby clock,
 standby greeting, wake hint, sign-in heading, and sign-in caption slots.
