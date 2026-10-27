@@ -99,6 +99,7 @@ Future<SynthesizedTheme> createThemeProject({
       nodes: [
         for (final node in validated.nodes)
           node.copyWith(
+            asset: node.asset?.copyWith(path: rewriteAsset(node.asset!.path)),
             properties: node.properties.map(
               (key, value) => MapEntry(key, rewriteAsset(value)),
             ),
@@ -332,6 +333,8 @@ Future<Map<String, String>> _copyReferencedAssets(
     if (validated.background.asset != null) validated.background.asset!,
     ...validated.themeProperties.values,
     for (final node in validated.nodes) ...node.properties.values,
+    for (final node in validated.nodes)
+      if (node.asset != null) node.asset!.path,
   };
   for (final entry in assetFiles.entries) {
     if (!references.contains(entry.key)) continue;

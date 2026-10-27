@@ -113,6 +113,45 @@ ThemeDefinition buildOriginalTheme({Color? seed, SceneDocument? document}) => th
   });
   tearDown(() => root.delete(recursive: true));
 
+  test(
+    'copies typed SVG assets and preserves their tint in an independent theme',
+    () async {
+      final icon = File(p.join(root.path, 'external', 'icon.svg'));
+      await icon.writeAsString('<svg xmlns="http://www.w3.org/2000/svg"/>');
+      final document = _document.copyWith(
+        nodes: [
+          _document.nodes.single.copyWith(
+            asset: const SceneAsset(
+              path: 'packages/external/assets/icon.svg',
+              kind: SceneAssetKind.svg,
+              tint: 0xff123456,
+            ),
+          ),
+        ],
+      );
+      final result = await createThemeProject(
+        source: source,
+        destination: target,
+        packageName: 'theme_icons',
+        document: document,
+        assetFiles: {
+          document.background.asset!: wallpaper,
+          'packages/external/assets/icon.svg': icon,
+        },
+      );
+      expect(
+        result.document.nodes.single.asset!.path,
+        'packages/theme_icons/assets/composed/icon.svg',
+      );
+      expect(result.document.nodes.single.asset!.tint, 0xff123456);
+      expect(
+        await File(p.join(target.path, 'assets/composed/icon.svg'))
+            .readAsString(),
+        await icon.readAsString(),
+      );
+    },
+  );
+
   test('synthesizes an independent package with edited scene, fonts, assets and entrypoint', () async {
     final sourceManifest = await File(p.join(source.path, 'pubspec.yaml'))
         .readAsString();
