@@ -91,6 +91,11 @@ SceneDocument decodeSceneDocument(String source) {
     background: _decodeBackground(_getMap(decoded, 'background')),
     nodes: nodes,
     styleTokens: styles,
+    guides: [
+      for (final value
+          in decoded['guides'] == null ? const [] : _getList(decoded, 'guides'))
+        _decodeGuide(_getMapValue(value, 'guides[]')),
+    ],
     themeProperties: {
       for (final entry in _getMap(
         decoded,
@@ -148,6 +153,11 @@ Map<String, dynamic> _encodeDocument(SceneDocument document) {
   return {
     'id': document.id,
     'version': document.version,
+    if (document.guides.isNotEmpty)
+      'guides': [
+        for (final guide in document.guides)
+          {'axis': guide.axis.name, 'position': guide.position},
+      ],
     if (document.styleTokens.isNotEmpty)
       'styleTokens': {
         for (final entry in document.styleTokens.entries)
@@ -404,6 +414,21 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
     if (node.interactive) 'interactive': true,
     if (node.properties.isNotEmpty) 'properties': node.properties,
   };
+}
+
+SceneGuide _decodeGuide(Map<String, dynamic> json) {
+  final position = _getDouble(json, 'position');
+  if (position < 0 || position > 1) {
+    throw const FormatException('Guide position must be in [0, 1].');
+  }
+  return SceneGuide(
+    axis: _getEnumValue(
+      SceneGuideAxis.values,
+      _getString(json, 'axis'),
+      'guide.axis',
+    ),
+    position: position,
+  );
 }
 
 SceneMotionTiming _decodeMotionTiming(Map<String, dynamic> json) {

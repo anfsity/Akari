@@ -49,6 +49,11 @@ Studio appearance preferences. An omitted object uses the theme's defaults.
 
 ## Canvas
 
+Optional root `guides` stores Studio reference lines as
+`{"axis":"vertical"|"horizontal", "position":0..1}`. Positions are canvas
+fractions, so guides follow reference-resolution changes. They compile with the
+document for lossless authoring round trips and do not paint in the greeter.
+
 | Field | Type / Values | Default | Description |
 | --- | --- | --- | --- |
 | `fit` | `"cover"` \| `"contain"` \| `"reflow"` | Required | How the canvas scales to the output viewport |

@@ -48,6 +48,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
   StudioTransition _transition = StudioTransition.wake;
   bool _showStateGraph = false;
   bool _comparing = false;
+  bool _showRulers = false;
   StudioPreviewScenario _scenario = StudioPreviewScenario.password;
   double? _zoom;
   int _resetView = 0;
@@ -488,6 +489,11 @@ class _StudioCanvasState extends State<StudioCanvas> {
                                     onPlaceNode: session.placeNode,
                                     onUpdateText: session.updateNodeText,
                                     snapToGuides: _snapToGuides,
+                                    showRulers: _showRulers,
+                                    onPrepareGuide: session.applyDraft,
+                                    onCreateGuide: session.createGuide,
+                                    onUpdateGuide: session.updateGuide,
+                                    onDeleteGuide: session.deleteGuide,
                                     dormant: widget.dormant,
                                     scenario: _scenario,
                                     playbackElapsed: presenting
@@ -546,7 +552,10 @@ class _StudioCanvasState extends State<StudioCanvas> {
                 if (!presenting)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-                    child: Row(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         if (session != null)
                           SizedBox(
@@ -606,7 +615,22 @@ class _StudioCanvasState extends State<StudioCanvas> {
                               .small(),
                         ),
                         const Gap(8),
-                        Expanded(
+                        Tooltip(
+                          tooltip: (_) => const Text(
+                            'Rulers · Drag from a ruler to create a guide',
+                          ),
+                          child: Button(
+                            key: const ValueKey('canvas-rulers'),
+                            style: _showRulers
+                                ? const ButtonStyle.primaryIcon()
+                                : const ButtonStyle.outlineIcon(),
+                            onPressed: () =>
+                                setState(() => _showRulers = !_showRulers),
+                            child: const Icon(LucideIcons.ruler, size: 16),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 180,
                           child: Text(
                             session == null
                                 ? 'Choose a valid scene document.'

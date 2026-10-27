@@ -534,6 +534,27 @@ class SceneEditor extends ChangeNotifier {
     notifyListeners();
   }
 
+  void createGuide(SceneGuide guide) {
+    if (!applyDraft()) return;
+    _updateDocument(
+      document.copyWith(guides: [...document.guides, guide]),
+      selectedId: selectedId,
+    );
+  }
+
+  void updateGuide(int index, SceneGuide guide) {
+    if (!applyDraft()) return;
+    final guides = [...document.guides];
+    guides[index] = guide;
+    _updateDocument(document.copyWith(guides: guides), selectedId: selectedId);
+  }
+
+  void deleteGuide(int index) {
+    if (!applyDraft()) return;
+    final guides = [...document.guides]..removeAt(index);
+    _updateDocument(document.copyWith(guides: guides), selectedId: selectedId);
+  }
+
   void updateSelectionStyleToken(String? token) {
     if (!applyDraft() || selectedIds.isEmpty) return;
     updateNodes([

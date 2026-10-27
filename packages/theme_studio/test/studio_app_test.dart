@@ -591,6 +591,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('rulers create move delete and save guides as atomic edits', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.tap(find.byKey(const ValueKey('canvas-rulers'))); await tester.pumpAndSettle();
+    final ruler = find.byKey(const ValueKey('ruler-vertical'));
+    final canvas = tester.getRect(find.byType(SceneRuntime));
+    final gesture = await tester.startGesture(tester.getCenter(ruler));
+    await gesture.moveBy(const Offset(20, 20)); await tester.pump();
+    await gesture.moveTo(canvas.topLeft + Offset(canvas.width * .4, canvas.height * .3)); await tester.pump();
+    expect(editor.document.guides, isEmpty);
+    await gesture.up(); await tester.pumpAndSettle();
+    expect(editor.document.guides.single.position, closeTo(.4, .001));
+    editor.undo(); expect(editor.canUndo, isFalse); editor.redo();
+    editor.save(); expect(decodeSceneDocument(file.readAsStringSync()).guides, editor.document.guides);
+    final line = find.byKey(const ValueKey('guide-0'));
+    await tester.drag(line, const Offset(30, 0)); await tester.pumpAndSettle();
+    expect(editor.document.guides.single.position, greaterThan(.4));
+    await tester.tap(line); await tester.pump(const Duration(milliseconds: 50)); await tester.tap(line); await tester.pumpAndSettle();
+    expect(editor.document.guides, isEmpty); editor.undo(); expect(editor.document.guides.length, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('preview scenarios wake the canvas without editing the scene', (
     tester,
   ) async {
