@@ -546,6 +546,32 @@ void main() {
     },
   );
 
+  testWidgets('panel edges face outward and floating drags accumulate between frames', (tester) async {
+    await openStudio(tester);
+    expect(tester.getCenter(find.byKey(const ValueKey('toggle-sidebar'))).dx, lessThan(40));
+    expect(tester.getCenter(find.byKey(const ValueKey('toggle-inspector'))).dx, greaterThan(1360));
+    expect(tester.getTopLeft(find.text('Theme Studio')).dx, lessThan(100));
+    await tester.tap(find.byKey(const ValueKey('float-Sidebar')));
+    await tester.pumpAndSettle();
+    final panel = find.byKey(const ValueKey('floating-Sidebar'));
+    final before = tester.getRect(panel);
+    final drag = await tester.startGesture(tester.getCenter(find.byKey(const ValueKey('float-drag-Sidebar'))));
+    await drag.moveBy(const Offset(40, 20));
+    await drag.moveBy(const Offset(40, 20));
+    await tester.pump();
+    expect(tester.getTopLeft(panel) - before.topLeft, const Offset(80, 40));
+    await drag.up();
+    await tester.tap(find.byKey(const ValueKey('dock-Sidebar')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('toggle-sidebar')));
+    await tester.pumpAndSettle();
+    expect(tester.getCenter(find.byKey(const ValueKey('toggle-sidebar'))).dx, lessThan(40));
+    await tester.tap(find.byKey(const ValueKey('toggle-sidebar')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('layer-list')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('floating panels and presentation retain drafts and component state', (tester) async {
     await openStudio(tester);
     final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 class StudioWorkspaceScope extends InheritedWidget {
@@ -89,28 +90,78 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
     String title,
     VoidCallback onCollapse,
     VoidCallback onFloat,
-  ) => GestureDetector(
-    onDoubleTap: onCollapse,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  ) {
+    final left = title == 'Sidebar';
+    final collapse = _button(
+      left ? 'toggle-sidebar' : 'toggle-inspector',
+      left ? 'Collapse project panel' : 'Collapse properties panel',
+      left ? LucideIcons.chevronLeft : LucideIcons.chevronRight,
+      onCollapse,
+    );
+    return SizedBox(
+      height: 36,
       child: Row(
         children: [
-          Expanded(child: Text(title).small().muted()),
-          GhostButton(
-            key: ValueKey('float-$title'),
-            density: ButtonDensity.compact,
-            onPressed: onFloat,
-            child: const Icon(LucideIcons.externalLink, size: 14),
+          if (left) collapse,
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onDoubleTap: onCollapse,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(left ? 'Project' : 'Properties').small().semiBold(),
+              ),
+            ),
           ),
-          GhostButton(
-            key: ValueKey('collapse-$title'),
-            density: ButtonDensity.compact,
-            onPressed: onCollapse,
-            child: const Icon(LucideIcons.panelLeftClose, size: 14),
+          _button(
+            'float-$title',
+            'Float panel',
+            LucideIcons.externalLink,
+            onFloat,
           ),
+          if (!left) collapse,
         ],
       ),
-    ),
+    );
+  }
+
+  Widget _buildDockedPanel(
+    AbsoluteResizablePaneController controller,
+    String title,
+    Widget child,
+    bool floating,
+    VoidCallback onToggle,
+    VoidCallback onFloat,
+  ) => Stack(
+    fit: StackFit.expand,
+    children: [
+      _pane(
+        controller,
+        floating
+            ? const SizedBox()
+            : Column(
+                children: [
+                  _panelHeader(title, onToggle, onFloat),
+                  const Divider(),
+                  Expanded(child: child),
+                ],
+              ),
+      ),
+      if (controller.collapsed && !_presenting)
+        Align(
+          alignment: title == 'Sidebar'
+              ? Alignment.topLeft
+              : Alignment.topRight,
+          child: _button(
+            title == 'Sidebar' ? 'toggle-sidebar' : 'toggle-inspector',
+            'Show panel',
+            title == 'Sidebar'
+                ? LucideIcons.chevronRight
+                : LucideIcons.chevronLeft,
+            onToggle,
+          ),
+        ),
+    ],
   );
 
   Widget _pane(AbsoluteResizablePaneController controller, Widget child) =>
@@ -135,7 +186,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
     child: GhostButton(
       key: ValueKey(key),
       onPressed: action,
-      density: ButtonDensity.compact,
+      density: ButtonDensity.icon,
       child: Icon(icon, size: 16),
     ),
   );
@@ -202,7 +253,18 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                             Visibility(
                               visible: !_presenting,
                               maintainState: true,
-                              child: widget.toolbar,
+                              child: Row(
+                                children: [
+                                  Expanded(child: widget.toolbar),
+                                  _button(
+                                    'presentation-mode',
+                                    'Presentation · Ctrl+Shift+P',
+                                    LucideIcons.maximize,
+                                    _togglePresentation,
+                                  ),
+                                  const Gap(8),
+                                ],
+                              ),
                             ),
                             if (!_presenting) const Divider(),
                             Expanded(
@@ -218,24 +280,17 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                         controller: _sidebar,
                                         minSize: 240,
                                         maxSize: 360,
-                                        collapsedSize: _sidebar.collapsed
-                                            ? 0
-                                            : null,
-                                        child: _pane(
+                                        collapsedSize:
+                                            _sidebar.collapsed && !_presenting
+                                            ? 32
+                                            : 0,
+                                        child: _buildDockedPanel(
                                           _sidebar,
-                                          _sidebarFloating
-                                              ? const SizedBox()
-                                              : Column(
-                                                  children: [
-                                                    _panelHeader(
-                                                      'Sidebar',
-                                                      _toggleSidebar,
-                                                      _toggleSidebarDock,
-                                                    ),
-                                                    const Divider(),
-                                                    Expanded(child: sidebar),
-                                                  ],
-                                                ),
+                                          'Sidebar',
+                                          sidebar,
+                                          _sidebarFloating,
+                                          _toggleSidebar,
+                                          _toggleSidebarDock,
                                         ),
                                       ),
                                       ResizablePane.flex(
@@ -247,24 +302,17 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                         controller: _inspector,
                                         minSize: 280,
                                         maxSize: 420,
-                                        collapsedSize: _inspector.collapsed
-                                            ? 0
-                                            : null,
-                                        child: _pane(
+                                        collapsedSize:
+                                            _inspector.collapsed && !_presenting
+                                            ? 32
+                                            : 0,
+                                        child: _buildDockedPanel(
                                           _inspector,
-                                          _inspectorFloating
-                                              ? const SizedBox()
-                                              : Column(
-                                                  children: [
-                                                    _panelHeader(
-                                                      'Inspector',
-                                                      _toggleInspector,
-                                                      _toggleInspectorDock,
-                                                    ),
-                                                    const Divider(),
-                                                    Expanded(child: inspector),
-                                                  ],
-                                                ),
+                                          'Inspector',
+                                          inspector,
+                                          _inspectorFloating,
+                                          _toggleInspector,
+                                          _toggleInspectorDock,
                                         ),
                                       ),
                                     ],
@@ -305,30 +353,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                             Visibility(
                               visible: !_presenting,
                               maintainState: true,
-                              child: Row(
-                                children: [
-                                  Expanded(child: widget.statusBar),
-                                  _button(
-                                    'toggle-sidebar',
-                                    'Toggle sidebar · Ctrl+B',
-                                    LucideIcons.panelLeft,
-                                    _toggleSidebar,
-                                  ),
-                                  _button(
-                                    'toggle-inspector',
-                                    'Toggle inspector · Ctrl+Shift+B',
-                                    LucideIcons.panelRight,
-                                    _toggleInspector,
-                                  ),
-                                  _button(
-                                    'presentation-mode',
-                                    'Presentation · Ctrl+Shift+P',
-                                    LucideIcons.maximize,
-                                    _togglePresentation,
-                                  ),
-                                  const Gap(8),
-                                ],
-                              ),
+                              child: widget.statusBar,
                             ),
                           ],
                         ),
@@ -372,7 +397,10 @@ class _FloatingPanel extends StatefulWidget {
 
 class _FloatingPanelState extends State<_FloatingPanel> {
   late Offset _offset = widget.initialOffset;
-  Size _size = const Size(320, 560);
+  Size _size = const Size(300, 520);
+  Offset _dragStart = Offset.zero;
+  Offset _dragOrigin = Offset.zero;
+  Size _resizeOrigin = Size.zero;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
@@ -391,6 +419,7 @@ class _FloatingPanelState extends State<_FloatingPanel> {
             height: height,
             child: Container(
               key: ValueKey('floating-${widget.title}'),
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.background,
                 border: Border.all(color: Theme.of(context).colorScheme.border),
@@ -406,8 +435,19 @@ class _FloatingPanelState extends State<_FloatingPanel> {
                     child: GestureDetector(
                       key: ValueKey('float-drag-${widget.title}'),
                       behavior: HitTestBehavior.opaque,
-                      onPanUpdate: (details) =>
-                          setState(() => _offset = offset + details.delta),
+                      dragStartBehavior: DragStartBehavior.down,
+                      onPanStart: (details) {
+                        _dragStart = details.globalPosition;
+                        _dragOrigin = offset;
+                      },
+                      onPanUpdate: (details) => setState(() {
+                        final target =
+                            _dragOrigin + details.globalPosition - _dragStart;
+                        _offset = Offset(
+                          target.dx.clamp(0, constraints.maxWidth - width),
+                          target.dy.clamp(0, constraints.maxHeight - height),
+                        );
+                      }),
                       child: Padding(
                         padding: const EdgeInsets.all(8),
                         child: Row(
@@ -435,12 +475,24 @@ class _FloatingPanelState extends State<_FloatingPanel> {
                       child: GestureDetector(
                         key: ValueKey('float-resize-${widget.title}'),
                         behavior: HitTestBehavior.opaque,
-                        onPanUpdate: (details) => setState(
-                          () => _size = Size(
-                            (_size.width + details.delta.dx).clamp(280, 600),
-                            (_size.height + details.delta.dy).clamp(300, 900),
-                          ),
-                        ),
+                        dragStartBehavior: DragStartBehavior.down,
+                        onPanStart: (details) {
+                          _dragStart = details.globalPosition;
+                          _resizeOrigin = Size(width, height);
+                        },
+                        onPanUpdate: (details) => setState(() {
+                          final delta = details.globalPosition - _dragStart;
+                          _size = Size(
+                            (_resizeOrigin.width + delta.dx).clamp(
+                              math.min(240, constraints.maxWidth - offset.dx),
+                              math.min(600, constraints.maxWidth - offset.dx),
+                            ),
+                            (_resizeOrigin.height + delta.dy).clamp(
+                              math.min(260, constraints.maxHeight - offset.dy),
+                              math.min(900, constraints.maxHeight - offset.dy),
+                            ),
+                          );
+                        }),
                         child: const SizedBox(
                           width: 24,
                           height: 16,
