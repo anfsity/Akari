@@ -139,6 +139,18 @@ Transform translations (`translateX`, `translateY`) remain in logical pixels as 
 
 ## Canvas tools & gestures
 
+Shift-click canvas components or layer rows to toggle multiple selections.
+Drag empty canvas space to marquee-select visible layers; Shift adds to the
+selection. `Ctrl+A` selects all layers. With sibling layers selected, the
+context toolbar offers alignment, equal-gap distribution, and **Group**
+(`Ctrl+G`). A group is a real frame; its descendants move, transform, and hide
+together. **Frame layout** in the inspector supports absolute, row, and column
+placement, padding, gap, alignment, clipping, fixed dimensions, and flex weights.
+Nested layer rows show the hierarchy. Pixel geometry uses the parent's content
+size. Batch edits, subtree duplication, and deletion each use one undo step;
+required layout controls remain protected inside frames. Plain absolute frames
+can be ungrouped with `Ctrl+Shift+G` while preserving their children's positions.
+
 Switch preview states with **State: Login / Dormant**. The adjacent scenario menu
 previews password or username input, signing in, rejected credentials,
 authentication errors, account/session selection, connecting, and service

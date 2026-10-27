@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import 'node_inspector_controller.dart';
+import 'node_geometry.dart';
 
 // Store canonical JSON with history so status queries and undo/redo do not
 // serialize the entire scene again. Selection changes reuse the same encoding.
@@ -11,6 +14,7 @@ typedef _SceneRevision = ({
   SceneDocument document,
   String encoded,
   String selectedId,
+  Set<String> selectedIds,
 });
 
 /// Owns one authoring session. Only validated documents enter history, and
@@ -23,7 +27,7 @@ class SceneEditor extends ChangeNotifier {
     ThemeLayoutDefinition? layout,
   }) : _declaredLayout = layout {
     _loadFromDisk(initial: true);
-    inspector = NodeInspectorController(selectedNode, document.canvas);
+    inspector = NodeInspectorController(selectedNode, getInspectorCanvas());
   }
 
   final File file;
@@ -40,14 +44,45 @@ class SceneEditor extends ChangeNotifier {
   SceneDocument get document => _revision.document;
   String get encodedDocument => _revision.encoded;
   String get selectedId => _revision.selectedId;
+  Set<String> get selectedIds => Set.unmodifiable(_revision.selectedIds);
+  List<SceneNode> get selectedNodes =>
+      document.nodes.where((node) => selectedIds.contains(node.id)).toList();
   SceneNode get selectedNode =>
       document.nodes.firstWhere((node) => node.id == selectedId);
   bool get isDirty => _revision.encoded != _savedDocument;
   bool get canUndo => _undo.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
   bool get canDeleteNode => deletionBlockReason == null;
-  bool get canDuplicateNode => layout?.findSlot(selectedId) == null;
-  String? get deletionBlockReason => getDeletionBlockReason(selectedId);
+  bool get canDuplicateNode =>
+      selectedIds.isNotEmpty &&
+      getSelectionSubtree().every((node) => layout?.findSlot(node.id) == null);
+  String? get deletionBlockReason {
+    if (selectedIds.isEmpty) return 'Select a layer first.';
+    final nodes = getSelectionSubtree();
+    if (nodes.length == document.nodes.length) {
+      return 'A scene needs at least one node.';
+    }
+    for (final node in nodes) {
+      final reason = getDeletionBlockReason(node.id);
+      if (reason != null) return reason;
+    }
+    return null;
+  }
+
+  bool get canGroup =>
+      selectedNodes.length >= 2 &&
+      selectedNodes.every((node) => node.parentId == selectedNode.parentId) &&
+      getParentLayout(selectedNode).direction ==
+          SceneLayoutDirection.absolute &&
+      getSelectionLayoutNodes().every((node) => node.rect.isNormalized);
+  bool get canArrange => canGroup;
+  bool get canUngroup =>
+      selectedIds.length == 1 &&
+      selectedNode.layout?.direction == SceneLayoutDirection.absolute &&
+      selectedNode.transform.isIdentity &&
+      selectedNode.visibleWhen == null &&
+      selectedNode.motion == SceneMotionPreset.none &&
+      !selectedNode.layout!.clip;
   ThemeComponentCatalog get componentCatalog => _componentCatalog;
   ThemePresetCatalog get presetCatalog => _presetCatalog;
   ThemeLayoutDefinition? get layout =>
@@ -93,9 +128,18 @@ class SceneEditor extends ChangeNotifier {
 
   String? getDeletionBlockReason(String nodeId) {
     if (document.nodes.length == 1) return 'A scene needs at least one node.';
-    final slot = layout?.findSlot(nodeId);
-    if (slot != null && slot.isRequired) {
-      return '${slot.label} is required by this layout.';
+    final ids = {nodeId};
+    for (final node in document.layerOrder) {
+      if (ids.contains(node.parentId)) ids.add(node.id);
+    }
+    if (ids.length == document.nodes.length) {
+      return 'A scene needs at least one node.';
+    }
+    for (final id in ids) {
+      final slot = layout?.findSlot(id);
+      if (slot != null && slot.isRequired) {
+        return '${slot.label} is required by this layout.';
+      }
     }
     return null;
   }
@@ -152,26 +196,235 @@ class SceneEditor extends ChangeNotifier {
     }
   }
 
-  bool selectNode(String id) {
+  bool selectNode(String id, {bool toggle = false}) {
+    final ids = toggle ? {...selectedIds} : <String>{};
+    if (!toggle || !ids.remove(id)) ids.add(id);
+    return selectNodes(ids, primaryId: id);
+  }
+
+  bool selectNodes(Set<String> ids, {String? primaryId}) {
     if (!applyDraft()) return false;
-    if (!document.nodes.any((node) => node.id == id)) {
-      throw ArgumentError.value(id, 'id');
+    if (!document.nodes.map((node) => node.id).toSet().containsAll(ids)) {
+      throw ArgumentError.value(ids, 'ids');
     }
-    if (selectedId == id) return true;
+    final id = ids.isEmpty
+        ? selectedId
+        : ids.contains(primaryId)
+        ? primaryId!
+        : ids.last;
+    if (selectedId == id && setEquals(selectedIds, ids)) return true;
     _applyRevision((
       document: document,
       encoded: _revision.encoded,
       selectedId: id,
+      selectedIds: Set.of(ids),
     ));
     return true;
   }
 
   void updateNode(SceneNode node) {
-    final index = document.nodes.indexWhere((entry) => entry.id == node.id);
-    if (index < 0) throw ArgumentError.value(node.id, 'node.id');
-    final nodes = [...document.nodes];
-    nodes[index] = node;
-    _updateDocument(document.copyWith(nodes: nodes), selectedId: selectedId);
+    updateNodes([node]);
+  }
+
+  void updateNodes(List<SceneNode> updated) {
+    final replacements = {for (final node in updated) node.id: node};
+    if (!document.nodes
+        .map((node) => node.id)
+        .toSet()
+        .containsAll(replacements.keys)) {
+      throw ArgumentError.value(replacements.keys, 'node ids');
+    }
+    _updateDocument(
+      document.copyWith(
+        nodes: [
+          for (final node in document.nodes) replacements[node.id] ?? node,
+        ],
+      ),
+      selectedId: selectedId,
+    );
+  }
+
+  SceneLayout getParentLayout(SceneNode node) => node.parentId == null
+      ? const SceneLayout()
+      : document.nodes
+            .firstWhere((parent) => parent.id == node.parentId)
+            .layout!;
+
+  List<SceneNode> getSelectionRoots() {
+    final byId = {for (final node in document.nodes) node.id: node};
+    return selectedNodes.where((node) {
+      var parent = node.parentId;
+      while (parent != null) {
+        if (selectedIds.contains(parent)) return false;
+        parent = byId[parent]!.parentId;
+      }
+      return true;
+    }).toList();
+  }
+
+  List<SceneNode> getSelectionSubtree() {
+    final ids = {...selectedIds};
+    for (final node in document.layerOrder) {
+      if (ids.contains(node.parentId)) ids.add(node.id);
+    }
+    return document.nodes.where((node) => ids.contains(node.id)).toList();
+  }
+
+  void moveSelection(Offset delta) {
+    if (!applyDraft()) return;
+    final size = Size(
+      document.canvas.referenceWidth.toDouble(),
+      document.canvas.referenceHeight.toDouble(),
+    );
+    final geometry = calculateSceneLayout(document: document, size: size);
+    updateNodes([
+      for (final node in getSelectionRoots())
+        if (getParentLayout(node).direction == SceneLayoutDirection.absolute)
+          node.copyWith(
+            rect: calculateMovedRect(
+              rect: node.rect,
+              canvasSize: getParentContentSize(node, geometry),
+              delta: delta,
+            ),
+          ),
+    ]);
+  }
+
+  Size getParentContentSize(
+    SceneNode node,
+    Map<String, SceneNodeGeometry> geometry,
+  ) {
+    if (node.parentId == null) {
+      return Size(
+        document.canvas.referenceWidth.toDouble(),
+        document.canvas.referenceHeight.toDouble(),
+      );
+    }
+    final size = geometry[node.parentId]!.rect.size;
+    final padding = getParentLayout(node).padding * 2;
+    return Size(
+      math.max(1, size.width - padding),
+      math.max(1, size.height - padding),
+    );
+  }
+
+  void alignSelection(NodeAlignment alignment) {
+    if (!applyDraft() || !canArrange) return;
+    updateNodes(calculateAlignedNodes(getSelectionLayoutNodes(), alignment));
+  }
+
+  void distributeSelection({required bool horizontal}) {
+    if (!applyDraft() || !canArrange || selectedNodes.length < 3) return;
+    updateNodes(
+      calculateDistributedNodes(
+        getSelectionLayoutNodes(),
+        horizontal: horizontal,
+      ),
+    );
+  }
+
+  void groupSelection() {
+    if (!applyDraft() || !canGroup) return;
+    final nodes = getSelectionLayoutNodes();
+    final byId = {for (final node in nodes) node.id: node};
+    final left = nodes.map((node) => node.rect.x).reduce(math.min);
+    final top = nodes.map((node) => node.rect.y).reduce(math.min);
+    final right = nodes
+        .map((node) => node.rect.x + node.rect.width)
+        .reduce(math.max);
+    final bottom = nodes
+        .map((node) => node.rect.y + node.rect.height)
+        .reduce(math.max);
+    final id = _getUniqueId(
+      'frame',
+      document.nodes.map((node) => node.id).toSet(),
+    );
+    final frame = SceneNode(
+      id: id,
+      componentId: 'frame',
+      parentId: selectedNode.parentId,
+      rect: SceneRect(
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+      ),
+      layout: const SceneLayout(),
+      renderOrder: nodes.map((node) => node.renderOrder).reduce(math.max),
+    );
+    _updateDocument(
+      document.copyWith(
+        nodes: [
+          for (final node in document.nodes)
+            if (selectedIds.contains(node.id))
+              node.copyWith(
+                parentId: id,
+                rect: getRelativeRect(byId[node.id]!.rect, frame.rect),
+              )
+            else
+              node,
+          frame,
+        ],
+      ),
+      selectedId: id,
+      selectedIds: {id},
+    );
+  }
+
+  void ungroupSelection() {
+    if (!applyDraft() || !canUngroup) return;
+    final frame = selectedNode;
+    final children = document.getChildren(frame.id);
+    if (children.isEmpty) {
+      deleteSelectedNode();
+      return;
+    }
+    final geometry = calculateSceneLayout(
+      document: document,
+      size: Size(
+        document.canvas.referenceWidth.toDouble(),
+        document.canvas.referenceHeight.toDouble(),
+      ),
+    );
+    final frameRect = geometry[frame.id]!.rect;
+    final parentSize = getParentContentSize(frame, geometry);
+    final padding = getParentLayout(frame).padding;
+    final replacements = {
+      for (final node in children)
+        node.id: node.copyWith(
+          parentId: frame.parentId,
+          rect: SceneRect(
+            x:
+                (frameRect.left - padding + geometry[node.id]!.rect.left) /
+                parentSize.width,
+            y:
+                (frameRect.top - padding + geometry[node.id]!.rect.top) /
+                parentSize.height,
+            width: geometry[node.id]!.rect.width / parentSize.width,
+            height: geometry[node.id]!.rect.height / parentSize.height,
+          ),
+        ),
+    };
+    _updateDocument(
+      document.copyWith(
+        nodes: [
+          for (final node in document.nodes)
+            if (node.id != frame.id) replacements[node.id] ?? node,
+        ],
+      ),
+      selectedId: children.last.id,
+      selectedIds: children.map((node) => node.id).toSet(),
+    );
+  }
+
+  String _getUniqueId(String base, Set<String> ids) {
+    var id = base;
+    var suffix = 2;
+    while (ids.contains(id)) {
+      id = '$base-${suffix++}';
+    }
+    ids.add(id);
+    return id;
   }
 
   void updateScene({SceneCanvas? canvas, SceneBackground? background}) {
@@ -187,38 +440,73 @@ class SceneEditor extends ChangeNotifier {
     if (!canDuplicateNode) {
       throw StateError('Layout slots can only be added once.');
     }
-    final node = selectedNode;
     final ids = document.nodes.map((entry) => entry.id).toSet();
-    var id = '${node.id}-copy';
-    var suffix = 2;
-    while (ids.contains(id)) {
-      id = '${node.id}-copy-${suffix++}';
-    }
-    final nodes = [...document.nodes];
-    nodes.insert(nodes.indexOf(node) + 1, node.copyWith(id: id));
-    _updateDocument(document.copyWith(nodes: nodes), selectedId: id);
+    final subtree = getSelectionSubtree();
+    final copies = {
+      for (final node in subtree) node.id: _getUniqueId('${node.id}-copy', ids),
+    };
+    _updateDocument(
+      document.copyWith(
+        nodes: [
+          for (final node in document.nodes) ...[
+            node,
+            if (copies.containsKey(node.id))
+              node.copyWith(
+                id: copies[node.id],
+                parentId: copies[node.parentId] ?? node.parentId,
+              ),
+          ],
+        ],
+      ),
+      selectedId: copies[selectedId]!,
+      selectedIds: {for (final id in selectedIds) copies[id]!},
+    );
   }
 
   void deleteSelectedNode() {
     if (!applyDraft()) return;
-    _removeNode(selectedId);
+    final reason = deletionBlockReason;
+    if (reason != null) throw StateError(reason);
+    final ids = getSelectionSubtree().map((node) => node.id).toSet();
+    final index = document.nodes.indexWhere((node) => node.id == selectedId);
+    final nodes = document.nodes
+        .where((node) => !ids.contains(node.id))
+        .toList();
+    final next = nodes[math.min(index, nodes.length - 1)].id;
+    _updateDocument(
+      document.copyWith(nodes: nodes),
+      selectedId: next,
+      selectedIds: {next},
+    );
   }
 
   void _removeNode(String nodeId) {
     final reason = getDeletionBlockReason(nodeId);
     if (reason != null) throw StateError(reason);
-    final nodes = [...document.nodes];
-    final index = nodes.indexWhere((node) => node.id == nodeId);
-    nodes.removeAt(index);
+    final ids = {nodeId};
+    for (final node in document.layerOrder) {
+      if (ids.contains(node.parentId)) ids.add(node.id);
+    }
+    final index = document.nodes.indexWhere((node) => node.id == nodeId);
+    final nodes = document.nodes
+        .where((node) => !ids.contains(node.id))
+        .toList();
     _updateDocument(
       document.copyWith(nodes: nodes),
-      selectedId: selectedId == nodeId
-          ? nodes[index < nodes.length ? index : index - 1].id
+      selectedId: ids.contains(selectedId)
+          ? nodes[math.min(index, nodes.length - 1)].id
           : selectedId,
+      selectedIds: selectedIds.difference(ids).isEmpty
+          ? {nodes[math.min(index, nodes.length - 1)].id}
+          : selectedIds.difference(ids),
     );
   }
 
-  void _updateDocument(SceneDocument document, {required String selectedId}) {
+  void _updateDocument(
+    SceneDocument document, {
+    required String selectedId,
+    Set<String>? selectedIds,
+  }) {
     // The codec is the same boundary used by code generation. Invalid edits
     // never replace the last working preview or create an undo entry.
     final encoded = encodeSceneDocument(document);
@@ -233,13 +521,58 @@ class SceneEditor extends ChangeNotifier {
       document: updated,
       encoded: encoded,
       selectedId: selectedId,
+      selectedIds:
+          selectedIds ??
+          (selectedId == this.selectedId ? this.selectedIds : {selectedId}),
     ));
   }
 
   void _applyRevision(_SceneRevision revision) {
     _revision = revision;
-    inspector.resetNode(selectedNode, canvas: document.canvas);
+    inspector.resetNode(selectedNode, canvas: getInspectorCanvas());
     notifyListeners();
+  }
+
+  SceneCanvas getInspectorCanvas() {
+    final geometry = calculateSceneLayout(
+      document: document,
+      size: Size(
+        document.canvas.referenceWidth.toDouble(),
+        document.canvas.referenceHeight.toDouble(),
+      ),
+    );
+    final size = getParentContentSize(selectedNode, geometry);
+    return document.canvas.copyWith(
+      referenceWidth: size.width.round(),
+      referenceHeight: size.height.round(),
+    );
+  }
+
+  List<SceneNode> getSelectionLayoutNodes() {
+    final geometry = calculateSceneLayout(
+      document: document,
+      size: Size(
+        document.canvas.referenceWidth.toDouble(),
+        document.canvas.referenceHeight.toDouble(),
+      ),
+    );
+    final result = <SceneNode>[];
+    for (final node in selectedNodes) {
+      final rect = geometry[node.id]!.rect;
+      final size = getParentContentSize(node, geometry);
+      final padding = getParentLayout(node).padding;
+      result.add(
+        node.copyWith(
+          rect: SceneRect(
+            x: (rect.left - padding) / size.width,
+            y: (rect.top - padding) / size.height,
+            width: rect.width / size.width,
+            height: rect.height / size.height,
+          ),
+        ),
+      );
+    }
+    return result;
   }
 
   void undo() {
@@ -295,6 +628,11 @@ class SceneEditor extends ChangeNotifier {
           !initial && document.nodes.any((node) => node.id == selectedId)
           ? selectedId
           : document.nodes.first.id,
+      selectedIds: {
+        !initial && document.nodes.any((node) => node.id == selectedId)
+            ? selectedId
+            : document.nodes.first.id,
+      },
     );
     _savedDocument = revision.encoded;
     _undo.clear();

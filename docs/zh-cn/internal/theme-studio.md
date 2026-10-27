@@ -1,5 +1,14 @@
 # Theme Studio
 
+Studio 支持 Shift 点击多选、空白画布拖动框选（Shift 追加）和 `Ctrl+A` 全选。
+选中同级图层后，可使用工具条对齐、等距分布或 `Ctrl+G` 分组。
+分组是实际 Frame，子节点随父级移动、变换及隐藏；图层面板显示嵌套关系。
+Inspector 的 **Frame layout** 支持 absolute/row/column、Padding、Gap、
+双轴对齐、裁剪；**Responsive sizing** 支持固定逻辑尺寸与 Flex 权重。
+嵌套节点的像素坐标以父容器内容区为基准。批量操作均可一次撤销，
+必需控件在容器中仍受删除和复制保护。无附加效果的绝对布局容器
+可通过 `Ctrl+Shift+G` 解组并保留子节点位置。
+
 > [!NOTE]
 > Theme Studio 目前仍处于活跃开发阶段，部分功能、交互与扩展接口仍在快速演进中。
 

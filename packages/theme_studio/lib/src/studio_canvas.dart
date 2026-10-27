@@ -8,6 +8,7 @@ import 'studio_preferences.dart';
 import 'studio_preview.dart';
 import 'studio_preview_host.dart';
 import 'studio_form.dart';
+import 'node_arrangement_toolbar.dart';
 
 class StudioCanvas extends StatefulWidget {
   const StudioCanvas({
@@ -96,6 +97,14 @@ class _StudioCanvasState extends State<StudioCanvas> {
         session.redo();
       } else if (key == LogicalKeyboardKey.keyD) {
         if (session.canDuplicateNode) session.duplicateSelectedNode();
+      } else if (key == LogicalKeyboardKey.keyA) {
+        session.selectNodes(
+          session.document.nodes.map((node) => node.id).toSet(),
+        );
+      } else if (key == LogicalKeyboardKey.keyG) {
+        keyboard.isShiftPressed
+            ? session.ungroupSelection()
+            : session.groupSelection();
       } else {
         return KeyEventResult.ignored;
       }
@@ -110,21 +119,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
       _ => null,
     };
     if (delta != null) {
-      if (session.applyDraft()) {
-        final node = session.selectedNode;
-        session.updateNode(
-          node.copyWith(
-            rect: calculateMovedRect(
-              rect: node.rect,
-              canvasSize: Size(
-                session.document.canvas.referenceWidth.toDouble(),
-                session.document.canvas.referenceHeight.toDouble(),
-              ),
-              delta: delta,
-            ),
-          ),
-        );
-      }
+      session.moveSelection(delta);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.keyV) {
@@ -341,6 +336,12 @@ class _StudioCanvasState extends State<StudioCanvas> {
                   ],
                 ),
               ),
+              if (session != null &&
+                  !widget.readOnly &&
+                  !_previewing &&
+                  (session.selectedIds.length > 1 ||
+                      session.selectedNode.layout != null))
+                NodeArrangementToolbar(editor: session),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -361,6 +362,9 @@ class _StudioCanvasState extends State<StudioCanvas> {
                             interactive: _previewing,
                             document: session.document,
                             selectedId: session.selectedId,
+                            selectedIds: session.selectedIds,
+                            onSelectNodes: session.selectNodes,
+                            onCommitNodes: session.updateNodes,
                             dormant: widget.dormant,
                             scenario: _scenario,
                             preferences: widget.preferences,
@@ -370,10 +374,25 @@ class _StudioCanvasState extends State<StudioCanvas> {
                             panEnabled: _handTool || _spacePan,
                             resetView: _resetView,
                             onZoom: (zoom) => setState(() => _zoom = zoom),
-                            onSelect: session.selectNode,
-                            onStartDrag: (id) => session.selectNode(id)
-                                ? session.selectedNode
-                                : null,
+                            onSelect: (id) => session.selectNode(
+                              id,
+                              toggle: HardwareKeyboard.instance.isShiftPressed,
+                            ),
+                            onStartDrag: (id) {
+                              if (!session.selectedIds.contains(id) &&
+                                  !session.selectNode(
+                                    id,
+                                    toggle: HardwareKeyboard
+                                        .instance
+                                        .isShiftPressed,
+                                  )) {
+                                return null;
+                              }
+                              if (!session.applyDraft()) return null;
+                              return session.document.nodes.firstWhere(
+                                (node) => node.id == id,
+                              );
+                            },
                             onCommitDrag: session.updateNode,
                             onDragNodeChanged:
                                 session.inspector.updatePreviewNode,

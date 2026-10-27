@@ -568,6 +568,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                   child: _inspect
                       ? CodeInspector(key: ObjectKey(editor), editor: editor)
                       : NodeInspector(
+                          editor: editor,
                           controller: editor.inspector,
                           componentCatalog: editor.componentCatalog,
                           onApply: editor.applyDraft,

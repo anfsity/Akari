@@ -16,6 +16,83 @@ double calculateFitZoom({
   viewportSize.height / referenceSize.height,
 );
 
+enum NodeAlignment { left, center, right, top, middle, bottom }
+
+SceneRect getRelativeRect(SceneRect rect, SceneRect parent) {
+  final x = ((rect.x - parent.x) / parent.width).clamp(0.0, 1.0);
+  final y = ((rect.y - parent.y) / parent.height).clamp(0.0, 1.0);
+  return SceneRect(
+    x: x,
+    y: y,
+    width: math.min(rect.width / parent.width, 1 - x),
+    height: math.min(rect.height / parent.height, 1 - y),
+  );
+}
+
+List<SceneNode> calculateAlignedNodes(
+  List<SceneNode> nodes,
+  NodeAlignment alignment,
+) {
+  final left = nodes.map((node) => node.rect.x).reduce(math.min);
+  final right = nodes
+      .map((node) => node.rect.x + node.rect.width)
+      .reduce(math.max);
+  final top = nodes.map((node) => node.rect.y).reduce(math.min);
+  final bottom = nodes
+      .map((node) => node.rect.y + node.rect.height)
+      .reduce(math.max);
+  return [
+    for (final node in nodes)
+      node.copyWith(
+        rect: node.rect.copyWith(
+          x: switch (alignment) {
+            NodeAlignment.left => left,
+            NodeAlignment.center => (left + right - node.rect.width) / 2,
+            NodeAlignment.right => right - node.rect.width,
+            _ => node.rect.x,
+          },
+          y: switch (alignment) {
+            NodeAlignment.top => top,
+            NodeAlignment.middle => (top + bottom - node.rect.height) / 2,
+            NodeAlignment.bottom => bottom - node.rect.height,
+            _ => node.rect.y,
+          },
+        ),
+      ),
+  ];
+}
+
+List<SceneNode> calculateDistributedNodes(
+  List<SceneNode> nodes, {
+  required bool horizontal,
+}) {
+  final sorted = [...nodes]
+    ..sort(
+      (a, b) => horizontal
+          ? a.rect.x.compareTo(b.rect.x)
+          : a.rect.y.compareTo(b.rect.y),
+    );
+  final start = horizontal ? sorted.first.rect.x : sorted.first.rect.y;
+  final last = sorted.last.rect;
+  final end = horizontal ? last.x + last.width : last.y + last.height;
+  final occupied = sorted.fold(
+    0.0,
+    (sum, node) => sum + (horizontal ? node.rect.width : node.rect.height),
+  );
+  final gap = (end - start - occupied) / (nodes.length - 1);
+  var cursor = start;
+  final result = <SceneNode>[];
+  for (final node in sorted) {
+    final rect = node.rect.copyWith(
+      x: horizontal ? cursor : null,
+      y: horizontal ? null : cursor,
+    );
+    cursor += (horizontal ? node.rect.width : node.rect.height) + gap;
+    result.add(node.copyWith(rect: rect));
+  }
+  return result;
+}
+
 SceneRect calculateMovedRect({
   required SceneRect rect,
   required Size canvasSize,
@@ -199,5 +276,16 @@ SceneNode calculateResizedNode({
       }
     }
   }
-  return source.copyWith(rect: resized);
+  return source.copyWith(
+    rect: resized,
+    sizing: SceneSizing(
+      width: source.sizing.width == null
+          ? null
+          : resized.width * canvasSize.width,
+      height: source.sizing.height == null
+          ? null
+          : resized.height * canvasSize.height,
+      flex: source.sizing.flex,
+    ),
+  );
 }

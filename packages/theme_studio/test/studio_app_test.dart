@@ -304,6 +304,31 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('Shift selection, marquee, grouping and frame layout work on canvas', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.tap(find.byKey(const ValueKey('preview-label')));
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pumpAndSettle();
+    expect(editor.selectedIds, {'panel', 'label'});
+    await tester.tap(find.byKey(const ValueKey('group-selection')));
+    await tester.pumpAndSettle();
+    expect(editor.selectedNode.layout, isNotNull);
+    expect(find.text('Frame layout'), findsOneWidget);
+    expect(find.byKey(const ValueKey('layer-list')), findsOneWidget);
+    editor.undo();
+    editor.selectNodes({});
+    await tester.pumpAndSettle();
+    final canvas = tester.getRect(find.byType(SceneRuntime));
+    final gesture = await tester.startGesture(canvas.topLeft + const Offset(3, 3));
+    await gesture.moveTo(canvas.bottomRight - const Offset(3, 3));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(editor.selectedIds, {'panel', 'label'});
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('preview scenarios wake the canvas without editing the scene', (
     tester,
   ) async {
