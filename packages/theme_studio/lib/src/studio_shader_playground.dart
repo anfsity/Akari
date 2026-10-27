@@ -83,6 +83,7 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
     setState(() {
       _busy = true;
       _error = null;
+      _compiled = null;
     });
     try {
       final compiled = await widget.assets.shaderCompiler.compile(

@@ -84,6 +84,12 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
   }
 
   void _refreshState() => setState(() {});
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    unawaited(_load());
+  }
   void _updateClock() {
     final running =
         widget.elapsed == null &&
