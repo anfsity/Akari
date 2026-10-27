@@ -2,6 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
+
+import 'studio_input.dart';
+
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 class StudioWorkspaceScope extends InheritedWidget {
@@ -26,6 +29,8 @@ class StudioWorkspace extends StatefulWidget {
     required this.inspector,
     required this.statusBar,
     required this.onSave,
+    this.onOpenSettings,
+    this.input = const StudioInputBindings(),
     super.key,
   });
   final Widget toolbar;
@@ -34,6 +39,8 @@ class StudioWorkspace extends StatefulWidget {
   final Widget inspector;
   final Widget statusBar;
   final VoidCallback onSave;
+  final VoidCallback? onOpenSettings;
+  final StudioInputBindings input;
   @override
   State<StudioWorkspace> createState() => _StudioWorkspaceState();
 }
@@ -194,20 +201,16 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
   @override
   Widget build(BuildContext context) => CallbackShortcuts(
     bindings: {
-      const SingleActivator(LogicalKeyboardKey.keyS, control: true):
-          widget.onSave,
-      const SingleActivator(LogicalKeyboardKey.keyB, control: true):
-          _toggleSidebar,
-      const SingleActivator(
-        LogicalKeyboardKey.keyB,
-        control: true,
-        shift: true,
-      ): _toggleInspector,
-      const SingleActivator(
-        LogicalKeyboardKey.keyP,
-        control: true,
-        shift: true,
-      ): _togglePresentation,
+      for (final entry in <StudioCommand, VoidCallback>{
+        StudioCommand.save: widget.onSave,
+        StudioCommand.sidebar: _toggleSidebar,
+        StudioCommand.inspector: _toggleInspector,
+        StudioCommand.presentation: _togglePresentation,
+        if (widget.onOpenSettings != null)
+          StudioCommand.settings: widget.onOpenSettings!,
+      }.entries)
+        if (widget.input.getBinding(entry.key) case final binding?)
+          binding.getActivator(repeats: false): entry.value,
       if (_presenting)
         const SingleActivator(LogicalKeyboardKey.escape): _togglePresentation,
     },
@@ -280,10 +283,9 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                         controller: _sidebar,
                                         minSize: 240,
                                         maxSize: 360,
-                                        collapsedSize:
-                                            _sidebar.collapsed && !_presenting
-                                            ? 32
-                                            : 0,
+                                        collapsedSize: _sidebar.collapsed
+                                            ? (_presenting ? 0 : 32)
+                                            : null,
                                         child: _buildDockedPanel(
                                           _sidebar,
                                           'Sidebar',
@@ -302,10 +304,9 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                         controller: _inspector,
                                         minSize: 280,
                                         maxSize: 420,
-                                        collapsedSize:
-                                            _inspector.collapsed && !_presenting
-                                            ? 32
-                                            : 0,
+                                        collapsedSize: _inspector.collapsed
+                                            ? (_presenting ? 0 : 32)
+                                            : null,
                                         child: _buildDockedPanel(
                                           _inspector,
                                           'Inspector',

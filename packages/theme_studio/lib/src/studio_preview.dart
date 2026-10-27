@@ -6,6 +6,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import 'node_geometry.dart';
 import 'studio_preferences.dart';
+import 'studio_input.dart';
 import 'studio_preview_host.dart';
 import 'studio_viewport.dart';
 import 'smart_guides.dart';
@@ -13,20 +14,24 @@ import 'studio_timeline.dart';
 import 'studio_rulers.dart';
 
 enum StudioCanvasTool {
-  move('Move', 'Drag to move', 'V'),
-  scale('Scale', 'Drag horizontally / vertically to scale X / Y', 'K'),
-  rotate('Rotate', 'Drag horizontally to rotate Z', 'R'),
+  move('Move', 'Drag to move', StudioCommand.move),
+  scale(
+    'Scale',
+    'Drag horizontally / vertically to scale X / Y',
+    StudioCommand.scale,
+  ),
+  rotate('Rotate', 'Drag horizontally to rotate Z', StudioCommand.rotate),
   rotate3d(
     '3D rotate',
     'Drag horizontally / vertically to rotate Y / X',
-    'Shift+R',
+    StudioCommand.rotate3d,
   );
 
-  const StudioCanvasTool(this.label, this.hint, this.shortcut);
+  const StudioCanvasTool(this.label, this.hint, this.command);
 
   final String label;
   final String hint;
-  final String shortcut;
+  final StudioCommand command;
 }
 
 /// Renders the compiled theme at its authored resolution. Selection wraps each
@@ -602,6 +607,7 @@ class _StudioPreviewState extends State<StudioPreview>
           );
     return StudioViewport(
       presenting: widget.presenting,
+      input: widget.preferences.input,
       canvasKey: _canvas,
       referenceSize: referenceSize,
       zoom: widget.zoom,
@@ -1042,7 +1048,11 @@ class _PreviewNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Listener(
-    onPointerDown: interactive ? null : (_) => onSelect(),
+    onPointerDown: interactive
+        ? null
+        : (event) {
+            if (event.buttons == kPrimaryMouseButton) onSelect();
+          },
     // Flutter reports an accepted pan's pointer cancellation as onPanEnd.
     // Clear the draft first so a cancelled pointer cannot commit a move.
     onPointerCancel: interactive ? null : (_) => onCancelDrag(),

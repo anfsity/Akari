@@ -22,6 +22,8 @@ import 'package:theme_studio/src/studio_timeline.dart';
 import 'package:theme_studio/src/studio_canvas_presets.dart';
 import 'package:theme_studio/src/studio_form.dart';
 import 'package:theme_studio/src/studio_assets.dart';
+import 'package:theme_studio/src/studio_input.dart';
+import 'package:theme_studio/src/studio_preferences.dart';
 
 const _document = SceneDocument(
   id: 'test',
@@ -545,6 +547,56 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('shortcut recorder rejects collisions and applies persistent canvas and workspace bindings', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-nav-input')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('shortcut-search')), 'Move / resize');
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('bind-move')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('bind-move')));
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('is assigned to Save scene'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('is assigned to'), findsNothing);
+    await tester.tap(find.text('Apply settings'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<StudioCanvas>(find.byType(StudioCanvas)).preferences.input.getBinding(StudioCommand.move)!.key, LogicalKeyboardKey.keyQ);
+    await tester.tap(find.byKey(const ValueKey('preview-panel')));
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+    await tester.pumpAndSettle();
+    expect(tester.widget<StudioPreview>(find.byType(StudioPreview)).tool, StudioCanvasTool.move);
+    expect((await StudioPreferences.load()).input.getBinding(StudioCommand.move)!.key, LogicalKeyboardKey.keyQ);
+    expect(editor.canUndo, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('middle-button canvas panning preserves selection and document history', (tester) async {
+    await openStudio(tester);
+    final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    final label = find.byKey(const ValueKey('preview-label'));
+    final before = tester.getTopLeft(label);
+    final drag = await tester.startGesture(tester.getCenter(label), kind: PointerDeviceKind.mouse, buttons: kMiddleMouseButton);
+    await drag.moveBy(const Offset(30, 10));
+    await drag.moveBy(const Offset(30, 10));
+    await tester.pump();
+    await drag.up();
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(label) - before, const Offset(60, 20));
+    expect(editor.selectedId, 'panel');
+    expect(editor.canUndo, isFalse);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('panel edges face outward and floating drags accumulate between frames', (tester) async {
     await openStudio(tester);

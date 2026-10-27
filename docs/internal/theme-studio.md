@@ -227,6 +227,19 @@ Adjust zoom with **− / +**, **100%**, or **Fit**, and select a canvas tool:
 
 ### Additional keyboard shortcuts
 
+**Settings → Shortcuts** lists keyboard commands and mouse gestures. Click a
+binding and press a new key combination; Escape cancels recording. Conflicting
+combinations name the existing command and must be cleared first. Each command
+can be unbound or reset, and **Reset all** restores the defaults. Settings are
+saved independently of scenes when applying the dialog. Text fields keep their
+own editing keys. Workspace commands such as Save and panel visibility work
+from the inspector as well as the canvas.
+
+Mouse settings select middle-button or right-button drag for panning, and the
+wheel's zoom modifier (Ctrl, Alt, Super, or none). Holding Space also pans by
+default. Navigation does not select or edit layers. Tools live in the canvas's
+left rail; state/preview controls are above it, and output size/zoom are below.
+
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl+Mouse wheel` | Zoom around the pointer |

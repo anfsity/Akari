@@ -5,6 +5,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 import 'node_geometry.dart';
 import 'scene_editor.dart';
 import 'studio_preferences.dart';
+import 'studio_input.dart';
 import 'studio_preview.dart';
 import 'studio_preview_host.dart';
 import 'studio_form.dart';
@@ -89,6 +90,47 @@ class _StudioCanvasState extends State<StudioCanvas> {
     );
   }
 
+  void _toggleTimeline() {
+    final session = widget.editor;
+    if (session == null || !session.applyDraft()) return;
+    setState(() {
+      _elapsed = _elapsed == null ? Duration.zero : null;
+      _previewing = false;
+      _showStateGraph = false;
+    });
+  }
+
+  void _toggleGraph() {
+    final session = widget.editor;
+    if (session == null || !session.applyDraft()) return;
+    setState(() {
+      _showStateGraph = !_showStateGraph;
+      _elapsed = null;
+      _previewing = _showStateGraph;
+    });
+  }
+
+  void _togglePreview() {
+    final session = widget.editor;
+    if (session == null || (!_previewing && !session.applyDraft())) return;
+    setState(() {
+      _elapsed = null;
+      _showStateGraph = false;
+      _previewing = !_previewing;
+    });
+  }
+
+  void _toggleComparison() {
+    final session = widget.editor;
+    if (session == null || !session.applyDraft()) return;
+    setState(() {
+      _comparing = !_comparing;
+      _previewing = false;
+      _elapsed = null;
+      _showStateGraph = false;
+    });
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode focus, KeyEvent event) {
     if (context
             .getInheritedWidgetOfExactType<StudioWorkspaceScope>()
@@ -96,73 +138,86 @@ class _StudioCanvasState extends State<StudioCanvas> {
         false) {
       return KeyEventResult.ignored;
     }
-    if (_previewing || _elapsed != null || _comparing) {
-      return KeyEventResult.ignored;
-    }
-    final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.space) {
+    final pan = widget.preferences.input.getBinding(StudioCommand.temporaryPan);
+    if (event.logicalKey == pan?.key && (pan!.isPressed(event) || _spacePan)) {
       setState(() => _spacePan = event is! KeyUpEvent);
       return KeyEventResult.handled;
     }
     if (event is KeyUpEvent) return KeyEventResult.ignored;
+    final command = widget.preferences.input.findCommand(event);
     final session = widget.editor;
-    if (session == null) return KeyEventResult.ignored;
-    final keyboard = HardwareKeyboard.instance;
-    if (widget.readOnly &&
-        key != LogicalKeyboardKey.keyH &&
-        !(key == LogicalKeyboardKey.digit1 && keyboard.isShiftPressed)) {
-      return KeyEventResult.ignored;
-    }
-    if (keyboard.isControlPressed) {
-      if (key == LogicalKeyboardKey.keyZ) {
-        keyboard.isShiftPressed ? session.redo() : session.undo();
-      } else if (key == LogicalKeyboardKey.keyY) {
-        session.redo();
-      } else if (key == LogicalKeyboardKey.keyD) {
-        if (session.canDuplicateNode) session.duplicateSelectedNode();
-      } else if (key == LogicalKeyboardKey.keyA) {
-        session.selectNodes(
-          session.document.nodes.map((node) => node.id).toSet(),
-        );
-      } else if (key == LogicalKeyboardKey.keyG) {
-        keyboard.isShiftPressed
-            ? session.ungroupSelection()
-            : session.groupSelection();
-      } else {
-        return KeyEventResult.ignored;
-      }
-      return KeyEventResult.handled;
-    }
-    final step = keyboard.isShiftPressed ? 10.0 : 1.0;
-    final delta = switch (key) {
-      LogicalKeyboardKey.arrowLeft => Offset(-step, 0),
-      LogicalKeyboardKey.arrowRight => Offset(step, 0),
-      LogicalKeyboardKey.arrowUp => Offset(0, -step),
-      LogicalKeyboardKey.arrowDown => Offset(0, step),
-      _ => null,
-    };
-    if (delta != null) {
-      session.moveSelection(delta);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.keyV) {
-      _selectTool(StudioCanvasTool.move);
-    } else if (key == LogicalKeyboardKey.keyK) {
-      _selectTool(StudioCanvasTool.scale);
-    } else if (key == LogicalKeyboardKey.keyR) {
-      _selectTool(
-        keyboard.isShiftPressed
-            ? StudioCanvasTool.rotate3d
-            : StudioCanvasTool.rotate,
-      );
-    } else if (key == LogicalKeyboardKey.keyH) {
-      setState(() => _handTool = true);
-    } else if (key == LogicalKeyboardKey.digit1 && keyboard.isShiftPressed) {
-      _fitView();
-    } else if (key == LogicalKeyboardKey.delete) {
-      if (session.canDeleteNode) session.deleteSelectedNode();
-    } else {
-      return KeyEventResult.ignored;
+    if (command == null || session == null) return KeyEventResult.ignored;
+    switch (command) {
+      case StudioCommand.fit:
+        _fitView();
+      case StudioCommand.actualSize:
+        setState(() => _zoom = 1);
+      case StudioCommand.zoomIn:
+        setState(() => _zoom = clampStudioZoom(_getEffectiveZoom() * 1.25));
+      case StudioCommand.zoomOut:
+        setState(() => _zoom = clampStudioZoom(_getEffectiveZoom() / 1.25));
+      case StudioCommand.hand:
+        setState(() => _handTool = !_handTool);
+      case StudioCommand.timeline:
+        _toggleTimeline();
+      case StudioCommand.stateGraph:
+        _toggleGraph();
+      case StudioCommand.compare:
+        _toggleComparison();
+      case StudioCommand.preview:
+        _togglePreview();
+      case StudioCommand.rulers:
+        setState(() => _showRulers = !_showRulers);
+      case StudioCommand.guides:
+        setState(() => _snapToGuides = !_snapToGuides);
+      default:
+        if (widget.readOnly || _previewing || _elapsed != null || _comparing) {
+          return KeyEventResult.ignored;
+        }
+        switch (command) {
+          case StudioCommand.undo:
+            session.undo();
+          case StudioCommand.redo:
+            session.redo();
+          case StudioCommand.duplicate:
+            if (session.canDuplicateNode) session.duplicateSelectedNode();
+          case StudioCommand.delete:
+            if (session.canDeleteNode) session.deleteSelectedNode();
+          case StudioCommand.selectAll:
+            session.selectNodes(
+              session.document.nodes.map((node) => node.id).toSet(),
+            );
+          case StudioCommand.group:
+            session.groupSelection();
+          case StudioCommand.ungroup:
+            session.ungroupSelection();
+          case StudioCommand.move:
+            _selectTool(StudioCanvasTool.move);
+          case StudioCommand.scale:
+            _selectTool(StudioCanvasTool.scale);
+          case StudioCommand.rotate:
+            _selectTool(StudioCanvasTool.rotate);
+          case StudioCommand.rotate3d:
+            _selectTool(StudioCanvasTool.rotate3d);
+          case StudioCommand.nudgeLeft:
+            session.moveSelection(const Offset(-1, 0));
+          case StudioCommand.nudgeRight:
+            session.moveSelection(const Offset(1, 0));
+          case StudioCommand.nudgeUp:
+            session.moveSelection(const Offset(0, -1));
+          case StudioCommand.nudgeDown:
+            session.moveSelection(const Offset(0, 1));
+          case StudioCommand.fastLeft:
+            session.moveSelection(const Offset(-10, 0));
+          case StudioCommand.fastRight:
+            session.moveSelection(const Offset(10, 0));
+          case StudioCommand.fastUp:
+            session.moveSelection(const Offset(0, -10));
+          case StudioCommand.fastDown:
+            session.moveSelection(const Offset(0, 10));
+          default:
+            return KeyEventResult.ignored;
+        }
     }
     return KeyEventResult.handled;
   }
@@ -186,6 +241,129 @@ class _StudioCanvasState extends State<StudioCanvas> {
           listenable: Listenable.merge([widget.editor]),
           builder: (context, _) {
             final session = widget.editor;
+            final toolControls = <Widget>[
+              if (!widget.readOnly && !_previewing && _elapsed == null)
+                for (final tool in StudioCanvasTool.values)
+                  Tooltip(
+                    tooltip: (_) => Text(
+                      '${tool.label} · ${widget.preferences.input.getBinding(tool.command)?.getLabel() ?? 'Unbound'}',
+                    ),
+                    child: Button(
+                      key: ValueKey('tool-${tool.name}'),
+                      style: !_handTool && tool == _tool
+                          ? const ButtonStyle.primaryIcon()
+                          : const ButtonStyle.outlineIcon(),
+                      onPressed: () => _selectTool(tool),
+                      child: Semantics(
+                        label: tool.label,
+                        child: Icon(switch (tool) {
+                          StudioCanvasTool.move => LucideIcons.mousePointer2,
+                          StudioCanvasTool.scale => LucideIcons.scaling,
+                          StudioCanvasTool.rotate => LucideIcons.rotateCw,
+                          StudioCanvasTool.rotate3d => LucideIcons.rotate3d,
+                        }, size: 16),
+                      ),
+                    ),
+                  ),
+              Tooltip(
+                tooltip: (_) => Text(
+                  'Hand · ${widget.preferences.input.getBinding(StudioCommand.hand)?.getLabel() ?? 'Unbound'} · Hold ${widget.preferences.input.getBinding(StudioCommand.temporaryPan)?.getLabel() ?? 'Unbound'} to pan',
+                ),
+                child: Button(
+                  key: const ValueKey('canvas-hand'),
+                  style: _handTool
+                      ? const ButtonStyle.primaryIcon()
+                      : const ButtonStyle.outlineIcon(),
+                  onPressed: () => setState(() => _handTool = !_handTool),
+                  child: Semantics(
+                    label: 'Hand',
+                    child: const Icon(LucideIcons.hand, size: 16),
+                  ),
+                ),
+              ),
+              if (!widget.readOnly && !_previewing && _elapsed == null)
+                Tooltip(
+                  tooltip: (_) => const Text('Smart guides · Alt to bypass'),
+                  child: Button(
+                    key: const ValueKey('smart-guides'),
+                    style: _snapToGuides
+                        ? const ButtonStyle.primaryIcon()
+                        : const ButtonStyle.outlineIcon(),
+                    onPressed: () =>
+                        setState(() => _snapToGuides = !_snapToGuides),
+                    child: const Icon(LucideIcons.magnet, size: 16),
+                  ),
+                ),
+              if (!widget.readOnly && !_previewing && _elapsed == null)
+                Tooltip(
+                  tooltip: (_) =>
+                      const Text('Lock aspect ratio · Shift while resizing'),
+                  child: Button(
+                    key: const ValueKey('lock-aspect-ratio'),
+                    style: _lockAspectRatio
+                        ? const ButtonStyle.primaryIcon()
+                        : const ButtonStyle.outlineIcon(),
+                    onPressed: () =>
+                        setState(() => _lockAspectRatio = !_lockAspectRatio),
+                    child: Semantics(
+                      label: 'Lock aspect ratio',
+                      toggled: _lockAspectRatio,
+                      child: Icon(
+                        _lockAspectRatio
+                            ? LucideIcons.lock
+                            : LucideIcons.lockOpen,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+            ];
+            final zoomControls = <Widget>[
+              OutlineButton(
+                key: const ValueKey('zoom-out'),
+                onPressed: session == null
+                    ? null
+                    : () => setState(
+                        () =>
+                            _zoom = clampStudioZoom(_getEffectiveZoom() / 1.25),
+                      ),
+                child: const Icon(LucideIcons.minus, size: 16),
+              ),
+              OutlineButton(
+                key: const ValueKey('zoom-fit'),
+                onPressed: _fitView,
+                child: SizedBox(
+                  width: 44,
+                  child: Text(
+                    _zoom == null ? 'Fit' : '${(_zoom! * 100).round()}%',
+                    textAlign: TextAlign.center,
+                  ).small(),
+                ),
+              ),
+              OutlineButton(
+                key: const ValueKey('zoom-in'),
+                onPressed: session == null
+                    ? null
+                    : () => setState(
+                        () =>
+                            _zoom = clampStudioZoom(_getEffectiveZoom() * 1.25),
+                      ),
+                child: const Icon(LucideIcons.plus, size: 16),
+              ),
+              SizedBox(
+                width: 72,
+                child: OutlineButton(
+                  key: const ValueKey('zoom-actual-size'),
+                  onPressed: session == null
+                      ? null
+                      : () => setState(() => _zoom = 1),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: const Text('100%').small(),
+                  ),
+                ),
+              ),
+            ];
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -199,7 +377,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         SizedBox(
-                          width: 150,
+                          width: 128,
                           child: OutlineButton(
                             onPressed: _elapsed == null
                                 ? widget.onToggleDormant
@@ -221,23 +399,12 @@ class _StudioCanvasState extends State<StudioCanvas> {
                             style: _elapsed == null
                                 ? const ButtonStyle.outlineIcon()
                                 : const ButtonStyle.primaryIcon(),
-                            onPressed: session == null
-                                ? null
-                                : () {
-                                    if (!session.applyDraft()) return;
-                                    setState(() {
-                                      _elapsed = _elapsed == null
-                                          ? Duration.zero
-                                          : null;
-                                      _previewing = false;
-                                      _showStateGraph = false;
-                                    });
-                                  },
+                            onPressed: session == null ? null : _toggleTimeline,
                             child: const Icon(LucideIcons.film, size: 16),
                           ),
                         ),
                         SizedBox(
-                          width: 160,
+                          width: 144,
                           child: StudioEnumSelect<StudioPreviewScenario>(
                             key: const ValueKey('preview-scenario'),
                             enabled: _elapsed == null,
@@ -257,16 +424,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                             style: _showStateGraph
                                 ? const ButtonStyle.primaryIcon()
                                 : const ButtonStyle.outlineIcon(),
-                            onPressed: session == null
-                                ? null
-                                : () {
-                                    if (!session.applyDraft()) return;
-                                    setState(() {
-                                      _showStateGraph = !_showStateGraph;
-                                      _elapsed = null;
-                                      _previewing = _showStateGraph;
-                                    });
-                                  },
+                            onPressed: session == null ? null : _toggleGraph,
                             child: const Icon(LucideIcons.gitBranch, size: 16),
                           ),
                         ),
@@ -279,18 +437,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                             style: _previewing
                                 ? const ButtonStyle.primaryIcon()
                                 : const ButtonStyle.outlineIcon(),
-                            onPressed: session == null
-                                ? null
-                                : () {
-                                    if (!_previewing && !session.applyDraft()) {
-                                      return;
-                                    }
-                                    setState(() {
-                                      _elapsed = null;
-                                      _showStateGraph = false;
-                                      _previewing = !_previewing;
-                                    });
-                                  },
+                            onPressed: session == null ? null : _togglePreview,
                             child: Semantics(
                               label: _previewing ? 'Edit canvas' : 'Preview',
                               toggled: _previewing,
@@ -300,143 +447,6 @@ class _StudioCanvasState extends State<StudioCanvas> {
                                     : LucideIcons.play,
                                 size: 16,
                               ),
-                            ),
-                          ),
-                        ),
-                        if (!widget.readOnly &&
-                            !_previewing &&
-                            _elapsed == null)
-                          for (final tool in StudioCanvasTool.values)
-                            Tooltip(
-                              tooltip: (_) =>
-                                  Text('${tool.label} (${tool.shortcut})'),
-                              child: Button(
-                                key: ValueKey('tool-${tool.name}'),
-                                style: !_handTool && tool == _tool
-                                    ? const ButtonStyle.primaryIcon()
-                                    : const ButtonStyle.outlineIcon(),
-                                onPressed: () => _selectTool(tool),
-                                child: Semantics(
-                                  label: tool.label,
-                                  child: Icon(switch (tool) {
-                                    StudioCanvasTool.move =>
-                                      LucideIcons.mousePointer2,
-                                    StudioCanvasTool.scale =>
-                                      LucideIcons.scaling,
-                                    StudioCanvasTool.rotate =>
-                                      LucideIcons.rotateCw,
-                                    StudioCanvasTool.rotate3d =>
-                                      LucideIcons.rotate3d,
-                                  }, size: 16),
-                                ),
-                              ),
-                            ),
-                        Tooltip(
-                          tooltip: (_) =>
-                              const Text('Hand (H) · Hold Space to pan'),
-                          child: Button(
-                            key: const ValueKey('canvas-hand'),
-                            style: _handTool
-                                ? const ButtonStyle.primaryIcon()
-                                : const ButtonStyle.outlineIcon(),
-                            onPressed: () =>
-                                setState(() => _handTool = !_handTool),
-                            child: Semantics(
-                              label: 'Hand',
-                              child: const Icon(LucideIcons.hand, size: 16),
-                            ),
-                          ),
-                        ),
-                        if (!widget.readOnly &&
-                            !_previewing &&
-                            _elapsed == null)
-                          Tooltip(
-                            tooltip: (_) =>
-                                const Text('Smart guides · Alt to bypass'),
-                            child: Button(
-                              key: const ValueKey('smart-guides'),
-                              style: _snapToGuides
-                                  ? const ButtonStyle.primaryIcon()
-                                  : const ButtonStyle.outlineIcon(),
-                              onPressed: () => setState(
-                                () => _snapToGuides = !_snapToGuides,
-                              ),
-                              child: const Icon(LucideIcons.magnet, size: 16),
-                            ),
-                          ),
-                        if (!widget.readOnly &&
-                            !_previewing &&
-                            _elapsed == null)
-                          Tooltip(
-                            tooltip: (_) => const Text(
-                              'Lock aspect ratio · Shift while resizing',
-                            ),
-                            child: Button(
-                              key: const ValueKey('lock-aspect-ratio'),
-                              style: _lockAspectRatio
-                                  ? const ButtonStyle.primaryIcon()
-                                  : const ButtonStyle.outlineIcon(),
-                              onPressed: () => setState(
-                                () => _lockAspectRatio = !_lockAspectRatio,
-                              ),
-                              child: Semantics(
-                                label: 'Lock aspect ratio',
-                                toggled: _lockAspectRatio,
-                                child: Icon(
-                                  _lockAspectRatio
-                                      ? LucideIcons.lock
-                                      : LucideIcons.lockOpen,
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-
-                        OutlineButton(
-                          key: const ValueKey('zoom-out'),
-                          onPressed: session == null
-                              ? null
-                              : () => setState(
-                                  () => _zoom = clampStudioZoom(
-                                    _getEffectiveZoom() / 1.25,
-                                  ),
-                                ),
-                          child: const Icon(LucideIcons.minus, size: 16),
-                        ),
-                        OutlineButton(
-                          key: const ValueKey('zoom-fit'),
-                          onPressed: _fitView,
-                          child: SizedBox(
-                            width: 44,
-                            child: Text(
-                              _zoom == null
-                                  ? 'Fit'
-                                  : '${(_zoom! * 100).round()}%',
-                              textAlign: TextAlign.center,
-                            ).small(),
-                          ),
-                        ),
-                        OutlineButton(
-                          key: const ValueKey('zoom-in'),
-                          onPressed: session == null
-                              ? null
-                              : () => setState(
-                                  () => _zoom = clampStudioZoom(
-                                    _getEffectiveZoom() * 1.25,
-                                  ),
-                                ),
-                          child: const Icon(LucideIcons.plus, size: 16),
-                        ),
-                        SizedBox(
-                          width: 72,
-                          child: OutlineButton(
-                            key: const ValueKey('zoom-actual-size'),
-                            onPressed: session == null
-                                ? null
-                                : () => setState(() => _zoom = 1),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: const Text('100%').small(),
                             ),
                           ),
                         ),
@@ -453,110 +463,153 @@ class _StudioCanvasState extends State<StudioCanvas> {
                         session.selectedNode.layout != null))
                   NodeArrangementToolbar(editor: session),
                 Expanded(
-                  child: Padding(
-                    padding: presenting
-                        ? EdgeInsets.zero
-                        : const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!presenting && !_comparing)
+                        Container(
+                          key: const ValueKey('canvas-tool-rail'),
+                          width: 44,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.background,
+                            border: Border(
+                              right: BorderSide(
+                                color: Theme.of(context).colorScheme.border,
+                              ),
+                            ),
                           ),
-                    child: session == null
-                        ? const Center(child: Text('Unable to open scene'))
-                        : Listener(
-                            key: _viewportKey,
-                            onPointerDown: _previewing || presenting
-                                ? null
-                                : (_) => _focus.requestFocus(),
-                            child: Stack(
-                              fit: StackFit.expand,
+                          child: SingleChildScrollView(
+                            child: Column(
                               children: [
-                                Visibility(
-                                  visible: !_comparing || presenting,
-                                  maintainState: true,
-                                  child: StudioPreview(
-                                    key: ObjectKey(session),
-                                    theme: widget.theme,
-                                    readOnly:
-                                        widget.readOnly ||
-                                        _previewing ||
-                                        _elapsed != null ||
-                                        presenting,
-                                    interactive:
-                                        _previewing ||
-                                        _elapsed != null ||
-                                        presenting,
-                                    document: session.previewDocument,
-                                    selectedId: session.selectedId,
-                                    selectedIds: session.selectedIds,
-                                    onSelectNodes: session.selectNodes,
-                                    onCommitNodes: session.updateNodes,
-                                    onPlaceNode: session.placeNode,
-                                    onUpdateText: session.updateNodeText,
-                                    snapToGuides: _snapToGuides,
-                                    showRulers: _showRulers,
-                                    onPrepareGuide: session.applyDraft,
-                                    onCreateGuide: session.createGuide,
-                                    onUpdateGuide: session.updateGuide,
-                                    onDeleteGuide: session.deleteGuide,
-                                    assetImageResolver:
-                                        widget.assetImageResolver,
-                                    assetSvgLoader: widget.assetSvgLoader,
-                                    dormant: widget.dormant,
-                                    scenario: _scenario,
-                                    playbackElapsed: presenting
-                                        ? null
-                                        : _elapsed,
-                                    transition: _transition,
-                                    preferences: widget.preferences,
-                                    tool: _tool,
-                                    lockAspectRatio: _lockAspectRatio,
-                                    zoom: presenting ? null : _zoom,
-                                    presenting: presenting,
-                                    panEnabled:
-                                        !presenting && (_handTool || _spacePan),
-                                    resetView: _resetView,
-                                    onZoom: (zoom) =>
-                                        setState(() => _zoom = zoom),
-                                    onSelect: (id) => session.selectNode(
-                                      id,
-                                      toggle: HardwareKeyboard
-                                          .instance
-                                          .isShiftPressed,
+                                const Gap(8),
+                                for (final control in toolControls)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 3,
                                     ),
-                                    onStartDrag: (id) {
-                                      if (!session.selectedIds.contains(id) &&
-                                          !session.selectNode(
-                                            id,
-                                            toggle: HardwareKeyboard
-                                                .instance
-                                                .isShiftPressed,
-                                          )) {
-                                        return null;
-                                      }
-                                      if (!session.applyDraft()) return null;
-                                      return session.document.nodes.firstWhere(
-                                        (node) => node.id == id,
-                                      );
-                                    },
-                                    onCommitDrag: session.updateNode,
-                                    onDragNodeChanged:
-                                        session.inspector.updatePreviewNode,
-                                  ),
-                                ),
-                                if (_comparing && !presenting)
-                                  StudioComparison(
-                                    theme: widget.theme,
-                                    document: session.previewDocument,
-                                    preferences: widget.preferences,
-                                    dormant: widget.dormant,
-                                    scenario: _scenario,
-                                    assetImageResolver:
-                                        widget.assetImageResolver,
-                                    assetSvgLoader: widget.assetSvgLoader,
+                                    child: control,
                                   ),
                               ],
                             ),
                           ),
+                        ),
+                      Expanded(
+                        child: Padding(
+                          padding: presenting
+                              ? EdgeInsets.zero
+                              : const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                          child: session == null
+                              ? const Center(
+                                  child: Text('Unable to open scene'),
+                                )
+                              : Listener(
+                                  key: _viewportKey,
+                                  onPointerDown: _previewing || presenting
+                                      ? null
+                                      : (_) => _focus.requestFocus(),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Visibility(
+                                        visible: !_comparing || presenting,
+                                        maintainState: true,
+                                        child: StudioPreview(
+                                          key: ObjectKey(session),
+                                          theme: widget.theme,
+                                          readOnly:
+                                              widget.readOnly ||
+                                              _previewing ||
+                                              _elapsed != null ||
+                                              presenting,
+                                          interactive:
+                                              _previewing ||
+                                              _elapsed != null ||
+                                              presenting,
+                                          document: session.previewDocument,
+                                          selectedId: session.selectedId,
+                                          selectedIds: session.selectedIds,
+                                          onSelectNodes: session.selectNodes,
+                                          onCommitNodes: session.updateNodes,
+                                          onPlaceNode: session.placeNode,
+                                          onUpdateText: session.updateNodeText,
+                                          snapToGuides: _snapToGuides,
+                                          showRulers: _showRulers,
+                                          onPrepareGuide: session.applyDraft,
+                                          onCreateGuide: session.createGuide,
+                                          onUpdateGuide: session.updateGuide,
+                                          onDeleteGuide: session.deleteGuide,
+                                          assetImageResolver:
+                                              widget.assetImageResolver,
+                                          assetSvgLoader: widget.assetSvgLoader,
+                                          dormant: widget.dormant,
+                                          scenario: _scenario,
+                                          playbackElapsed: presenting
+                                              ? null
+                                              : _elapsed,
+                                          transition: _transition,
+                                          preferences: widget.preferences,
+                                          tool: _tool,
+                                          lockAspectRatio: _lockAspectRatio,
+                                          zoom: presenting ? null : _zoom,
+                                          presenting: presenting,
+                                          panEnabled:
+                                              !presenting &&
+                                              (_handTool || _spacePan),
+                                          resetView: _resetView,
+                                          onZoom: (zoom) =>
+                                              setState(() => _zoom = zoom),
+                                          onSelect: (id) => session.selectNode(
+                                            id,
+                                            toggle: HardwareKeyboard
+                                                .instance
+                                                .isShiftPressed,
+                                          ),
+                                          onStartDrag: (id) {
+                                            if (!session.selectedIds.contains(
+                                                  id,
+                                                ) &&
+                                                !session.selectNode(
+                                                  id,
+                                                  toggle: HardwareKeyboard
+                                                      .instance
+                                                      .isShiftPressed,
+                                                )) {
+                                              return null;
+                                            }
+                                            if (!session.applyDraft()) {
+                                              return null;
+                                            }
+                                            return session.document.nodes
+                                                .firstWhere(
+                                                  (node) => node.id == id,
+                                                );
+                                          },
+                                          onCommitDrag: session.updateNode,
+                                          onDragNodeChanged: session
+                                              .inspector
+                                              .updatePreviewNode,
+                                        ),
+                                      ),
+                                      if (_comparing && !presenting)
+                                        StudioComparison(
+                                          theme: widget.theme,
+                                          document: session.previewDocument,
+                                          preferences: widget.preferences,
+                                          dormant: widget.dormant,
+                                          scenario: _scenario,
+                                          assetImageResolver:
+                                              widget.assetImageResolver,
+                                          assetSvgLoader: widget.assetSvgLoader,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 if (!presenting)
@@ -610,17 +663,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                         OutlineButton(
                           key: const ValueKey('canvas-compare'),
                           density: ButtonDensity.compact,
-                          onPressed: session == null
-                              ? null
-                              : () {
-                                  if (!session.applyDraft()) return;
-                                  setState(() {
-                                    _comparing = !_comparing;
-                                    _previewing = false;
-                                    _elapsed = null;
-                                    _showStateGraph = false;
-                                  });
-                                },
+                          onPressed: session == null ? null : _toggleComparison,
                           child: Text(_comparing ? 'Single' : 'Compare')
                               .small(),
                         ),
@@ -639,30 +682,7 @@ class _StudioCanvasState extends State<StudioCanvas> {
                             child: const Icon(LucideIcons.ruler, size: 16),
                           ),
                         ),
-                        SizedBox(
-                          width: 180,
-                          child: Text(
-                            session == null
-                                ? 'Choose a valid scene document.'
-                                : _previewing
-                                ? 'Preview focus, menus and motion · Choose scenarios for outcomes'
-                                : widget.readOnly
-                                ? 'Select a layer to inspect code'
-                                : _handTool || _spacePan
-                                ? 'Drag to pan'
-                                : _tool.hint,
-                            textAlign: TextAlign.right,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ).small().muted(),
-                        ),
-                        const Gap(8),
-                        Tooltip(
-                          tooltip: (_) => const Text(
-                            'Ctrl+wheel to zoom · Space+drag to pan · Shift+1 to fit',
-                          ),
-                          child: const Icon(LucideIcons.circleHelp, size: 14),
-                        ),
+                        ...zoomControls,
                       ],
                     ),
                   ),
