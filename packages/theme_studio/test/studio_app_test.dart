@@ -50,6 +50,20 @@ class _Components implements GreeterThemeComponents {
       Center(child: Text(node.componentId));
 }
 
+class _InputComponents implements GreeterThemeComponents {
+  _InputComponents(this.host);
+  final GreeterHost host;
+
+  @override
+  Widget build(BuildContext context, SceneNode node) => node.id == 'panel'
+      ? material.TextField(
+          key: const ValueKey('preview-input'),
+          controller: host.credentialController,
+          focusNode: host.credentialFocusNode,
+        )
+      : const Text('Preview label');
+}
+
 class _ThemedBackground extends BackgroundRenderer {
   const _ThemedBackground({this.resolveImage});
   final SceneImageProviderResolver? resolveImage;
@@ -158,10 +172,13 @@ ThemeDefinition _buildTheme({
   ThemeComponentCatalog componentCatalog = const ThemeComponentCatalog(),
   ThemePresetCatalog presetCatalog = const ThemePresetCatalog(),
   ThemeLayoutDefinition? layout,
+  GreeterThemeComponentsFactory? components,
+  Duration mediumMotion = Duration.zero,
+  bool disableAnimations = false,
 }) => ThemeDefinition(
   id: 'test',
   document: document ?? _document,
-  components: (_) => _Components(),
+  components: components ?? (_) => _Components(),
   componentCatalog: componentCatalog,
   presetCatalog: presetCatalog,
   layout: layout,
@@ -180,7 +197,8 @@ ThemeDefinition _buildTheme({
               ),
       ),
       panelRadius: 8,
-      mediumMotion: Duration.zero,
+      mediumMotion: mediumMotion,
+      disableAnimations: disableAnimations,
       standardCurve: Curves.linear,
       minHitTarget: 44,
       surfaceColor: const Color(0xff222222),
@@ -324,6 +342,123 @@ void main() {
     }
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'interactive preview retains controls and prevents geometry edits',
+    (tester) async {
+      late GreeterHost host;
+      await openStudio(
+        tester,
+        themeBuilder: ({Color? seed, SceneDocument? document}) => _buildTheme(
+          document: document,
+          components: (context) {
+            host = context.host;
+            return _InputComponents(host);
+          },
+        ),
+      );
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      final original = encodeSceneDocument(editor.document);
+      final controller = host.credentialController;
+      await tester.tap(find.byKey(const ValueKey('canvas-preview')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<StudioPreview>(find.byType(StudioPreview)).interactive,
+        isTrue,
+      );
+      expect(find.byKey(const ValueKey('resize-topLeft')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('preview-input')));
+      await tester.pump();
+      expect(host.credentialFocusNode.hasFocus, isTrue);
+      await tester.enterText(
+        find.byKey(const ValueKey('preview-input')),
+        'Preview only',
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+      await tester.pump();
+      expect(encodeSceneDocument(editor.document), original);
+      expect(editor.canUndo, isFalse);
+      await tester.tap(find.byKey(const ValueKey('canvas-preview')));
+      await tester.pumpAndSettle();
+      expect(host.credentialController, same(controller));
+      expect(host.credentialFocusNode.hasFocus, isFalse);
+      expect(find.byKey(const ValueKey('resize-topLeft')), findsOneWidget);
+      expect(editor.isDirty, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'preview wake motion reverses and respects theme and system policy',
+    (tester) async {
+      file.writeAsStringSync(
+        encodeSceneDocument(
+          _document.copyWith(
+            background: const SceneBackground(
+              kind: SceneBackgroundKind.solid,
+              blurSigma: 12,
+            ),
+          ),
+        ),
+      );
+      var disabled = false;
+      await openStudio(
+        tester,
+        themeBuilder: ({Color? seed, SceneDocument? document}) => _buildTheme(
+          document: document,
+          mediumMotion: const Duration(milliseconds: 400),
+          disableAnimations: disabled,
+        ),
+      );
+      SceneRuntime getRuntime() =>
+          tester.widget<SceneRuntime>(find.byType(SceneRuntime));
+      expect(
+        MediaQuery.of(tester.element(find.byType(SceneRuntime)))
+            .disableAnimations,
+        isTrue,
+      );
+      await tester.tap(find.byKey(const ValueKey('canvas-preview')));
+      await tester.pumpAndSettle();
+      expect(
+        MediaQuery.of(tester.element(find.byType(SceneRuntime)))
+            .disableAnimations,
+        isFalse,
+      );
+      await tester.tap(find.text('State: Login'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      final midway = getRuntime().backgroundBlurSigma!.value;
+      expect(midway, greaterThan(0));
+      expect(midway, lessThan(12));
+      await tester.tap(find.text('State: Dormant'));
+      await tester.pumpAndSettle();
+      expect(getRuntime().backgroundBlurSigma!.value, 12);
+      disabled = true;
+      final reload = tester.binding.reassembleApplication();
+      await tester.pumpAndSettle();
+      await reload;
+      await tester.tap(find.text('State: Login'));
+      await tester.pump();
+      expect(getRuntime().backgroundBlurSigma!.value, 0);
+      disabled = false;
+      final refresh = tester.binding.reassembleApplication();
+      await tester.pumpAndSettle();
+      await refresh;
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('State: Dormant'));
+      await tester.pump();
+      expect(getRuntime().backgroundBlurSigma!.value, 12);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   Future<void> prepareSynthesisSource() async {
     final lib = Directory('${directory.path}/lib')..createSync();

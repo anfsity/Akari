@@ -145,6 +145,12 @@ unavailability. Choosing a different scenario wakes a dormant preview. These
 simulated states never change scene files or undo history; credentials are cleared
 on scenario changes.
 
+Click **Preview** to play theme motion and interact with input focus, hover effects,
+and choice menus. Use the scenario menu to inspect outcomes. **Edit canvas**
+returns to selection and geometry editing; preview input and animation do not
+enter document history. Dormant/login switches play the theme's wake transition,
+including background blur. Theme and system reduced-motion settings still apply.
+
 Adjust zoom with **− / +**, **100%**, or **Fit**, and select a canvas tool:
 
 | Tool | Shortcut | Behavior |
