@@ -136,7 +136,7 @@ class _AssemblySlot extends StatelessWidget {
         !readOnly &&
         (!isPresent ||
             editor.getDeletionBlockReason(slot.defaultNode.id) == null);
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -204,6 +204,25 @@ class _AssemblySlot extends StatelessWidget {
           ],
         ),
       ),
+    );
+    if (readOnly) return row;
+    return Draggable<SceneNode>(
+      data: slot.defaultNode,
+      dragAnchorStrategy: pointerDragAnchorStrategy,
+      feedback: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: colors.background,
+          border: Border.all(color: colors.primary),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          slot.label,
+          style: TextStyle(color: colors.foreground, fontSize: 14),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: .4, child: row),
+      child: row,
     );
   }
 }

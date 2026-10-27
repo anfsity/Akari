@@ -106,8 +106,8 @@ SceneRect calculateMovedRect({
     y = (y / gridSize).round() * gridSize;
   }
   return rect.copyWith(
-    x: (x / canvasSize.width).clamp(0.0, 1.0 - rect.width),
-    y: (y / canvasSize.height).clamp(0.0, 1.0 - rect.height),
+    x: (x / canvasSize.width).clamp(0.0, math.max(0.0, 1.0 - rect.width)),
+    y: (y / canvasSize.height).clamp(0.0, math.max(0.0, 1.0 - rect.height)),
   );
 }
 
