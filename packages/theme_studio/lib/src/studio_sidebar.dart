@@ -83,42 +83,44 @@ class _StudioSidebarState extends State<StudioSidebar> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(12, 10, 8, 6),
           child: Row(
             children: [
-              const Text('Scenes').small().muted(),
+              const Text('Scenes').xSmall().muted(),
               const Spacer(),
               GhostButton(
                 onPressed: widget.loadingFile ? null : widget.onLoadJson,
                 density: ButtonDensity.compact,
-                child: const Text('Load JSON').small(),
+                child: const Text('Load JSON').xSmall(),
               ),
             ],
           ),
         ),
         ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 90),
+          constraints: const BoxConstraints(maxHeight: 96),
           child: ListView(
             shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             children: [
-              for (final path in widget.scenePaths)
+              for (var i = 0; i < widget.scenePaths.length; i++) ...[
+                if (i > 0) const Gap(2),
                 Button(
-                  key: ValueKey('scene-$path'),
-                  style: editor?.file.path == path
+                  key: ValueKey('scene-${widget.scenePaths[i]}'),
+                  style: editor?.file.path == widget.scenePaths[i]
                       ? const ButtonStyle.secondary(
                           density: ButtonDensity.dense,
                         )
                       : const ButtonStyle.ghost(density: ButtonDensity.dense),
-                  onPressed: () => widget.onSwitchScene(path),
+                  onPressed: () => widget.onSwitchScene(widget.scenePaths[i]),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      File(path).uri.pathSegments.last,
+                      File(widget.scenePaths[i]).uri.pathSegments.last,
                       overflow: TextOverflow.ellipsis,
                     ).small(),
                   ),
                 ),
+              ],
             ],
           ),
         ),
@@ -126,7 +128,7 @@ class _StudioSidebarState extends State<StudioSidebar> {
         if (editor != null)
           StudioLayoutCompleteness(editor: editor, readOnly: widget.readOnly),
         Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Tabs(
             index: tab.index,
             expand: true,
@@ -149,6 +151,7 @@ class _StudioSidebarState extends State<StudioSidebar> {
             ],
           ),
         ),
+        const Divider(),
         Expanded(
           child: tab == _SidebarTab.assets
               ? _AssetList(
@@ -416,20 +419,14 @@ class _AssetListState extends State<_AssetList> {
                   ),
                   const Gap(12),
                   if (kind == StudioAssetKind.svg) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: const Text('Override icon color').small(),
-                        ),
-                        Switch(
-                          value: _tint != null,
-                          onChanged: (enabled) => setState(
-                            () => _tint = enabled ? 0xffffffff : null,
-                          ),
-                        ),
-                      ],
+                    StudioSwitchRow(
+                      label: 'Override icon color',
+                      value: _tint != null,
+                      onChanged: (enabled) =>
+                          setState(() => _tint = enabled ? 0xffffffff : null),
                     ),
-                    if (_tint != null)
+                    if (_tint != null) ...[
+                      const Gap(8),
                       ColorInput(
                         key: const ValueKey('asset-tint'),
                         value: ColorDerivative.fromColor(Color(_tint!)),
@@ -438,6 +435,7 @@ class _AssetListState extends State<_AssetList> {
                         onChanged: (value) =>
                             setState(() => _tint = value.toColor().toARGB32()),
                       ),
+                    ],
                     const Gap(8),
                   ],
                   StudioAssetPreview(
@@ -468,7 +466,7 @@ class _AssetListState extends State<_AssetList> {
           itemBuilder: (context, index) {
             final path = paths[index];
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
               child: Button(
                 key: ValueKey('asset-$path'),
                 style: path == selected
@@ -568,7 +566,7 @@ class _LayerListState extends State<_LayerList> {
         controller: _scroll,
         itemExtent: _rowHeight,
         itemCount: nodes.length + 1,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         itemBuilder: (context, index) {
           if (index == nodes.length) {
             final colors = Theme.of(context).colorScheme;
@@ -651,43 +649,43 @@ class _NodeActions extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: editor,
     builder: (context, _) => Padding(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 6,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlineButton(
-                  density: ButtonDensity.dense,
-                  onPressed: !readOnly && editor.canDuplicateNode
-                      ? editor.duplicateSelectedNode
-                      : null,
-                  child: const Text('Duplicate', maxLines: 1).small(),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 32),
+            child: Row(
+              spacing: 8,
+              children: [
+                Expanded(
+                  child: OutlineButton(
+                    density: ButtonDensity.dense,
+                    onPressed: !readOnly && editor.canDuplicateNode
+                        ? editor.duplicateSelectedNode
+                        : null,
+                    child: const Text('Duplicate', maxLines: 1).small(),
+                  ),
                 ),
-              ),
-              const Gap(8),
-              Expanded(
-                child: OutlineButton(
-                  density: ButtonDensity.dense,
-                  onPressed: !readOnly && editor.canDeleteNode
-                      ? editor.deleteSelectedNode
-                      : null,
-                  child: const Text('Delete', maxLines: 1).small(),
+                Expanded(
+                  child: OutlineButton(
+                    density: ButtonDensity.dense,
+                    onPressed: !readOnly && editor.canDeleteNode
+                        ? editor.deleteSelectedNode
+                        : null,
+                    child: const Text('Delete', maxLines: 1).small(),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          if (editor.deletionBlockReason case final reason?) ...[
-            const Gap(8),
-            Text(reason).small().muted(),
-          ],
-          if (!editor.canDuplicateNode) ...[
-            const Gap(8),
+          if (editor.deletionBlockReason case final reason?)
+            Text(reason).xSmall().muted(),
+          if (!editor.canDuplicateNode)
             const Text('Layout components can only be added once.')
-                .small()
+                .xSmall()
                 .muted(),
-          ],
         ],
       ),
     ),

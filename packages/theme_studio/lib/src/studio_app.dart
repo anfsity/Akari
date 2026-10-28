@@ -687,7 +687,10 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   child: Tabs(
                     index: _inspect
                         ? 2
@@ -695,7 +698,10 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                         ? 1
                         : 0,
                     expand: true,
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 8,
+                    ),
                     onChanged: (index) {
                       if (!editor.applyDraft()) return;
                       setState(() {
@@ -712,7 +718,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                               label,
                               textAlign: TextAlign.center,
                               maxLines: 1,
-                            ),
+                            ).small(),
                           ),
                         ),
                     ],

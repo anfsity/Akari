@@ -39,46 +39,72 @@ class _CodeInspectorState extends State<CodeInspector> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 2,
               children: [
-                Text(node.id, overflow: TextOverflow.ellipsis).semiBold(),
-                Text(node.componentId).small().muted(),
-                const Gap(8),
                 Text(
+                  node.id,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ).small().semiBold(),
+                Text(
+                  '${node.componentId} · '
                   '${(node.rect.width * canvas.referenceWidth).toStringAsFixed(1)} × '
                   '${(node.rect.height * canvas.referenceHeight).toStringAsFixed(1)} px',
-                ).small().muted(),
-                const Gap(12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ).xSmall().muted(),
+              ],
+            ),
+          ),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 6,
+              children: [
+                Row(
+                  spacing: 4,
                   children: [
                     for (final format in _CodeFormat.values)
-                      Button(
-                        style: _format == format
-                            ? const ButtonStyle.secondary()
-                            : const ButtonStyle.ghost(),
-                        onPressed: () => setState(() => _format = format),
-                        child: Text(
-                          format == _CodeFormat.json ? 'JSON' : 'Dart',
+                      Expanded(
+                        child: Button(
+                          style: _format == format
+                              ? const ButtonStyle.secondary(
+                                  density: ButtonDensity.dense,
+                                )
+                              : const ButtonStyle.ghost(
+                                  density: ButtonDensity.dense,
+                                ),
+                          onPressed: () => setState(() => _format = format),
+                          child: Text(
+                            format == _CodeFormat.json ? 'JSON' : 'Dart',
+                          ).small(),
                         ),
                       ),
                   ],
                 ),
-                const Gap(8),
                 Row(
+                  spacing: 4,
                   children: [
                     for (final wholeScene in [false, true])
                       Expanded(
                         child: Button(
                           style: _wholeScene == wholeScene
-                              ? const ButtonStyle.secondary()
-                              : const ButtonStyle.ghost(),
+                              ? const ButtonStyle.secondary(
+                                  density: ButtonDensity.dense,
+                                )
+                              : const ButtonStyle.ghost(
+                                  density: ButtonDensity.dense,
+                                ),
                           onPressed: () =>
                               setState(() => _wholeScene = wholeScene),
-                          child: Text(wholeScene ? 'Scene' : 'Selection'),
+                          child: Text(
+                            wholeScene ? 'Scene' : 'Selection',
+                          ).small(),
                         ),
                       ),
                   ],
@@ -90,12 +116,12 @@ class _CodeInspectorState extends State<CodeInspector> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) => SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      minWidth: constraints.maxWidth - 32,
+                      minWidth: constraints.maxWidth - 24,
                     ),
                     child: SelectableText(
                       source,
@@ -110,10 +136,15 @@ class _CodeInspectorState extends State<CodeInspector> {
           ),
           const Divider(),
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: OutlineButton(
-              onPressed: () => Clipboard.setData(ClipboardData(text: source)),
-              child: const Text('Copy code'),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 32),
+              child: OutlineButton(
+                density: ButtonDensity.dense,
+                onPressed: () =>
+                    Clipboard.setData(ClipboardData(text: source)),
+                child: const Text('Copy code').small(),
+              ),
             ),
           ),
         ],
