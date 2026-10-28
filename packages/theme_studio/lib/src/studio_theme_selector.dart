@@ -21,7 +21,7 @@ class StudioThemeSelector extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('THEME').small().muted(),
+        const Text('Theme').small().muted(),
         const Gap(8),
         StudioSelect<StudioThemeProject>(
           key: const ValueKey('studio-theme-select'),
