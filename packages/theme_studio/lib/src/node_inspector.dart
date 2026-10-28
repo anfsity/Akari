@@ -47,8 +47,10 @@ class NodeInspector extends StatelessWidget {
                   editor: editor,
                 ),
               ),
-              const Divider(),
-              _InspectorActions(error: controller.error, onApply: onApply),
+              if (controller.hasDraft || controller.error != null) ...[
+                const Divider(),
+                _InspectorActions(error: controller.error, onApply: onApply),
+              ],
             ],
           ),
   );
@@ -240,15 +242,19 @@ class _InspectorDisclosureState extends State<_InspectorDisclosure> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       GhostButton(
+        density: ButtonDensity.compact,
         onPressed: () => setState(() => _expanded = !_expanded),
-        child: Row(
-          children: [
-            Expanded(child: Text(widget.title).small().semiBold()),
-            Icon(
-              _expanded ? LucideIcons.chevronDown : LucideIcons.chevronRight,
-              size: 16,
-            ),
-          ],
+        child: SizedBox(
+          height: 32,
+          child: Row(
+            children: [
+              Expanded(child: Text(widget.title).small().semiBold()),
+              Icon(
+                _expanded ? LucideIcons.chevronDown : LucideIcons.chevronRight,
+                size: 15,
+              ),
+            ],
+          ),
         ),
       ),
       if (_expanded) widget.child,
@@ -454,7 +460,8 @@ class _InspectorActions extends StatelessWidget {
           ),
           const Gap(8),
         ],
-        OutlineButton(
+        PrimaryButton(
+          density: ButtonDensity.dense,
           onPressed: onApply,
           child: const Text('Apply to preview'),
         ),

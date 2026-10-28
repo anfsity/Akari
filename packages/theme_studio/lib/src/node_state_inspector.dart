@@ -32,112 +32,117 @@ class _NodeStateInspectorState extends State<NodeStateInspector> {
         predicate,
       _ => null,
     };
-    return StudioFormSection(
-      title: 'State rules',
-      children: [
-        const Text('Visible when').small().muted(),
-        const Gap(6),
-        StudioSelect<String>(
-          key: const ValueKey('state-visibility'),
-          value: condition == null ? 'always' : predicate?.name,
-          values: [
-            'always',
-            for (final value in ScenePredicate.values) value.name,
-          ],
-          formatValue: (value) => value == 'always'
-              ? 'Always'
-              : getScenePredicateLabel(ScenePredicate.values.byName(value)),
-          placeholder: const Text('Custom condition (preserved)'),
-          onChanged: (value) => _updateNode(
-            (node) => node.copyWith(
-              visibleWhen: value == 'always'
-                  ? null
-                  : ScenePredicateCondition(
-                      ScenePredicate.values.byName(value),
-                    ),
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Visible when').small().muted(),
+          const Gap(6),
+          StudioSelect<String>(
+            key: const ValueKey('state-visibility'),
+            value: condition == null ? 'always' : predicate?.name,
+            values: [
+              'always',
+              for (final value in ScenePredicate.values) value.name,
+            ],
+            formatValue: (value) => value == 'always'
+                ? 'Always'
+                : getScenePredicateLabel(ScenePredicate.values.byName(value)),
+            placeholder: const Text('Custom condition (preserved)'),
+            onChanged: (value) => _updateNode(
+              (node) => node.copyWith(
+                visibleWhen: value == 'always'
+                    ? null
+                    : ScenePredicateCondition(
+                        ScenePredicate.values.byName(value),
+                      ),
+              ),
             ),
           ),
-        ),
-        const Gap(8),
-        OutlineButton(
-          key: const ValueKey('edit-visibility-condition'),
-          onPressed: () async {
-            if (!widget.editor.applyDraft()) return;
-            final result = await editStudioCondition(context, condition);
-            if (!mounted || result == null) return;
-            _updateNode((node) => node.copyWith(visibleWhen: result.condition));
-          },
-          child: const Text('Edit compound condition').small(),
-        ),
-        if (predicate != null)
-          Row(
-            children: [
-              const Expanded(child: Text('Invert condition')),
-              Switch(
-                value: condition is SceneNot,
-                onChanged: (invert) => _updateNode(
-                  (node) => node.copyWith(
-                    visibleWhen: invert
-                        ? SceneNot(ScenePredicateCondition(predicate))
-                        : ScenePredicateCondition(predicate),
-                  ),
-                ),
-              ),
-            ],
+          const Gap(8),
+          OutlineButton(
+            key: const ValueKey('edit-visibility-condition'),
+            onPressed: () async {
+              if (!widget.editor.applyDraft()) return;
+              final result = await editStudioCondition(context, condition);
+              if (!mounted || result == null) return;
+              _updateNode(
+                (node) => node.copyWith(visibleWhen: result.condition),
+              );
+            },
+            child: const Text('Edit compound condition').small(),
           ),
-        const Gap(12),
-        const Text('On state entry').small().semiBold(),
-        const Gap(8),
-        for (final rule in node.stateEffects.entries)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
+          if (predicate != null)
+            Row(
               children: [
-                Expanded(
-                  child: Text(
-                    '${getScenePredicateLabel(rule.key)} → ${rule.value.name}',
-                  ).small(),
-                ),
-                GhostButton(
-                  onPressed: () => _updateNode(
+                const Expanded(child: Text('Invert condition')),
+                Switch(
+                  value: condition is SceneNot,
+                  onChanged: (invert) => _updateNode(
                     (node) => node.copyWith(
-                      stateEffects: {...node.stateEffects}..remove(rule.key),
+                      visibleWhen: invert
+                          ? SceneNot(ScenePredicateCondition(predicate))
+                          : ScenePredicateCondition(predicate),
                     ),
                   ),
-                  child: const Icon(LucideIcons.x, size: 14),
                 ),
               ],
             ),
-          ),
-        StudioEnumSelect(
-          key: const ValueKey('state-trigger'),
-          value: _trigger,
-          values: ScenePredicate.values,
-          formatValue: getScenePredicateLabel,
-          onChanged: (value) => setState(() => _trigger = value),
-        ),
-        const Gap(8),
-        StudioEnumSelect(
-          key: const ValueKey('state-effect'),
-          value: _effect,
-          values: SceneStateEffect.values,
-          onChanged: (value) => setState(() => _effect = value),
-        ),
-        const Gap(8),
-        OutlineButton(
-          key: const ValueKey('add-state-effect'),
-          onPressed: () => _updateNode(
-            (node) => node.copyWith(
-              stateEffects: {...node.stateEffects, _trigger: _effect},
+          const Gap(12),
+          const Text('On state entry').small().semiBold(),
+          const Gap(8),
+          for (final rule in node.stateEffects.entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${getScenePredicateLabel(rule.key)} → ${rule.value.name}',
+                    ).small(),
+                  ),
+                  GhostButton(
+                    onPressed: () => _updateNode(
+                      (node) => node.copyWith(
+                        stateEffects: {...node.stateEffects}..remove(rule.key),
+                      ),
+                    ),
+                    child: const Icon(LucideIcons.x, size: 14),
+                  ),
+                ],
+              ),
             ),
+          StudioEnumSelect(
+            key: const ValueKey('state-trigger'),
+            value: _trigger,
+            values: ScenePredicate.values,
+            formatValue: getScenePredicateLabel,
+            onChanged: (value) => setState(() => _trigger = value),
           ),
-          child: const Text('Add / update response'),
-        ),
-        const Gap(8),
-        const Text('Responses use node timing and respect reduced motion.')
-            .small()
-            .muted(),
-      ],
+          const Gap(8),
+          StudioEnumSelect(
+            key: const ValueKey('state-effect'),
+            value: _effect,
+            values: SceneStateEffect.values,
+            onChanged: (value) => setState(() => _effect = value),
+          ),
+          const Gap(8),
+          OutlineButton(
+            key: const ValueKey('add-state-effect'),
+            onPressed: () => _updateNode(
+              (node) => node.copyWith(
+                stateEffects: {...node.stateEffects, _trigger: _effect},
+              ),
+            ),
+            child: const Text('Add / update response'),
+          ),
+          const Gap(8),
+          const Text('Responses use node timing and respect reduced motion.')
+              .small()
+              .muted(),
+        ],
+      ),
     );
   }
 }
