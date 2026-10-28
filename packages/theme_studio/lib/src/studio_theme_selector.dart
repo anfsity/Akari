@@ -18,21 +18,17 @@ class StudioThemeSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.all(12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text('Theme').small().muted(),
-        const Gap(8),
-        StudioSelect<StudioThemeProject>(
-          key: const ValueKey('studio-theme-select'),
-          value: selected,
-          values: projects,
-          formatValue: (project) => project.packageName,
-          onChanged: (project) {
-            if (!identical(project, selected)) onChanged(project);
-          },
-        ),
-      ],
+    child: StudioLabeledField(
+      label: 'Theme',
+      child: StudioSelect<StudioThemeProject>(
+        key: const ValueKey('studio-theme-select'),
+        value: selected,
+        values: projects,
+        formatValue: (project) => project.packageName,
+        onChanged: (project) {
+          if (!identical(project, selected)) onChanged(project);
+        },
+      ),
     ),
   );
 }
