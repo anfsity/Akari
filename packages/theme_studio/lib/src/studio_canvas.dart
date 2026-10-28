@@ -405,83 +405,113 @@ class StudioCanvasState extends State<StudioCanvas> {
                     key: const ValueKey('canvas-toolbar'),
                     padding: const EdgeInsets.all(8),
                     child: Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
+                      spacing: 16,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.spaceBetween,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        SizedBox(
-                          width: 128,
-                          child: OutlineButton(
-                            onPressed: _elapsed == null
-                                ? widget.onToggleDormant
-                                : null,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                widget.dormant
-                                    ? 'State: Dormant'
-                                    : 'State: Login',
-                              ).small(),
-                            ),
-                          ),
-                        ),
-                        Tooltip(
-                          tooltip: (_) => const Text('Timeline'),
-                          child: Button(
-                            key: const ValueKey('canvas-timeline'),
-                            style: _elapsed == null
-                                ? const ButtonStyle.outlineIcon()
-                                : const ButtonStyle.primaryIcon(),
-                            onPressed: session == null ? null : _toggleTimeline,
-                            child: const Icon(LucideIcons.film, size: 16),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 144,
-                          child: StudioEnumSelect<StudioPreviewScenario>(
-                            key: const ValueKey('preview-scenario'),
-                            enabled: _elapsed == null,
-                            value: _scenario,
-                            values: StudioPreviewScenario.values,
-                            formatValue: (scenario) => scenario.label,
-                            onChanged: (scenario) {
-                              if (widget.dormant) widget.onToggleDormant();
-                              setState(() => _scenario = scenario);
-                            },
-                          ),
-                        ),
-                        Tooltip(
-                          tooltip: (_) => const Text('State flow'),
-                          child: Button(
-                            key: const ValueKey('canvas-state-graph'),
-                            style: _showStateGraph
-                                ? const ButtonStyle.primaryIcon()
-                                : const ButtonStyle.outlineIcon(),
-                            onPressed: session == null ? null : _toggleGraph,
-                            child: const Icon(LucideIcons.gitBranch, size: 16),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Tooltip(
-                          tooltip: (_) =>
-                              Text(_previewing ? 'Edit canvas' : 'Preview'),
-                          child: Button(
-                            key: const ValueKey('canvas-preview'),
-                            style: _previewing
-                                ? const ButtonStyle.primaryIcon()
-                                : const ButtonStyle.outlineIcon(),
-                            onPressed: session == null ? null : _togglePreview,
-                            child: Semantics(
-                              label: _previewing ? 'Edit canvas' : 'Preview',
-                              toggled: _previewing,
-                              child: Icon(
-                                _previewing
-                                    ? LucideIcons.mousePointer2
-                                    : LucideIcons.play,
-                                size: 16,
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 128,
+                              child: OutlineButton(
+                                onPressed: _elapsed == null
+                                    ? widget.onToggleDormant
+                                    : null,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    widget.dormant
+                                        ? 'State: Dormant'
+                                        : 'State: Login',
+                                  ).small(),
+                                ),
                               ),
                             ),
-                          ),
+                            SizedBox(
+                              width: 144,
+                              child: StudioEnumSelect<StudioPreviewScenario>(
+                                key: const ValueKey('preview-scenario'),
+                                enabled: _elapsed == null,
+                                value: _scenario,
+                                values: StudioPreviewScenario.values,
+                                formatValue: (scenario) => scenario.label,
+                                onChanged: (scenario) {
+                                  if (widget.dormant) widget.onToggleDormant();
+                                  setState(() => _scenario = scenario);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Tooltip(
+                              tooltip: (_) => const Text('Timeline'),
+                              child: Button(
+                                key: const ValueKey('canvas-timeline'),
+                                style: _elapsed == null
+                                    ? const ButtonStyle.outlineIcon()
+                                    : const ButtonStyle.primaryIcon(),
+                                onPressed: session == null
+                                    ? null
+                                    : _toggleTimeline,
+                                child: const Icon(LucideIcons.film, size: 16),
+                              ),
+                            ),
+                            const Gap(4),
+                            Tooltip(
+                              tooltip: (_) => const Text('State flow'),
+                              child: Button(
+                                key: const ValueKey('canvas-state-graph'),
+                                style: _showStateGraph
+                                    ? const ButtonStyle.primaryIcon()
+                                    : const ButtonStyle.outlineIcon(),
+                                onPressed: session == null
+                                    ? null
+                                    : _toggleGraph,
+                                child: const Icon(
+                                  LucideIcons.gitBranch,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                            const Gap(12),
+                            const SizedBox(
+                              height: 20,
+                              child: VerticalDivider(),
+                            ),
+                            const Gap(12),
+                            Tooltip(
+                              tooltip: (_) =>
+                                  Text(_previewing ? 'Edit canvas' : 'Preview'),
+                              child: Button(
+                                key: const ValueKey('canvas-preview'),
+                                style: _previewing
+                                    ? const ButtonStyle.primaryIcon()
+                                    : const ButtonStyle.outlineIcon(),
+                                onPressed: session == null
+                                    ? null
+                                    : _togglePreview,
+                                child: Semantics(
+                                  label: _previewing
+                                      ? 'Edit canvas'
+                                      : 'Preview',
+                                  toggled: _previewing,
+                                  child: Icon(
+                                    _previewing
+                                        ? LucideIcons.mousePointer2
+                                        : LucideIcons.play,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
