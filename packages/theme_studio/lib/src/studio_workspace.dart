@@ -273,7 +273,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
       () => _togglePanel(active),
     );
     return SizedBox(
-      height: 36,
+      height: 42,
       child: Row(
         children: [
           if (side == StudioDock.left) collapse,
@@ -316,7 +316,10 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                     behavior: HitTestBehavior.opaque,
                     onDoubleTap: () => _togglePanel(active),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      padding: EdgeInsets.only(
+                        left: side == StudioDock.left ? 4 : 12,
+                        right: 8,
+                      ),
                       child: Text(_getPanelLabel(active)).small().semiBold(),
                     ),
                   ),
@@ -472,13 +475,14 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                         onChanged: _applyPreset,
                                       ),
                                     ),
+                                    const Gap(4),
                                     _button(
                                       'presentation-mode',
                                       'Presentation · ${widget.input.getBinding(StudioCommand.presentation)?.getLabel() ?? 'Unbound'}',
                                       LucideIcons.maximize,
                                       _togglePresentation,
                                     ),
-                                    const Gap(8),
+                                    const Gap(12),
                                   ],
                                 ),
                               ),
@@ -687,23 +691,23 @@ class _FloatingPanelState extends State<_FloatingPanel> {
                         );
                       }),
                       child: SizedBox(
-                        height: 36,
+                        height: 42,
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
                           child: Row(
                             children: [
                               Icon(
                                 LucideIcons.gripVertical,
                                 size: 14,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.mutedForeground,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .mutedForeground,
                               ),
                               const Gap(6),
                               Expanded(
-                                child: Text(
-                                  _getPanelLabel(widget.title),
-                                ).small().semiBold(),
+                                child: Text(_getPanelLabel(widget.title))
+                                    .small()
+                                    .semiBold(),
                               ),
                               Tooltip(
                                 tooltip: (_) => const Text('Dock left'),

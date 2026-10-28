@@ -83,7 +83,7 @@ class _StudioSidebarState extends State<StudioSidebar> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 8, 6),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
           child: Row(
             children: [
               const Text('Scenes').xSmall().muted(),
@@ -655,7 +655,7 @@ class _NodeActions extends StatelessWidget {
         spacing: 6,
         children: [
           ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 32),
+            constraints: const BoxConstraints(minHeight: 34),
             child: Row(
               spacing: 8,
               children: [

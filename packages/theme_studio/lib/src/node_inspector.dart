@@ -447,40 +447,42 @@ class _InspectorActions extends StatelessWidget {
     final active = hasDraft || error != null;
     return Padding(
       key: const ValueKey('inspector-actions'),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 6,
         children: [
-          if (error case final message?) ...[
+          if (error case final message?)
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 64),
               child: SingleChildScrollView(child: StudioFormError(message)),
             ),
-            const Gap(6),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  error != null
-                      ? 'Validation error'
-                      : hasDraft
-                      ? 'Pending draft'
-                      : 'Synced',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ).xSmall().muted(),
-              ),
-              Button(
-                style: active
-                    ? const ButtonStyle.primary(density: ButtonDensity.dense)
-                    : const ButtonStyle.ghost(density: ButtonDensity.dense),
-                onPressed: onApply,
-                child: active
-                    ? const Text('Apply to preview').xSmall()
-                    : const Text('Apply to preview').xSmall().muted(),
-              ),
-            ],
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 34),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    error != null
+                        ? 'Validation error'
+                        : hasDraft
+                        ? 'Pending draft'
+                        : 'Synced',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ).xSmall().muted(),
+                ),
+                Button(
+                  style: active
+                      ? const ButtonStyle.primary(density: ButtonDensity.dense)
+                      : const ButtonStyle.ghost(density: ButtonDensity.dense),
+                  onPressed: onApply,
+                  child: active
+                      ? const Text('Apply to preview').xSmall()
+                      : const Text('Apply to preview').xSmall().muted(),
+                ),
+              ],
+            ),
           ),
         ],
       ),
