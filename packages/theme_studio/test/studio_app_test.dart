@@ -1548,6 +1548,8 @@ void main() {
     'sizing controls stay readable and advanced limits remain editable',
     (tester) async {
       await openStudio(tester);
+      tester.view.physicalSize = const Size(1400, 1400);
+      await tester.pumpAndSettle();
       final editor = tester
           .widget<StudioCanvas>(find.byType(StudioCanvas))
           .editor!;
@@ -1588,6 +1590,18 @@ void main() {
       await tester.pumpAndSettle();
       expect(editor.selectedNode.breakpoints, isEmpty);
       expect(editor.encodedDocument, original);
+      editor.selectNode('label');
+      editor.updateNode(
+        editor.selectedNode.copyWith(sizing: const SceneSizing(maxWidth: 360)),
+      );
+      final constrained = editor.encodedDocument;
+      editor.selectNode('panel');
+      await tester.pumpAndSettle();
+      expect(maxWidth.hitTestable(), findsNothing);
+      editor.selectNode('label');
+      await tester.pumpAndSettle();
+      expect(maxWidth.hitTestable(), findsOneWidget);
+      expect(editor.encodedDocument, constrained);
       expect(tester.takeException(), isNull);
     },
   );
