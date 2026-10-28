@@ -514,6 +514,13 @@ class _LayerListState extends State<_LayerList> {
   static const _rowHeight = 36.0;
   final _scroll = ScrollController();
   late String _selectedId;
+  bool _dragging = false;
+
+  void _updateDragging(bool dragging) {
+    if (mounted && _dragging != dragging) {
+      setState(() => _dragging = dragging);
+    }
+  }
 
   @override
   void initState() {
@@ -564,17 +571,48 @@ class _LayerListState extends State<_LayerList> {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         itemBuilder: (context, index) {
           if (index == nodes.length) {
+            final colors = Theme.of(context).colorScheme;
             return DragTarget<String>(
               onWillAcceptWithDetails: (_) => !widget.readOnly,
               onAcceptWithDetails: (details) =>
                   widget.editor.moveLayer(details.data, parentId: null),
               builder: (context, candidates, _) => Container(
                 key: const ValueKey('layer-root-drop'),
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 alignment: Alignment.centerLeft,
-                color: candidates.isEmpty
+                decoration: !_dragging && candidates.isEmpty
                     ? null
-                    : Theme.of(context).colorScheme.secondary,
-                child: const Text('Move to scene root').small().muted(),
+                    : BoxDecoration(
+                        color: candidates.isEmpty
+                            ? colors.muted.withValues(alpha: 0.45)
+                            : colors.secondary,
+                        border: Border.all(
+                          color: candidates.isEmpty
+                              ? colors.border
+                              : colors.primary,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                child: !_dragging && candidates.isEmpty
+                    ? null
+                    : Row(
+                        children: [
+                          Icon(
+                            LucideIcons.cornerLeftUp,
+                            size: 13,
+                            color: colors.mutedForeground,
+                          ),
+                          const Gap(6),
+                          Expanded(
+                            child: const Text(
+                              'Move to scene root',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ).xSmall().muted(),
+                          ),
+                        ],
+                      ),
               ),
             );
           }
@@ -595,6 +633,7 @@ class _LayerListState extends State<_LayerList> {
             depth: depth,
             selected: selected,
             readOnly: widget.readOnly,
+            onDragChanged: _updateDragging,
           );
         },
       );
@@ -663,6 +702,7 @@ class _LayerRow extends StatefulWidget {
     required this.depth,
     required this.selected,
     required this.readOnly,
+    required this.onDragChanged,
   });
   final SceneEditor editor;
   final SceneNode node;
@@ -670,6 +710,7 @@ class _LayerRow extends StatefulWidget {
   final int depth;
   final bool selected;
   final bool readOnly;
+  final ValueChanged<bool> onDragChanged;
   @override
   State<_LayerRow> createState() => _LayerRowState();
 }
@@ -741,10 +782,20 @@ class _LayerRowState extends State<_LayerRow> {
             affinity: Axis.horizontal,
             maxSimultaneousDrags: widget.readOnly ? 0 : 1,
             dragAnchorStrategy: pointerDragAnchorStrategy,
+            onDragStarted: () => widget.onDragChanged(true),
+            onDragEnd: (_) => widget.onDragChanged(false),
+            onDraggableCanceled: (_, _) => widget.onDragChanged(false),
             feedback: Container(
-              padding: const EdgeInsets.all(8),
-              color: colors.background,
-              child: Text(widget.label),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: colors.background,
+                border: Border.all(color: colors.border),
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x33000000), blurRadius: 8),
+                ],
+              ),
+              child: Text(widget.label).small(),
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 1),
@@ -761,10 +812,20 @@ class _LayerRowState extends State<_LayerRow> {
                   children: [
                     SizedBox(width: widget.depth * 12),
                     Icon(
-                      widget.node.layout == null
-                          ? LucideIcons.layers
-                          : LucideIcons.frame,
+                      widget.node.layout != null
+                          ? LucideIcons.frame
+                          : widget.node.asset != null
+                          ? LucideIcons.image
+                          : switch (widget.node.primitive) {
+                              ScenePrimitive.text => LucideIcons.type,
+                              ScenePrimitive.rectangle => LucideIcons.square,
+                              ScenePrimitive.circle => LucideIcons.circle,
+                              null => LucideIcons.component,
+                            },
                       size: 14,
+                      color: widget.selected
+                          ? colors.foreground
+                          : colors.mutedForeground,
                     ),
                     const Gap(8),
                     Expanded(
@@ -774,6 +835,23 @@ class _LayerRowState extends State<_LayerRow> {
                         overflow: TextOverflow.ellipsis,
                       ).small(),
                     ),
+                    if (widget.node.tracks.isNotEmpty) ...[
+                      const Gap(4),
+                      Icon(
+                        LucideIcons.film,
+                        size: 12,
+                        color: colors.mutedForeground,
+                      ),
+                    ],
+                    if (widget.node.visibleWhen != null ||
+                        widget.node.stateEffects.isNotEmpty) ...[
+                      const Gap(4),
+                      Icon(
+                        LucideIcons.gitBranch,
+                        size: 12,
+                        color: colors.mutedForeground,
+                      ),
+                    ],
                   ],
                 ),
               ),
