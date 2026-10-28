@@ -20,8 +20,7 @@ class NodeAssetInspector extends StatelessWidget {
     return StudioFormSection(
       title: asset.kind == SceneAssetKind.svg ? 'SVG icon' : 'Image',
       children: [
-        Text(asset.path.split('/').last).small().muted(),
-        const Gap(8),
+        Text(asset.path.split('/').last).xSmall().muted(),
         StudioEnumSelect(
           key: const ValueKey('asset-fit'),
           label: 'Fit',
@@ -30,20 +29,14 @@ class NodeAssetInspector extends StatelessWidget {
           onChanged: (value) =>
               _updateAsset((asset) => asset.copyWith(fit: value)),
         ),
-        const Gap(12),
-        Row(
-          children: [
-            const Expanded(child: Text('Override color')),
-            Switch(
-              value: asset.tint != null,
-              onChanged: (enabled) => _updateAsset(
-                (asset) => asset.copyWith(tint: enabled ? 0xffffffff : null),
-              ),
-            ),
-          ],
+        StudioSwitchRow(
+          label: 'Override color',
+          value: asset.tint != null,
+          onChanged: (enabled) => _updateAsset(
+            (asset) => asset.copyWith(tint: enabled ? 0xffffffff : null),
+          ),
         ),
-        if (asset.tint != null) ...[
-          const Gap(8),
+        if (asset.tint != null)
           ColorInput(
             key: const ValueKey('node-asset-tint'),
             value: ColorDerivative.fromColor(Color(asset.tint!)),
@@ -51,8 +44,6 @@ class NodeAssetInspector extends StatelessWidget {
               (asset) => asset.copyWith(tint: value.toColor().toARGB32()),
             ),
           ),
-        ],
-        const Gap(12),
       ],
     );
   }

@@ -32,14 +32,13 @@ class _NodeStateInspectorState extends State<NodeStateInspector> {
         predicate,
       _ => null,
     };
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text('Visible when').small().muted(),
-          const Gap(6),
-          StudioSelect<String>(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 10,
+      children: [
+        StudioLabeledField(
+          label: 'Visible when',
+          child: StudioSelect<String>(
             key: const ValueKey('state-visibility'),
             value: condition == null ? 'always' : predicate?.name,
             values: [
@@ -60,42 +59,39 @@ class _NodeStateInspectorState extends State<NodeStateInspector> {
               ),
             ),
           ),
-          const Gap(8),
-          OutlineButton(
-            key: const ValueKey('edit-visibility-condition'),
-            onPressed: () async {
-              if (!widget.editor.applyDraft()) return;
-              final result = await editStudioCondition(context, condition);
-              if (!mounted || result == null) return;
-              _updateNode(
-                (node) => node.copyWith(visibleWhen: result.condition),
-              );
-            },
-            child: const Text('Edit compound condition').small(),
-          ),
-          if (predicate != null)
-            Row(
-              children: [
-                const Expanded(child: Text('Invert condition')),
-                Switch(
-                  value: condition is SceneNot,
-                  onChanged: (invert) => _updateNode(
-                    (node) => node.copyWith(
-                      visibleWhen: invert
-                          ? SceneNot(ScenePredicateCondition(predicate))
-                          : ScenePredicateCondition(predicate),
-                    ),
-                  ),
-                ),
-              ],
+        ),
+        OutlineButton(
+          key: const ValueKey('edit-visibility-condition'),
+          density: ButtonDensity.dense,
+          onPressed: () async {
+            if (!widget.editor.applyDraft()) return;
+            final result = await editStudioCondition(context, condition);
+            if (!mounted || result == null) return;
+            _updateNode(
+              (node) => node.copyWith(visibleWhen: result.condition),
+            );
+          },
+          child: const Text('Edit compound condition').small(),
+        ),
+        if (predicate != null)
+          StudioSwitchRow(
+            label: 'Invert condition',
+            value: condition is SceneNot,
+            onChanged: (invert) => _updateNode(
+              (node) => node.copyWith(
+                visibleWhen: invert
+                    ? SceneNot(ScenePredicateCondition(predicate))
+                    : ScenePredicateCondition(predicate),
+              ),
             ),
-          const Gap(12),
-          const Text('On state entry').small().semiBold(),
-          const Gap(8),
-          for (final rule in node.stateEffects.entries)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
+          ),
+        const Divider(),
+        StudioFormSection(
+          title: 'On state entry',
+          spacing: 8,
+          children: [
+            for (final rule in node.stateEffects.entries)
+              Row(
                 children: [
                   Expanded(
                     child: Text(
@@ -103,6 +99,7 @@ class _NodeStateInspectorState extends State<NodeStateInspector> {
                     ).small(),
                   ),
                   GhostButton(
+                    density: ButtonDensity.iconDense,
                     onPressed: () => _updateNode(
                       (node) => node.copyWith(
                         stateEffects: {...node.stateEffects}..remove(rule.key),
@@ -112,37 +109,35 @@ class _NodeStateInspectorState extends State<NodeStateInspector> {
                   ),
                 ],
               ),
+            StudioEnumSelect(
+              key: const ValueKey('state-trigger'),
+              value: _trigger,
+              values: ScenePredicate.values,
+              formatValue: getScenePredicateLabel,
+              onChanged: (value) => setState(() => _trigger = value),
             ),
-          StudioEnumSelect(
-            key: const ValueKey('state-trigger'),
-            value: _trigger,
-            values: ScenePredicate.values,
-            formatValue: getScenePredicateLabel,
-            onChanged: (value) => setState(() => _trigger = value),
-          ),
-          const Gap(8),
-          StudioEnumSelect(
-            key: const ValueKey('state-effect'),
-            value: _effect,
-            values: SceneStateEffect.values,
-            onChanged: (value) => setState(() => _effect = value),
-          ),
-          const Gap(8),
-          OutlineButton(
-            key: const ValueKey('add-state-effect'),
-            onPressed: () => _updateNode(
-              (node) => node.copyWith(
-                stateEffects: {...node.stateEffects, _trigger: _effect},
+            StudioEnumSelect(
+              key: const ValueKey('state-effect'),
+              value: _effect,
+              values: SceneStateEffect.values,
+              onChanged: (value) => setState(() => _effect = value),
+            ),
+            OutlineButton(
+              key: const ValueKey('add-state-effect'),
+              density: ButtonDensity.dense,
+              onPressed: () => _updateNode(
+                (node) => node.copyWith(
+                  stateEffects: {...node.stateEffects, _trigger: _effect},
+                ),
               ),
+              child: const Text('Add / update response').small(),
             ),
-            child: const Text('Add / update response'),
-          ),
-          const Gap(8),
-          const Text('Responses use node timing and respect reduced motion.')
-              .small()
-              .muted(),
-        ],
-      ),
+            const Text('Responses use node timing and respect reduced motion.')
+                .xSmall()
+                .muted(),
+          ],
+        ),
+      ],
     );
   }
 }

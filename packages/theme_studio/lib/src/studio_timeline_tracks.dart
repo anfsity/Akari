@@ -672,6 +672,7 @@ class _KeyframeDialogState extends State<_KeyframeDialog> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 10,
         children: [
           StudioFormField(
             label: 'Time ms',

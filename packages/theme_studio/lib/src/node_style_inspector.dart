@@ -44,11 +44,12 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
   }
 
   Widget _color(String label, int value, SceneStyle Function(int) update) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+      ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 32),
         child: Row(
           children: [
-            Expanded(child: Text(label).small().muted()),
+            Expanded(child: Text(label).xSmall().muted()),
+            const Gap(8),
             ColorInput(
               key: ValueKey('style-$label'),
               value: ColorDerivative.fromColor(Color(value)),
@@ -83,119 +84,117 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
   );
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 8, bottom: 12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        StudioSelect<String>(
-          key: const ValueKey('style-token'),
-          value: widget.editor.selectedNode.styleToken,
-          values: widget.editor.document.styleTokens.keys,
-          formatValue: (token) => token,
-          placeholder: const Text('New style token on first edit'),
-          onChanged: widget.editor.updateSelectionStyleToken,
-        ),
-        const Gap(8),
-        if (widget.editor.selectedNode.styleToken != null) ...[
-          const Text('Editing a shared token updates every layer that uses it.')
-              .small()
-              .muted(),
-          GhostButton(
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: 10,
+    children: [
+      StudioSelect<String>(
+        key: const ValueKey('style-token'),
+        value: widget.editor.selectedNode.styleToken,
+        values: widget.editor.document.styleTokens.keys,
+        formatValue: (token) => token,
+        placeholder: const Text('New style token on first edit'),
+        onChanged: widget.editor.updateSelectionStyleToken,
+      ),
+      if (widget.editor.selectedNode.styleToken != null) ...[
+        const Text('Editing a shared token updates every layer that uses it.')
+            .xSmall()
+            .muted(),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: GhostButton(
+            density: ButtonDensity.dense,
             onPressed: () => widget.editor.updateSelectionStyleToken(null),
-            child: const Text('Detach style'),
+            child: const Text('Detach style').small(),
           ),
-        ],
-        const Gap(8),
-        _color('Fill', _draft.fill, (value) => _draft.copyWith(fill: value)),
+        ),
+      ],
+      _color('Fill', _draft.fill, (value) => _draft.copyWith(fill: value)),
+      StudioSwitchRow(
+        label: 'Gradient',
+        value: _draft.gradientEnd != null,
+        onChanged: (enabled) => _commit(
+          _draft.copyWith(gradientEnd: enabled ? 0xff6366f1 : null),
+        ),
+      ),
+      if (_draft.gradientEnd != null) ...[
+        _color(
+          'Gradient end',
+          _draft.gradientEnd!,
+          (value) => _draft.copyWith(gradientEnd: value),
+        ),
+        _slider(
+          'Gradient angle',
+          _draft.gradientAngle,
+          360,
+          (value) => _draft.copyWith(gradientAngle: value),
+        ),
+      ],
+      _color(
+        'Border',
+        _draft.border,
+        (value) => _draft.copyWith(border: value),
+      ),
+      _slider(
+        'Border width',
+        _draft.borderWidth,
+        20,
+        (value) => _draft.copyWith(borderWidth: value),
+      ),
+      _slider(
+        'Corner radius',
+        _draft.radius,
+        160,
+        (value) => _draft.copyWith(radius: value),
+      ),
+      _color(
+        'Shadow',
+        _draft.shadow,
+        (value) => _draft.copyWith(shadow: value),
+      ),
+      _slider(
+        'Shadow blur',
+        _draft.shadowBlur,
+        100,
+        (value) => _draft.copyWith(shadowBlur: value),
+      ),
+      _slider(
+        'Shadow offset',
+        _draft.shadowY,
+        100,
+        (value) => _draft.copyWith(shadowY: value),
+      ),
+      _slider(
+        'Background blur',
+        _draft.backgroundBlur,
+        80,
+        (value) => _draft.copyWith(backgroundBlur: value),
+      ),
+      _color(
+        'Text color',
+        _draft.textColor ?? 0xffffffff,
+        (value) => _draft.copyWith(textColor: value),
+      ),
+      _slider(
+        'Font size',
+        _draft.fontSize,
+        160,
+        (value) => _draft.copyWith(fontSize: value),
+      ),
+      if (_draft.fontAsset != null)
         Row(
           children: [
-            const Expanded(child: Text('Gradient')),
-            Switch(
-              value: _draft.gradientEnd != null,
-              onChanged: (enabled) => _commit(
-                _draft.copyWith(gradientEnd: enabled ? 0xff6366f1 : null),
-              ),
+            Expanded(child: Text(_draft.fontAsset!.split('/').last).small()),
+            GhostButton(
+              density: ButtonDensity.dense,
+              onPressed: () => _commit(_draft.copyWith(fontAsset: null)),
+              child: const Text('Inherit font').small(),
             ),
           ],
         ),
-        const Gap(12),
-        if (_draft.gradientEnd != null) ...[
-          _color(
-            'Gradient end',
-            _draft.gradientEnd!,
-            (value) => _draft.copyWith(gradientEnd: value),
-          ),
-          _slider(
-            'Gradient angle',
-            _draft.gradientAngle,
-            360,
-            (value) => _draft.copyWith(gradientAngle: value),
-          ),
-        ],
-        _color(
-          'Border',
-          _draft.border,
-          (value) => _draft.copyWith(border: value),
-        ),
-        _slider(
-          'Border width',
-          _draft.borderWidth,
-          20,
-          (value) => _draft.copyWith(borderWidth: value),
-        ),
-        _slider(
-          'Corner radius',
-          _draft.radius,
-          160,
-          (value) => _draft.copyWith(radius: value),
-        ),
-        _color(
-          'Shadow',
-          _draft.shadow,
-          (value) => _draft.copyWith(shadow: value),
-        ),
-        _slider(
-          'Shadow blur',
-          _draft.shadowBlur,
-          100,
-          (value) => _draft.copyWith(shadowBlur: value),
-        ),
-        _slider(
-          'Shadow offset',
-          _draft.shadowY,
-          100,
-          (value) => _draft.copyWith(shadowY: value),
-        ),
-        _slider(
-          'Background blur',
-          _draft.backgroundBlur,
-          80,
-          (value) => _draft.copyWith(backgroundBlur: value),
-        ),
-        _color(
-          'Text color',
-          _draft.textColor ?? 0xffffffff,
-          (value) => _draft.copyWith(textColor: value),
-        ),
-        _slider(
-          'Font size',
-          _draft.fontSize,
-          160,
-          (value) => _draft.copyWith(fontSize: value),
-        ),
-        if (_draft.fontAsset != null)
-          Row(
-            children: [
-              Expanded(child: Text(_draft.fontAsset!.split('/').last).small()),
-              GhostButton(
-                onPressed: () => _commit(_draft.copyWith(fontAsset: null)),
-                child: const Text('Inherit font').small(),
-              ),
-            ],
-          ),
-        const Gap(8),
-        StudioSelect<int>(
+      StudioLabeledField(
+        label: 'Font weight',
+        child: StudioSelect<int>(
           key: const ValueKey('style-font-weight'),
           value: _draft.fontWeight,
           values: [
@@ -206,28 +205,27 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
               weight == 0 ? 'Inherit weight' : 'Weight $weight',
           onChanged: (weight) => _commit(_draft.copyWith(fontWeight: weight)),
         ),
-        const Gap(12),
-        _slider(
-          'Letter spacing',
-          _draft.letterSpacing ?? 0,
-          16,
-          (value) => _draft.copyWith(letterSpacing: value),
-          minimum: -4,
-        ),
-        _slider(
-          'Line height',
-          _draft.lineHeight ?? 1.2,
-          3,
-          (value) => _draft.copyWith(lineHeight: value),
-          minimum: .5,
-        ),
-        _slider(
-          'Opacity',
-          _draft.opacity,
-          1,
-          (value) => _draft.copyWith(opacity: value),
-        ),
-      ],
-    ),
+      ),
+      _slider(
+        'Letter spacing',
+        _draft.letterSpacing ?? 0,
+        16,
+        (value) => _draft.copyWith(letterSpacing: value),
+        minimum: -4,
+      ),
+      _slider(
+        'Line height',
+        _draft.lineHeight ?? 1.2,
+        3,
+        (value) => _draft.copyWith(lineHeight: value),
+        minimum: .5,
+      ),
+      _slider(
+        'Opacity',
+        _draft.opacity,
+        1,
+        (value) => _draft.copyWith(opacity: value),
+      ),
+    ],
   );
 }

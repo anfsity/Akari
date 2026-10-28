@@ -87,73 +87,95 @@ class _StudioEffectsInspectorState extends State<StudioEffectsInspector> {
   Widget build(BuildContext context) {
     final renderer = widget.theme.bundle.backgrounds[_draft.kind];
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Background effects').semiBold(),
-          const Gap(12),
-          OutlineButton(
-            key: const ValueKey('open-shader-playground'),
-            onPressed: () => showOverlay<void>(
-              context,
-              const DialogConfiguration(),
-              builder: (_) => StudioShaderPlayground(
-                editor: widget.editor,
-                assets: widget.assets,
-                onAssetsChanged: widget.onAssetsChanged,
-              ),
-            ),
-            child: const Text('Shader Playground'),
-          ),
-          if (_draft.shader != null) ...[
-            const Gap(8),
-            Text(_draft.shader!.asset.split('/').last).small().muted(),
-            GhostButton(
-              onPressed: () => _commit(_draft.copyWith(shader: null)),
-              child: const Text('Remove authored shader').small(),
-            ),
-          ],
-          const Gap(16),
-          _slider(
-            'blur',
-            'Blur',
-            _draft.blurSigma,
-            0,
-            80,
-            (value) => _draft.copyWith(blurSigma: value),
-          ),
-          _slider(
-            'scrim',
-            'Scrim opacity',
-            _draft.scrimOpacity,
-            0,
-            1,
-            (value) => _draft.copyWith(scrimOpacity: value),
-          ),
-          if (renderer != null && renderer.parameters.isNotEmpty) ...[
-            const Divider(),
-            const Gap(12),
-            const Text('Shader parameters').small().semiBold(),
-            const Text('Use Preview to animate speed and flow.')
-                .small()
-                .muted(),
-            const Gap(16),
-            for (final parameter in renderer.parameters)
-              _slider(
-                parameter.id,
-                parameter.label,
-                parameter.getValue(_draft),
-                parameter.minimum,
-                parameter.maximum,
-                (value) => _draft.copyWith(
-                  parameters: {..._draft.parameters, parameter.id: value},
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: StudioFormSection(
+              title: 'Background effects',
+              spacing: 12,
+              children: [
+                OutlineButton(
+                  key: const ValueKey('open-shader-playground'),
+                  density: ButtonDensity.dense,
+                  onPressed: () => showOverlay<void>(
+                    context,
+                    const DialogConfiguration(),
+                    builder: (_) => StudioShaderPlayground(
+                      editor: widget.editor,
+                      assets: widget.assets,
+                      onAssetsChanged: widget.onAssetsChanged,
+                    ),
+                  ),
+                  child: const Text('Shader Playground').small(),
                 ),
-              ),
-          ] else
-            const Text('This background has no declared shader parameters.')
-                .small()
-                .muted(),
+                if (_draft.shader != null)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(_draft.shader!.asset.split('/').last)
+                            .xSmall()
+                            .muted(),
+                      ),
+                      GhostButton(
+                        density: ButtonDensity.dense,
+                        onPressed: () =>
+                            _commit(_draft.copyWith(shader: null)),
+                        child: const Text('Remove authored shader').small(),
+                      ),
+                    ],
+                  ),
+                _slider(
+                  'blur',
+                  'Blur',
+                  _draft.blurSigma,
+                  0,
+                  80,
+                  (value) => _draft.copyWith(blurSigma: value),
+                ),
+                _slider(
+                  'scrim',
+                  'Scrim opacity',
+                  _draft.scrimOpacity,
+                  0,
+                  1,
+                  (value) => _draft.copyWith(scrimOpacity: value),
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: renderer != null && renderer.parameters.isNotEmpty
+                ? StudioFormSection(
+                    title: 'Shader parameters',
+                    spacing: 12,
+                    children: [
+                      const Text('Use Preview to animate speed and flow.')
+                          .xSmall()
+                          .muted(),
+                      for (final parameter in renderer.parameters)
+                        _slider(
+                          parameter.id,
+                          parameter.label,
+                          parameter.getValue(_draft),
+                          parameter.minimum,
+                          parameter.maximum,
+                          (value) => _draft.copyWith(
+                            parameters: {
+                              ..._draft.parameters,
+                              parameter.id: value,
+                            },
+                          ),
+                        ),
+                    ],
+                  )
+                : const Text(
+                    'This background has no declared shader parameters.',
+                  ).xSmall().muted(),
+          ),
         ],
       ),
     );
