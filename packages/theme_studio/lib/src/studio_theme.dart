@@ -1,5 +1,10 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
+Color getStudioStageColor(ColorScheme colors) =>
+    colors.brightness == Brightness.dark
+    ? Color.lerp(colors.background, const Color(0xFF000000), 0.35)!
+    : Color.lerp(colors.muted, colors.border, 0.45)!;
+
 enum StudioPalette {
   zinc('Zinc'),
   neutral('Neutral'),
