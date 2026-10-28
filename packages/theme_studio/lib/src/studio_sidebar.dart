@@ -83,7 +83,7 @@ class _StudioSidebarState extends State<StudioSidebar> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
               const Text('Scenes').small().muted(),
@@ -106,8 +106,10 @@ class _StudioSidebarState extends State<StudioSidebar> {
                 Button(
                   key: ValueKey('scene-$path'),
                   style: editor?.file.path == path
-                      ? const ButtonStyle.secondary()
-                      : const ButtonStyle.ghost(),
+                      ? const ButtonStyle.secondary(
+                          density: ButtonDensity.dense,
+                        )
+                      : const ButtonStyle.ghost(density: ButtonDensity.dense),
                   onPressed: () => widget.onSwitchScene(path),
                   child: Align(
                     alignment: Alignment.centerLeft,
@@ -141,7 +143,7 @@ class _StudioSidebarState extends State<StudioSidebar> {
                       item.label,
                       textAlign: TextAlign.center,
                       maxLines: 1,
-                    ),
+                    ).small(),
                   ),
                 ),
             ],

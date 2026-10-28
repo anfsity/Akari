@@ -26,7 +26,7 @@ fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
 
 ## Editing workflow
 
-1. **Choose a theme and scene**: Select a compiled theme in **THEME** and a scene in **Scenes**, or click **Load JSON** to open any `*.scene.json` file from disk.
+1. **Choose a theme and scene**: Select a compiled theme in **Theme** and a scene in **Scenes**, or click **Load JSON** to open any `*.scene.json` file from disk.
 2. **Choose components**: Scenes with a declared layout open in **Compose**, where you can toggle optional components and select included components. **Layers** shows compact rows with the layout's component labels, ordered front-to-back, including hidden nodes. **Assets** provides thumbnails and actions for the selected file.
 3. **Customize**: The right-hand inspector shows component properties first, followed by position/size and advanced layout controls. Canvas selection automatically reveals the selected row when **Layers** is open.
 4. **Apply & preview**: Press `Enter`, leave a field, or click **Apply to preview** to validate and apply edits. Invalid inputs display an error and keep the last valid scene.
@@ -94,7 +94,7 @@ interaction. Themes may expose presets without declaring layout slots.
 Click **Create theme**, enter a lower-case name and a parent folder, then confirm.
 Studio copies the current valid design, including pending inspector edits, into a
 new theme project and opens its saved composition. You do not need to save over
-the source preset first. The new project stays available in **THEME** while Studio
+the source preset first. The new project stays available in **Theme** while Studio
 is open. Existing destinations are refused.
 
 The project owns copied scene files, implementation, assets, fonts, shaders, and
@@ -326,7 +326,7 @@ The top bar stays on one row and switches secondary actions to labeled icon
 tooltips in narrower windows. New workspaces and workspace presets give the
 properties panel 320 pixels; previously saved panel widths are preserved.
 
-- **Presets & projects**: Studio compiles all packages under `themes/` alongside `--theme`. Switching **THEME** (or loading a scene from a registered theme package) switches the component factory, tokens, background renderers, and assets together.
+- **Presets & projects**: Studio compiles all packages under `themes/` alongside `--theme`. Switching **Theme** (or loading a scene from a registered theme package) switches the component factory, tokens, background renderers, and assets together.
 - **Inspect code**: Switch the right panel from **Design** to **Inspect code** to view and copy validated **JSON** or generated **Dart** for the **Selection** or the entire **Scene**.
 - **Settings**: The dialog separates **Canvas**, **Background**, **Appearance**, **Grid & snapping**, and **Shortcuts**. Drafts stay intact while switching categories; validation opens the category that needs correction.
   - **Canvas** offers HD, Full HD, QHD, 4K UHD, and portrait presets, custom dimensions, a dimension swap action, `fit`, and `useSafeArea`.
