@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/widgets.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import 'node_geometry.dart';
 import 'studio_input.dart';
@@ -164,10 +164,27 @@ class _StudioViewportState extends State<StudioViewport> {
                     transform: Matrix4.identity()
                       ..translateByDouble(origin.dx, origin.dy, 0, 1)
                       ..scaleByDouble(scale, scale, 1, 1),
-                    child: SizedBox.fromSize(
-                      key: widget.canvasKey,
-                      size: widget.referenceSize,
-                      child: widget.childBuilder(scale),
+                    child: DecoratedBox(
+                      decoration: widget.presenting
+                          ? const BoxDecoration()
+                          : BoxDecoration(
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Theme.of(context).colorScheme.border,
+                                  spreadRadius: 1 / scale,
+                                ),
+                                BoxShadow(
+                                  color: const Color(0x24000000),
+                                  blurRadius: 20 / scale,
+                                  offset: Offset(0, 6 / scale),
+                                ),
+                              ],
+                            ),
+                      child: SizedBox.fromSize(
+                        key: widget.canvasKey,
+                        size: widget.referenceSize,
+                        child: widget.childBuilder(scale),
+                      ),
                     ),
                   ),
                 ),
