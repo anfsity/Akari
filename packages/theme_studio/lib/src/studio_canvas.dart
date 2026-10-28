@@ -740,7 +740,6 @@ class StudioCanvasState extends State<StudioCanvas> {
                                     : 'Authored size',
                               ).small(),
                             ),
-                            const Gap(8),
                             OutlineButton(
                               key: const ValueKey('canvas-compare'),
                               density: ButtonDensity.compact,
@@ -750,7 +749,6 @@ class StudioCanvasState extends State<StudioCanvas> {
                               child: Text(_comparing ? 'Single' : 'Compare')
                                   .small(),
                             ),
-                            const Gap(8),
                             Tooltip(
                               tooltip: (_) => const Text(
                                 'Rulers · Drag from a ruler to create a guide',
