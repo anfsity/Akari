@@ -58,16 +58,15 @@ class StudioComponentAssembly extends StatelessWidget {
                               ? null
                               : () => editor.createComponent(component),
                           child: Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(component.icon, size: 14),
-                              const Gap(6),
+                              const Gap(4),
                               Expanded(
                                 child: Text(
                                   component.label,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                ).small(),
+                                ).xSmall(),
                               ),
                             ],
                           ),
