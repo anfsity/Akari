@@ -162,6 +162,11 @@ matching minimum width overrides that node's layout and sizing; removing the
 rule restores its base behavior. Rules use the logical viewport supplied to `SceneRuntime`; physical pixel
 density does not alter breakpoint matching.
 
+**Width mode** and **Height mode** each use a full-width selector. The **+** and
+**−** buttons beside the layout selector add and remove breakpoints. Expand
+**Size constraints** for minimum/maximum dimensions and flex; layers with
+authored constraints open this section automatically when selected.
+
 **Responsive** below the canvas continuously varies preview width/height without
 changing the authored canvas or history. Edit rules in the inspector while
 checking the preview. **Authored size** returns to geometry editing.
@@ -316,6 +321,10 @@ and do not create scene history. Collapse and restore controls stay on the
 corresponding outer edge, and camera controls occupy a separate footer group.
 Canvas shortcuts also work while a layer row is focused; text fields retain
 their own editing behavior.
+
+The top bar stays on one row and switches secondary actions to labeled icon
+tooltips in narrower windows. New workspaces and workspace presets give the
+properties panel 320 pixels; previously saved panel widths are preserved.
 
 - **Presets & projects**: Studio compiles all packages under `themes/` alongside `--theme`. Switching **THEME** (or loading a scene from a registered theme package) switches the component factory, tokens, background renderers, and assets together.
 - **Inspect code**: Switch the right panel from **Design** to **Inspect code** to view and copy validated **JSON** or generated **Dart** for the **Selection** or the entire **Scene**.

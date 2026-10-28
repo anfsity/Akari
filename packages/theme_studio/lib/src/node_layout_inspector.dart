@@ -170,41 +170,62 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
     return StudioFormSection(
       title: layout == null ? 'Responsive sizing' : 'Frame layout',
       children: [
-        StudioSelect<int>(
-          value: _editing,
-          values: [-1, for (var i = 0; i < node.breakpoints.length; i++) i],
-          formatValue: (index) => index < 0
-              ? 'Base layout'
-              : 'Viewport ≥ ${node.breakpoints[index].minWidth.round()} px',
-          onChanged: (value) => setState(() {
-            _editing = value;
-            _updateFields();
-          }),
-        ),
-        const Gap(8),
-        if (_editing >= 0) _field('Viewport ≥ px'),
-        Wrap(
-          spacing: 8,
+        Row(
           children: [
-            OutlineButton(
-              key: const ValueKey('layout-add-breakpoint'),
-              onPressed: _addBreakpoint,
-              child: const Text('Add breakpoint'),
+            Expanded(
+              child: StudioSelect<int>(
+                value: _editing,
+                values: [
+                  -1,
+                  for (var i = 0; i < node.breakpoints.length; i++) i,
+                ],
+                formatValue: (index) => index < 0
+                    ? 'Base layout'
+                    : 'Viewport ≥ ${node.breakpoints[index].minWidth.round()} px',
+                onChanged: (value) => setState(() {
+                  _editing = value;
+                  _updateFields();
+                }),
+              ),
+            ),
+            const Gap(8),
+            Tooltip(
+              tooltip: (_) => const Text('Add breakpoint'),
+              child: Semantics(
+                label: 'Add breakpoint',
+                child: OutlineButton(
+                  key: const ValueKey('layout-add-breakpoint'),
+                  density: ButtonDensity.icon,
+                  onPressed: _addBreakpoint,
+                  child: const Icon(LucideIcons.plus, size: 16),
+                ),
+              ),
             ),
             if (_editing >= 0)
-              GhostButton(
-                onPressed: () {
-                  final rules = [...node.breakpoints]..removeAt(_editing);
-                  setState(() {
-                    _editing = -1;
-                  });
-                  widget.editor.updateNode(node.copyWith(breakpoints: rules));
-                },
-                child: const Text('Remove'),
+              Tooltip(
+                tooltip: (_) => const Text('Remove breakpoint'),
+                child: Semantics(
+                  label: 'Remove breakpoint',
+                  child: GhostButton(
+                    key: const ValueKey('layout-remove-breakpoint'),
+                    density: ButtonDensity.icon,
+                    onPressed: () {
+                      final rules = [...node.breakpoints]..removeAt(_editing);
+                      setState(() {
+                        _editing = -1;
+                      });
+                      widget.editor.updateNode(
+                        node.copyWith(breakpoints: rules),
+                      );
+                    },
+                    child: const Icon(LucideIcons.minus, size: 16),
+                  ),
+                ),
               ),
           ],
         ),
         const Gap(12),
+        if (_editing >= 0) _field('Viewport ≥ px'),
         if (layout != null) ...[
           StudioEnumSelect(
             value: layout.direction,
@@ -249,31 +270,63 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
           ),
           const Gap(12),
         ],
-        const Text('Width / Height').small().muted(),
+        const Text('Width mode').small().muted(),
         const Gap(6),
-        StudioFieldRow(
-          left: StudioEnumSelect(
-            value: _sizing.widthMode,
-            values: modes,
-            onChanged: (value) => _apply(widthMode: value),
-          ),
-          right: StudioEnumSelect(
-            value: _sizing.heightMode,
-            values: modes,
-            onChanged: (value) => _apply(heightMode: value),
-          ),
+        StudioEnumSelect(
+          key: const ValueKey('layout-width-mode'),
+          value: _sizing.widthMode,
+          values: modes,
+          onChanged: (value) => _apply(widthMode: value),
+        ),
+        const Gap(12),
+        const Text('Height mode').small().muted(),
+        const Gap(6),
+        StudioEnumSelect(
+          key: const ValueKey('layout-height-mode'),
+          value: _sizing.heightMode,
+          values: modes,
+          onChanged: (value) => _apply(heightMode: value),
         ),
         const Gap(8),
         StudioFieldRow(
           left: _field('Fixed width'),
           right: _field('Fixed height'),
         ),
-        StudioFieldRow(left: _field('Min width'), right: _field('Min height')),
-        StudioFieldRow(left: _field('Max width'), right: _field('Max height')),
-        _field('Flex'),
-        const Text(
-          'Blank fixed sizes use the selected mode. Hug measures text or frame contents; fill shares the available space. Breakpoints use logical viewport width.',
-        ).small().muted(),
+        Accordion(
+          theme: const AccordionTheme(padding: 8),
+          items: [
+            AccordionItem(
+              key: ValueKey('sizing-constraints-${node.id}-$_editing'),
+              expanded:
+                  _sizing.minWidth > 0 ||
+                  _sizing.minHeight > 0 ||
+                  _sizing.maxWidth != null ||
+                  _sizing.maxHeight != null ||
+                  _sizing.flex != 1,
+              trigger: const AccordionTrigger(
+                key: ValueKey('layout-size-constraints'),
+                child: Text('Size constraints'),
+              ),
+              content: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  StudioFieldRow(
+                    left: _field('Min width'),
+                    right: _field('Min height'),
+                  ),
+                  StudioFieldRow(
+                    left: _field('Max width'),
+                    right: _field('Max height'),
+                  ),
+                  _field('Flex'),
+                  const Text(
+                    'Blank fixed sizes use the selected mode. Hug measures text or frame contents; fill shares the available space. Breakpoints use logical viewport width.',
+                  ).small().muted(),
+                ],
+              ),
+            ),
+          ],
+        ),
         const Gap(12),
       ],
     );

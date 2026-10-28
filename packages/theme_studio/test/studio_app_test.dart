@@ -1544,6 +1544,54 @@ void main() {
     },
   );
 
+  testWidgets(
+    'sizing controls stay readable and advanced limits remain editable',
+    (tester) async {
+      await openStudio(tester);
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      final original = editor.encodedDocument;
+      final widthMode = tester.getRect(
+        find.byKey(const ValueKey('layout-width-mode')),
+      );
+      final heightMode = tester.getRect(
+        find.byKey(const ValueKey('layout-height-mode')),
+      );
+      expect(widthMode.width, greaterThan(250));
+      expect(heightMode.left, widthMode.left);
+      expect(heightMode.right, widthMode.right);
+      expect(heightMode.top, greaterThan(widthMode.bottom));
+      expect(
+        find.byKey(const ValueKey('layout-Max width')).hitTestable(),
+        findsNothing,
+      );
+      final limits = find.byKey(const ValueKey('layout-size-constraints'));
+      await tester.ensureVisible(limits);
+      await tester.tap(limits);
+      await tester.pumpAndSettle();
+      final maxWidth = find.byKey(const ValueKey('layout-Max width'));
+      await tester.ensureVisible(maxWidth);
+      await tester.enterText(maxWidth, '420');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(editor.selectedNode.sizing.maxWidth, 420);
+      editor.undo();
+      await tester.pumpAndSettle();
+      expect(editor.encodedDocument, original);
+      final add = find.byKey(const ValueKey('layout-add-breakpoint'));
+      await tester.ensureVisible(add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(editor.selectedNode.breakpoints, hasLength(1));
+      await tester.tap(find.byKey(const ValueKey('layout-remove-breakpoint')));
+      await tester.pumpAndSettle();
+      expect(editor.selectedNode.breakpoints, isEmpty);
+      expect(editor.encodedDocument, original);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('canvas toolbar stays compact and wraps within narrow panels', (
     tester,
   ) async {
