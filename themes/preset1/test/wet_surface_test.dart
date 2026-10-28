@@ -37,6 +37,34 @@ void main() {
     flatSurface.dispose();
   });
 
+  test('bounded artwork preserves refraction and light streaks', () async {
+    final recorder = ui.PictureRecorder();
+    const PresetArtworkPainter().paint(Canvas(recorder), const Size(960, 540));
+    final picture = recorder.endRecording();
+    final texture = await picture.toImage(960, 540);
+    picture.dispose();
+    addTearDown(texture.dispose);
+    final original = await _renderSurfaceFrame(program, artwork, .25);
+    final bounded = await _renderSurfaceFrame(program, texture, .25);
+    var difference = 0;
+    var maxDifference = 0;
+    for (var offset = 0; offset < original.length; offset += 4) {
+      final x = (offset ~/ 4 % 1920).toDouble();
+      final y = offset ~/ 4 ~/ 1920;
+      // Rasterizing the diagonal at half resolution changes its two-pixel
+      // antialiasing fringe. Detail away from that edge should stay intact.
+      final edge = (y - calculatePresetNightTop(x)).abs() <= 2;
+      for (var channel = 0; channel < 4; channel++) {
+        final delta = (original[offset + channel] - bounded[offset + channel])
+            .abs();
+        difference += delta;
+        if (!edge) maxDifference = math.max(maxDifference, delta);
+      }
+    }
+    expect(difference / original.length, lessThan(1));
+    expect(maxDifference, lessThan(10));
+  });
+
   test('authored uniforms change refraction density and dispersion', () async {
     final normal = await _renderSurfaceFrame(program, artwork, .25);
     for (final parameters in [

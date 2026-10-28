@@ -37,11 +37,14 @@ weather use the same 1920×1080 coordinate space and adapt to the scene bounds.
 in `lib/preset_components.dart`; display lettering is in `lib/weekday_lettering.dart`.
 `lib/shaders/wet_surface.frag` owns glass refraction and the diagonal water current.
 
-The static artwork and blossoms have separate repaint boundaries. Blur is used
-only when painting the cached light streaks. The environment owns a single
-1920×1080 texture and its shader for its lifetime; resizing scales the authored
-coordinates without recreating those resources. A single weather controller
-drives 170 petals, 630 fine raindrops and 90 longer distant streaks, sliding glass
+The artwork is rasterized once into a 960×540 texture shared by the still
+background and the water shader. Only smooth gradients and blurred light
+streaks enter that texture; blossoms, lettering and particles retain their
+display resolution. Reusing the raster avoids another set of blur render
+targets whenever Studio zooms or resizes the canvas. The environment owns the
+texture (under 2 MiB of RGBA pixels) and shader for its lifetime and releases
+both when removed. Blossoms keep their own repaint boundary. A single weather
+controller drives 170 petals, 630 fine raindrops and 90 longer distant streaks, sliding glass
 drops and the water current without rebuilding widgets. Rain falls quickly;
 glass drops slide slowly with varying speeds, curved trails and refracted rims.
 Small condensation beads stay on the glass while highlights and ripples travel

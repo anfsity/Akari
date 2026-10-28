@@ -72,8 +72,9 @@ class PresetBackgroundRenderer extends BackgroundRenderer {
   );
 }
 
-/// The water samples a single raster of the artwork rather than blurring on
-/// each tick. Blossoms stay in their own raster boundary above the wet surface.
+/// One bounded raster supplies both the artwork and the water's texture, so
+/// resizing or zooming never reruns the light streaks' expensive blur passes.
+/// Blossoms retain their own full-resolution boundary above the wet surface.
 /// All layers share the same authored 1920 x 1080 coordinates.
 class PresetEnvironment extends StatefulWidget {
   const PresetEnvironment({
@@ -94,6 +95,10 @@ class PresetEnvironment extends StatefulWidget {
 
 class _PresetEnvironmentState extends State<PresetEnvironment>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  // Only smooth gradients and blurred light streaks enter this texture. Half
+  // resolution bounds temporary blur targets as well as the retained image;
+  // branches, lettering and particles are still painted at the display scale.
+  static const _surfaceTextureSize = Size(960, 540);
   late final AnimationController _weather;
   late final PresetWeatherPainter _painter;
   PresetSurfacePainter? _surfacePainter;
@@ -119,18 +124,22 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
   }
 
   Future<void> _createSurface() async {
-    if (_surfaceImage != null) return;
     final program = await ui.FragmentProgram.fromAsset(
       'packages/theme_preset1/shaders/wet_surface.frag',
     );
+    if (!mounted) return;
     final recorder = ui.PictureRecorder();
-    const PresetArtworkPainter().paint(Canvas(recorder), presetCanvasSize);
+    const PresetArtworkPainter().paint(Canvas(recorder), _surfaceTextureSize);
     final picture = recorder.endRecording();
-    final image = await picture.toImage(
-      presetCanvasSize.width.toInt(),
-      presetCanvasSize.height.toInt(),
-    );
-    picture.dispose();
+    final ui.Image image;
+    try {
+      image = await picture.toImage(
+        _surfaceTextureSize.width.toInt(),
+        _surfaceTextureSize.height.toInt(),
+      );
+    } finally {
+      picture.dispose();
+    }
     if (!mounted) {
       image.dispose();
       return;
@@ -215,10 +224,12 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            const RepaintBoundary(
-              child: CustomPaint(
-                painter: PresetArtworkPainter(),
-                isComplex: true,
+            ColoredBox(
+              color: presetPaper,
+              child: RawImage(
+                image: _surfaceImage,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.low,
               ),
             ),
             if (_surfacePainter case final painter?)
