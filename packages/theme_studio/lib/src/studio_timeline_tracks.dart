@@ -577,8 +577,8 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
             ],
           ),
           Positioned(
-            left: 120 + progress * math.max(0, width - 2),
-            top: 0,
+            left: 120 + progress * width - 3,
+            top: 15,
             bottom: 0,
             child: IgnorePointer(
               child: Column(
