@@ -148,8 +148,22 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
     super.dispose();
   }
 
+  static const _prefixes = <String, String>{
+    'Fixed width': 'Fix W',
+    'Fixed height': 'Fix H',
+    'Min width': 'Min W',
+    'Min height': 'Min H',
+    'Max width': 'Max W',
+    'Max height': 'Max H',
+    'Flex': 'Flex',
+    'Padding': 'Pad',
+    'Gap': 'Gap',
+    'Viewport ≥ px': '≥ px',
+  };
+
   Widget _field(String label) => StudioFormField(
     label: label,
+    prefix: _prefixes[label],
     controller: _fields[label]!,
     inputKey: ValueKey('layout-$label'),
     onSubmitted: _apply,

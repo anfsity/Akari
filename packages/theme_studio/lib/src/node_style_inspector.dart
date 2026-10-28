@@ -67,27 +67,19 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
     double maximum,
     SceneStyle Function(double) update, {
     double minimum = 0,
-  }) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('$label  ${value.toStringAsFixed(1)}').small().muted(),
-        const Gap(6),
-        StudioPreviewSlider(
-          key: ValueKey('style-$label'),
-          value: value,
-          maximum: maximum,
-          minimum: minimum,
-          onCancel: () {
-            widget.editor.cancelPreview();
-            setState(_updateDraft);
-          },
-          onPreview: (value) => _preview(update(value)),
-          onCommit: (value) => _commit(update(value)),
-        ),
-      ],
-    ),
+  }) => StudioSliderField(
+    sliderKey: ValueKey('style-$label'),
+    label: label,
+    value: value,
+    maximum: maximum,
+    minimum: minimum,
+    decimals: maximum <= 3 ? 2 : 1,
+    onCancel: () {
+      widget.editor.cancelPreview();
+      setState(_updateDraft);
+    },
+    onPreview: (value) => _preview(update(value)),
+    onCommit: (value) => _commit(update(value)),
   );
 
   @override
