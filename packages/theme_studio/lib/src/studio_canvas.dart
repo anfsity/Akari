@@ -17,6 +17,7 @@ import 'studio_workspace.dart';
 import 'studio_workspace_layout.dart';
 import 'studio_canvas_presets.dart';
 import 'studio_comparison.dart';
+import 'studio_theme.dart';
 
 class StudioCanvas extends StatefulWidget {
   const StudioCanvas({
@@ -268,9 +269,7 @@ class StudioCanvasState extends State<StudioCanvas> {
         if (!focused && _spacePan) setState(() => _spacePan = false);
       },
       child: ColoredBox(
-        color: colors.brightness == Brightness.dark
-            ? Color.lerp(colors.background, const Color(0xFF000000), 0.35)!
-            : Color.lerp(colors.muted, colors.border, 0.45)!,
+        color: getStudioStageColor(colors),
         child: ListenableBuilder(
           listenable: Listenable.merge([widget.editor]),
           builder: (context, _) {
