@@ -72,24 +72,16 @@ class _StudioEffectsInspectorState extends State<StudioEffectsInspector> {
     double minimum,
     double maximum,
     SceneBackground Function(double) update,
-  ) => Padding(
-    padding: const EdgeInsets.only(bottom: 20),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('$label  ${value.toStringAsFixed(2)}').small().muted(),
-        const Gap(8),
-        StudioPreviewSlider(
-          key: ValueKey('effect-$id'),
-          value: value,
-          minimum: minimum,
-          maximum: maximum,
-          onPreview: (value) => _preview(update(value)),
-          onCommit: (value) => _commit(update(value)),
-          onCancel: _cancel,
-        ),
-      ],
-    ),
+  ) => StudioSliderField(
+    sliderKey: ValueKey('effect-$id'),
+    label: label,
+    value: value,
+    minimum: minimum,
+    maximum: maximum,
+    decimals: 2,
+    onPreview: (value) => _preview(update(value)),
+    onCommit: (value) => _commit(update(value)),
+    onCancel: _cancel,
   );
   @override
   Widget build(BuildContext context) {

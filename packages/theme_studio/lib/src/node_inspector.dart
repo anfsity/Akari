@@ -147,6 +147,26 @@ class _InspectorForm extends StatelessWidget {
     ),
   );
 
+  static const _prefixes = <String, String>{
+    'X': 'X',
+    'Y': 'Y',
+    'Width': 'W',
+    'Height': 'H',
+    'Rotate Z': '∠',
+    'Depth': 'Z',
+    'Paint order': 'Paint',
+    'Focus order': 'Focus',
+    'Translate X': 'TX',
+    'Translate Y': 'TY',
+    'Scale X': 'SX',
+    'Scale Y': 'SY',
+    'Rotate X': 'RX',
+    'Rotate Y': 'RY',
+    'Pivot X': 'PX',
+    'Pivot Y': 'PY',
+    'Perspective': 'Persp',
+  };
+
   Widget _buildLayoutSection() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -163,10 +183,14 @@ class _InspectorForm extends StatelessWidget {
           ),
         ],
       ),
-      const Gap(12),
+      const Gap(10),
       _buildPair('X', 'Y'),
       _buildPair('Width', 'Height'),
-      _buildField('Rotate Z'),
+      StudioFieldRow(
+        left: _buildField('Rotate Z'),
+        right: const SizedBox.shrink(),
+      ),
+      const Gap(4),
     ],
   );
 
@@ -182,13 +206,14 @@ class _InspectorForm extends StatelessWidget {
       _buildPair('Scale X', 'Scale Y'),
       OutlineButton(
         key: const ValueKey('reset-node-scale'),
+        density: ButtonDensity.dense,
         onPressed: () {
           controller.resetScale();
           onApply();
         },
         child: const Text('Reset scale'),
       ),
-      const Gap(12),
+      const Gap(10),
       _buildPair('Rotate X', 'Rotate Y'),
       _buildPair('Pivot X', 'Pivot Y'),
       _buildField('Perspective'),
@@ -216,6 +241,7 @@ class _InspectorForm extends StatelessWidget {
 
   Widget _buildField(String label, {int maxLines = 1}) => StudioFormField(
     label: label,
+    prefix: _prefixes[label],
     inputKey: ValueKey('field-$label'),
     controller: controller.getField(label),
     maxLines: maxLines,

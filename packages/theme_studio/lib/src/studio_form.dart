@@ -54,11 +54,127 @@ class _StudioPreviewSliderState extends State<StudioPreviewSlider> {
   );
 }
 
+class StudioSliderField extends StatefulWidget {
+  const StudioSliderField({
+    required this.sliderKey,
+    required this.label,
+    required this.value,
+    required this.maximum,
+    required this.onPreview,
+    required this.onCommit,
+    required this.onCancel,
+    this.minimum = 0,
+    this.decimals = 1,
+    super.key,
+  });
+
+  final Key sliderKey;
+  final String label;
+  final double value;
+  final double minimum;
+  final double maximum;
+  final int decimals;
+  final ValueChanged<double> onPreview;
+  final ValueChanged<double> onCommit;
+  final VoidCallback onCancel;
+
+  @override
+  State<StudioSliderField> createState() => _StudioSliderFieldState();
+}
+
+class _StudioSliderFieldState extends State<StudioSliderField> {
+  late final _controller = TextEditingController(
+    text: widget.value.toStringAsFixed(widget.decimals),
+  );
+  final _focus = FocusNode();
+
+  @override
+  void didUpdateWidget(StudioSliderField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_focus.hasFocus) {
+      final text = widget.value.toStringAsFixed(widget.decimals);
+      if (_controller.text != text) _controller.text = text;
+    }
+  }
+
+  void _commitText() {
+    final parsed = double.tryParse(_controller.text.trim());
+    if (parsed == null || !parsed.isFinite) {
+      _controller.text = widget.value.toStringAsFixed(widget.decimals);
+      return;
+    }
+    final clamped = parsed.clamp(widget.minimum, widget.maximum);
+    _controller.text = clamped.toStringAsFixed(widget.decimals);
+    if ((clamped - widget.value).abs() > 1e-6) {
+      widget.onCommit(clamped);
+    }
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(widget.label).xSmall().muted()),
+            const Gap(8),
+            SizedBox(
+              width: 58,
+              child: Semantics(
+                label: '${widget.label} value',
+                child: Focus(
+                  focusNode: _focus,
+                  onFocusChange: (focused) {
+                    if (!focused) _commitText();
+                  },
+                  child: TextField(
+                    controller: _controller,
+                    textAlign: TextAlign.right,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                    onSubmitted: (_) => _commitText(),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const Gap(6),
+        StudioPreviewSlider(
+          key: widget.sliderKey,
+          value: widget.value,
+          minimum: widget.minimum,
+          maximum: widget.maximum,
+          onPreview: widget.onPreview,
+          onCommit: widget.onCommit,
+          onCancel: widget.onCancel,
+        ),
+      ],
+    ),
+  );
+}
+
 class StudioFormField extends StatelessWidget {
   const StudioFormField({
     required this.label,
     required this.controller,
     required this.inputKey,
+    this.prefix,
     this.maxLines = 1,
     this.onSubmitted,
     this.onFocusLost,
@@ -69,39 +185,53 @@ class StudioFormField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final Key inputKey;
+  final String? prefix;
   final int maxLines;
   final VoidCallback? onSubmitted;
   final VoidCallback? onFocusLost;
   final ValueChanged<String>? onChanged;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(label).small().muted(),
-        const Gap(6),
-        Semantics(
-          label: label,
-          child: Focus(
-            onFocusChange: (focused) {
-              if (!focused) onFocusLost?.call();
-            },
-            child: TextField(
-              key: inputKey,
-              controller: controller,
-              maxLines: maxLines,
-              onChanged: onChanged,
-              onSubmitted: onSubmitted == null
-                  ? null
-                  : (_) => onSubmitted?.call(),
-            ),
-          ),
+  Widget build(BuildContext context) {
+    final input = Semantics(
+      label: label,
+      child: Focus(
+        onFocusChange: (focused) {
+          if (!focused) onFocusLost?.call();
+        },
+        child: TextField(
+          key: inputKey,
+          controller: controller,
+          maxLines: maxLines,
+          padding: maxLines == 1
+              ? const EdgeInsets.symmetric(horizontal: 8, vertical: 6)
+              : null,
+          features: [
+            if (prefix case final badge?)
+              InputFeature.leading(
+                Tooltip(
+                  tooltip: (_) => Text(label),
+                  child: Text(badge).xSmall().muted(),
+                ),
+                skipFocusTraversal: true,
+              ),
+          ],
+          onChanged: onChanged,
+          onSubmitted: onSubmitted == null ? null : (_) => onSubmitted?.call(),
         ),
-      ],
-    ),
-  );
+      ),
+    );
+    if (prefix != null) {
+      return Padding(padding: const EdgeInsets.only(bottom: 8), child: input);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [Text(label).xSmall().muted(), const Gap(4), input],
+      ),
+    );
+  }
 }
 
 class StudioFieldRow extends StatelessWidget {
@@ -115,7 +245,7 @@ class StudioFieldRow extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Expanded(child: left),
-      const Gap(12),
+      const Gap(8),
       Expanded(child: right),
     ],
   );

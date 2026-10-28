@@ -80,8 +80,18 @@ class _NodeMotionInspectorState extends State<NodeMotionInspector> {
     super.dispose();
   }
 
+  static const _prefixes = <String, String>{
+    'Duration ms': 'Dur',
+    'Delay ms': 'Delay',
+    'Bezier X1': 'X1',
+    'Bezier Y1': 'Y1',
+    'Bezier X2': 'X2',
+    'Bezier Y2': 'Y2',
+  };
+
   Widget _field(String label) => StudioFormField(
     label: label,
+    prefix: _prefixes[label],
     controller: _fields[label]!,
     inputKey: ValueKey('motion-$label'),
     onSubmitted: () =>
