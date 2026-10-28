@@ -29,50 +29,59 @@ class StudioComponentAssembly extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Component library').semiBold(),
+            const Text('Component library').small().semiBold(),
             const Gap(8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final component in StudioComponent.values)
-                  Draggable<StudioComponent>(
-                    data: component,
-                    affinity: Axis.horizontal,
-                    dragAnchorStrategy: pointerDragAnchorStrategy,
-                    maxSimultaneousDrags: readOnly ? 0 : 1,
-                    feedback: Container(
-                      padding: const EdgeInsets.all(12),
-                      color: Theme.of(context).colorScheme.background,
-                      child: Text(component.label),
-                    ),
-                    child: OutlineButton(
-                      key: ValueKey('add-component-${component.name}'),
-                      onPressed: readOnly
-                          ? null
-                          : () => editor.createComponent(component),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(component.icon, size: 14),
-                          const Gap(6),
-                          Text(component.label).small(),
-                        ],
+            LayoutBuilder(
+              builder: (context, constraints) => Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final component in StudioComponent.values)
+                    SizedBox(
+                      width: (constraints.maxWidth - 6) / 2,
+                      height: 32,
+                      child: Draggable<StudioComponent>(
+                        data: component,
+                        affinity: Axis.horizontal,
+                        dragAnchorStrategy: pointerDragAnchorStrategy,
+                        maxSimultaneousDrags: readOnly ? 0 : 1,
+                        feedback: Container(
+                          padding: const EdgeInsets.all(12),
+                          color: Theme.of(context).colorScheme.background,
+                          child: Text(component.label),
+                        ),
+                        child: OutlineButton(
+                          key: ValueKey('add-component-${component.name}'),
+                          density: ButtonDensity.dense,
+                          alignment: Alignment.centerLeft,
+                          onPressed: readOnly
+                              ? null
+                              : () => editor.createComponent(component),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(component.icon, size: 14),
+                              const Gap(6),
+                              Expanded(
+                                child: Text(
+                                  component.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ).small(),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
             const Gap(16),
-            Text(layout?.label ?? 'Theme customization').semiBold(),
-            const Gap(8),
-            Text(
-              layout == null
-                  ? 'Choose the presets provided by this theme.'
-                  : 'Choose components, then select one to customize. '
-                        'The layout supplies its starting position.',
-            ).small().muted(),
+            const Divider(),
             const Gap(16),
+            Text(layout?.label ?? 'Theme customization').small().semiBold(),
+            const Gap(8),
             if (layout != null && layout.presets.length > 1) ...[
               const Text('Layout preset').small().muted(),
               const Gap(6),
@@ -84,7 +93,7 @@ class StudioComponentAssembly extends StatelessWidget {
                 formatValue: (id) => layout.presets[id]!.label,
                 onChanged: editor.updateLayoutPreset,
               ),
-              const Gap(16),
+              const Gap(12),
             ],
             if (editor.presetCatalog.properties.isNotEmpty) ...[
               const Text('Theme presets').small().semiBold(),
@@ -113,10 +122,10 @@ class StudioComponentAssembly extends StatelessWidget {
                     ],
                   ),
                 ),
-              const Divider(),
-              const Gap(12),
             ],
-            if (layout != null)
+            if (layout != null) ...[
+              const Divider(),
+              const Gap(16),
               for (final (label, slots) in [
                 (
                   'Optional components',
@@ -139,6 +148,7 @@ class StudioComponentAssembly extends StatelessWidget {
                     ),
                   const Gap(12),
                 ],
+            ],
             if (layout != null)
               const Text(
                 'Use Login / Dormant to preview both states. '
