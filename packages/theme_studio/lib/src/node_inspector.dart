@@ -47,10 +47,12 @@ class NodeInspector extends StatelessWidget {
                   editor: editor,
                 ),
               ),
-              if (controller.hasDraft || controller.error != null) ...[
-                const Divider(),
-                _InspectorActions(error: controller.error, onApply: onApply),
-              ],
+              const Divider(),
+              _InspectorActions(
+                hasDraft: controller.hasDraft,
+                error: controller.error,
+                onApply: onApply,
+              ),
             ],
           ),
   );
@@ -467,31 +469,58 @@ class _PropertyRowsState extends State<_PropertyRows> {
 }
 
 class _InspectorActions extends StatelessWidget {
-  const _InspectorActions({required this.error, required this.onApply});
+  const _InspectorActions({
+    required this.hasDraft,
+    required this.error,
+    required this.onApply,
+  });
 
+  final bool hasDraft;
   final String? error;
   final VoidCallback onApply;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    key: const ValueKey('inspector-actions'),
-    padding: const EdgeInsets.all(12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (error case final message?) ...[
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 64),
-            child: SingleChildScrollView(child: StudioFormError(message)),
+  Widget build(BuildContext context) {
+    final active = hasDraft || error != null;
+    return Padding(
+      key: const ValueKey('inspector-actions'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (error case final message?) ...[
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 64),
+              child: SingleChildScrollView(child: StudioFormError(message)),
+            ),
+            const Gap(6),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  error != null
+                      ? 'Validation error'
+                      : hasDraft
+                      ? 'Pending draft'
+                      : 'Synced',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ).xSmall().muted(),
+              ),
+              Button(
+                style: active
+                    ? const ButtonStyle.primary(density: ButtonDensity.dense)
+                    : const ButtonStyle.ghost(density: ButtonDensity.dense),
+                onPressed: onApply,
+                child: active
+                    ? const Text('Apply to preview').xSmall()
+                    : const Text('Apply to preview').xSmall().muted(),
+              ),
+            ],
           ),
-          const Gap(8),
         ],
-        PrimaryButton(
-          density: ButtonDensity.dense,
-          onPressed: onApply,
-          child: const Text('Apply to preview'),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
