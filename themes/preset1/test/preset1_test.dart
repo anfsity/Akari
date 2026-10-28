@@ -155,6 +155,49 @@ void main() {
   });
 
   testWidgets(
+    'artwork texture stays bounded through resizing and edits and is released on removal',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      Future<void> mount(Size size, double refraction) {
+        tester.view.physicalSize = size;
+        return tester.pumpWidget(
+          MaterialApp(home: PresetEnvironment(refraction: refraction)),
+        );
+      }
+
+      await mount(const Size(1920, 1080), 1);
+      for (
+        var i = 0;
+        i < 100 && tester.widget<RawImage>(find.byType(RawImage)).image == null;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      final image = tester.widget<RawImage>(find.byType(RawImage)).image!;
+      expect(
+        image.width * image.height * 4,
+        lessThanOrEqualTo(2 * 1024 * 1024),
+      );
+      for (var i = 0; i < 10; i++) {
+        await mount(Size(3840 + i * 10, 2160), i / 4);
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(
+          tester.widget<RawImage>(find.byType(RawImage)).image,
+          same(image),
+        );
+      }
+      await tester.pumpWidget(const SizedBox());
+      expect(image.debugDisposed, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'weather stops scheduling when reduced motion or TickerMode disables it',
     (tester) async {
       Future<void> mount({bool reduced = false, bool enabled = true}) =>
