@@ -293,16 +293,16 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
           right: _field('Fixed height'),
         ),
         Accordion(
+          key: ValueKey('sizing-constraints-${node.id}-$_editing'),
           theme: const AccordionTheme(padding: 8),
           items: [
             AccordionItem(
-              key: ValueKey('sizing-constraints-${node.id}-$_editing'),
               expanded:
                   _sizing.minWidth > 0 ||
                   _sizing.minHeight > 0 ||
                   _sizing.maxWidth != null ||
                   _sizing.maxHeight != null ||
-                  _sizing.flex != 1,
+                  _sizing.flex > 0,
               trigger: const AccordionTrigger(
                 key: ValueKey('layout-size-constraints'),
                 child: Text('Size constraints'),
