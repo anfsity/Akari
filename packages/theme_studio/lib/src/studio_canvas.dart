@@ -742,7 +742,6 @@ class StudioCanvasState extends State<StudioCanvas> {
                             ),
                             OutlineButton(
                               key: const ValueKey('canvas-compare'),
-                              density: ButtonDensity.compact,
                               onPressed: session == null
                                   ? null
                                   : _toggleComparison,
