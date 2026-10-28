@@ -9,20 +9,15 @@ class NodeArrangementToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
     child: Wrap(
       spacing: 4,
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text('${editor.selectedIds.length} selected').small().muted(),
-        OutlineButton(
-          key: const ValueKey('stagger-selection'),
-          density: ButtonDensity.dense,
-          onPressed: editor.selectedIds.length > 1
-              ? () => editor.staggerSelection(100)
-              : null,
-          child: const Text('Stagger 100 ms'),
+        Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: Text('${editor.selectedIds.length} selected').small().muted(),
         ),
         OutlineButton(
           key: const ValueKey('group-selection'),
@@ -37,34 +32,84 @@ class NodeArrangementToolbar extends StatelessWidget {
             onPressed: editor.canUngroup ? editor.ungroupSelection : null,
             child: const Text('Ungroup'),
           ),
+        OutlineButton(
+          key: const ValueKey('stagger-selection'),
+          density: ButtonDensity.dense,
+          onPressed: editor.selectedIds.length > 1
+              ? () => editor.staggerSelection(100)
+              : null,
+          child: const Text('Stagger 100 ms'),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: SizedBox(height: 18, child: VerticalDivider()),
+        ),
         for (final alignment in NodeAlignment.values)
-          OutlineButton(
-            key: ValueKey('align-${alignment.name}'),
-            density: ButtonDensity.dense,
-            onPressed: editor.canArrange
-                ? () => editor.alignSelection(alignment)
-                : null,
-            child: Text(switch (alignment) {
-              NodeAlignment.left => 'Left',
-              NodeAlignment.center => 'H center',
-              NodeAlignment.right => 'Right',
-              NodeAlignment.top => 'Top',
-              NodeAlignment.middle => 'V center',
-              NodeAlignment.bottom => 'Bottom',
-            }),
-          ),
-        for (final horizontal in [true, false])
-          OutlineButton(
-            key: ValueKey(
-              'distribute-${horizontal ? 'horizontal' : 'vertical'}',
+          Tooltip(
+            tooltip: (_) => Text(_getAlignmentLabel(alignment)),
+            child: OutlineButton(
+              key: ValueKey('align-${alignment.name}'),
+              density: ButtonDensity.iconDense,
+              onPressed: editor.canArrange
+                  ? () => editor.alignSelection(alignment)
+                  : null,
+              child: Semantics(
+                label: _getAlignmentLabel(alignment),
+                child: Icon(
+                  switch (alignment) {
+                    NodeAlignment.left => LucideIcons.alignStartVertical,
+                    NodeAlignment.center => LucideIcons.alignCenterVertical,
+                    NodeAlignment.right => LucideIcons.alignEndVertical,
+                    NodeAlignment.top => LucideIcons.alignStartHorizontal,
+                    NodeAlignment.middle => LucideIcons.alignCenterHorizontal,
+                    NodeAlignment.bottom => LucideIcons.alignEndHorizontal,
+                  },
+                  size: 15,
+                ),
+              ),
             ),
-            density: ButtonDensity.dense,
-            onPressed: editor.canArrange && editor.selectedIds.length >= 3
-                ? () => editor.distributeSelection(horizontal: horizontal)
-                : null,
-            child: Text(horizontal ? 'Space horizontally' : 'Space vertically'),
+          ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: SizedBox(height: 18, child: VerticalDivider()),
+        ),
+        for (final horizontal in [true, false])
+          Tooltip(
+            tooltip: (_) => Text(
+              horizontal ? 'Distribute horizontally' : 'Distribute vertically',
+            ),
+            child: OutlineButton(
+              key: ValueKey(
+                'distribute-${horizontal ? 'horizontal' : 'vertical'}',
+              ),
+              density: ButtonDensity.iconDense,
+              onPressed: editor.canArrange && editor.selectedIds.length >= 3
+                  ? () => editor.distributeSelection(horizontal: horizontal)
+                  : null,
+              child: Semantics(
+                label: horizontal
+                    ? 'Distribute horizontally'
+                    : 'Distribute vertically',
+                child: Icon(
+                  horizontal
+                      ? LucideIcons.alignHorizontalSpaceBetween
+                      : LucideIcons.alignVerticalSpaceBetween,
+                  size: 15,
+                ),
+              ),
+            ),
           ),
       ],
     ),
   );
+
+  static String _getAlignmentLabel(NodeAlignment alignment) =>
+      switch (alignment) {
+        NodeAlignment.left => 'Align left',
+        NodeAlignment.center => 'Align horizontal center',
+        NodeAlignment.right => 'Align right',
+        NodeAlignment.top => 'Align top',
+        NodeAlignment.middle => 'Align vertical center',
+        NodeAlignment.bottom => 'Align bottom',
+      };
 }
