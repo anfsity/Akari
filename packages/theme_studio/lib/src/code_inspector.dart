@@ -102,9 +102,8 @@ class _CodeInspectorState extends State<CodeInspector> {
                                 ),
                           onPressed: () =>
                               setState(() => _wholeScene = wholeScene),
-                          child: Text(
-                            wholeScene ? 'Scene' : 'Selection',
-                          ).small(),
+                          child: Text(wholeScene ? 'Scene' : 'Selection')
+                              .small(),
                         ),
                       ),
                   ],
@@ -138,11 +137,10 @@ class _CodeInspectorState extends State<CodeInspector> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 32),
+              constraints: const BoxConstraints(minHeight: 34),
               child: OutlineButton(
                 density: ButtonDensity.dense,
-                onPressed: () =>
-                    Clipboard.setData(ClipboardData(text: source)),
+                onPressed: () => Clipboard.setData(ClipboardData(text: source)),
                 child: const Text('Copy code').small(),
               ),
             ),
