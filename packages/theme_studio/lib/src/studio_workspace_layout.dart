@@ -15,13 +15,15 @@ class StudioWorkspaceLayout {
     this.inspectorDock = StudioDock.right,
     this.sidebarVisible = true,
     this.inspectorVisible = true,
-    this.leftWidth = 232,
-    this.rightWidth = 280,
+    this.leftWidth = defaultLeftWidth,
+    this.rightWidth = defaultRightWidth,
     this.sidebarBounds = const Rect.fromLTWH(16, 16, 300, 520),
     this.inspectorBounds = const Rect.fromLTWH(460, 16, 300, 520),
   });
 
   static const storageKey = 'akari.studio.workspace';
+  static const defaultLeftWidth = 232.0;
+  static const defaultRightWidth = 320.0;
   final StudioWorkspaceMode mode;
   final StudioDock sidebarDock;
   final StudioDock inspectorDock;
