@@ -352,6 +352,7 @@ class StudioCanvasState extends State<StudioCanvas> {
             final zoomControls = <Widget>[
               OutlineButton(
                 key: const ValueKey('zoom-out'),
+                density: ButtonDensity.icon,
                 onPressed: session == null
                     ? null
                     : () => setState(
@@ -373,6 +374,7 @@ class StudioCanvasState extends State<StudioCanvas> {
               ),
               OutlineButton(
                 key: const ValueKey('zoom-in'),
+                density: ButtonDensity.icon,
                 onPressed: session == null
                     ? null
                     : () => setState(
