@@ -120,6 +120,8 @@ class _StudioCreateThemeState extends State<StudioCreateTheme> {
                 child: IgnorePointer(
                   ignoring: _creating,
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: 8,
                     children: [
                       StudioFormField(
                         label: 'Name',
@@ -130,7 +132,7 @@ class _StudioCreateThemeState extends State<StudioCreateTheme> {
                       const Text(
                         'Use lower-case letters, numbers, and underscores, starting with a letter.',
                       ).small().muted(),
-                      const Gap(16),
+                      const Gap(8),
                       StudioFormField(
                         label: 'Location',
                         inputKey: const ValueKey('create-theme-location'),
@@ -141,6 +143,7 @@ class _StudioCreateThemeState extends State<StudioCreateTheme> {
                   ),
                 ),
               ),
+              const Gap(8),
               OutlineButton(
                 onPressed: _creating ? null : _chooseLocation,
                 child: const Text('Choose folder'),

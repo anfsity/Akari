@@ -118,54 +118,51 @@ class _StudioSliderFieldState extends State<StudioSliderField> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(child: Text(widget.label).xSmall().muted()),
-            const Gap(8),
-            SizedBox(
-              width: 58,
-              child: Semantics(
-                label: '${widget.label} value',
-                child: Focus(
-                  focusNode: _focus,
-                  onFocusChange: (focused) {
-                    if (!focused) _commitText();
-                  },
-                  child: TextField(
-                    controller: _controller,
-                    textAlign: TextAlign.right,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 3,
-                    ),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontFeatures: [FontFeature.tabularFigures()],
-                    ),
-                    onSubmitted: (_) => _commitText(),
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: 6,
+    children: [
+      Row(
+        children: [
+          Expanded(child: Text(widget.label).xSmall().muted()),
+          const Gap(8),
+          SizedBox(
+            width: 58,
+            child: Semantics(
+              label: '${widget.label} value',
+              child: Focus(
+                focusNode: _focus,
+                onFocusChange: (focused) {
+                  if (!focused) _commitText();
+                },
+                child: TextField(
+                  controller: _controller,
+                  textAlign: TextAlign.right,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
                   ),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                  onSubmitted: (_) => _commitText(),
                 ),
               ),
             ),
-          ],
-        ),
-        const Gap(6),
-        StudioPreviewSlider(
-          key: widget.sliderKey,
-          value: widget.value,
-          minimum: widget.minimum,
-          maximum: widget.maximum,
-          onPreview: widget.onPreview,
-          onCommit: widget.onCommit,
-          onCancel: widget.onCancel,
-        ),
-      ],
-    ),
+          ),
+        ],
+      ),
+      StudioPreviewSlider(
+        key: widget.sliderKey,
+        value: widget.value,
+        minimum: widget.minimum,
+        maximum: widget.maximum,
+        onPreview: widget.onPreview,
+        onCommit: widget.onCommit,
+        onCancel: widget.onCancel,
+      ),
+    ],
   );
 }
 
@@ -205,13 +202,26 @@ class StudioFormField extends StatelessWidget {
           maxLines: maxLines,
           padding: maxLines == 1
               ? const EdgeInsets.symmetric(horizontal: 8, vertical: 6)
-              : null,
+              : const EdgeInsets.all(8),
+          style: maxLines > 1
+              ? Theme.of(context).typography.mono.copyWith(fontSize: 12)
+              : TextStyle(
+                  fontSize: 13,
+                  fontFeatures: prefix != null
+                      ? const [FontFeature.tabularFigures()]
+                      : null,
+                ),
           features: [
             if (prefix case final badge?)
               InputFeature.leading(
                 Tooltip(
                   tooltip: (_) => Text(label),
-                  child: Text(badge).xSmall().muted(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: badge.length <= 2 ? 14 : 32,
+                    ),
+                    child: Text(badge).xSmall().muted(),
+                  ),
                 ),
                 skipFocusTraversal: true,
               ),
@@ -221,17 +231,52 @@ class StudioFormField extends StatelessWidget {
         ),
       ),
     );
-    if (prefix != null) {
-      return Padding(padding: const EdgeInsets.only(bottom: 8), child: input);
-    }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [Text(label).xSmall().muted(), const Gap(4), input],
-      ),
-    );
+    if (prefix != null) return input;
+    return StudioLabeledField(label: label, child: input);
   }
+}
+
+class StudioLabeledField extends StatelessWidget {
+  const StudioLabeledField({
+    required this.label,
+    required this.child,
+    super.key,
+  });
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: 6,
+    children: [Text(label).xSmall().muted(), child],
+  );
+}
+
+class StudioSwitchRow extends StatelessWidget {
+  const StudioSwitchRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    super.key,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: const BoxConstraints(minHeight: 28),
+    child: Row(
+      children: [
+        Expanded(child: Text(label).small()),
+        const Gap(8),
+        Switch(value: value, onChanged: onChanged),
+      ],
+    ),
+  );
 }
 
 class StudioFieldRow extends StatelessWidget {
@@ -243,9 +288,9 @@ class StudioFieldRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
+    spacing: 8,
     children: [
       Expanded(child: left),
-      const Gap(8),
       Expanded(child: right),
     ],
   );
@@ -255,19 +300,115 @@ class StudioFormSection extends StatelessWidget {
   const StudioFormSection({
     required this.title,
     required this.children,
-    this.headerSpacing = 12,
+    this.trailing,
+    this.headerSpacing = 10,
+    this.spacing = 10,
     super.key,
   });
 
   final String title;
+  final Widget? trailing;
   final List<Widget> children;
   final double headerSpacing;
+  final double spacing;
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [Text(title).small().semiBold(), Gap(headerSpacing), ...children],
+    children: [
+      Row(
+        children: [
+          Expanded(child: Text(title).small().semiBold()),
+          if (trailing case final action?) ...[
+            const Gap(8),
+            action,
+          ],
+        ],
+      ),
+      Gap(headerSpacing),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: spacing,
+        children: children,
+      ),
+    ],
   );
+}
+
+class StudioDisclosureSection extends StatefulWidget {
+  const StudioDisclosureSection({
+    required this.title,
+    required this.child,
+    this.triggerKey,
+    this.initiallyExpanded = false,
+    super.key,
+  });
+
+  final String title;
+  final Widget child;
+  final Key? triggerKey;
+  final bool initiallyExpanded;
+
+  @override
+  State<StudioDisclosureSection> createState() =>
+      _StudioDisclosureSectionState();
+}
+
+class _StudioDisclosureSectionState extends State<StudioDisclosureSection> {
+  late bool _expanded = widget.initiallyExpanded;
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          button: true,
+          expanded: _expanded,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            onEnter: (_) => setState(() => _hovered = true),
+            onExit: (_) => setState(() => _hovered = false),
+            child: GestureDetector(
+              key: widget.triggerKey,
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: ColoredBox(
+                color: _hovered
+                    ? colors.muted.withValues(alpha: 0.5)
+                    : Colors.transparent,
+                child: SizedBox(
+                  height: 40,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(widget.title).small().semiBold()),
+                        Icon(
+                          _expanded
+                              ? LucideIcons.chevronDown
+                              : LucideIcons.chevronRight,
+                          size: 14,
+                          color: colors.mutedForeground,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (_expanded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+            child: widget.child,
+          ),
+      ],
+    );
+  }
 }
 
 class StudioEnumSelect<T extends Enum> extends StatelessWidget {

@@ -102,29 +102,24 @@ class _NodeMotionInspectorState extends State<NodeMotionInspector> {
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: 8,
     children: [
-      const Gap(12),
       StudioFieldRow(left: _field('Duration ms'), right: _field('Delay ms')),
-      Row(
-        children: [
-          const Expanded(child: Text('Custom Bezier')),
-          Switch(
-            value: widget.editor.selectedNode.motionTiming.curve != null,
-            onChanged: (value) => _apply(customCurve: value),
-          ),
-        ],
+      StudioSwitchRow(
+        label: 'Custom Bezier',
+        value: widget.editor.selectedNode.motionTiming.curve != null,
+        onChanged: (value) => _apply(customCurve: value),
       ),
       if (widget.editor.selectedNode.motionTiming.curve case final curve?)
         SizedBox(
-          height: 90,
+          height: 80,
           child: CustomPaint(painter: _BezierPainter(curve)),
         ),
-      const Gap(8),
       StudioFieldRow(left: _field('Bezier X1'), right: _field('Bezier Y1')),
       StudioFieldRow(left: _field('Bezier X2'), right: _field('Bezier Y2')),
       const Text(
         'Blank duration inherits theme timing. Curve controls use 0..1.',
-      ).small().muted(),
+      ).xSmall().muted(),
     ],
   );
 }

@@ -273,7 +273,10 @@ class _TransitionDialogState extends State<_TransitionDialog> {
                   inputKey: const ValueKey('transition-delay'),
                 ),
               ),
-              if (_error != null) Text(_error!).small(),
+              if (_error != null) ...[
+                const Gap(8),
+                Text(_error!).small(),
+              ],
             ],
           ),
         ),

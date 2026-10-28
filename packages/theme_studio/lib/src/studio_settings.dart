@@ -421,6 +421,7 @@ class _StudioSettingsState extends State<StudioSettings> {
         left: _buildField('Canvas width'),
         right: _buildField('Canvas height'),
       ),
+      const Gap(10),
       Align(
         alignment: Alignment.centerLeft,
         child: OutlineButton(
@@ -543,12 +544,14 @@ class _StudioSettingsState extends State<StudioSettings> {
           const Gap(12),
         ],
         _buildField('Background asset'),
+        const Gap(6),
         const Text(
           'Use a registered theme asset, or import an image from the Assets tab.',
         ).small().muted(),
         const Gap(16),
       ],
       _buildField('Background color'),
+      const Gap(6),
       const Text('Hex color: #RRGGBB or #AARRGGBB.').small().muted(),
       const Gap(20),
       const Divider(),
@@ -557,6 +560,7 @@ class _StudioSettingsState extends State<StudioSettings> {
         left: _buildField('Background blur'),
         right: _buildField('Scrim opacity'),
       ),
+      const Gap(8),
       const Text(
         'Blur softens the background. Scrim opacity adds a dark overlay from 0 (clear) to 1 (black).',
       ).small().muted(),
@@ -716,6 +720,7 @@ class _StudioSettingsState extends State<StudioSettings> {
       ).small().muted(),
       const Gap(24),
       _buildField('Grid size (pixels)'),
+      const Gap(10),
       ListenableBuilder(
         listenable: _fields['Grid size (pixels)']!,
         builder: (context, _) => Wrap(

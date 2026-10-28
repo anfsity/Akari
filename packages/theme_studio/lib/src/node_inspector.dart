@@ -66,16 +66,21 @@ class _InspectorHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 2,
       children: [
-        Text(node.id, maxLines: 1, overflow: TextOverflow.ellipsis).semiBold(),
+        Text(
+          node.id,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ).small().semiBold(),
         Text(
           definition?.label ?? node.componentId,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-        ).muted().small(),
+        ).muted().xSmall(),
       ],
     ),
   );
@@ -97,54 +102,61 @@ class _InspectorForm extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
     key: const ValueKey('node-inspector-form'),
-    padding: const EdgeInsets.all(16),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (editor case final session? when controller.node.asset != null)
-          NodeAssetInspector(editor: session)
-        else
-          _InspectorProperties(
-            controller: controller,
-            definition: definition,
-            onApply: onApply,
-          ),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: switch (editor) {
+            final session? when controller.node.asset != null =>
+              NodeAssetInspector(editor: session),
+            _ => _InspectorProperties(
+              controller: controller,
+              definition: definition,
+              onApply: onApply,
+            ),
+          },
+        ),
         const Divider(),
-        const Gap(12),
-        _buildLayoutSection(),
-        if (editor case final session?) NodeLayoutInspector(editor: session),
-        if (editor case final session?)
-          _InspectorDisclosure(
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: _buildLayoutSection(),
+        ),
+        const Divider(),
+        if (editor case final session?) ...[
+          NodeLayoutInspector(editor: session),
+          const Divider(),
+          StudioDisclosureSection(
             title: 'Visual style',
             child: NodeStyleInspector(editor: session),
           ),
-        if (editor case final session?)
-          _InspectorDisclosure(
+          const Divider(),
+          StudioDisclosureSection(
             title: 'State rules',
             child: NodeStateInspector(editor: session),
           ),
-        const Divider(),
-        const Gap(12),
-        _InspectorDisclosure(
+          const Divider(),
+        ],
+        StudioDisclosureSection(
           title: 'Advanced layout',
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 12,
             children: [
-              const Gap(12),
               _buildLayeringSection(),
+              const Divider(),
               _buildTransformSection(),
-              const Gap(12),
+              const Divider(),
               _buildMotionSection(),
             ],
           ),
         ),
-        const Gap(12),
-        _InspectorDisclosure(
+        const Divider(),
+        StudioDisclosureSection(
           title: 'Advanced properties',
-          child: Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: _buildField('Properties', maxLines: 6),
-          ),
+          child: _buildField('Properties', maxLines: 6),
         ),
+        const Divider(),
       ],
     ),
   );
@@ -169,40 +181,35 @@ class _InspectorForm extends StatelessWidget {
     'Perspective': 'Persp',
   };
 
-  Widget _buildLayoutSection() => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _buildLayoutSection() => StudioFormSection(
+    title: 'Layout',
+    trailing: StudioEnumSelect(
+      value: controller.layoutUnit,
+      values: StudioLayoutUnit.values,
+      formatValue: (unit) =>
+          unit == StudioLayoutUnit.pixels ? 'Pixels' : 'Percent',
+      onChanged: controller.updateLayoutUnit,
+    ),
+    spacing: 8,
     children: [
-      Row(
-        children: [
-          const Text('Layout').small().semiBold(),
-          const Spacer(),
-          StudioEnumSelect(
-            value: controller.layoutUnit,
-            values: StudioLayoutUnit.values,
-            formatValue: (unit) =>
-                unit == StudioLayoutUnit.pixels ? 'Pixels' : 'Percent',
-            onChanged: controller.updateLayoutUnit,
-          ),
-        ],
-      ),
-      const Gap(10),
       _buildPair('X', 'Y'),
       _buildPair('Width', 'Height'),
       StudioFieldRow(
         left: _buildField('Rotate Z'),
         right: const SizedBox.shrink(),
       ),
-      const Gap(4),
     ],
   );
 
   Widget _buildLayeringSection() => StudioFormSection(
     title: 'Layering',
+    spacing: 8,
     children: [_buildField('Depth'), _buildPair('Paint order', 'Focus order')],
   );
 
   Widget _buildTransformSection() => StudioFormSection(
     title: 'Transform',
+    spacing: 8,
     children: [
       _buildPair('Translate X', 'Translate Y'),
       _buildPair('Scale X', 'Scale Y'),
@@ -213,9 +220,8 @@ class _InspectorForm extends StatelessWidget {
           controller.resetScale();
           onApply();
         },
-        child: const Text('Reset scale'),
+        child: const Text('Reset scale').small(),
       ),
-      const Gap(10),
       _buildPair('Rotate X', 'Rotate Y'),
       _buildPair('Pivot X', 'Pivot Y'),
       _buildField('Perspective'),
@@ -225,6 +231,7 @@ class _InspectorForm extends StatelessWidget {
   Widget _buildMotionSection() => StudioFormSection(
     title: 'Motion',
     headerSpacing: 8,
+    spacing: 8,
     children: [
       StudioEnumSelect(
         value: controller.motion,
@@ -249,44 +256,6 @@ class _InspectorForm extends StatelessWidget {
     maxLines: maxLines,
     onSubmitted: maxLines == 1 ? onApply : null,
     onFocusLost: onApply,
-  );
-}
-
-class _InspectorDisclosure extends StatefulWidget {
-  const _InspectorDisclosure({required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  State<_InspectorDisclosure> createState() => _InspectorDisclosureState();
-}
-
-class _InspectorDisclosureState extends State<_InspectorDisclosure> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      GhostButton(
-        density: ButtonDensity.compact,
-        onPressed: () => setState(() => _expanded = !_expanded),
-        child: SizedBox(
-          height: 32,
-          child: Row(
-            children: [
-              Expanded(child: Text(widget.title).small().semiBold()),
-              Icon(
-                _expanded ? LucideIcons.chevronDown : LucideIcons.chevronRight,
-                size: 15,
-              ),
-            ],
-          ),
-        ),
-      ),
-      if (_expanded) widget.child,
-    ],
   );
 }
 
@@ -341,7 +310,6 @@ class _InspectorProperties extends StatelessWidget {
               onChanged: controller.updateProperty,
               onApply: onApply,
             ),
-          const Gap(12),
         ],
       );
     },
@@ -414,6 +382,8 @@ class _PropertyRowsState extends State<_PropertyRows> {
 
   @override
   Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: 10,
     children: [
       for (final property in widget.definitions)
         switch (property) {
@@ -444,25 +414,18 @@ class _PropertyRowsState extends State<_PropertyRows> {
       // available to repair it while the canvas retains its last valid scene.
       value = null;
     }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(property.label).small().muted(),
-          const Gap(6),
-          StudioSelect<Enum>(
-            key: ValueKey('property-${property.name}'),
-            value: value,
-            values: property.choices.keys,
-            formatValue: (choice) => property.choices[choice]!,
-            placeholder: const Text('Choose a valid option'),
-            onChanged: (choice) {
-              widget.onChanged(property.name, choice.name);
-              widget.onApply();
-            },
-          ),
-        ],
+    return StudioLabeledField(
+      label: property.label,
+      child: StudioSelect<Enum>(
+        key: ValueKey('property-${property.name}'),
+        value: value,
+        values: property.choices.keys,
+        formatValue: (choice) => property.choices[choice]!,
+        placeholder: const Text('Choose a valid option'),
+        onChanged: (choice) {
+          widget.onChanged(property.name, choice.name);
+          widget.onApply();
+        },
       ),
     );
   }
