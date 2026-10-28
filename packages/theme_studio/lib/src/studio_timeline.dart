@@ -114,7 +114,7 @@ class _StudioTimelineState extends State<StudioTimeline>
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+    padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -122,7 +122,8 @@ class _StudioTimelineState extends State<StudioTimeline>
           children: [
             const Text('Timeline').small().semiBold(),
             const Gap(12),
-            Expanded(
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 200),
               child: StudioEnumSelect(
                 value: widget.transition,
                 values: StudioTransition.values,
@@ -134,52 +135,76 @@ class _StudioTimelineState extends State<StudioTimeline>
               ),
             ),
             const Gap(8),
-            OutlineButton(
-              key: const ValueKey('timeline-restart'),
-              onPressed: () {
-                _player.stop();
-                widget.onTimeChanged(Duration.zero);
-              },
-              child: const Icon(LucideIcons.skipBack, size: 16),
+            Tooltip(
+              tooltip: (_) => const Text('Restart'),
+              child: OutlineButton(
+                key: const ValueKey('timeline-restart'),
+                density: ButtonDensity.iconDense,
+                onPressed: () {
+                  _player.stop();
+                  widget.onTimeChanged(Duration.zero);
+                },
+                child: const Icon(LucideIcons.skipBack, size: 15),
+              ),
             ),
             const Gap(4),
-            OutlineButton(
-              key: const ValueKey('timeline-play'),
-              onPressed: () => setState(() {
-                if (_player.isAnimating) {
-                  _player.stop();
-                } else {
-                  _player.forward(from: _player.value >= 1 ? 0 : _player.value);
-                }
-              }),
-              child: Icon(
-                _player.isAnimating ? LucideIcons.pause : LucideIcons.play,
-                size: 16,
+            Tooltip(
+              tooltip: (_) =>
+                  Text(_player.isAnimating ? 'Pause' : 'Play preview'),
+              child: OutlineButton(
+                key: const ValueKey('timeline-play'),
+                density: ButtonDensity.iconDense,
+                onPressed: () => setState(() {
+                  if (_player.isAnimating) {
+                    _player.stop();
+                  } else {
+                    _player.forward(
+                      from: _player.value >= 1 ? 0 : _player.value,
+                    );
+                  }
+                }),
+                child: Icon(
+                  _player.isAnimating ? LucideIcons.pause : LucideIcons.play,
+                  size: 15,
+                ),
               ),
             ),
           ],
         ),
         const Gap(8),
-        Slider(
-          key: const ValueKey('timeline-scrubber'),
-          value: SliderValue.single(
-            (widget.elapsed.inMicroseconds / widget.duration.inMicroseconds)
-                .clamp(0, 1),
-          ),
-          onChanged: (value) {
-            _player.stop();
-            widget.onTimeChanged(
-              Duration(
-                microseconds: (value.value * widget.duration.inMicroseconds)
-                    .round(),
+        Row(
+          children: [
+            SizedBox(
+              width: 120,
+              child: Text(
+                '${(widget.elapsed.inMilliseconds / 1000).toStringAsFixed(2)}s / ${(widget.duration.inMilliseconds / 1000).toStringAsFixed(2)}s',
+                style: const TextStyle(
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ).xSmall().muted(),
+            ),
+            Expanded(
+              child: Slider(
+                key: const ValueKey('timeline-scrubber'),
+                value: SliderValue.single(
+                  (widget.elapsed.inMicroseconds /
+                          widget.duration.inMicroseconds)
+                      .clamp(0, 1),
+                ),
+                onChanged: (value) {
+                  _player.stop();
+                  widget.onTimeChanged(
+                    Duration(
+                      microseconds:
+                          (value.value * widget.duration.inMicroseconds)
+                              .round(),
+                    ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         ),
-        const Gap(6),
-        Text(
-          '${(widget.elapsed.inMilliseconds / 1000).toStringAsFixed(2)} s / ${(widget.duration.inMilliseconds / 1000).toStringAsFixed(2)} s',
-        ).small().muted(),
         StudioTimelineTracks(
           editor: widget.editor,
           duration: widget.duration,
