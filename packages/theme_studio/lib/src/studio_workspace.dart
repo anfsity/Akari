@@ -9,6 +9,9 @@ import 'studio_input.dart';
 import 'studio_form.dart';
 import 'studio_workspace_layout.dart';
 
+String _getPanelLabel(String title) =>
+    title == 'Sidebar' ? 'Project' : 'Properties';
+
 class StudioWorkspaceScope extends InheritedWidget {
   const StudioWorkspaceScope({
     required this.presenting,
@@ -256,14 +259,18 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
     ),
   );
 
-  Widget _panelHeader(String title, StudioDock side) {
+  Widget _buildDockHeader(
+    String active,
+    List<String> visible,
+    StudioDock side,
+  ) {
     final collapse = _button(
-      title == 'Sidebar' ? 'toggle-sidebar' : 'toggle-inspector',
+      active == 'Sidebar' ? 'toggle-sidebar' : 'toggle-inspector',
       'Collapse panel',
       side == StudioDock.left
           ? LucideIcons.chevronLeft
           : LucideIcons.chevronRight,
-      () => _togglePanel(title),
+      () => _togglePanel(active),
     );
     return SizedBox(
       height: 36,
@@ -271,22 +278,54 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
         children: [
           if (side == StudioDock.left) collapse,
           Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onDoubleTap: () => _togglePanel(title),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(title == 'Sidebar' ? 'Project' : 'Properties')
-                    .small()
-                    .semiBold(),
-              ),
-            ),
+            child: visible.length > 1
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      children: [
+                        for (var i = 0; i < visible.length; i++) ...[
+                          if (i > 0) const Gap(2),
+                          Expanded(
+                            child: Button(
+                              key: ValueKey('dock-tab-${visible[i]}'),
+                              style: active == visible[i]
+                                  ? const ButtonStyle.secondary(
+                                      density: ButtonDensity.dense,
+                                    )
+                                  : const ButtonStyle.ghost(
+                                      density: ButtonDensity.dense,
+                                    ),
+                              onPressed: () => setState(() {
+                                if (side == StudioDock.left) {
+                                  _leftActive = visible[i];
+                                } else {
+                                  _rightActive = visible[i];
+                                }
+                              }),
+                              child: Text(
+                                _getPanelLabel(visible[i]),
+                                overflow: TextOverflow.ellipsis,
+                              ).small(),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  )
+                : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onDoubleTap: () => _togglePanel(active),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(_getPanelLabel(active)).small().semiBold(),
+                    ),
+                  ),
           ),
           _button(
-            'float-$title',
+            'float-$active',
             'Float panel',
             LucideIcons.externalLink,
-            () => _setDock(title, StudioDock.floating),
+            () => _setDock(active, StudioDock.floating),
           ),
           if (side == StudioDock.right) collapse,
         ],
@@ -317,30 +356,10 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
             maintainState: true,
             child: Column(
               children: [
-                if (visible.length > 1)
-                  Row(
-                    children: [
-                      for (final title in visible)
-                        Expanded(
-                          child: Button(
-                            key: ValueKey('dock-tab-$title'),
-                            style: active == title
-                                ? const ButtonStyle.secondary()
-                                : const ButtonStyle.ghost(),
-                            onPressed: () => setState(() {
-                              if (side == StudioDock.left) {
-                                _leftActive = title;
-                              } else {
-                                _rightActive = title;
-                              }
-                            }),
-                            child: Text(
-                              title == 'Sidebar' ? 'Project' : 'Properties',
-                            ).small(),
-                          ),
-                        ),
-                    ],
-                  ),
+                if (active != null && !_presenting) ...[
+                  _buildDockHeader(active, visible, side),
+                  const Divider(),
+                ],
                 Expanded(
                   child: Stack(
                     fit: StackFit.expand,
@@ -348,13 +367,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                       for (final title in panels)
                         Offstage(
                           offstage: active != title || _presenting,
-                          child: Column(
-                            children: [
-                              _panelHeader(title, side),
-                              const Divider(),
-                              Expanded(child: contents[title]!),
-                            ],
-                          ),
+                          child: contents[title]!,
                         ),
                     ],
                   ),
@@ -371,7 +384,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                 for (final title in _getRailPanels(side))
                   _button(
                     title == 'Sidebar' ? 'toggle-sidebar' : 'toggle-inspector',
-                    'Show ${title == 'Sidebar' ? 'project' : 'properties'} panel',
+                    'Show ${_getPanelLabel(title).toLowerCase()} panel',
                     side == StudioDock.left
                         ? LucideIcons.chevronRight
                         : LucideIcons.chevronLeft,
@@ -673,46 +686,60 @@ class _FloatingPanelState extends State<_FloatingPanel> {
                           target.dy.clamp(0, constraints.maxHeight - height),
                         );
                       }),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(widget.title).small().semiBold(),
-                            ),
-                            Tooltip(
-                              tooltip: (_) => const Text('Dock left'),
-                              child: GhostButton(
-                                key: ValueKey('dock-left-${widget.title}'),
-                                onPressed: () =>
-                                    widget.onDockTo(StudioDock.left),
-                                density: ButtonDensity.icon,
-                                child: const Icon(
-                                  LucideIcons.panelLeft,
-                                  size: 14,
+                      child: SizedBox(
+                        height: 36,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            children: [
+                              Icon(
+                                LucideIcons.gripVertical,
+                                size: 14,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.mutedForeground,
+                              ),
+                              const Gap(6),
+                              Expanded(
+                                child: Text(
+                                  _getPanelLabel(widget.title),
+                                ).small().semiBold(),
+                              ),
+                              Tooltip(
+                                tooltip: (_) => const Text('Dock left'),
+                                child: GhostButton(
+                                  key: ValueKey('dock-left-${widget.title}'),
+                                  onPressed: () =>
+                                      widget.onDockTo(StudioDock.left),
+                                  density: ButtonDensity.icon,
+                                  child: const Icon(
+                                    LucideIcons.panelLeft,
+                                    size: 14,
+                                  ),
                                 ),
                               ),
-                            ),
-                            Tooltip(
-                              tooltip: (_) => const Text('Dock right'),
-                              child: GhostButton(
-                                key: ValueKey('dock-right-${widget.title}'),
-                                onPressed: () =>
-                                    widget.onDockTo(StudioDock.right),
-                                density: ButtonDensity.icon,
-                                child: const Icon(
-                                  LucideIcons.panelRight,
-                                  size: 14,
+                              Tooltip(
+                                tooltip: (_) => const Text('Dock right'),
+                                child: GhostButton(
+                                  key: ValueKey('dock-right-${widget.title}'),
+                                  onPressed: () =>
+                                      widget.onDockTo(StudioDock.right),
+                                  density: ButtonDensity.icon,
+                                  child: const Icon(
+                                    LucideIcons.panelRight,
+                                    size: 14,
+                                  ),
                                 ),
                               ),
-                            ),
-                            OutlineButton(
-                              key: ValueKey('dock-${widget.title}'),
-                              density: ButtonDensity.compact,
-                              onPressed: widget.onDock,
-                              child: const Text('Dock').small(),
-                            ),
-                          ],
+                              const Gap(2),
+                              OutlineButton(
+                                key: ValueKey('dock-${widget.title}'),
+                                density: ButtonDensity.dense,
+                                onPressed: widget.onDock,
+                                child: const Text('Dock').xSmall(),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
