@@ -24,6 +24,30 @@ class StudioToolbar extends StatelessWidget {
   final VoidCallback onCreateTheme;
   final VoidCallback onCreateScene;
 
+  Widget _buildAction({
+    required String key,
+    required String label,
+    required IconData icon,
+    required bool compact,
+    required VoidCallback? onPressed,
+  }) => Tooltip(
+    tooltip: (_) => Text(label),
+    child: Semantics(
+      label: compact ? label : null,
+      child: OutlineButton(
+        key: ValueKey(key),
+        density: compact ? ButtonDensity.icon : ButtonDensity.normal,
+        onPressed: onPressed,
+        child: compact
+            ? Icon(icon, size: 16)
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [Icon(icon, size: 16), const Gap(6), Text(label)],
+              ),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: Listenable.merge([editor, editor?.inspector]),
@@ -33,97 +57,100 @@ class StudioToolbar extends StatelessWidget {
       final canUndo = session != null && session.canUndo;
       final canRedo = session != null && session.canRedo;
       final isDirty = session != null && session.isDirty;
-      return SizedBox(
-        width: double.infinity,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 16,
-            runSpacing: 8,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(LucideIcons.panelsTopLeft, size: 20),
-                  const Gap(12),
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 1100;
+          return Padding(
+            key: const ValueKey('studio-toolbar'),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                const Icon(LucideIcons.panelsTopLeft, size: 20),
+                const Gap(10),
+                if (!compact) ...[
                   const Text('Theme Studio').semiBold(),
-                  const Gap(16),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 240),
-                    child: Text(
-                      themeId,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ).muted(),
-                  ),
+                  const Gap(12),
                 ],
-              ),
-              Wrap(
-                spacing: 16,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Row(
+                Expanded(
+                  child: Text(
+                    themeId,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ).small().muted(),
+                ),
+                const Gap(12),
+                _buildAction(
+                  key: 'new-scene',
+                  label: 'New scene',
+                  icon: LucideIcons.filePlus2,
+                  compact: compact,
+                  onPressed: !readOnly && session != null
+                      ? onCreateScene
+                      : null,
+                ),
+                const Gap(4),
+                _buildAction(
+                  key: 'create-theme',
+                  label: 'Create theme',
+                  icon: LucideIcons.folderPlus,
+                  compact: compact,
+                  onPressed: !readOnly && session != null
+                      ? onCreateTheme
+                      : null,
+                ),
+                const Gap(4),
+                _buildAction(
+                  key: 'toolbar-settings',
+                  label: 'Settings',
+                  icon: LucideIcons.settings2,
+                  compact: compact,
+                  onPressed: !readOnly && session != null && preferencesReady
+                      ? onOpenSettings
+                      : null,
+                ),
+                const Gap(12),
+                // Undo clears an uncommitted inspector draft before it consumes
+                // a scene history entry, including in the compact toolbar.
+                _buildAction(
+                  key: 'toolbar-undo',
+                  label: 'Undo',
+                  icon: LucideIcons.undo2,
+                  compact: compact,
+                  onPressed: !readOnly && (hasDraft || canUndo)
+                      ? session.undo
+                      : null,
+                ),
+                const Gap(4),
+                _buildAction(
+                  key: 'toolbar-redo',
+                  label: 'Redo',
+                  icon: LucideIcons.redo2,
+                  compact: compact,
+                  onPressed: !readOnly && canRedo ? session.redo : null,
+                ),
+                const Gap(12),
+                Text(hasDraft || isDirty ? 'Unsaved changes' : 'Saved')
+                    .small()
+                    .muted(),
+                const Gap(12),
+                PrimaryButton(
+                  key: const ValueKey('toolbar-save'),
+                  onPressed: session == null ? null : onSave,
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      OutlineButton(
-                        key: const ValueKey('new-scene'),
-                        onPressed: !readOnly && session != null
-                            ? onCreateScene
-                            : null,
-                        child: const Text('New scene'),
-                      ),
-                      const Gap(8),
-                      OutlineButton(
-                        key: const ValueKey('create-theme'),
-                        onPressed: !readOnly && session != null
-                            ? onCreateTheme
-                            : null,
-                        child: const Text('Create theme'),
-                      ),
-                      const Gap(8),
-                      OutlineButton(
-                        onPressed:
-                            !readOnly && session != null && preferencesReady
-                            ? onOpenSettings
-                            : null,
-                        child: const Text('Settings'),
-                      ),
+                      if (!compact) ...[
+                        const Icon(LucideIcons.save, size: 16),
+                        const Gap(6),
+                      ],
+                      const Text('Save scene'),
                     ],
                   ),
-                  Text(hasDraft || isDirty ? 'Unsaved changes' : 'Saved')
-                      .small()
-                      .muted(),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // When an inspector field has an uncommitted draft, Undo resets the
-                      // draft to the current revision without popping an undo stack entry.
-                      OutlineButton(
-                        onPressed: !readOnly && (hasDraft || canUndo)
-                            ? session.undo
-                            : null,
-                        child: const Text('Undo'),
-                      ),
-                      const Gap(8),
-                      OutlineButton(
-                        onPressed: !readOnly && canRedo ? session.redo : null,
-                        child: const Text('Redo'),
-                      ),
-                      const Gap(16),
-                      PrimaryButton(
-                        onPressed: session == null ? null : onSave,
-                        child: const Text('Save scene'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+                ),
+              ],
+            ),
+          );
+        },
       );
     },
   );
