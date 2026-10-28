@@ -737,7 +737,7 @@ void main() {
   testWidgets('shortcut recorder rejects collisions and applies persistent canvas and workspace bindings', (tester) async {
     await openStudio(tester);
     final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
-    await tester.tap(find.text('Settings'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-settings')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('settings-nav-input')));
     await tester.pumpAndSettle();
@@ -788,7 +788,7 @@ void main() {
     await openStudio(tester);
     expect(tester.getCenter(find.byKey(const ValueKey('toggle-sidebar'))).dx, lessThan(40));
     expect(tester.getCenter(find.byKey(const ValueKey('toggle-inspector'))).dx, greaterThan(1360));
-    expect(tester.getTopLeft(find.text('Theme Studio')).dx, lessThan(100));
+    expect(tester.getTopLeft(find.byKey(const ValueKey('studio-toolbar'))).dx, lessThan(100));
     await tester.tap(find.byKey(const ValueKey('float-Sidebar')));
     await tester.pumpAndSettle();
     final panel = find.byKey(const ValueKey('floating-Sidebar'));
@@ -1506,7 +1506,7 @@ void main() {
           .widget<StudioCanvas>(find.byType(StudioCanvas))
           .editor!;
       final original = editor.encodedDocument;
-      for (final width in [1000.0, 1280.0, 1920.0]) {
+      for (final width in [1000.0, 1280.0, 1400.0, 1920.0]) {
         tester.view.physicalSize = Size(width, 900);
         await tester.pumpAndSettle();
         final toolbar = tester.getRect(
@@ -1833,11 +1833,11 @@ void main() {
       expect(preview.document.themeProperties, {'palette': 'rose'});
       expect(preview.theme.materialTheme.colorScheme.primary, isNot(original));
       expect(file.readAsStringSync(), source);
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(find.text('Ocean'), findsOneWidget);
       expect(find.text('Saved'), findsOneWidget);
-      await tester.tap(find.text('Redo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
@@ -1926,9 +1926,9 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
     await tester.tap(find.text('Apply to preview'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Undo'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Redo'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('State: Login'));
     await tester.pumpAndSettle();
@@ -2003,13 +2003,13 @@ void main() {
       await tester.tap(badge);
       await tester.pumpAndSettle();
       expect(editor.selectedNode.rect.x, 0.6);
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(editor.document.nodes, hasLength(2));
       expect(editor.document.themeProperties, isEmpty);
-      await tester.tap(find.text('Redo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
@@ -2058,11 +2058,11 @@ void main() {
       await tester.tap(find.text('State: Login'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('preview-badge')), findsOneWidget);
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(canvas.editor!.selectedId, 'panel');
       expect(canvas.editor!.document.nodes, hasLength(2));
-      await tester.tap(find.text('Redo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
@@ -2085,7 +2085,7 @@ void main() {
             .any((node) => node.id == 'badge'),
         isFalse,
       );
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(
         tester
@@ -2157,12 +2157,12 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.delete);
       await tester.pumpAndSettle();
       expect(editor.document.nodes, hasLength(4));
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(editor.document.nodes, hasLength(2));
       expect(editor.canUndo, isFalse);
       expect(find.byKey(const ValueKey('add-required-slots')), findsOneWidget);
-      await tester.tap(find.text('Redo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('sidebar-components')));
       await tester.pumpAndSettle();
@@ -2332,16 +2332,16 @@ void main() {
             .properties,
         {'private': 'keep', 'text': 'My desktop', 'variant': 'large'},
       );
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(find.text('Regular'), findsOneWidget);
       expect(tester.widget<TextField>(text).controller!.text, 'My desktop');
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(text).controller!.text, 'Welcome');
-      await tester.tap(find.text('Redo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Redo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
@@ -2531,10 +2531,10 @@ void main() {
             .properties['variant'],
         'wide',
       );
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(property).controller!.text, 'compact');
-      await tester.tap(find.text('Redo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(property).controller!.text, 'wide');
       final scroll = find
@@ -2603,12 +2603,12 @@ void main() {
             .width,
         0.4,
       );
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(find.text('Saved'), findsOneWidget);
       expect(
         tester
-            .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Undo'))
+            .widget<OutlineButton>(find.byKey(const ValueKey('toolbar-undo')))
             .onPressed,
         isNull,
       );
@@ -2623,10 +2623,10 @@ void main() {
       await openStudio(tester);
       expect(find.byType(StudioPreview), findsNothing);
       expect(find.byType(NodeInspector), findsNothing);
-      for (final label in ['Settings', 'Undo', 'Redo']) {
+      for (final key in ['toolbar-settings', 'toolbar-undo', 'toolbar-redo']) {
         expect(
           tester
-              .widget<OutlineButton>(find.widgetWithText(OutlineButton, label))
+              .widget<OutlineButton>(find.byKey(ValueKey(key)))
               .onPressed,
           isNull,
         );
@@ -2653,7 +2653,7 @@ void main() {
     tester,
   ) async {
     await openStudio(tester);
-    await tester.tap(find.text('Settings'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-settings')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('setting-Canvas width')),
@@ -2690,7 +2690,7 @@ void main() {
       decodeSceneDocument(file.readAsStringSync()).canvas.referenceWidth,
       1600,
     );
-    await tester.tap(find.text('Undo'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
     await tester.pumpAndSettle();
     expect(
       tester
@@ -2700,7 +2700,7 @@ void main() {
           .referenceWidth,
       1280,
     );
-    await tester.tap(find.text('Settings'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-settings')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('setting-Canvas width')),
@@ -2724,7 +2724,7 @@ void main() {
   ) async {
     await openStudio(tester);
     final source = file.readAsStringSync();
-    await tester.tap(find.text('Settings'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-settings')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('canvas-resolution-preset')));
     await tester.pumpAndSettle();
@@ -2764,7 +2764,7 @@ void main() {
     expect(editor.document.canvas.referenceHeight, 1920);
     expect(editor.document.background.color, 0xff123456);
     expect(file.readAsStringSync(), source);
-    await tester.tap(find.text('Undo'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
     await tester.pumpAndSettle();
     expect(encodeSceneDocument(editor.document), source);
     expect(editor.canUndo, isFalse);
@@ -2775,7 +2775,7 @@ void main() {
     'settings reveal invalid categories and preserve drafts while correcting them',
     (tester) async {
       await openStudio(tester);
-      await tester.tap(find.text('Settings'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-settings')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('setting-Canvas width')),
@@ -2834,7 +2834,7 @@ void main() {
     'settings reset editor defaults without changing the scene and fit small windows',
     (tester) async {
       await openStudio(tester);
-      await tester.tap(find.text('Settings'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-settings')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('settings-nav-appearance')));
       await tester.pumpAndSettle();
@@ -2876,7 +2876,7 @@ void main() {
     'appearance, grid and snapping apply and persist across remounts',
     (tester) async {
       await openStudio(tester);
-      await tester.tap(find.text('Settings'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-settings')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('settings-nav-appearance')));
       await tester.pumpAndSettle();
@@ -3005,7 +3005,7 @@ void main() {
             .onPressed,
         isNull,
       );
-      await tester.tap(find.text('Settings'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-settings')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('settings-nav-background')));
       await tester.pumpAndSettle();
@@ -3283,7 +3283,7 @@ void main() {
       preview.theme.materialTheme.colorScheme.primary,
       isNot(initialTheme.materialTheme.colorScheme.primary),
     );
-    await tester.tap(find.text('Undo'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
     await tester.pumpAndSettle();
     final undonePreview = tester.widget<StudioPreview>(
       find.byType(StudioPreview),
@@ -3480,7 +3480,7 @@ void main() {
       final moved = tester.widget<StudioPreview>(find.byType(StudioPreview));
       expect(moved.document.nodes.first.rect.x, closeTo(0.7, 0.00001));
       expect(moved.document.nodes.first.rect.y, closeTo(0.6, 0.00001));
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(
         tester
@@ -3493,7 +3493,7 @@ void main() {
         0.1,
       );
       expect(find.text('Saved'), findsOneWidget);
-      await tester.tap(find.text('Redo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
@@ -3543,7 +3543,7 @@ void main() {
       expect(find.text('Saved'), findsOneWidget);
       expect(
         tester
-            .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Undo'))
+            .widget<OutlineButton>(find.byKey(const ValueKey('toolbar-undo')))
             .onPressed,
         isNull,
       );
@@ -3560,7 +3560,7 @@ void main() {
             .x,
         closeTo(liveX / 1280, 1e-7),
       );
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(inspector.getField('X').text, '128');
       expect(find.text('Saved'), findsOneWidget);
@@ -3849,16 +3849,16 @@ void main() {
         .widget<StudioPreview>(find.byType(StudioPreview))
         .document;
     expect(changed.nodes.first.rect.width, closeTo(live.rect.width, 1e-8));
-    await tester.tap(find.text('Undo'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
     await tester.pumpAndSettle();
     expect(find.text('Saved'), findsOneWidget);
     expect(
       tester
-          .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Undo'))
+          .widget<OutlineButton>(find.byKey(const ValueKey('toolbar-undo')))
           .onPressed,
       isNull,
     );
-    await tester.tap(find.text('Redo'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save scene'));
     await tester.pumpAndSettle();
@@ -3886,7 +3886,7 @@ void main() {
           .nodes
           .first;
       expect(node.rect.width / node.rect.height, closeTo(0.75, 1e-8));
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('lock-aspect-ratio')));
       await tester.pumpAndSettle();
@@ -3936,7 +3936,7 @@ void main() {
     expect(find.text('Saved'), findsOneWidget);
     expect(
       tester
-          .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Undo'))
+          .widget<OutlineButton>(find.byKey(const ValueKey('toolbar-undo')))
           .onPressed,
       isNull,
     );
@@ -4071,7 +4071,7 @@ void main() {
       final changed = encodeSceneDocument(
         tester.widget<StudioPreview>(find.byType(StudioPreview)).document,
       );
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(find.text('Saved'), findsOneWidget);
       expect(
@@ -4082,11 +4082,11 @@ void main() {
       );
       expect(
         tester
-            .widget<OutlineButton>(find.widgetWithText(OutlineButton, 'Undo'))
+            .widget<OutlineButton>(find.byKey(const ValueKey('toolbar-undo')))
             .onPressed,
         isNull,
       );
-      await tester.tap(find.text('Redo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
@@ -4202,7 +4202,7 @@ void main() {
       expect(node.transform.pivotX, 0.3);
       expect(node.rect.width, 0.3);
       expect(node.rect.height, 0.4);
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(
         encodeSceneDocument(
@@ -4241,7 +4241,7 @@ void main() {
           .x,
       0.6,
     );
-    await tester.tap(find.text('Undo'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
     await tester.pumpAndSettle();
     expect(
       tester
@@ -4253,7 +4253,7 @@ void main() {
           .x,
       0.5,
     );
-    await tester.tap(find.text('Redo'));
+    await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save scene'));
     await tester.pumpAndSettle();
@@ -4347,14 +4347,14 @@ void main() {
       expect(preview.document.nodes[1].rect.x, 0.2);
       expect(find.byKey(const ValueKey('layer-panel-copy')), findsOneWidget);
       expect(find.text('Unsaved changes'), findsOneWidget);
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('layer-panel-copy')), findsNothing);
       expect(
         tester.widget<StudioPreview>(find.byType(StudioPreview)).selectedId,
         'panel',
       );
-      await tester.tap(find.text('Redo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
       await tester.pumpAndSettle();
       expect(
         tester.widget<StudioPreview>(find.byType(StudioPreview)).selectedId,
@@ -4415,13 +4415,13 @@ void main() {
         isNull,
       );
       expect(find.text('A scene needs at least one node.'), findsOneWidget);
-      await tester.tap(find.text('Undo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
       await tester.pumpAndSettle();
       final restored = tester.widget<StudioPreview>(find.byType(StudioPreview));
       expect(restored.selectedId, 'label');
       expect(restored.document.nodes.last.rect.x, 0.6);
       expect(find.byKey(const ValueKey('layer-label')), findsOneWidget);
-      await tester.tap(find.text('Redo'));
+      await tester.tap(find.byKey(const ValueKey('toolbar-redo')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();

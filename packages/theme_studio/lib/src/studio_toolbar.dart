@@ -59,7 +59,7 @@ class StudioToolbar extends StatelessWidget {
       final isDirty = session != null && session.isDirty;
       return LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxWidth < 1100;
+          final compact = constraints.maxWidth < 1500;
           return Padding(
             key: const ValueKey('studio-toolbar'),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
