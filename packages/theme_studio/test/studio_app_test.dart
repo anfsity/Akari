@@ -1492,6 +1492,58 @@ void main() {
     },
   );
 
+  testWidgets(
+    'main toolbar stays on one row and compact actions retain draft undo',
+    (tester) async {
+      await openStudio(
+        tester,
+        themeBuilder: ({Color? seed, SceneDocument? document}) =>
+            _buildTheme(seed: seed, document: document).copyWith(
+              id: 'a-theme-with-a-long-name-that-must-not-displace-editor-actions',
+            ),
+      );
+      final editor = tester
+          .widget<StudioCanvas>(find.byType(StudioCanvas))
+          .editor!;
+      final original = editor.encodedDocument;
+      for (final width in [1000.0, 1280.0, 1920.0]) {
+        tester.view.physicalSize = Size(width, 900);
+        await tester.pumpAndSettle();
+        final toolbar = tester.getRect(
+          find.byKey(const ValueKey('studio-toolbar')),
+        );
+        expect(toolbar.height, lessThanOrEqualTo(56));
+        for (final action in [
+          'new-scene',
+          'create-theme',
+          'toolbar-settings',
+          'toolbar-undo',
+          'toolbar-redo',
+          'toolbar-save',
+        ]) {
+          final bounds = tester.getRect(find.byKey(ValueKey(action)));
+          expect(bounds.center.dy, closeTo(toolbar.center.dy, 0.1));
+          expect(bounds.left, greaterThanOrEqualTo(toolbar.left));
+          expect(
+            bounds.right,
+            lessThanOrEqualTo(toolbar.right),
+            reason: '$action at $width: $bounds, toolbar: $toolbar',
+          );
+        }
+        expect(tester.takeException(), isNull);
+      }
+      tester.view.physicalSize = const Size(1000, 900);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
+      await tester.pumpAndSettle();
+      expect(editor.inspector.hasDraft, isFalse);
+      expect(editor.encodedDocument, original);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('canvas toolbar stays compact and wraps within narrow panels', (
     tester,
   ) async {
