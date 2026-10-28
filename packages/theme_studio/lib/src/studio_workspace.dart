@@ -52,8 +52,12 @@ class StudioWorkspace extends StatefulWidget {
 }
 
 class _StudioWorkspaceState extends State<StudioWorkspace> {
-  final _sidebar = AbsoluteResizablePaneController(232);
-  final _inspector = AbsoluteResizablePaneController(280);
+  final _sidebar = AbsoluteResizablePaneController(
+    StudioWorkspaceLayout.defaultLeftWidth,
+  );
+  final _inspector = AbsoluteResizablePaneController(
+    StudioWorkspaceLayout.defaultRightWidth,
+  );
   final _sidebarKey = GlobalKey();
   final _inspectorKey = GlobalKey();
   StudioDock _sidebarDock = StudioDock.left;
@@ -217,8 +221,8 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
           : StudioDock.left;
       _inspectorDock = StudioDock.right;
       _sidebarVisible = _inspectorVisible = mode != StudioWorkspaceMode.focus;
-      _sidebar.size = 232;
-      _inspector.size = 280;
+      _sidebar.size = StudioWorkspaceLayout.defaultLeftWidth;
+      _inspector.size = StudioWorkspaceLayout.defaultRightWidth;
       _leftActive = 'Sidebar';
       _rightActive = 'Inspector';
       _updatePanels();
