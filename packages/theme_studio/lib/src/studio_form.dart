@@ -83,28 +83,35 @@ class StudioSliderField extends StatefulWidget {
 }
 
 class _StudioSliderFieldState extends State<StudioSliderField> {
-  late final _controller = TextEditingController(
-    text: widget.value.toStringAsFixed(widget.decimals),
-  );
+  late String _displayText = widget.value.toStringAsFixed(widget.decimals);
+  late final _controller = TextEditingController(text: _displayText);
   final _focus = FocusNode();
 
   @override
   void didUpdateWidget(StudioSliderField oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_focus.hasFocus) {
-      final text = widget.value.toStringAsFixed(widget.decimals);
-      if (_controller.text != text) _controller.text = text;
+      _updateText(widget.value);
     }
   }
 
+  void _updateText(double value) {
+    _displayText = value.toStringAsFixed(widget.decimals);
+    _controller.text = _displayText;
+  }
+
   void _commitText() {
+    if (_controller.text == _displayText) {
+      _updateText(widget.value);
+      return;
+    }
     final parsed = double.tryParse(_controller.text.trim());
     if (parsed == null || !parsed.isFinite) {
-      _controller.text = widget.value.toStringAsFixed(widget.decimals);
+      _updateText(widget.value);
       return;
     }
     final clamped = parsed.clamp(widget.minimum, widget.maximum);
-    _controller.text = clamped.toStringAsFixed(widget.decimals);
+    _updateText(clamped);
     if ((clamped - widget.value).abs() > 1e-6) {
       widget.onCommit(clamped);
     }
@@ -319,10 +326,7 @@ class StudioFormSection extends StatelessWidget {
       Row(
         children: [
           Expanded(child: Text(title).small().semiBold()),
-          if (trailing case final action?) ...[
-            const Gap(8),
-            action,
-          ],
+          if (trailing case final action?) ...[const Gap(8), action],
         ],
       ),
       Gap(headerSpacing),
