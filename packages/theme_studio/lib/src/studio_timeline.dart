@@ -175,7 +175,7 @@ class _StudioTimelineState extends State<StudioTimeline>
         Row(
           children: [
             SizedBox(
-              width: 120,
+              width: studioTimelineLabelWidth,
               child: Text(
                 '${(widget.elapsed.inMilliseconds / 1000).toStringAsFixed(2)}s / ${(widget.duration.inMilliseconds / 1000).toStringAsFixed(2)}s',
                 style: const TextStyle(
@@ -184,23 +184,28 @@ class _StudioTimelineState extends State<StudioTimeline>
               ).xSmall().muted(),
             ),
             Expanded(
-              child: Slider(
-                key: const ValueKey('timeline-scrubber'),
-                value: SliderValue.single(
-                  (widget.elapsed.inMicroseconds /
-                          widget.duration.inMicroseconds)
-                      .clamp(0, 1),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: studioTimelineTrackPadding,
                 ),
-                onChanged: (value) {
-                  _player.stop();
-                  widget.onTimeChanged(
-                    Duration(
-                      microseconds:
-                          (value.value * widget.duration.inMicroseconds)
-                              .round(),
-                    ),
-                  );
-                },
+                child: Slider(
+                  key: const ValueKey('timeline-scrubber'),
+                  value: SliderValue.single(
+                    (widget.elapsed.inMicroseconds /
+                            widget.duration.inMicroseconds)
+                        .clamp(0, 1),
+                  ),
+                  onChanged: (value) {
+                    _player.stop();
+                    widget.onTimeChanged(
+                      Duration(
+                        microseconds:
+                            (value.value * widget.duration.inMicroseconds)
+                                .round(),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],
