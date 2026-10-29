@@ -360,7 +360,6 @@ class StudioDisclosureSection extends StatefulWidget {
 
 class _StudioDisclosureSectionState extends State<StudioDisclosureSection> {
   late bool _expanded = widget.initiallyExpanded;
-  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
@@ -369,37 +368,26 @@ class _StudioDisclosureSectionState extends State<StudioDisclosureSection> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Semantics(
-          button: true,
           expanded: _expanded,
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            onEnter: (_) => setState(() => _hovered = true),
-            onExit: (_) => setState(() => _hovered = false),
-            child: GestureDetector(
-              key: widget.triggerKey,
-              behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _expanded = !_expanded),
-              child: ColoredBox(
-                color: _hovered
-                    ? colors.muted.withValues(alpha: 0.5)
-                    : Colors.transparent,
-                child: SizedBox(
-                  height: 40,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(widget.title).small().semiBold()),
-                        Icon(
-                          _expanded
-                              ? LucideIcons.chevronDown
-                              : LucideIcons.chevronRight,
-                          size: 14,
-                          color: colors.mutedForeground,
-                        ),
-                      ],
+          child: GhostButton(
+            key: widget.triggerKey,
+            density: ButtonDensity.compact,
+            onPressed: () => setState(() => _expanded = !_expanded),
+            child: SizedBox(
+              height: 40,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(widget.title).small().semiBold()),
+                    Icon(
+                      _expanded
+                          ? LucideIcons.chevronDown
+                          : LucideIcons.chevronRight,
+                      size: 14,
+                      color: colors.mutedForeground,
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
