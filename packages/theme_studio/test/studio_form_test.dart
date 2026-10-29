@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_studio/src/studio_form.dart';
@@ -89,5 +90,41 @@ void main() {
     await tester.pumpAndSettle();
     expect(commits, [100]);
     expect(find.text('100.0'), findsOneWidget);
+  });
+
+  testWidgets('disclosure headers support Tab, Enter and Space', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const ShadcnApp(
+        home: Scaffold(
+          child: Center(
+            child: SizedBox(
+              width: 320,
+              child: StudioDisclosureSection(
+                title: 'Advanced',
+                child: Text('Details'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Details'), findsNothing);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.text('Details'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(find.text('Details'), findsNothing);
+
+    await tester.tap(find.text('Advanced'));
+    await tester.pumpAndSettle();
+    expect(find.text('Details'), findsOneWidget);
   });
 }
