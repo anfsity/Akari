@@ -9,6 +9,9 @@ import 'scene_editor.dart';
 import 'studio_form.dart';
 import 'studio_form_values.dart';
 
+const studioTimelineLabelWidth = 120.0;
+const studioTimelineTrackPadding = 10.0;
+
 /// Track gestures preview against a captured node and commit once on release.
 class StudioTimelineTracks extends StatefulWidget {
   const StudioTimelineTracks({
@@ -160,7 +163,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
     child: Row(
       children: [
         SizedBox(
-          width: 120,
+          width: studioTimelineLabelWidth,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onSelect,
@@ -189,7 +192,11 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
     final editor = widget.editor;
     final node = editor.selectedNode;
     final hasTrack = node.tracks.any((track) => track.property == _property);
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    // Match Slider's internal inset, with room for endpoint keyframe targets.
+    final trackInset =
+        studioTimelineTrackPadding + theme.density.baseGap * theme.scaling / 2;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -238,7 +245,10 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
           height: 152,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final width = math.max(1.0, constraints.maxWidth - 120);
+              final width = math.max(
+                1.0,
+                constraints.maxWidth - studioTimelineLabelWidth - 2 * trackInset,
+              );
               final total = math.max(1, widget.duration.inMilliseconds);
               final progress =
                   (widget.elapsed.inMicroseconds /
@@ -253,22 +263,27 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                         child: Row(
                           children: [
                             SizedBox(
-                              width: 120,
+                              width: studioTimelineLabelWidth,
                               child: const Text('Layer').xSmall().muted(),
                             ),
                             Expanded(
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('0s').xSmall().muted(),
-                                  Text(
-                                    '${(total / 2000).toStringAsFixed(2)}s',
-                                  ).xSmall().muted(),
-                                  Text(
-                                    '${(total / 1000).toStringAsFixed(2)}s',
-                                  ).xSmall().muted(),
-                                ],
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: trackInset,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('0s').xSmall().muted(),
+                                    Text(
+                                      '${(total / 2000).toStringAsFixed(2)}s',
+                                    ).xSmall().muted(),
+                                    Text(
+                                      '${(total / 1000).toStringAsFixed(2)}s',
+                                    ).xSmall().muted(),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -286,6 +301,8 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                                   clipBehavior: Clip.hardEdge,
                                   children: [
                                     Positioned.fill(
+                                      left: trackInset,
+                                      right: trackInset,
                                       child: DecoratedBox(
                                         decoration: BoxDecoration(
                                           color: colors.muted.withValues(
@@ -299,6 +316,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                                     ),
                                     Positioned(
                                       left:
+                                          trackInset +
                                           item.motionTiming.delayMs /
                                           total *
                                           width,
@@ -467,6 +485,8 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                             clipBehavior: Clip.hardEdge,
                             children: [
                               Positioned.fill(
+                                left: trackInset,
+                                right: trackInset,
                                 child: DecoratedBox(
                                   decoration: BoxDecoration(
                                     color: colors.muted.withValues(alpha: .18),
@@ -482,13 +502,15 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                               )
                                 Positioned(
                                   left:
+                                      trackInset +
                                       (item.motionTiming.delayMs +
                                           item
                                               .tracks[trackIndex]
                                               .keyframes[frameIndex]
                                               .timeMs) /
                                       total *
-                                      (width - 20),
+                                      width -
+                                      studioTimelineTrackPadding,
                                   top: 2,
                                   child: GestureDetector(
                                     key: ValueKey(
@@ -550,7 +572,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                                         'Drag time · Double-click to edit',
                                       ),
                                       child: const SizedBox(
-                                        width: 20,
+                                        width: 2 * studioTimelineTrackPadding,
                                         height: 24,
                                         child: Icon(
                                           LucideIcons.diamond,
@@ -577,7 +599,8 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
             ],
           ),
           Positioned(
-            left: 120 + progress * width - 3,
+            left:
+                studioTimelineLabelWidth + trackInset + progress * width - 3,
             top: 15,
             bottom: 0,
             child: IgnorePointer(
