@@ -70,6 +70,7 @@ class GreeterFeature {
   bool _beginInFlight = false;
   bool _sessionStartInFlight = false;
   bool _disposed = false;
+  int _serviceGeneration = 0;
   int _sessionLoadGeneration = 0;
 
   GreeterState get state => _state;
@@ -135,12 +136,19 @@ class GreeterFeature {
   }
 
   Future<void> _loadService() async {
+    final generation = _serviceGeneration;
     if (_state.serviceMode != ServiceMode.starting) {
       _updateState(_state.copyWith(serviceMode: ServiceMode.starting));
     }
     try {
       final snapshot = await gateway.getState();
+      if (generation != _serviceGeneration) {
+        return;
+      }
       final users = await gateway.getUsers();
+      if (generation != _serviceGeneration) {
+        return;
+      }
       // GetState has no attempt token. An existing conversation cannot be
       // adopted by this client, so expose recovery instead of inventing one.
       if (snapshot.state != BackendAuthState.idle) {
@@ -181,6 +189,9 @@ class GreeterFeature {
       );
       unawaited(_loadSessionCatalog());
     } on Object catch (error) {
+      if (generation != _serviceGeneration) {
+        return;
+      }
       _updateState(
         _state.copyWith(
           serviceMode: ServiceMode.unavailable,
@@ -200,9 +211,7 @@ class GreeterFeature {
     if (_state.serviceMode == ServiceMode.starting) {
       return;
     }
-    _attemptId = null;
-    _eventsDuringBegin.clear();
-    _sessionLoadGeneration++;
+    _invalidateServiceRequests();
     _updateState(
       _state.copyWith(
         serviceMode: ServiceMode.starting,
@@ -220,6 +229,17 @@ class GreeterFeature {
       ),
     );
     await _loadService();
+  }
+
+  void _invalidateServiceRequests() {
+    // Method replies may outlive a disconnect or reconnect. Invalidate their
+    // continuations as well as signals so they cannot revive the old service.
+    _serviceGeneration++;
+    _sessionLoadGeneration++;
+    _attemptId = null;
+    _beginInFlight = false;
+    _sessionStartInFlight = false;
+    _eventsDuringBegin.clear();
   }
 
   void _wakeGreeter() {
@@ -267,8 +287,10 @@ class GreeterFeature {
       return;
     }
     if (_attemptId != null) {
+      final generation = _serviceGeneration;
       await _cancelAuthentication();
-      if (_state.serviceMode != ServiceMode.ready) {
+      if (generation != _serviceGeneration ||
+          _state.serviceMode != ServiceMode.ready) {
         return;
       }
     }
@@ -306,10 +328,14 @@ class GreeterFeature {
 
     _beginInFlight = true;
     _eventsDuringBegin.clear();
+    final generation = _serviceGeneration;
     try {
       // Signals can precede the reply that supplies the attempt ID. Replay
       // them only after binding that ID, preserving order and stale filtering.
       final attemptId = await gateway.beginAuthentication(user.id);
+      if (generation != _serviceGeneration) {
+        return;
+      }
       _attemptId = attemptId;
       final pendingEvents = List<GreeterEvent>.from(_eventsDuringBegin);
       _eventsDuringBegin.clear();
@@ -318,6 +344,9 @@ class GreeterFeature {
         _handleEvent(event);
       }
     } on Object catch (error) {
+      if (generation != _serviceGeneration) {
+        return;
+      }
       _eventsDuringBegin.clear();
       _beginInFlight = false;
       _setAuthError(
@@ -376,6 +405,7 @@ class GreeterFeature {
     // Invalidate locally before awaiting cancellation; late prompts from the
     // abandoned conversation must no longer be able to restore the input UI.
     _attemptId = null;
+    final generation = _serviceGeneration;
     _updateState(
       _state.copyWith(
         authMode: AuthMode.submitting,
@@ -388,6 +418,9 @@ class GreeterFeature {
     try {
       await gateway.cancel(attemptId);
     } on Object catch (error) {
+      if (generation != _serviceGeneration) {
+        return;
+      }
       _updateState(
         _state.copyWith(
           serviceMode: ServiceMode.unavailable,
@@ -402,6 +435,9 @@ class GreeterFeature {
           promptError: null,
         ),
       );
+      return;
+    }
+    if (generation != _serviceGeneration) {
       return;
     }
     _resetToUserSelection(clearSelectedUser: true);
@@ -426,11 +462,15 @@ class GreeterFeature {
     }
 
     _sessionStartInFlight = true;
+    final generation = _serviceGeneration;
     _updateState(
       _state.copyWith(authMode: AuthMode.submitting, catalogError: null),
     );
     try {
       await gateway.startSession(attemptId, session.id);
+      if (generation != _serviceGeneration || attemptId != _attemptId) {
+        return;
+      }
       _updateState(
         _state.copyWith(
           authMode: AuthMode.handingOff,
@@ -442,7 +482,7 @@ class GreeterFeature {
     } on Object catch (error) {
       // A Failed signal can invalidate this attempt before the method reply.
       // Preserve its authentication recovery instead of offering a session retry.
-      if (attemptId != _attemptId) {
+      if (generation != _serviceGeneration || attemptId != _attemptId) {
         return;
       }
       _updateState(
@@ -454,7 +494,9 @@ class GreeterFeature {
       );
       _effects.add(ShowErrorNoticeEffect(_getErrorMessage(error)));
     } finally {
-      _sessionStartInFlight = false;
+      if (generation == _serviceGeneration) {
+        _sessionStartInFlight = false;
+      }
     }
   }
 
@@ -521,7 +563,7 @@ class GreeterFeature {
     }
     switch (event) {
       case BackendDisconnected():
-        _attemptId = null;
+        _invalidateServiceRequests();
         _updateState(
           _state.copyWith(
             serviceMode: ServiceMode.unavailable,

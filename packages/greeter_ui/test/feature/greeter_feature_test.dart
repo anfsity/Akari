@@ -64,6 +64,206 @@ void main() {
     },
   );
 
+  for (final query in ['state', 'users']) {
+    for (final fails in [false, true]) {
+      test(
+        'ignores stale $query ${fails ? 'failure' : 'reply'} after reconnect',
+        () async {
+          final snapshot = Completer<BackendStateSnapshot>();
+          final users = Completer<List<UserSummary>>();
+          final gateway = _FakeGreeterGateway()
+            ..stateFuture = query == 'state' ? snapshot.future : null
+            ..usersFuture = query == 'users' ? users.future : null;
+          final feature = GreeterFeature(gateway: gateway);
+          addTearDown(feature.dispose);
+          final initializing = feature.initialize();
+          await _flushEvents();
+
+          gateway.emit(const BackendDisconnected());
+          await _flushEvents();
+          expect(feature.state.serviceMode, ServiceMode.unavailable);
+          gateway.stateFuture = null;
+          gateway.usersFuture = null;
+          gateway.users = const [UserSummary(id: 'bob', displayName: 'Bob')];
+          await feature.dispatch(const ReconnectServiceCommand());
+          await _flushEvents();
+          final reconnectedState = feature.state;
+
+          if (query == 'state') {
+            if (fails) {
+              snapshot.completeError(
+                const GreeterGatewayException('Old state failure'),
+              );
+            } else {
+              snapshot.complete(
+                const BackendStateSnapshot(
+                  state: BackendAuthState.waitingForInput,
+                  detail: 'Old authentication',
+                ),
+              );
+            }
+          } else if (fails) {
+            users.completeError(
+              const GreeterGatewayException('Old users failure'),
+            );
+          } else {
+            users.complete(const [
+              UserSummary(id: 'alice', displayName: 'Alice'),
+            ]);
+          }
+          await initializing;
+          await _flushEvents();
+
+          expect(feature.state, same(reconnectedState));
+          expect(gateway.getSessionsCalls, 1);
+        },
+      );
+    }
+  }
+
+  for (final fails in [false, true]) {
+    test(
+      'ignores stale begin ${fails ? 'failure' : 'reply'} during a new attempt',
+      () async {
+        final oldBegin = Completer<void>();
+        final gateway = _FakeGreeterGateway()
+          ..beginAuthenticationFuture = oldBegin.future;
+        final feature = GreeterFeature(gateway: gateway);
+        addTearDown(feature.dispose);
+        await feature.initialize();
+        await _flushEvents();
+        await feature.dispatch(const WakeGreeterCommand());
+        await feature.dispatch(SelectUserCommand(gateway.users.first));
+        await _flushEvents();
+
+        gateway.emit(const BackendDisconnected());
+        await _flushEvents();
+        final newBegin = Completer<void>();
+        gateway.beginAuthenticationFuture = newBegin.future;
+        await feature.dispatch(const ReconnectServiceCommand());
+        await _flushEvents();
+        await feature.dispatch(SelectUserCommand(gateway.users.last));
+        await _flushEvents();
+
+        if (fails) {
+          oldBegin.completeError(
+            const GreeterGatewayException('Old begin failure'),
+          );
+        } else {
+          oldBegin.complete();
+        }
+        await _flushEvents();
+        gateway.emit(
+          const BackendStateChanged(
+            attemptId: 'attempt-1',
+            state: BackendAuthState.authenticated,
+            detail: '',
+          ),
+        );
+        await _flushEvents();
+        expect(feature.state.authMode, AuthMode.submitting);
+        expect(gateway.startSessionCalls, 0);
+
+        newBegin.complete();
+        await _flushEvents();
+        expect(feature.state.authMode, AuthMode.prompting);
+        expect(feature.state.selectedUser?.id, 'bob');
+        expect(feature.state.authError, isNull);
+        expect(feature.state.prompt?.text, 'Password');
+        await feature.dispatch(const RespondToPromptCommand('response'));
+        expect(gateway.respondedAttemptId, 'attempt-2');
+      },
+    );
+  }
+
+  for (final fails in [false, true]) {
+    test(
+      'ignores stale cancellation ${fails ? 'failure' : 'reply'} after reconnect',
+      () async {
+        final cancellation = Completer<void>();
+        final gateway = _FakeGreeterGateway()
+          ..cancellationFuture = cancellation.future;
+        final feature = await _createPromptedFeature(gateway);
+        addTearDown(feature.dispose);
+        final switching = feature.dispatch(
+          SelectUserCommand(gateway.users.last),
+        );
+        await _flushEvents();
+        gateway.emit(const BackendDisconnected());
+        await _flushEvents();
+        await feature.dispatch(const ReconnectServiceCommand());
+        await _flushEvents();
+        await feature.dispatch(SelectUserCommand(gateway.users.first));
+        await _flushEvents();
+        final reconnectedState = feature.state;
+
+        if (fails) {
+          cancellation.completeError(
+            const GreeterGatewayException('Old cancellation failure'),
+          );
+        } else {
+          cancellation.complete();
+        }
+        await switching;
+        await _flushEvents();
+
+        expect(feature.state, same(reconnectedState));
+        expect(feature.state.selectedUser?.id, 'alice');
+        expect(feature.state.authMode, AuthMode.prompting);
+        expect(gateway.beginAuthenticationCalls, 2);
+      },
+    );
+  }
+
+  test('disconnection invalidates a pending session catalog load', () async {
+    final sessions = Completer<List<SessionSummary>>();
+    final gateway = _FakeGreeterGateway()..sessionsFuture = sessions.future;
+    final feature = GreeterFeature(gateway: gateway);
+    addTearDown(feature.dispose);
+    await feature.initialize();
+    await _flushEvents();
+    gateway.emit(const BackendDisconnected());
+    await _flushEvents();
+    final disconnectedState = feature.state;
+
+    sessions.complete(const [(id: 'wayland:sway', name: 'Sway')]);
+    await _flushEvents();
+
+    expect(feature.state, same(disconnectedState));
+    expect(gateway.beginAuthenticationCalls, 0);
+  });
+
+  test(
+    'a late session start reply does not exit after disconnection',
+    () async {
+      final start = Completer<void>();
+      final gateway = _FakeGreeterGateway()..startSessionFuture = start.future;
+      final feature = await _createPromptedFeature(gateway);
+      addTearDown(feature.dispose);
+      final effects = <FeatureEffect>[];
+      final subscription = feature.effects.listen(effects.add);
+      addTearDown(subscription.cancel);
+      gateway.emit(
+        BackendStateChanged(
+          attemptId: gateway.attemptId!,
+          state: BackendAuthState.authenticated,
+          detail: '',
+        ),
+      );
+      await _flushEvents();
+      expect(gateway.startSessionCalls, 1);
+      gateway.emit(const BackendDisconnected());
+      await _flushEvents();
+      final disconnectedState = feature.state;
+
+      start.complete();
+      await _flushEvents();
+
+      expect(feature.state, same(disconnectedState));
+      expect(effects.whereType<ExitAfterHandoffEffect>(), isEmpty);
+    },
+  );
+
   test('applies queued prompts and ignores stale events', () async {
     final gateway = _FakeGreeterGateway();
     final feature = GreeterFeature(gateway: gateway);
@@ -820,11 +1020,15 @@ class _FakeGreeterGateway implements GreeterGateway {
   int getStateCalls = 0;
   int getSessionsCalls = 0;
   int respondCalls = 0;
+  String? respondedAttemptId;
   int beginAuthenticationCalls = 0;
   String? attemptId;
   String? cancelledAttemptId;
   PromptState initialPrompt = (kind: PromptKind.secret, text: 'Password');
   PowerAction? requestedPowerAction;
+  Future<BackendStateSnapshot>? stateFuture;
+  Future<List<UserSummary>>? usersFuture;
+  Future<void>? beginAuthenticationFuture;
   Future<List<SessionSummary>>? sessionsFuture;
   Future<void>? cancellationFuture;
   Object? sessionsError;
@@ -843,11 +1047,11 @@ class _FakeGreeterGateway implements GreeterGateway {
   @override
   Future<BackendStateSnapshot> getState() async {
     getStateCalls++;
-    return snapshot;
+    return stateFuture ?? snapshot;
   }
 
   @override
-  Future<List<UserSummary>> getUsers() async => users;
+  Future<List<UserSummary>> getUsers() async => usersFuture ?? users;
 
   @override
   Future<List<SessionSummary>> getSessions() async {
@@ -891,13 +1095,14 @@ class _FakeGreeterGateway implements GreeterGateway {
         detail: '',
       ),
     );
-    await Future<void>.delayed(Duration.zero);
+    await (beginAuthenticationFuture ?? Future<void>.delayed(Duration.zero));
     return attemptId;
   }
 
   @override
   Future<void> respond(String attemptId, String response) async {
     respondCalls++;
+    respondedAttemptId = attemptId;
   }
 
   @override
