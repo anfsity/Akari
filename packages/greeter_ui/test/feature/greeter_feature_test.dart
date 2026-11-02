@@ -264,6 +264,132 @@ void main() {
     },
   );
 
+  test(
+    'disposing stops pending initialization before the next query',
+    () async {
+      final snapshot = Completer<BackendStateSnapshot>();
+      final gateway = _FakeGreeterGateway()..stateFuture = snapshot.future;
+      final feature = GreeterFeature(gateway: gateway);
+      final initializing = feature.initialize();
+      feature.dispose();
+
+      snapshot.complete(
+        const BackendStateSnapshot(state: BackendAuthState.idle, detail: ''),
+      );
+      await initializing;
+
+      expect(gateway.getUsersCalls, 0);
+      expect(gateway.getSessionsCalls, 0);
+    },
+  );
+
+  test(
+    'disposing discards a pending begin reply and its buffered prompts',
+    () async {
+      final begin = Completer<void>();
+      final gateway = _FakeGreeterGateway()
+        ..beginAuthenticationFuture = begin.future;
+      final feature = GreeterFeature(gateway: gateway);
+      await feature.initialize();
+      await _flushEvents();
+      final effects = <FeatureEffect>[];
+      final subscription = feature.effects.listen(effects.add);
+      addTearDown(subscription.cancel);
+      await feature.dispatch(const WakeGreeterCommand());
+      await feature.dispatch(SelectUserCommand(gateway.users.first));
+      await _flushEvents();
+      feature.dispose();
+      final disposedState = feature.state;
+
+      begin.complete();
+      await _flushEvents();
+
+      expect(feature.state, same(disposedState));
+      expect(effects, isEmpty);
+    },
+  );
+
+  test(
+    'disposing stops a pending catalog load before reading preferences',
+    () async {
+      final sessions = Completer<List<SessionSummary>>();
+      final gateway = _FakeGreeterGateway()..sessionsFuture = sessions.future;
+      final store = _FakeSessionStore();
+      final feature = GreeterFeature(gateway: gateway, sessionStore: store);
+      await feature.initialize();
+      await _flushEvents();
+      feature.dispose();
+
+      sessions.complete(const [(id: 'wayland:sway', name: 'Sway')]);
+      await _flushEvents();
+
+      expect(store.findCalls, 0);
+    },
+  );
+
+  for (final fails in [false, true]) {
+    test(
+      'discards session start ${fails ? 'failure' : 'success'} after disposal',
+      () async {
+        final start = Completer<void>();
+        final gateway = _FakeGreeterGateway()
+          ..startSessionFuture = start.future;
+        final feature = await _createPromptedFeature(gateway);
+        final effects = <FeatureEffect>[];
+        final subscription = feature.effects.listen(effects.add);
+        addTearDown(subscription.cancel);
+        final starting = feature.dispatch(const StartSelectedSessionCommand());
+        feature.dispose();
+        final disposedState = feature.state;
+
+        if (fails) {
+          start.completeError(
+            const GreeterGatewayException('Session unavailable'),
+          );
+        } else {
+          start.complete();
+        }
+        await starting;
+        await _flushEvents();
+
+        expect(feature.state, same(disposedState));
+        expect(effects, isEmpty);
+      },
+    );
+
+    test(
+      'discards power action ${fails ? 'failure' : 'success'} after disposal',
+      () async {
+        final power = Completer<void>();
+        final gateway = _FakeGreeterGateway()..powerActionFuture = power.future;
+        final feature = GreeterFeature(gateway: gateway);
+        await feature.initialize();
+        await _flushEvents();
+        final effects = <FeatureEffect>[];
+        final subscription = feature.effects.listen(effects.add);
+        addTearDown(subscription.cancel);
+        final executing = feature.dispatch(
+          const RequestPowerActionCommand(PowerAction.reboot),
+        );
+        feature.dispose();
+        final disposedState = feature.state;
+
+        if (fails) {
+          power.completeError(
+            const GreeterGatewayException('Power unavailable'),
+          );
+        } else {
+          power.complete();
+        }
+        await executing;
+        await _flushEvents();
+
+        expect(feature.state, same(disposedState));
+        expect(effects, isEmpty);
+      },
+    );
+  }
+
   test('applies queued prompts and ignores stale events', () async {
     final gateway = _FakeGreeterGateway();
     final feature = GreeterFeature(gateway: gateway);
@@ -997,10 +1123,14 @@ Future<void> _flushEvents() async {
 
 class _FakeSessionStore implements SessionStore {
   String? storedId;
+  int findCalls = 0;
   final List<String> savedIds = [];
 
   @override
-  Future<String?> findSelectedSessionId() async => storedId;
+  Future<String?> findSelectedSessionId() async {
+    findCalls++;
+    return storedId;
+  }
 
   @override
   Future<void> saveSelectedSessionId(String sessionId) async {
@@ -1018,6 +1148,7 @@ class _FakeGreeterGateway implements GreeterGateway {
     UserSummary(id: 'bob', displayName: 'Bob'),
   ];
   int getStateCalls = 0;
+  int getUsersCalls = 0;
   int getSessionsCalls = 0;
   int respondCalls = 0;
   String? respondedAttemptId;
@@ -1029,6 +1160,7 @@ class _FakeGreeterGateway implements GreeterGateway {
   Future<BackendStateSnapshot>? stateFuture;
   Future<List<UserSummary>>? usersFuture;
   Future<void>? beginAuthenticationFuture;
+  Future<void>? powerActionFuture;
   Future<List<SessionSummary>>? sessionsFuture;
   Future<void>? cancellationFuture;
   Object? sessionsError;
@@ -1051,7 +1183,10 @@ class _FakeGreeterGateway implements GreeterGateway {
   }
 
   @override
-  Future<List<UserSummary>> getUsers() async => usersFuture ?? users;
+  Future<List<UserSummary>> getUsers() async {
+    getUsersCalls++;
+    return usersFuture ?? users;
+  }
 
   @override
   Future<List<SessionSummary>> getSessions() async {
@@ -1131,6 +1266,7 @@ class _FakeGreeterGateway implements GreeterGateway {
   @override
   Future<void> requestPowerAction(PowerAction action) async {
     requestedPowerAction = action;
+    await powerActionFuture;
     final error = powerActionError;
     if (error != null) {
       throw error;

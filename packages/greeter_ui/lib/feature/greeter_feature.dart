@@ -511,6 +511,9 @@ class GreeterFeature {
       await gateway.requestPowerAction(action);
       _updateState(_state.copyWith(powerMode: PowerMode.succeeded));
     } on Object catch (error) {
+      if (_disposed) {
+        return;
+      }
       final powerError = _getGreeterError(
         error,
         fallbackKind: GreeterErrorKind.power,
@@ -850,6 +853,7 @@ class GreeterFeature {
 
   void dispose() {
     _disposed = true;
+    _invalidateServiceRequests();
     unawaited(_eventSubscription?.cancel());
     unawaited(gateway.close());
     unawaited(_effects.close());
