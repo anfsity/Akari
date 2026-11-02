@@ -56,7 +56,7 @@ SceneRuntime
 `SceneRuntime` 在节点级别隔离重建（Rebuild）与重绘（Repaint）：
 
 - **局部订阅与独立重绘**：每个场景节点外层自动包裹独立的 `RepaintBoundary`。主题组件通过 `SceneRegion` 仅订阅自身所需的 `GreeterHost` Slot；节点的 `visibleWhen` 变化由各自的节点宿主独立响应，不会触发整棵场景树重建。
-- **退出动画与卸载生命周期**：当节点的 `visibleWhen` 变为 `false` 时，节点会屏蔽指针与焦点输入并反向播放退出动画，待动画结束后再正式卸载（unmount），从而干净停止时钟等内部定时器。
+- **退出动画与预热生命周期**：当节点的 `visibleWhen` 变为 `false` 时，节点会屏蔽指针与焦点输入并反向播放退出动画。`SceneRuntime` 默认在动画结束后卸载隐藏子树；登录界面的 `ThemeDefinition` 为降低唤醒延迟启用了 `prewarmHiddenNodes`，因此隐藏组件仍保持挂载，定时器与订阅也继续存活。主题组件应控制隐藏时的工作量，并在销毁时释放资源。
 - **可交互节点约束**：经过 2.5D 变换的可交互节点仍强制保持最小点击热区（`minHitTarget`）、安全区域回退和确定性的键盘焦点顺序。
 
 ### 背景、动效与模糊策略

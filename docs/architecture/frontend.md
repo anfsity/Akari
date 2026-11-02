@@ -56,7 +56,7 @@ Each theme is a standalone Dart package compiled into the executable:
 `SceneRuntime` enforces fast, isolated updates across the scene tree:
 
 - **Targeted rebuilds & repaints**: Each scene node is wrapped in a `RepaintBoundary`. Theme widgets subscribe to specific `GreeterHost` listenables via `SceneRegion`, and visibility changes are handled per node without rebuilding the entire scene tree.
-- **Exit transition lifetime**: When `visibleWhen` becomes `false`, the node remains mounted (ignoring pointer/focus input) until its reverse exit animation finishes, then unmounts so timers and subscriptions stop cleanly.
+- **Exit transitions and prewarming**: When `visibleWhen` becomes `false`, the node stops accepting pointer/focus input and reverses its exit animation. By default, `SceneRuntime` unmounts the hidden subtree after the transition. The greeter's `ThemeDefinition` enables `prewarmHiddenNodes` to reduce wake latency, so hidden components remain mounted with their timers and subscriptions alive. Theme components must keep this hidden work inexpensive and release resources when disposed.
 - **Interactive invariants**: Transformed interactive nodes still enforce minimum hit target sizes (`minHitTarget`), safe-area fallback, and deterministic `focusOrder` traversal.
 
 ### Backgrounds, motion, and blur
