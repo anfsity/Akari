@@ -11,7 +11,7 @@ Dart API 参考文档由源码中的 `///` 文档注释自动生成，版本与�
 | --- | --- | --- |
 | `theme_sdk` | [浏览 API](/Akari/api/dart/theme_sdk/index.html) | `ThemeDefinition`、`GreeterHost`、状态插槽（Slots）与组件工厂接口 |
 | `scene` | [浏览 API](/Akari/api/dart/scene/index.html) | `SceneRuntime`、`ThemeTokens`、背景渲染器与动效构建器 |
-| `scene_schema` | [浏览 API](/Akari/api/dart/scene_schema/index.html) | `SceneDocument`、`ScenePredicate`、校验规则与 JSON 编解码器 |
+| `scene_schema` | [浏览 API](/Akari/api/dart/scene_schema/index.html) | `SceneDocument`、`ScenePredicate`、组件/布局/预设声明契约、校验规则与 JSON 编解码器 |
 | `greeter_components` | [浏览 API](/Akari/api/dart/greeter_components/index.html) | 可选的标准登录组件集（`StandardGreeterComponents`） |
 
 关于具体用法与状态边界，请参阅[开发主题组件](../guides/components.md)和[代码导航](../architecture/code-map.md)。

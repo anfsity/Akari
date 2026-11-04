@@ -11,7 +11,7 @@ The Dart API reference is generated from package doc comments at the same revisi
 | --- | --- | --- |
 | `theme_sdk` | [Browse API](/Akari/api/dart/theme_sdk/index.html) | `ThemeDefinition`, `GreeterHost`, state slots, and component factory contracts |
 | `scene` | [Browse API](/Akari/api/dart/scene/index.html) | `SceneRuntime`, `ThemeTokens`, background renderers, and motion builders |
-| `scene_schema` | [Browse API](/Akari/api/dart/scene_schema/index.html) | `SceneDocument`, `ScenePredicate`, validation rules, and JSON codec |
+| `scene_schema` | [Browse API](/Akari/api/dart/scene_schema/index.html) | `SceneDocument`, `ScenePredicate`, component/layout/preset contracts, validation, and JSON codec |
 | `greeter_components` | [Browse API](/Akari/api/dart/greeter_components/index.html) | Optional reusable greeter widgets (`StandardGreeterComponents`) |
 
 For usage patterns and ownership boundaries, see [Develop theme components](../guides/components.md) and the [Code map](../architecture/code-map.md).

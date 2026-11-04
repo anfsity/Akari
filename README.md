@@ -92,6 +92,7 @@ The CLI is a pure Dart package. To build a native executable:
 ```sh
 cd packages/akari_cli
 fvm dart pub get
+mkdir -p ../../build
 fvm dart compile exe bin/akari.dart -o ../../build/akari
 ```
 
