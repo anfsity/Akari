@@ -1,14 +1,8 @@
-//! Client-side greetd protocol transport.
-//!
-//! Requests and responses use greetd's native-endian four-byte length prefix
-//! followed by UTF-8 JSON. The real transport keeps credential-bearing buffers
-//! in [`zeroize::Zeroizing`] storage, while the mock transport provides a
-//! deterministic authentication flow for local and D-Bus integration tests.
+//! Unix socket ownership, bounded framing, and zeroized credential buffers.
 
 use std::{env, io, path::Path, time::Duration};
 
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
+use serde::Serialize;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
@@ -17,216 +11,17 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use zeroize::Zeroizing;
 
+use super::protocol::{
+    AuthMessageResponseRequest, CancelSessionRequest, CreateSessionRequest, GreetdError,
+    GreetdResponse, StartSessionRequest,
+};
+
 const MAX_FRAME_SIZE: usize = 1024 * 1024;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 enum ResponseWait {
     Pam,
     Immediate,
-}
-
-/// Errors produced while connecting to greetd or exchanging one framed request.
-#[derive(Debug, Error)]
-pub enum GreetdError {
-    #[error("GREETD_SOCK is not set")]
-    #[cfg_attr(feature = "mock", allow(dead_code))]
-    SocketNotConfigured,
-    #[error("could not connect to greetd")]
-    #[cfg_attr(feature = "mock", allow(dead_code))]
-    Connect(#[source] io::Error),
-    #[error("could not encode greetd request")]
-    Encode(#[source] serde_json::Error),
-    #[error("greetd request is too large")]
-    RequestTooLarge,
-    #[error("greetd socket I/O failed")]
-    Io(#[source] io::Error),
-    #[error("greetd request timed out")]
-    Timeout,
-    #[error("greetd request was cancelled")]
-    Cancelled,
-    #[error("greetd response frame is too large")]
-    ResponseTooLarge,
-    #[error("greetd response was truncated")]
-    ResponseTruncated,
-    #[error("greetd response was malformed")]
-    Decode(#[source] serde_json::Error),
-    #[error("unexpected greetd response: {0}")]
-    UnexpectedResponse(String),
-}
-
-/// Responses defined by greetd's authentication and session protocol.
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type")]
-pub enum GreetdResponse {
-    /// The requested operation completed successfully.
-    #[serde(rename = "success")]
-    Success,
-    /// greetd rejected the operation and supplied a description.
-    #[serde(rename = "error")]
-    Error {
-        error_type: String,
-        description: String,
-    },
-    /// PAM requested a prompt or emitted an informational message.
-    #[serde(rename = "auth_message")]
-    AuthMessage {
-        auth_message_type: String,
-        auth_message: String,
-    },
-}
-
-/// Selects the real greetd socket or the deterministic local mock.
-#[derive(Debug)]
-pub enum GreetdTransport {
-    #[cfg(not(feature = "mock"))]
-    Real(GreetdClient),
-    #[cfg(feature = "mock")]
-    Mock(MockGreetdClientApi),
-}
-
-impl GreetdTransport {
-    /// Connects to the configured transport.
-    ///
-    /// The mock implementation is compiled only with the `mock` feature;
-    /// production builds therefore always use `GREETD_SOCK`.
-    pub async fn connect(_cancellation: &CancellationToken) -> Result<Self, GreetdError> {
-        #[cfg(feature = "mock")]
-        {
-            Ok(Self::Mock(MockGreetdClientApi::configured()))
-        }
-
-        #[cfg(not(feature = "mock"))]
-        {
-            Ok(Self::Real(GreetdClient::connect(_cancellation).await?))
-        }
-    }
-
-    /// Starts a greetd authentication session for `username`.
-    pub async fn create_session(
-        &mut self,
-        username: &str,
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError> {
-        match self {
-            #[cfg(not(feature = "mock"))]
-            Self::Real(client) => client.create_session(username, cancellation).await,
-            #[cfg(feature = "mock")]
-            Self::Mock(client) => client.create_session(username, cancellation).await,
-        }
-    }
-
-    /// Submits an answer to the current greetd authentication message.
-    ///
-    /// `None` is used for informational and error messages, for which greetd
-    /// expects an automatic empty response rather than UI input.
-    pub async fn post_auth_message_response(
-        &mut self,
-        response: Option<&str>,
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError> {
-        match self {
-            #[cfg(not(feature = "mock"))]
-            Self::Real(client) => {
-                client
-                    .post_auth_message_response(response, cancellation)
-                    .await
-            }
-            #[cfg(feature = "mock")]
-            Self::Mock(client) => {
-                client
-                    .post_auth_message_response(response, cancellation)
-                    .await
-            }
-        }
-    }
-
-    /// Requests greetd to launch the backend-validated session command.
-    pub async fn start_session(
-        &mut self,
-        cmd: &[String],
-        env: &[String],
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError> {
-        match self {
-            #[cfg(not(feature = "mock"))]
-            Self::Real(client) => client.start_session(cmd, env, cancellation).await,
-            #[cfg(feature = "mock")]
-            Self::Mock(client) => client.start_session(cmd, env, cancellation).await,
-        }
-    }
-
-    /// Cancels the current greetd authentication session.
-    pub async fn cancel_session(
-        &mut self,
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError> {
-        match self {
-            #[cfg(not(feature = "mock"))]
-            Self::Real(client) => client.cancel_session(cancellation).await,
-            #[cfg(feature = "mock")]
-            Self::Mock(client) => client.cancel_session(cancellation).await,
-        }
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct CreateSessionRequest<'a> {
-    #[serde(rename = "type")]
-    kind: &'static str,
-    username: &'a str,
-}
-
-#[derive(Debug, Serialize)]
-struct AuthMessageResponseRequest<'a> {
-    #[serde(rename = "type")]
-    kind: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    response: Option<&'a str>,
-}
-
-#[derive(Debug, Serialize)]
-struct StartSessionRequest<'a> {
-    #[serde(rename = "type")]
-    kind: &'static str,
-    cmd: [String; 1],
-    env: &'a [String],
-}
-
-#[derive(Debug, Serialize)]
-struct CancelSessionRequest {
-    #[serde(rename = "type")]
-    kind: &'static str,
-}
-
-/// Signature used to generate the mock greetd transport in `mock` builds.
-#[cfg(feature = "mock")]
-#[mockall::automock]
-pub(crate) trait GreetdClientApi {
-    async fn create_session(
-        &mut self,
-        username: &str,
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError>;
-
-    // mockall requires an explicit lifetime for this borrowed optional argument.
-    #[allow(clippy::needless_lifetimes)]
-    async fn post_auth_message_response<'a>(
-        &mut self,
-        response: Option<&'a str>,
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError>;
-
-    async fn start_session(
-        &mut self,
-        cmd: &[String],
-        env: &[String],
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError>;
-
-    async fn cancel_session(
-        &mut self,
-        cancellation: &CancellationToken,
-    ) -> Result<GreetdResponse, GreetdError>;
 }
 
 /// An established greetd Unix-socket connection.
@@ -413,84 +208,6 @@ fn encode_frame(payload: &[u8]) -> Result<Zeroizing<Vec<u8>>, GreetdError> {
     Ok(frame)
 }
 
-#[cfg(feature = "mock")]
-impl MockGreetdClientApi {
-    fn configured() -> Self {
-        use mockall::Sequence;
-
-        let mut mock = Self::new();
-        let mut sequence = Sequence::new();
-
-        mock.expect_create_session()
-            .times(..=1)
-            .in_sequence(&mut sequence)
-            .returning(|_, cancellation| {
-                if cancellation.is_cancelled() {
-                    return Err(GreetdError::Cancelled);
-                }
-                Ok(GreetdResponse::AuthMessage {
-                    auth_message_type: "secret".to_owned(),
-                    auth_message: "Password: ".to_owned(),
-                })
-            });
-
-        mock.expect_post_auth_message_response()
-            .withf(|response, _| *response == Some("password"))
-            .times(..=1)
-            .in_sequence(&mut sequence)
-            .returning(|_, cancellation| {
-                if cancellation.is_cancelled() {
-                    return Err(GreetdError::Cancelled);
-                }
-                Ok(GreetdResponse::AuthMessage {
-                    auth_message_type: "info".to_owned(),
-                    auth_message: "Authentication successful.".to_owned(),
-                })
-            });
-
-        mock.expect_post_auth_message_response()
-            .withf(|response, _| response.is_none())
-            .times(..=1)
-            .in_sequence(&mut sequence)
-            .returning(|_, cancellation| {
-                if cancellation.is_cancelled() {
-                    return Err(GreetdError::Cancelled);
-                }
-                Ok(GreetdResponse::Success)
-            });
-
-        mock.expect_post_auth_message_response()
-            .withf(|response, _| response.is_some() && *response != Some("password"))
-            .returning(|_, cancellation| {
-                if cancellation.is_cancelled() {
-                    return Err(GreetdError::Cancelled);
-                }
-                Ok(GreetdResponse::Error {
-                    error_type: "auth_error".to_owned(),
-                    description: "authentication failed".to_owned(),
-                })
-            });
-
-        mock.expect_start_session()
-            .times(..=1)
-            .returning(|_, _, cancellation| {
-                if cancellation.is_cancelled() {
-                    return Err(GreetdError::Cancelled);
-                }
-                Ok(GreetdResponse::Success)
-            });
-
-        mock.expect_cancel_session().returning(|cancellation| {
-            if cancellation.is_cancelled() {
-                return Err(GreetdError::Cancelled);
-            }
-            Ok(GreetdResponse::Success)
-        });
-
-        mock
-    }
-}
-
 /// Performs one exact socket read with the protocol timeout and maps EOF to a
 /// truncated-response error.
 async fn read_exact_with_timeout(
@@ -541,9 +258,6 @@ mod tests {
     };
 
     use tokio_util::sync::CancellationToken;
-
-    #[cfg(feature = "mock")]
-    use super::GreetdTransport;
 
     #[test]
     fn shell_handoff_preserves_literal_and_empty_arguments() {
@@ -895,65 +609,6 @@ mod tests {
 
         server.await.unwrap();
         let _ = std::fs::remove_file(socket);
-    }
-
-    #[cfg(feature = "mock")]
-    #[tokio::test]
-    async fn mock_auth_flow() {
-        let cancellation = CancellationToken::new();
-        let mut transport = GreetdTransport::connect(&cancellation)
-            .await
-            .expect("mock transport should connect");
-
-        assert!(matches!(
-            transport.create_session("alice", &cancellation).await,
-            Ok(GreetdResponse::AuthMessage {
-                auth_message_type,
-                auth_message
-            }) if auth_message_type == "secret" && auth_message == "Password: "
-        ));
-        assert!(matches!(
-            transport
-                .post_auth_message_response(Some("password"), &cancellation)
-                .await,
-            Ok(GreetdResponse::AuthMessage {
-                auth_message_type,
-                auth_message
-            }) if auth_message_type == "info" && auth_message == "Authentication successful."
-        ));
-        assert!(matches!(
-            transport
-                .post_auth_message_response(None, &cancellation)
-                .await,
-            Ok(GreetdResponse::Success)
-        ));
-        assert!(matches!(
-            transport.start_session(&[], &[], &cancellation).await,
-            Ok(GreetdResponse::Success)
-        ));
-    }
-
-    #[cfg(feature = "mock")]
-    #[tokio::test]
-    async fn mock_rejects_password() {
-        let cancellation = CancellationToken::new();
-        let mut transport = GreetdTransport::connect(&cancellation)
-            .await
-            .expect("mock transport should connect");
-
-        transport
-            .create_session("alice", &cancellation)
-            .await
-            .expect("mock create_session should succeed");
-        assert!(matches!(
-            transport
-                .post_auth_message_response(Some("incorrect"), &cancellation)
-                .await,
-            Ok(GreetdResponse::Error {
-                error_type,
-                description
-            }) if error_type == "auth_error" && description == "authentication failed"
-        ));
     }
 
     #[tokio::test]
