@@ -1,23 +1,18 @@
-//! Serialized owner of authentication state and the greetd transaction.
+//! Owns an active attempt, greetd I/O, cleanup, and ordered state/prompt signals.
 //!
-//! Commands serialize protocol I/O with state changes, avoiding separate locks
-//! whose ordering could let a response mutate a replacement attempt. Watch
-//! channels expose snapshots and cancellation handles without sharing mutable
-//! transport ownership. Cancellation interrupts I/O outside the queue; cleanup
-//! and replies still run through the actor, even when that queue is full.
+//! The actor calls these operations serially. Attempt resources are detached
+//! before publishing Idle, and interrupted framing always drops its transport.
 
 use std::time::Duration;
 
-use futures_util::StreamExt;
 use tokio::{
-    sync::{mpsc, oneshot, watch},
-    task::JoinHandle,
+    sync::{mpsc, watch},
     time::timeout,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::Instrument;
 use zbus::{fdo, object_server::SignalEmitter};
 
+use super::{caller_watch::spawn_caller_watcher, handle::AuthCommand};
 use crate::{
     greetd::{GreetdError, GreetdResponse, GreetdTransport},
     session_catalog::SessionEntry,
@@ -26,246 +21,16 @@ use crate::{
 };
 
 const CANCEL_TIMEOUT: Duration = Duration::from_secs(1);
-const COMMAND_BUFFER: usize = 16;
-
-type CommandSender = mpsc::Sender<AuthCommand>;
-
-/// Handle used by D-Bus methods to communicate with the single authentication owner.
-#[derive(Clone, Debug)]
-pub(crate) struct AuthActorHandle {
-    commands: CommandSender,
-    snapshot: watch::Receiver<AuthSnapshot>,
-    control: watch::Receiver<Option<AttemptControl>>,
-}
-
-impl AuthActorHandle {
-    /// Starts the actor and returns the D-Bus-facing command and snapshot handle.
-    pub(crate) fn spawn() -> (Self, AuthActorTask) {
-        let (commands, receiver) = mpsc::channel(COMMAND_BUFFER);
-        let (snapshot_sender, snapshot) = watch::channel(AuthSnapshot::idle());
-        let (control_sender, control) = watch::channel(None);
-        let shutdown = CancellationToken::new();
-        let task = tokio::spawn(run_actor(
-            receiver,
-            commands.downgrade(),
-            snapshot_sender,
-            control_sender,
-            shutdown.clone(),
-        ));
-        let runtime = AuthActorTask { task, shutdown };
-        (
-            Self {
-                commands,
-                snapshot,
-                control,
-            },
-            runtime,
-        )
-    }
-
-    /// Returns the latest state without waiting for greetd I/O.
-    pub(crate) fn get_state(&self) -> fdo::Result<(String, String)> {
-        if self.commands.is_closed() {
-            return Err(fdo::Error::Failed(
-                "authentication actor is unavailable".to_owned(),
-            ));
-        }
-        let snapshot = self.snapshot.borrow().clone();
-        Ok((snapshot.state, snapshot.detail))
-    }
-
-    /// Cancels the current attempt when it still matches `expected_attempt`.
-    ///
-    /// The token is cancelled before the command is queued so an in-flight
-    /// transport operation observes cancellation while the actor preserves
-    /// the ordering of state cleanup.
-    pub(crate) fn interrupt_current(&self, expected_attempt: Option<&str>, caller: &str) -> bool {
-        let control = self.control.borrow().clone();
-        if let Some(control) = control
-            && control.caller == caller
-            && expected_attempt.is_none_or(|attempt| attempt == control.attempt_id)
-        {
-            control.cancellation.cancel();
-            return true;
-        }
-        false
-    }
-
-    /// Replaces the current attempt and starts a new greetd transaction.
-    pub(crate) async fn begin(
-        &self,
-        caller: String,
-        username: String,
-        emitter: SignalEmitter<'static>,
-    ) -> fdo::Result<String> {
-        self.interrupt_current(None, &caller);
-        self.send_with(|reply| AuthCommand::Begin {
-            caller,
-            username,
-            emitter,
-            reply,
-        })
-        .await
-    }
-
-    /// Submits a UI response to the actor for the active prompt.
-    pub(crate) async fn respond(
-        &self,
-        caller: String,
-        attempt_id: String,
-        response: zeroize::Zeroizing<String>,
-        emitter: SignalEmitter<'static>,
-    ) -> fdo::Result<()> {
-        self.send_with(|reply| AuthCommand::Respond {
-            caller,
-            attempt_id,
-            response,
-            emitter,
-            reply,
-        })
-        .await
-    }
-
-    /// Requests cancellation of one specific authentication attempt.
-    pub(crate) async fn cancel(
-        &self,
-        caller: String,
-        attempt_id: String,
-        emitter: SignalEmitter<'static>,
-    ) -> fdo::Result<()> {
-        let allow_after_cleanup = self.interrupt_current(Some(&attempt_id), &caller);
-        self.send_with(|reply| AuthCommand::Cancel {
-            expected_attempt: Some(attempt_id),
-            expected_caller: Some(caller),
-            allow_after_cleanup,
-            emitter: Some(emitter),
-            reply,
-        })
-        .await
-    }
-
-    /// Moves an authenticated attempt into backend-owned session resolution.
-    pub(crate) async fn begin_session_resolution(
-        &self,
-        caller: String,
-        attempt_id: String,
-        emitter: SignalEmitter<'static>,
-    ) -> fdo::Result<()> {
-        self.send_with(|reply| AuthCommand::BeginSessionResolution {
-            caller,
-            attempt_id,
-            emitter,
-            reply,
-        })
-        .await
-    }
-
-    /// Reports that the selected session disappeared during catalog lookup.
-    pub(crate) async fn report_session_unavailable(
-        &self,
-        caller: String,
-        attempt_id: String,
-        detail: String,
-        emitter: SignalEmitter<'static>,
-    ) -> fdo::Result<()> {
-        self.send_with(|reply| AuthCommand::ReportSessionUnavailable {
-            caller,
-            attempt_id,
-            detail,
-            emitter,
-            reply,
-        })
-        .await
-    }
-
-    /// Reports a session-catalog failure while retaining actor ownership of state.
-    pub(crate) async fn fail_session_resolution(
-        &self,
-        caller: String,
-        attempt_id: String,
-        detail: String,
-        emitter: SignalEmitter<'static>,
-    ) -> fdo::Result<()> {
-        self.send_with(|reply| AuthCommand::FailSessionResolution {
-            caller,
-            attempt_id,
-            detail,
-            emitter,
-            reply,
-        })
-        .await
-    }
-
-    /// Starts the backend-validated session through the active greetd transport.
-    pub(crate) async fn start_session(
-        &self,
-        caller: String,
-        attempt_id: String,
-        session: SessionEntry,
-        emitter: SignalEmitter<'static>,
-    ) -> fdo::Result<()> {
-        self.send_with(|reply| AuthCommand::StartSession {
-            caller,
-            attempt_id,
-            session,
-            emitter,
-            reply,
-        })
-        .await
-    }
-
-    /// Builds, enqueues, and awaits one typed command reply.
-    async fn send_with<T, Build>(&self, build: Build) -> fdo::Result<T>
-    where
-        Build: FnOnce(oneshot::Sender<fdo::Result<T>>) -> AuthCommand,
-    {
-        send_command(&self.commands, build).await
-    }
-}
-
-/// Owned by the process runtime so actor completion and failures are observed.
-#[derive(Debug)]
-pub(crate) struct AuthActorTask {
-    pub(crate) task: JoinHandle<()>,
-    shutdown: CancellationToken,
-}
-
-impl AuthActorTask {
-    pub(crate) fn stop(&self) {
-        self.shutdown.cancel();
-    }
-}
-
-impl Drop for AuthActorTask {
-    fn drop(&mut self) {
-        self.stop();
-    }
-}
-
-/// Enqueues one typed command and waits for the actor's reply.
-async fn send_command<T, Build>(commands: &CommandSender, build: Build) -> fdo::Result<T>
-where
-    Build: FnOnce(oneshot::Sender<fdo::Result<T>>) -> AuthCommand,
-{
-    let (reply, receiver) = oneshot::channel();
-    commands
-        .send(build(reply))
-        .await
-        .map_err(|_| fdo::Error::Failed("authentication actor is unavailable".to_owned()))?;
-    receiver
-        .await
-        .map_err(|_| fdo::Error::Failed("authentication actor stopped".to_owned()))?
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct AuthSnapshot {
-    attempt_id: String,
-    state: String,
-    detail: String,
+pub(super) struct AuthSnapshot {
+    pub(super) attempt_id: String,
+    pub(super) state: String,
+    pub(super) detail: String,
 }
 
 impl AuthSnapshot {
-    fn idle() -> Self {
+    pub(super) fn idle() -> Self {
         Self {
             attempt_id: String::new(),
             state: AuthState::Idle.as_str().to_owned(),
@@ -273,7 +38,7 @@ impl AuthSnapshot {
         }
     }
 
-    fn from_auth(auth: &AuthStateMachine, attempt_id: &str) -> Self {
+    pub(super) fn from_auth(auth: &AuthStateMachine, attempt_id: &str) -> Self {
         Self {
             attempt_id: attempt_id.to_owned(),
             state: auth.get_state().as_str().to_owned(),
@@ -283,125 +48,15 @@ impl AuthSnapshot {
 }
 
 #[derive(Clone, Debug)]
-struct AttemptControl {
-    caller: String,
-    attempt_id: String,
-    cancellation: CancellationToken,
-}
-
-/// Commands are serialized so state transitions and greetd I/O share one owner.
-enum AuthCommand {
-    #[cfg(test)]
-    Panic,
-    Begin {
-        caller: String,
-        username: String,
-        emitter: SignalEmitter<'static>,
-        reply: oneshot::Sender<fdo::Result<String>>,
-    },
-    Respond {
-        caller: String,
-        attempt_id: String,
-        response: zeroize::Zeroizing<String>,
-        emitter: SignalEmitter<'static>,
-        reply: oneshot::Sender<fdo::Result<()>>,
-    },
-    Cancel {
-        expected_attempt: Option<String>,
-        expected_caller: Option<String>,
-        allow_after_cleanup: bool,
-        emitter: Option<SignalEmitter<'static>>,
-        reply: oneshot::Sender<fdo::Result<()>>,
-    },
-    BeginSessionResolution {
-        caller: String,
-        attempt_id: String,
-        emitter: SignalEmitter<'static>,
-        reply: oneshot::Sender<fdo::Result<()>>,
-    },
-    ReportSessionUnavailable {
-        caller: String,
-        attempt_id: String,
-        detail: String,
-        emitter: SignalEmitter<'static>,
-        reply: oneshot::Sender<fdo::Result<()>>,
-    },
-    FailSessionResolution {
-        caller: String,
-        attempt_id: String,
-        detail: String,
-        emitter: SignalEmitter<'static>,
-        reply: oneshot::Sender<fdo::Result<()>>,
-    },
-    StartSession {
-        caller: String,
-        attempt_id: String,
-        session: SessionEntry,
-        emitter: SignalEmitter<'static>,
-        reply: oneshot::Sender<fdo::Result<()>>,
-    },
-}
-
-impl AuthCommand {
-    fn get_operation(&self) -> &'static str {
-        match self {
-            Self::Begin { .. } => "BeginAuthentication",
-            Self::Respond { .. } => "Respond",
-            Self::Cancel { .. } => "Cancel",
-            Self::BeginSessionResolution { .. } => "ResolveSession",
-            Self::ReportSessionUnavailable { .. } => "SessionUnavailable",
-            Self::FailSessionResolution { .. } => "FailSessionResolution",
-            Self::StartSession { .. } => "StartSession",
-            #[cfg(test)]
-            Self::Panic => "TestPanic",
-        }
-    }
-
-    fn get_caller(&self) -> Option<&str> {
-        match self {
-            Self::Begin { caller, .. }
-            | Self::Respond { caller, .. }
-            | Self::BeginSessionResolution { caller, .. }
-            | Self::ReportSessionUnavailable { caller, .. }
-            | Self::FailSessionResolution { caller, .. }
-            | Self::StartSession { caller, .. } => Some(caller),
-            Self::Cancel {
-                expected_caller, ..
-            } => expected_caller.as_deref(),
-            #[cfg(test)]
-            Self::Panic => None,
-        }
-    }
-
-    fn get_attempt_id(&self) -> Option<&str> {
-        match self {
-            Self::Respond { attempt_id, .. }
-            | Self::BeginSessionResolution { attempt_id, .. }
-            | Self::ReportSessionUnavailable { attempt_id, .. }
-            | Self::FailSessionResolution { attempt_id, .. }
-            | Self::StartSession { attempt_id, .. } => Some(attempt_id),
-            Self::Cancel {
-                expected_attempt, ..
-            } => expected_attempt.as_deref(),
-            Self::Begin { .. } => None,
-            #[cfg(test)]
-            Self::Panic => None,
-        }
-    }
-}
-
-fn send_reply<T>(reply: oneshot::Sender<fdo::Result<T>>, result: fdo::Result<T>) {
-    if let Err(error) = &result {
-        tracing::warn!(%error, "authentication operation rejected or failed");
-    }
-    if reply.send(result).is_err() {
-        tracing::debug!("authentication method caller no longer awaiting reply");
-    }
+pub(super) struct AttemptControl {
+    pub(super) caller: String,
+    pub(super) attempt_id: String,
+    pub(super) cancellation: CancellationToken,
 }
 
 /// Mutable authentication resources owned exclusively by `run_actor`.
-struct ActorState {
-    auth: AuthStateMachine,
+pub(super) struct ActorState {
+    pub(super) auth: AuthStateMachine,
     attempt: Option<AttemptResources>,
     snapshots: watch::Sender<AuthSnapshot>,
     controls: watch::Sender<Option<AttemptControl>>,
@@ -426,7 +81,7 @@ impl Drop for AttemptResources {
 }
 
 impl ActorState {
-    fn new(
+    pub(super) fn new(
         snapshots: watch::Sender<AuthSnapshot>,
         controls: watch::Sender<Option<AttemptControl>>,
         shutdown: CancellationToken,
@@ -486,170 +141,7 @@ enum PromptDisposition {
     AutoAcknowledge,
 }
 
-async fn run_actor(
-    mut commands: mpsc::Receiver<AuthCommand>,
-    command_sender: mpsc::WeakSender<AuthCommand>,
-    snapshots: watch::Sender<AuthSnapshot>,
-    controls: watch::Sender<Option<AttemptControl>>,
-    shutdown: CancellationToken,
-) {
-    // Only external handles keep the command channel alive. Disconnect watchers
-    // use weak senders so releasing the service can reach the final cleanup even
-    // if an attempt watcher is still waiting for a bus event.
-    let mut actor = ActorState::new(snapshots, controls, shutdown.clone());
-    loop {
-        let command = tokio::select! {
-            biased;
-            _ = shutdown.cancelled() => break,
-            command = commands.recv() => command,
-        };
-        let Some(command) = command else {
-            break;
-        };
-        let initial_attempt_id = match &command {
-            AuthCommand::Begin { .. } => None,
-            _ => command
-                .get_attempt_id()
-                .or_else(|| actor.auth.find_active_attempt_id()),
-        };
-        let span = tracing::info_span!(
-            "authentication",
-            operation = command.get_operation(),
-            caller = command.get_caller().unwrap_or("runtime"),
-            attempt_id = initial_attempt_id,
-            initial_state = actor.auth.get_state().as_str(),
-        );
-        async {
-            tracing::debug!("processing authentication operation");
-            match command {
-                #[cfg(test)]
-                AuthCommand::Panic => panic!("test actor failure"),
-                AuthCommand::Begin {
-                    caller,
-                    username,
-                    emitter,
-                    reply,
-                } => {
-                    let attempt_id = match create_attempt(
-                        &mut actor,
-                        caller,
-                        username.clone(),
-                        &emitter,
-                        &command_sender,
-                    )
-                    .await
-                    {
-                        Ok(attempt_id) => attempt_id,
-                        Err(error) => {
-                            send_reply(reply, Err(error));
-                            return;
-                        }
-                    };
-                    // Bind the UI to the attempt before PAM starts waiting for
-                    // a camera or other passive factor. Protocol failures are
-                    // then reported through the attempt's state signals.
-                    send_reply(reply, Ok(attempt_id.clone()));
-                    let _ = run_authentication(&mut actor, &attempt_id, &username, emitter).await;
-                }
-                AuthCommand::Respond {
-                    caller,
-                    attempt_id,
-                    response,
-                    emitter,
-                    reply,
-                } => {
-                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                        send_reply(reply, Err(error));
-                        return;
-                    }
-                    let result = handle_respond(&mut actor, &attempt_id, response, emitter).await;
-                    send_reply(reply, result);
-                }
-                AuthCommand::Cancel {
-                    expected_attempt,
-                    expected_caller,
-                    allow_after_cleanup,
-                    emitter,
-                    reply,
-                } => {
-                    let result = cancel_current(
-                        &mut actor,
-                        expected_attempt.as_deref(),
-                        expected_caller.as_deref(),
-                        allow_after_cleanup,
-                        emitter,
-                    )
-                    .await;
-                    send_reply(reply, result);
-                }
-                AuthCommand::BeginSessionResolution {
-                    caller,
-                    attempt_id,
-                    emitter,
-                    reply,
-                } => {
-                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                        send_reply(reply, Err(error));
-                        return;
-                    }
-                    let result = begin_session_resolution(&mut actor, &attempt_id, &emitter).await;
-                    send_reply(reply, result);
-                }
-                AuthCommand::ReportSessionUnavailable {
-                    caller,
-                    attempt_id,
-                    detail,
-                    emitter,
-                    reply,
-                } => {
-                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                        send_reply(reply, Err(error));
-                        return;
-                    }
-                    let result =
-                        report_session_unavailable(&mut actor, &attempt_id, detail, &emitter).await;
-                    send_reply(reply, result);
-                }
-                AuthCommand::FailSessionResolution {
-                    caller,
-                    attempt_id,
-                    detail,
-                    emitter,
-                    reply,
-                } => {
-                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                        send_reply(reply, Err(error));
-                        return;
-                    }
-                    let result =
-                        fail_session_resolution(&mut actor, &attempt_id, detail, &emitter).await;
-                    send_reply(reply, result);
-                }
-                AuthCommand::StartSession {
-                    caller,
-                    attempt_id,
-                    session,
-                    emitter,
-                    reply,
-                } => {
-                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                        send_reply(reply, Err(error));
-                        return;
-                    }
-                    let result =
-                        handle_start_session(&mut actor, &attempt_id, session, emitter).await;
-                    send_reply(reply, result);
-                }
-            }
-        }
-        .instrument(span)
-        .await;
-    }
-
-    let _ = cancel_current(&mut actor, None, None, false, None).await;
-}
-
-async fn create_attempt(
+pub(super) async fn create_attempt(
     actor: &mut ActorState,
     caller: String,
     username: String,
@@ -700,7 +192,7 @@ async fn create_attempt(
     Ok(attempt_id)
 }
 
-async fn run_authentication(
+pub(super) async fn run_authentication(
     actor: &mut ActorState,
     attempt_id: &str,
     username: &str,
@@ -726,7 +218,7 @@ async fn run_authentication(
     consume_response(actor, attempt_id, response, emitter, &cancellation).await
 }
 
-async fn handle_respond(
+pub(super) async fn handle_respond(
     actor: &mut ActorState,
     attempt_id: &str,
     response: zeroize::Zeroizing<String>,
@@ -755,7 +247,7 @@ async fn handle_respond(
     consume_response(actor, attempt_id, next_response, emitter, &cancellation).await
 }
 
-async fn begin_session_resolution(
+pub(super) async fn begin_session_resolution(
     actor: &mut ActorState,
     attempt_id: &str,
     emitter: &SignalEmitter<'static>,
@@ -767,7 +259,7 @@ async fn begin_session_resolution(
     Ok(())
 }
 
-async fn report_session_unavailable(
+pub(super) async fn report_session_unavailable(
     actor: &mut ActorState,
     attempt_id: &str,
     detail: String,
@@ -784,7 +276,7 @@ async fn report_session_unavailable(
     Ok(())
 }
 
-async fn fail_session_resolution(
+pub(super) async fn fail_session_resolution(
     actor: &mut ActorState,
     attempt_id: &str,
     detail: String,
@@ -802,7 +294,7 @@ async fn fail_session_resolution(
     Ok(())
 }
 
-async fn handle_start_session(
+pub(super) async fn handle_start_session(
     actor: &mut ActorState,
     attempt_id: &str,
     session: SessionEntry,
@@ -1070,7 +562,7 @@ async fn consume_response(
     }
 }
 
-async fn cancel_current(
+pub(super) async fn cancel_current(
     actor: &mut ActorState,
     expected_attempt: Option<&str>,
     expected_caller: Option<&str>,
@@ -1208,74 +700,6 @@ async fn fail_transaction(
     fdo::Error::Failed(detail)
 }
 
-fn spawn_caller_watcher(
-    connection: zbus::Connection,
-    caller: String,
-    attempt_id: String,
-    watcher_token: CancellationToken,
-    cancellation: CancellationToken,
-    commands: mpsc::WeakSender<AuthCommand>,
-) {
-    // D-Bus may remove the caller while the original request is blocked in
-    // greetd, so this watcher must outlive the initiating method call.
-    tokio::spawn(async move {
-        let proxy = match zbus::fdo::DBusProxy::new(&connection).await {
-            Ok(proxy) => proxy,
-            Err(error) => {
-                tracing::warn!(%attempt_id, %caller, error = ?error, "could not create D-Bus disconnect watcher");
-                cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await;
-                return;
-            }
-        };
-        let mut stream = match proxy
-            .receive_name_owner_changed_with_args(&[(0, caller.as_str()), (2, "")])
-            .await
-        {
-            Ok(stream) => stream,
-            Err(error) => {
-                tracing::warn!(%attempt_id, %caller, error = ?error, "could not subscribe to D-Bus client disconnects");
-                cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await;
-                return;
-            }
-        };
-        let caller_name = caller
-            .as_str()
-            .try_into()
-            .expect("D-Bus sender is a unique bus name");
-        // Subscribe before checking ownership: checking first would miss a
-        // caller that disconnects between the check and signal registration.
-        if !proxy.name_has_owner(caller_name).await.unwrap_or(false) {
-            cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await;
-            return;
-        }
-        tokio::select! {
-            _ = watcher_token.cancelled() => {}
-            _ = stream.next() => cancel_for_caller_disconnect(commands, attempt_id, caller, cancellation).await,
-        }
-    });
-}
-
-async fn cancel_for_caller_disconnect(
-    commands: mpsc::WeakSender<AuthCommand>,
-    attempt_id: String,
-    caller: String,
-    cancellation: CancellationToken,
-) {
-    tracing::info!(%attempt_id, %caller, operation = "CallerDisconnected", "cancelling authentication after caller disconnect");
-    cancellation.cancel();
-    let Some(commands) = commands.upgrade() else {
-        return;
-    };
-    let _ = send_command(&commands, |reply| AuthCommand::Cancel {
-        expected_attempt: Some(attempt_id),
-        expected_caller: Some(caller),
-        allow_after_cleanup: false,
-        emitter: None,
-        reply,
-    })
-    .await;
-}
-
 async fn emit_state_best_effort(emitter: Option<&SignalEmitter<'_>>, snapshot: AuthSnapshot) {
     let Some(emitter) = emitter else {
         return;
@@ -1321,7 +745,11 @@ async fn emit_prompt_best_effort(
     }
 }
 
-fn validate_owned_attempt(actor: &ActorState, attempt_id: &str, caller: &str) -> fdo::Result<()> {
+pub(super) fn validate_owned_attempt(
+    actor: &ActorState,
+    attempt_id: &str,
+    caller: &str,
+) -> fdo::Result<()> {
     if !actor.auth.is_current_attempt(attempt_id) {
         return Err(fdo::Error::Failed("stale or unknown attempt id".to_owned()));
     }
@@ -1411,8 +839,8 @@ mod tests {
     use tokio_util::sync::CancellationToken;
 
     use super::{
-        ActorState, AttemptResources, AuthActorHandle, AuthSnapshot, cancel_current,
-        sanitize_detail, sanitize_event_detail, validate_cancel_request, validate_owned_attempt,
+        ActorState, AttemptResources, AuthSnapshot, cancel_current, sanitize_detail,
+        sanitize_event_detail, validate_cancel_request, validate_owned_attempt,
     };
     use crate::state::{AuthState, AuthStateMachine, StateEvent};
 
@@ -1523,35 +951,5 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(actor.auth.get_state(), AuthState::Idle);
-    }
-
-    #[tokio::test]
-    async fn actor_panic_is_observable_and_queries_fail() {
-        let (actor, mut runtime) = AuthActorHandle::spawn();
-        actor
-            .commands
-            .send(super::AuthCommand::Panic)
-            .await
-            .unwrap();
-        assert!((&mut runtime.task).await.unwrap_err().is_panic());
-        assert!(actor.get_state().is_err());
-    }
-
-    #[tokio::test]
-    async fn dropping_handles_stops_actor() {
-        let (actor, mut runtime) = AuthActorHandle::spawn();
-        drop(actor);
-        tokio::time::timeout(std::time::Duration::from_secs(1), &mut runtime.task)
-            .await
-            .unwrap()
-            .unwrap();
-    }
-
-    #[tokio::test]
-    async fn stopping_actor_closes_queries_and_commands() {
-        let (actor, mut runtime) = AuthActorHandle::spawn();
-        runtime.stop();
-        (&mut runtime.task).await.unwrap();
-        assert!(actor.get_state().is_err());
     }
 }
