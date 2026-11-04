@@ -47,6 +47,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "akari-backend"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "mockall",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "zbus",
+ "zeroize",
+]
+
+[[package]]
 name = "akari-splash"
 version = "0.1.0"
 dependencies = [
@@ -154,23 +171,6 @@ name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
-
-[[package]]
-name = "akari-backend"
-version = "0.1.0"
-dependencies = [
- "futures-util",
- "mockall",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "zbus",
- "zeroize",
-]
 
 [[package]]
 name = "bitflags"
