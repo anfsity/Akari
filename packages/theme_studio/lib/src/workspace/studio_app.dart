@@ -1,0 +1,757 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
+
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show mapEquals;
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:theme_sdk/theme_sdk.dart';
+
+import '../inspector/code_inspector.dart';
+import '../inspector/node_inspector.dart';
+import '../authoring/scene_editor.dart';
+import '../canvas/studio_canvas.dart';
+import '../inspector/studio_effects_inspector.dart';
+import 'studio_sidebar.dart';
+import 'studio_status_bar.dart';
+import 'studio_toolbar.dart';
+import '../authoring/studio_create_theme.dart';
+import 'studio_workspace.dart';
+import '../resources/studio_assets.dart';
+import 'studio_preferences.dart';
+import 'studio_settings.dart';
+import '../authoring/studio_theme_project.dart';
+import 'studio_theme_selector.dart';
+
+class ThemeStudioApp extends StatefulWidget {
+  const ThemeStudioApp({
+    required this.projects,
+    required this.initialThemePackageName,
+    super.key,
+  });
+
+  final List<StudioThemeProject> projects;
+  final String initialThemePackageName;
+
+  @override
+  State<ThemeStudioApp> createState() => _ThemeStudioAppState();
+}
+
+class _ThemeStudioAppState extends State<ThemeStudioApp> {
+  SceneEditor? _editor;
+  final _canvasKey = GlobalKey<StudioCanvasState>();
+  late ThemeDefinition _theme;
+  late String _path;
+  late List<String> _scenePaths;
+  late StudioThemeProject _project;
+  late final List<StudioThemeProject> _projects;
+  bool _loadingFile = false;
+  late StudioAssets _compiledAssets;
+  late StudioAssets _assets;
+  List<String> _assetPaths = [];
+  String? _error;
+  StudioPreferences _preferences = const StudioPreferences();
+  bool _preferencesReady = false;
+  bool _dormant = false;
+  bool _inspect = false;
+  bool _effects = false;
+  bool _confirmReload = false;
+  int _seedRevision = 0;
+  String? _lastBackgroundAsset;
+  Map<String, String> _lastThemeProperties = const {};
+  ui.Color? _themeSeed;
+
+  @override
+  void initState() {
+    super.initState();
+    _projects = [...widget.projects];
+    _project = _projects.firstWhere(
+      (project) => project.packageName == widget.initialThemePackageName,
+    );
+    _compiledAssets = StudioAssets(
+      directory: Directory(_project.directory),
+      packageName: _project.packageName,
+    );
+    _assets = _compiledAssets;
+    _updateTheme(_project.themeBuilder());
+    _scenePaths = [..._project.scenePaths];
+    _path = _scenePaths.first;
+    _openScene(_path);
+    unawaited(_loadSeed());
+    unawaited(_loadPreferences());
+  }
+
+  Future<void> _loadPreferences() async {
+    try {
+      final preferences = await StudioPreferences.load();
+      if (mounted) setState(() => _preferences = preferences);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _preferencesReady = true);
+    }
+  }
+
+  Future<void> _savePreferences(StudioPreferences preferences) async {
+    try {
+      await preferences.save();
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _error = 'Preferences were not saved: $error');
+      }
+    }
+  }
+
+  void _openSettings(BuildContext context) {
+    final editor = _editor;
+    if (editor == null || !editor.applyDraft()) return;
+    showOverlay<void>(
+      context,
+      const DialogConfiguration(),
+      builder: (context) => StudioSettings(
+        document: editor.document,
+        preferences: _preferences,
+        assetPaths: _assetPaths,
+        resolveAssetImage: _assets.getImageProvider,
+        supportsImageBackground: _theme.bundle.backgrounds.containsKey(
+          SceneBackgroundKind.image,
+        ),
+        onApply: (canvas, background, preferences) {
+          editor.updateScene(canvas: canvas, background: background);
+          setState(() {
+            _preferences = preferences;
+            _error = null;
+          });
+          unawaited(_savePreferences(preferences));
+        },
+      ),
+    );
+  }
+
+  void _updateTheme(ThemeDefinition theme) {
+    _editor?.updateAuthoring(
+      componentCatalog: theme.componentCatalog,
+      presetCatalog: theme.presetCatalog,
+      layout: theme.layout,
+    );
+    _theme = theme.copyWith(
+      bundle: theme.bundle.copyWith(
+        backgrounds: {
+          for (final entry in theme.bundle.backgrounds.entries)
+            entry.key: entry.value.getWithImageResolver(
+              _assets.getImageProvider,
+            ),
+        },
+      ),
+    );
+  }
+
+  static String? _getEffectiveBackgroundAsset(SceneBackground background) {
+    return background.kind == SceneBackgroundKind.image
+        ? background.asset
+        : null;
+  }
+
+  void _onEditorChanged() {
+    final editor = _editor;
+    if (editor == null) return;
+    if (!mapEquals(_lastThemeProperties, editor.document.themeProperties)) {
+      _lastThemeProperties = editor.document.themeProperties;
+      setState(() => _refreshTheme(seed: _themeSeed));
+    }
+    final currentAsset = _getEffectiveBackgroundAsset(
+      editor.document.background,
+    );
+    if (currentAsset != _lastBackgroundAsset) {
+      _lastBackgroundAsset = currentAsset;
+      unawaited(_loadSeed());
+    }
+  }
+
+  void _setEditor(SceneEditor editor) {
+    _editor?.removeListener(_onEditorChanged);
+    _editor?.dispose();
+    _editor = editor..addListener(_onEditorChanged);
+    _lastThemeProperties = editor.document.themeProperties;
+    _themeSeed = null;
+    _lastBackgroundAsset = _getEffectiveBackgroundAsset(
+      editor.document.background,
+    );
+  }
+
+  Future<void> _loadSeed() async {
+    final revision = ++_seedRevision;
+    final editor = _editor;
+    final asset = editor != null
+        ? _getEffectiveBackgroundAsset(editor.document.background)
+        : _getEffectiveBackgroundAsset(_theme.document.background);
+    Color? seed;
+    if (asset != null) {
+      final file = _assets.findFile(asset);
+      if (file != null && file.existsSync()) {
+        try {
+          final bytes = await file.readAsBytes();
+          seed = await extractSeedFromBytes(bytes);
+        } on Object {
+          seed = null;
+        }
+      } else {
+        seed = await _theme.findBackgroundSeed();
+      }
+    }
+    if (!mounted || revision != _seedRevision) return;
+    setState(() {
+      _themeSeed = seed;
+      _refreshTheme(seed: seed);
+    });
+  }
+
+  void _refreshTheme({Color? seed}) {
+    try {
+      _updateTheme(
+        _project.themeBuilder(seed: seed, document: _editor?.document),
+      );
+    } on FormatException catch (error) {
+      _error = 'Cannot refresh theme: ${error.message}';
+    }
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _lastBackgroundAsset = null;
+    _refreshTheme();
+    unawaited(_loadSeed());
+  }
+
+  @override
+  void dispose() {
+    _editor?.removeListener(_onEditorChanged);
+    _editor?.dispose();
+    super.dispose();
+  }
+
+  void _openScene(String path) {
+    try {
+      final assets = StudioAssets.findForScene(File(path)) ?? _compiledAssets;
+      final assetPaths = assets.getAssets();
+      final session = _project.createSceneSession(path);
+      _setEditor(session.editor);
+      _assets = assets;
+      _assetPaths = assetPaths;
+      _path = path;
+      _updateTheme(session.theme);
+      if (!_scenePaths.contains(path)) _scenePaths.add(path);
+      _error = null;
+      _confirmReload = false;
+      unawaited(_loadSeed());
+    } on Object catch (error) {
+      _error = '$error';
+    }
+  }
+
+  Future<void> _switchTheme(
+    StudioThemeProject project,
+    BuildContext context, {
+    String? scenePath,
+  }) async {
+    if (!await _confirmSwitch(context)) return;
+    if (!mounted) return;
+    try {
+      _openProject(project, scenePath: scenePath);
+    } on Object catch (error) {
+      setState(() => _error = 'Cannot open theme: $error');
+    }
+  }
+
+  void _openProject(StudioThemeProject project, {String? scenePath}) {
+    // Prepare the entire target before releasing the current session.
+    final assets = StudioAssets(
+      directory: Directory(project.directory),
+      packageName: project.packageName,
+    );
+    final assetPaths = assets.getAssets();
+    final session = project.createSceneSession(
+      scenePath ?? project.scenePaths.first,
+    );
+    setState(() {
+      if (!_projects.contains(project)) _projects.add(project);
+      _setEditor(session.editor);
+      _project = project;
+      _compiledAssets = assets;
+      _assets = assets;
+      _assetPaths = assetPaths;
+      _scenePaths = [...project.scenePaths];
+      _path = session.editor.file.path;
+      if (!_scenePaths.contains(_path)) _scenePaths.add(_path);
+      _updateTheme(session.theme);
+      _error = null;
+      _confirmReload = false;
+    });
+    unawaited(_loadSeed());
+  }
+
+  void _openCreateTheme(BuildContext context) {
+    final editor = _editor;
+    if (editor == null || !editor.applyDraft()) return;
+    final source = _project;
+    final document = editor.document;
+    final assets = _assets;
+    showOverlay<void>(
+      context,
+      const DialogConfiguration(barrierDismissible: false),
+      builder: (context) => StudioCreateTheme(
+        sourceLabel: _theme.id,
+        initialLocation: Directory(source.directory).parent.path,
+        existingNames: _projects.map((project) => project.packageName).toSet(),
+        onCreate: (packageName, destination) async {
+          final project = await source.createTheme(
+            packageName: packageName,
+            destination: destination,
+            document: document,
+            assets: assets,
+          );
+          if (!mounted) return;
+          _openProject(project);
+        },
+      ),
+    );
+  }
+
+  Future<bool> _confirmSwitch(BuildContext context) async {
+    final editor = _editor;
+    if (editor == null) return true;
+    if (!editor.applyDraft()) return false;
+    if (!editor.isDirty) return true;
+    final save = await showOverlay<bool>(
+      context,
+      const DialogConfiguration(),
+      builder: (context) => AlertDialog(
+        title: const Text('Unsaved scene changes'),
+        content: const Text(
+          'Save this scene before opening another project or scene?',
+        ),
+        actions: [
+          OutlineButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          OutlineButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Discard and switch'),
+          ),
+          PrimaryButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Save and switch'),
+          ),
+        ],
+      ),
+    ).future;
+    if (!mounted || save == null) return false;
+    if (!save) return true;
+    _save();
+    return !editor.isDirty;
+  }
+
+  Future<void> _switchScene(String path, BuildContext context) async {
+    if (path == _path) return;
+    final StudioAssets? assets;
+    try {
+      assets = StudioAssets.findForScene(File(path));
+    } on Object catch (error) {
+      setState(() => _error = '$error');
+      return;
+    }
+    for (final project in _projects) {
+      if (!identical(project, _project) &&
+          project.directory == assets?.directory.path) {
+        await _switchTheme(project, context, scenePath: path);
+        return;
+      }
+    }
+    if (!context.mounted || !await _confirmSwitch(context)) return;
+    if (mounted) setState(() => _openScene(path));
+  }
+
+  Future<void> _loadJson(BuildContext context) async {
+    setState(() => _loadingFile = true);
+    try {
+      final file = await FilePicker.pickFile(
+        dialogTitle: 'Load scene JSON',
+        initialDirectory: File(_path).parent.path,
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (!context.mounted || file == null) return;
+      await _switchScene(File.fromUri(file.uri).path, context);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _loadingFile = false);
+    }
+  }
+
+  Future<void> _importAsset() async {
+    setState(() => _loadingFile = true);
+    try {
+      final picked = await FilePicker.pickFile(dialogTitle: 'Import asset');
+      if (!mounted || picked == null) return;
+      final path = _assets.importFile(File.fromUri(picked.uri));
+      setState(() {
+        _assetPaths = _assets.getAssets();
+        _error = null;
+      });
+      await Clipboard.setData(ClipboardData(text: path));
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _loadingFile = false);
+    }
+  }
+
+  Future<void> _applyBackground(String asset) async {
+    final editor = _editor;
+    if (editor == null || !editor.applyDraft()) return;
+    try {
+      final file = _assets.findFile(asset);
+      if (file == null) {
+        throw FormatException('Asset "$asset" is not a local theme file.');
+      }
+      final bytes = await file.readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes);
+      codec.dispose();
+      if (!mounted || !identical(editor, _editor)) return;
+      editor.updateScene(
+        background: editor.document.background.copyWith(
+          kind: SceneBackgroundKind.image,
+          asset: asset,
+        ),
+      );
+      setState(() => _error = null);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = 'Cannot use image: $error');
+    }
+  }
+
+  Future<void> _applyFont(String asset) async {
+    final editor = _editor;
+    if (editor == null || !editor.applyDraft()) return;
+    try {
+      await _assets.loadFontPreview(asset);
+      if (!mounted || !identical(editor, _editor)) return;
+      final style =
+          editor.document.styleTokens[editor.selectedNode.styleToken] ??
+          const SceneStyle();
+      editor.updateSelectionStyle(style.copyWith(fontAsset: asset));
+      setState(() => _error = null);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = 'Cannot apply font: $error');
+    }
+  }
+
+  Future<void> _placeAsset(SceneAsset asset) async {
+    final editor = _editor;
+    if (editor == null || !editor.applyDraft()) return;
+    try {
+      if (asset.kind == SceneAssetKind.svg) {
+        final source = await _assets.loadTextAsset(asset.path);
+        final picture = await vg.loadPicture(SvgStringLoader(source), null);
+        picture.picture.dispose();
+      } else {
+        final bytes = await _assets.loadBytes(asset.path);
+        final codec = await ui.instantiateImageCodec(
+          bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
+        );
+        codec.dispose();
+      }
+      if (!mounted || !identical(editor, _editor)) return;
+      editor.createAssetNode(asset);
+      setState(() => _error = null);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = 'Cannot place asset: $error');
+    }
+  }
+
+  void _save() {
+    final editor = _editor;
+    if (editor == null) return;
+    try {
+      if (!editor.save()) return;
+      setState(() {
+        _error = null;
+        _confirmReload = false;
+      });
+    } on FileSystemException catch (error) {
+      setState(() => _error = error.message);
+    }
+  }
+
+  Future<void> _createScene(BuildContext context) async {
+    if (!await _confirmSwitch(context) || !context.mounted) return;
+    final name = TextEditingController(text: 'new-scene');
+    String? error;
+    try {
+      final path = await showOverlay<String>(
+        context,
+        const DialogConfiguration(),
+        builder: (context) => StatefulBuilder(
+          builder: (context, update) => AlertDialog(
+            title: const Text('New scene'),
+            content: SizedBox(
+              width: 320,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Start with an empty artboard in the current theme.',
+                  ),
+                  const Gap(12),
+                  TextField(
+                    key: const ValueKey('new-scene-name'),
+                    controller: name,
+                  ),
+                  if (error != null) Text(error!).small(),
+                ],
+              ),
+            ),
+            actions: [
+              OutlineButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              PrimaryButton(
+                key: const ValueKey('confirm-new-scene'),
+                onPressed: () {
+                  final id = name.text.trim();
+                  if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(id)) {
+                    update(() => error = 'Use a lower-case scene name.');
+                    return;
+                  }
+                  final file = File(
+                    '${_assets.directory.path}/lib/$id.scene.json',
+                  );
+                  if (file.existsSync()) {
+                    update(() => error = 'This scene already exists.');
+                    return;
+                  }
+                  try {
+                    file.parent.createSync(recursive: true);
+                    file.writeAsStringSync(
+                      encodeSceneDocument(
+                        SceneDocument(
+                          id: id,
+                          version: currentSceneVersion,
+                          canvas: _editor!.document.canvas,
+                          background: const SceneBackground(
+                            kind: SceneBackgroundKind.solid,
+                          ),
+                          nodes: const [
+                            SceneNode(
+                              id: 'artboard',
+                              componentId: 'frame',
+                              layout: SceneLayout(),
+                              rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                    Navigator.of(context).pop(file.path);
+                  } on FileSystemException catch (failure) {
+                    update(() => error = failure.message);
+                  }
+                },
+                child: const Text('Create scene'),
+              ),
+            ],
+          ),
+        ),
+      ).future;
+      if (mounted && path != null) setState(() => _openScene(path));
+    } finally {
+      name.dispose();
+    }
+  }
+
+  void _reload() {
+    if (!_confirmReload && _editor != null) {
+      setState(() => _confirmReload = true);
+      return;
+    }
+    setState(() {
+      final editor = _editor;
+      if (editor == null) {
+        _openScene(_path);
+        return;
+      }
+      try {
+        editor.reload();
+        _error = null;
+        _confirmReload = false;
+      } on Object catch (error) {
+        _error = '$error';
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ShadcnApp(
+      title: 'Akari Theme Studio',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: _preferences.palette.getColorScheme(Brightness.light),
+        radius: 0.5,
+      ),
+      darkTheme: ThemeData(
+        colorScheme: _preferences.palette.getColorScheme(Brightness.dark),
+        radius: 0.5,
+      ),
+      themeMode: _preferences.themeMode,
+      home: Builder(builder: _buildWorkspace),
+    );
+  }
+
+  Widget _buildWorkspace(BuildContext context) {
+    final editor = _editor;
+    return StudioWorkspace(
+      onSave: _save,
+      onOpenSettings: () => _openSettings(context),
+      input: _preferences.input,
+      onCanvasKeyEvent: (event) =>
+          _canvasKey.currentState!.handleKeyEvent(event),
+      toolbar: StudioToolbar(
+        themeId: _theme.id,
+        readOnly: _inspect,
+        editor: editor,
+        preferencesReady: _preferencesReady,
+        onOpenSettings: () => _openSettings(context),
+        onSave: _save,
+        onCreateTheme: () => _openCreateTheme(context),
+        onCreateScene: () => _createScene(context),
+      ),
+      sidebar: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          StudioThemeSelector(
+            projects: _projects,
+            selected: _project,
+            onChanged: (project) => unawaited(_switchTheme(project, context)),
+          ),
+          const Divider(),
+          Expanded(
+            child: StudioSidebar(
+              scenePaths: _scenePaths,
+              assetPaths: _assetPaths,
+              resolveAssetImage: _assets.getImageProvider,
+              loadAssetText: _assets.loadTextAsset,
+              loadFontPreview: _assets.loadFontPreview,
+              onPlaceAsset: _placeAsset,
+              onApplyFont: _applyFont,
+              editor: editor,
+              loadingFile: _loadingFile,
+              readOnly: _inspect,
+              onLoadJson: () => _loadJson(context),
+              onSwitchScene: (path) => _switchScene(path, context),
+              onImportAsset: _importAsset,
+              onApplyBackground:
+                  _theme.bundle.backgrounds.containsKey(
+                    SceneBackgroundKind.image,
+                  )
+                  ? _applyBackground
+                  : null,
+            ),
+          ),
+        ],
+      ),
+      canvas: StudioCanvas(
+        key: _canvasKey,
+        editor: editor,
+        theme: _theme,
+        preferences: _preferences,
+        dormant: _dormant,
+        readOnly: _inspect,
+        onToggleDormant: () => setState(() => _dormant = !_dormant),
+        assetImageResolver: _assets.getImageProvider,
+        assetSvgLoader: _assets.loadTextAsset,
+        assetFontLoader: _assets.loadFontPreview,
+        shaderLoader: _assets.loadShaderProgram,
+      ),
+      inspector: editor == null
+          ? const SizedBox()
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Tabs(
+                    index: _inspect
+                        ? 2
+                        : _effects
+                        ? 1
+                        : 0,
+                    expand: true,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 8,
+                    ),
+                    onChanged: (index) {
+                      if (!editor.applyDraft()) return;
+                      setState(() {
+                        _inspect = index == 2;
+                        _effects = index == 1;
+                      });
+                    },
+                    children: [
+                      for (final label in ['Design', 'Effects', 'Inspect code'])
+                        TabItem(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              label,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                            ).small(),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Expanded(
+                  child: _inspect
+                      ? CodeInspector(key: ObjectKey(editor), editor: editor)
+                      : _effects
+                      ? StudioEffectsInspector(
+                          editor: editor,
+                          theme: _theme,
+                          assets: _assets,
+                          onAssetsChanged: () =>
+                              setState(() => _assetPaths = _assets.getAssets()),
+                        )
+                      : NodeInspector(
+                          editor: editor,
+                          controller: editor.inspector,
+                          componentCatalog: editor.componentCatalog,
+                          onApply: editor.applyDraft,
+                        ),
+                ),
+              ],
+            ),
+      statusBar: StudioStatusBar(
+        path: _path,
+        error: _error,
+        confirmReload: _confirmReload,
+        onCancelReload: () => setState(() => _confirmReload = false),
+        onReload: _reload,
+      ),
+    );
+  }
+}

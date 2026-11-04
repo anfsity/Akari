@@ -1,4 +1,4 @@
 library;
 
-export 'src/studio_app.dart';
-export 'src/studio_theme_project.dart';
+export 'src/workspace/studio_app.dart';
+export 'src/authoring/studio_theme_project.dart';
