@@ -8,7 +8,7 @@ repo_root="$(akari_repo_root)"
 
 akari_require_command fvm
 akari_require_command cargo
-akari_require_file "$repo_root/backend/Cargo.toml" 'backend Cargo manifest'
+akari_require_file "$repo_root/crates/akari-backend/Cargo.toml" 'backend Cargo manifest'
 
 cd -- "$repo_root"
 
@@ -17,7 +17,6 @@ fvm use stable --force
 fvm flutter config --enable-linux-desktop
 
 fvm flutter pub get
-cargo fetch --manifest-path "$repo_root/backend/Cargo.toml" --locked
-cargo fetch --manifest-path "$repo_root/splash/Cargo.toml" --locked
+cargo fetch --manifest-path "$repo_root/crates/Cargo.toml" --locked
 printf '%s\n' 'Flutter toolchain ready.'
 fvm flutter doctor -v

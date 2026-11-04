@@ -113,7 +113,7 @@ String getBackendTargetDirectory(BackendMode backend) =>
     'target/akari-${backend.name}';
 
 String getBackendExecutablePath(BackendMode backend, BuildMode mode) =>
-    'backend/${getBackendTargetDirectory(backend)}/${mode.rustProfile}/backend';
+    'crates/${getBackendTargetDirectory(backend)}/${mode.rustProfile}/backend';
 
 String getSplashExecutablePath(BuildMode mode) =>
     'build/tool/splash/${mode.rustProfile}/akari-splash';

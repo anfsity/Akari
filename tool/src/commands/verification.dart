@@ -22,19 +22,19 @@ RunPlan createVerificationPlan(
         command: ['bash', 'scripts/check-toolchain.sh'],
       ),
       RunStep(
-        id: 'backend.format',
+        id: 'rust.format',
         command: ['cargo', 'fmt', '--all', '--', '--check'],
-        workingDirectory: 'backend',
+        workingDirectory: 'crates',
       ),
       RunStep(
-        id: 'backend.check',
-        command: ['cargo', 'check', '--locked'],
-        workingDirectory: 'backend',
+        id: 'rust.check',
+        command: ['cargo', 'check', '--locked', '--workspace'],
+        workingDirectory: 'crates',
       ),
       RunStep(
         id: 'backend.test',
         command: ['cargo', 'test', '--locked', '--', '--test-threads=1'],
-        workingDirectory: 'backend',
+        workingDirectory: 'crates/akari-backend',
       ),
       RunStep(
         id: 'backend.test_mock',
@@ -47,17 +47,12 @@ RunPlan createVerificationPlan(
           '--',
           '--test-threads=1',
         ],
-        workingDirectory: 'backend',
-      ),
-      RunStep(
-        id: 'splash.format',
-        command: ['cargo', 'fmt', '--all', '--', '--check'],
-        workingDirectory: 'splash',
+        workingDirectory: 'crates/akari-backend',
       ),
       RunStep(
         id: 'splash.test',
         command: ['cargo', 'test', '--locked'],
-        workingDirectory: 'splash',
+        workingDirectory: 'crates/akari-splash',
       ),
       for (final theme in themes)
         RunStep(

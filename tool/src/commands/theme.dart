@@ -302,11 +302,11 @@ RunStep _createSplashBuildStep(BuildMode mode, int? jobs) => RunStep(
     'build',
     '--locked',
     '--target-dir',
-    '../build/tool/splash',
+    '../../build/tool/splash',
     if (mode != BuildMode.debug) '--release',
     if (jobs != null) ...['--jobs', '$jobs'],
   ],
-  workingDirectory: 'splash',
+  workingDirectory: 'crates/akari-splash',
   dependencies: const [],
 );
 
@@ -321,12 +321,12 @@ RunStep _createBackendBuildStep(
     'build',
     '--locked',
     '--target-dir',
-    getBackendTargetDirectory(backend),
+    '../${getBackendTargetDirectory(backend)}',
     if (mode != BuildMode.debug) '--release',
     if (backend == BackendMode.mock) ...['--features', 'mock'],
     if (jobs != null) ...['--jobs', '$jobs'],
   ],
-  workingDirectory: 'backend',
+  workingDirectory: 'crates/akari-backend',
   dependencies: const [],
 );
 

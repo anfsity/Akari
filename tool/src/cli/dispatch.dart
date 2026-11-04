@@ -88,7 +88,7 @@ Directory _findRepoRoot() {
     final hasRootManifest = File(getJoinedPath(directory.path, 'pubspec.yaml'))
         .existsSync();
     final hasBackendManifest = File(
-      getJoinedPath(directory.path, 'backend/Cargo.toml'),
+      getJoinedPath(directory.path, 'crates/akari-backend/Cargo.toml'),
     ).existsSync();
     if (hasRootManifest && hasBackendManifest) {
       return directory;

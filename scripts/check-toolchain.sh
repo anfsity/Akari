@@ -22,8 +22,8 @@ if [[ ! -f "$repo_root/pubspec.yaml" ]]; then
   printf 'miss %-20s pubspec.yaml is missing\n' project
   missing=1
 fi
-if [[ ! -f "$repo_root/backend/Cargo.toml" ]]; then
-  printf 'miss %-20s backend/Cargo.toml is missing\n' backend
+if [[ ! -f "$repo_root/crates/akari-backend/Cargo.toml" ]]; then
+  printf 'miss %-20s crates/akari-backend/Cargo.toml is missing\n' backend
   missing=1
 fi
 
@@ -50,9 +50,9 @@ else
   missing=1
 fi
 
-if command -v cargo >/dev/null 2>&1 && [[ -f "$repo_root/backend/Cargo.toml" ]]; then
+if command -v cargo >/dev/null 2>&1 && [[ -f "$repo_root/crates/akari-backend/Cargo.toml" ]]; then
   if cargo metadata \
-    --manifest-path "$repo_root/backend/Cargo.toml" \
+    --manifest-path "$repo_root/crates/akari-backend/Cargo.toml" \
     --locked \
     --no-deps \
     --format-version 1 >/dev/null 2>&1; then

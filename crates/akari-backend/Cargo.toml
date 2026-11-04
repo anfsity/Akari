@@ -1,7 +1,11 @@
 [package]
-name = "backend"
+name = "akari-backend"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+
+[[bin]]
+name = "backend"
+path = "src/main.rs"
 
 [features]
 default = []

@@ -30,10 +30,8 @@
 !/linux/**
 
 # Backend
-!/backend/
-!/backend/**
-!/splash/
-!/splash/**
+!/crates/
+!/crates/**
 **/target/
 
 # Project-owned configuration, documentation, and tools.
