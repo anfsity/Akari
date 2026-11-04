@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:greeter_ui/feature/greeter_state.dart';
+import 'package:greeter_ui/greeter_ui.dart';
 
 void main() {
   test('GreeterState owns immutable user and session collections', () {

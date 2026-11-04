@@ -6,16 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:greeter_ui/feature/greeter_feature.dart';
-import 'package:greeter_ui/feature/greeter_state.dart';
-import 'package:greeter_ui/feature/ports/greeter_gateway.dart';
+import 'package:greeter_ui/greeter_ui.dart';
 
 import 'package:greeter/app/app.dart';
 import 'package:greeter_components/greeter_components.dart';
 
 import 'package:theme_default/theme.dart';
 import 'package:theme_sdk/theme_sdk.dart';
-import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
 
 void main() {
   testWidgets('opening choices preserves the wallpaper pointer offset', (

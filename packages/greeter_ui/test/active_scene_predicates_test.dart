@@ -1,7 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:greeter_ui/feature/greeter_slots.dart';
-import 'package:greeter_ui/feature/greeter_state.dart';
-import 'package:greeter_ui/scene/greeter_scene_adapter.dart';
+import 'package:greeter_ui/greeter_ui.dart';
 import 'package:scene/scene.dart';
 
 void main() {

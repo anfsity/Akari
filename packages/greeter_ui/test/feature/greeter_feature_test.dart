@@ -1,12 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:greeter_ui/feature/greeter_commands.dart';
-import 'package:greeter_ui/feature/greeter_effect.dart';
-import 'package:greeter_ui/feature/greeter_feature.dart';
-import 'package:greeter_ui/feature/greeter_state.dart';
-import 'package:greeter_ui/feature/ports/greeter_gateway.dart';
-import 'package:greeter_ui/feature/ports/session_store.dart';
+import 'package:greeter_ui/greeter_ui.dart';
 
 void main() {
   test('initializes from the backend state snapshot', () async {

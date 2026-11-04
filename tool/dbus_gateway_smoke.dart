@@ -2,8 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:greeter_ui/feature/greeter_state.dart';
-import 'package:greeter_ui/feature/ports/greeter_gateway.dart';
+import 'package:greeter_ui/greeter_ui.dart';
 import 'package:greeter/infrastructure/dbus/greeter_dbus_gateway.dart';
 
 void main() {

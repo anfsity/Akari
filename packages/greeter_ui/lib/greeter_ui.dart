@@ -4,13 +4,13 @@
 /// host supplies a `GreeterGateway` and a `SessionStore`.
 library;
 
-export 'feature/greeter_commands.dart';
-export 'feature/greeter_effect.dart';
-export 'feature/greeter_feature.dart';
-export 'feature/greeter_slots.dart';
-export 'feature/greeter_state.dart';
-export 'feature/ports/greeter_gateway.dart';
-export 'feature/ports/session_store.dart';
-export 'scene/greeter_scene_adapter.dart';
+export 'src/feature/greeter_commands.dart';
+export 'src/feature/greeter_effect.dart';
+export 'src/feature/greeter_feature.dart';
+export 'src/feature/greeter_slots.dart';
+export 'src/feature/greeter_state.dart';
+export 'src/feature/ports/greeter_gateway.dart';
+export 'src/feature/ports/session_store.dart';
+export 'src/scene/greeter_scene_adapter.dart';
 
 export 'package:theme_sdk/theme_sdk.dart' show ThemeDefinition;
