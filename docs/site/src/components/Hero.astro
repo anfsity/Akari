@@ -26,8 +26,10 @@ const { title, tagline, actions = [] } = entry.data.hero || {};
         <div class="akari-display-bar"><span>akari</span><span>EN · ◌</span></div>
         <div class="akari-landscape"></div>
         <div class="akari-login-preview">
-          <div class="akari-clock">09:41</div>
-          <div class="akari-date">{isChinese ? '新的一天，从这里开始' : 'A fresh start, every day'}</div>
+          <div class="akari-preview-time">
+            <div class="akari-clock">09:41</div>
+            <div class="akari-date">{isChinese ? '新的一天，从这里开始' : 'A fresh start, every day'}</div>
+          </div>
           <div class="akari-login-card">
             <div class="akari-avatar">a</div>
             <div class="akari-welcome">{isChinese ? '欢迎回来' : 'Welcome back'}</div>

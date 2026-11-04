@@ -24,24 +24,28 @@ hero:
 <div class="akari-features">
   <section>
     <span class="akari-feature-number" aria-hidden="true">01 / DESIGN</span>
+    <div class="akari-feature-art akari-art-widgets" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
     <h3>Flutter graphics & widget ecosystem</h3>
     <p>Compose your greeter with familiar widgets, custom Canvas painting, and rich motion tools. Typography, palettes, layouts, and animations belong entirely to your theme.</p>
     <a href="/Akari/guides/themes/">Explore theme development <span aria-hidden="true">↗</span></a>
   </section>
   <section>
     <span class="akari-feature-number" aria-hidden="true">02 / CREATE</span>
+    <div class="akari-feature-art akari-art-canvas" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
     <h3>Visual scene editing</h3>
     <p>Inspect layers and tune scene properties with the in-development Theme Studio. With hot reload during development, you can refine your layout and components live on the canvas.</p>
     <a href="/Akari/reference/cli/#commands-and-targets">Open Theme Studio <span aria-hidden="true">↗</span></a>
   </section>
   <section>
     <span class="akari-feature-number" aria-hidden="true">03 / DISPLAY</span>
+    <div class="akari-feature-art akari-art-displays" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
     <h3>Multi-display & HiDPI adaptation</h3>
     <p>Themes adapt to each monitor's native resolution and display scale. Account selection, desktop sessions, and authentication state stay synchronized across all screens.</p>
     <a href="/Akari/guides/display-testing/">Explore multiple displays <span aria-hidden="true">↗</span></a>
   </section>
   <section>
     <span class="akari-feature-number" aria-hidden="true">04 / ARCHITECTURE</span>
+    <div class="akari-feature-art akari-art-security" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
     <h3>Presentation on frontend, security in Rust</h3>
     <p>Your Flutter theme compiles to a native Linux interface, while an isolated Rust backend manages greetd and PAM authentication over a private D-Bus boundary.</p>
     <a href="/Akari/architecture/overview/">See how Akari works <span aria-hidden="true">↗</span></a>
@@ -52,11 +56,14 @@ hero:
 
 Preview the included themes on your desktop, then design your own.
 
-| Goal | Guide |
-| --- | --- |
-| Set up development toolchain | [Installation](getting-started/installation.md) |
-| Run desktop previews & mock sessions | [Quick start](getting-started/quick-start.md) |
-| Build your own login theme | [Theme development](guides/themes.md) |
-| Author custom Flutter widgets | [Component guide](guides/components.md) |
-| Look up SDK types and methods | [API reference](reference/api.md) |
-| Explore repository architecture | [Code map](architecture/code-map.md) |
+<div class="akari-guides">
+  <div class="akari-guide-labels"><span>Goal</span><span>Guide</span></div>
+  <ul>
+    <li><a href="/Akari/getting-started/installation/"><span>Set up development toolchain</span><strong>Installation</strong><span class="akari-guide-arrow" aria-hidden="true">↗</span></a></li>
+    <li><a href="/Akari/getting-started/quick-start/"><span>Run desktop previews & mock sessions</span><strong>Quick start</strong><span class="akari-guide-arrow" aria-hidden="true">↗</span></a></li>
+    <li><a href="/Akari/guides/themes/"><span>Build your own login theme</span><strong>Theme development</strong><span class="akari-guide-arrow" aria-hidden="true">↗</span></a></li>
+    <li><a href="/Akari/guides/components/"><span>Author custom Flutter widgets</span><strong>Component guide</strong><span class="akari-guide-arrow" aria-hidden="true">↗</span></a></li>
+    <li><a href="/Akari/reference/api/"><span>Look up SDK types and methods</span><strong>API reference</strong><span class="akari-guide-arrow" aria-hidden="true">↗</span></a></li>
+    <li><a href="/Akari/architecture/code-map/"><span>Explore repository architecture</span><strong>Code map</strong><span class="akari-guide-arrow" aria-hidden="true">↗</span></a></li>
+  </ul>
+</div>
