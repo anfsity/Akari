@@ -110,7 +110,7 @@ Future<void> main(List<String> arguments) async {
     ]) {
       final result = await Process.run(dart.first, [
         ...dart.skip(1),
-        'packages/akari_cli/bin/akari.dart',
+        '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
         'greetd-test',
         if (target.isNotEmpty) target,
         '--help',

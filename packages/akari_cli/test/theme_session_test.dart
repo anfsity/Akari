@@ -42,7 +42,7 @@ exit 17
       expect(chmod.exitCode, 0);
       final launcher = await Process.start(
         'bash',
-        ['scripts/debug-dbus.sh', '--inside-private-bus', client.path],
+        ['${_repoRoot.path}/scripts/debug-dbus.sh', '--inside-private-bus', client.path],
         environment: {
           'PATH': '${temporary.path}:${Platform.environment['PATH']}',
           'AKARI_PRIVATE_BUS': '1',
@@ -110,7 +110,7 @@ pathlib.Path(${jsonEncode(generated.path)}).write_text(content)
       sdk.first,
       [
         ...sdk.skip(1),
-        'packages/akari_cli/bin/theme_session.dart',
+        '${_repoRoot.path}/packages/akari_cli/bin/theme_session.dart',
         theme.path,
         temporary.path,
         'debug',
@@ -232,7 +232,7 @@ finally:
         sdk.first,
         [
           ...sdk.skip(1),
-          'packages/akari_cli/bin/theme_session.dart',
+          '${_repoRoot.path}/packages/akari_cli/bin/theme_session.dart',
           theme.path,
           temporary.path,
           'debug',

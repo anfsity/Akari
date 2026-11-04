@@ -21,7 +21,8 @@ void main() {
 
   Future<ProcessResult> runTool(List<String> arguments) => Process.run(
     '${_repoRoot.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
-    ['packages/akari_cli/bin/akari.dart', ...arguments],
+    ['${_repoRoot.path}/packages/akari_cli/bin/akari.dart', ...arguments],
+    workingDirectory: _repoRoot.path,
     environment: {'XDG_STATE_HOME': temp.path},
   );
 
@@ -53,7 +54,7 @@ void main() {
     );
     expect(steps.last['id'], 'theme.sway');
     final command = steps.last['command'] as List;
-    expect(command, contains(endsWith('scripts/debug-dbus.sh')));
+    expect(command, contains(endsWith('${_repoRoot.path}/scripts/debug-dbus.sh')));
     expect(command, contains(endsWith('scripts/sway-session.py')));
     expect(command, contains(endsWith('themes/fallback')));
     expect(command, isNot(contains(contains('apps/greeter/lib/main.dart'))));

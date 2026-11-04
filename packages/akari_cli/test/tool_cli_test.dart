@@ -94,7 +94,7 @@ runDirectory: 'run',
       final projects = jsonDecode(
         steps.last['environment']['AKARI_THEME_DIRECTORIES_JSON'] as String,
       ) as List;
-      expect(projects, contains(Directory('themes/preset1').absolute.path));
+      expect(projects, contains(Directory('${_repoRoot.path}/themes/preset1').absolute.path));
       expect(
         steps.map((step) => step['id']),
         containsAll([
@@ -1249,7 +1249,7 @@ Future<ProcessResult> _runTool(
   childEnvironment.addAll(environment);
   return Process.run(
     dartCommand.first,
-    [...dartCommand.skip(1), 'packages/akari_cli/bin/akari.dart', ...arguments],
+    [...dartCommand.skip(1), '${_repoRoot.path}/packages/akari_cli/bin/akari.dart', ...arguments],
     workingDirectory: _repoRoot.path,
     environment: childEnvironment,
     includeParentEnvironment: false,
