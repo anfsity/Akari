@@ -3,12 +3,12 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-import '../lib/src/execution/paths.dart';
+import 'package:akari_cli/src/execution/paths.dart';
 
-import '../lib/src/commands/development.dart';
-import '../lib/src/commands/plan.dart';
-import '../lib/src/execution/model.dart';
-import '../lib/src/theme/display_profile.dart';
+import 'package:akari_cli/src/commands/development.dart';
+import 'package:akari_cli/src/commands/plan.dart';
+import 'package:akari_cli/src/execution/model.dart';
+import 'package:akari_cli/src/theme/display_profile.dart';
 
 final _repoRoot = findRepositoryRoot();
 

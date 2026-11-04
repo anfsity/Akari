@@ -42,4 +42,3 @@ class PerformanceTestBinding extends IntegrationTestWidgetsFlutterBinding {
     }
   }
 }
-

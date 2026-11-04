@@ -26,7 +26,8 @@ void createThemeHost({
   final lib = Directory('${output.path}/lib')..createSync(recursive: true);
   final sources = studio
       ? const <FileSystemEntity>[]
-      : Directory('${repoRoot.path}/apps/greeter/lib').listSync(followLinks: false);
+      : Directory('${repoRoot.path}/apps/greeter/lib')
+            .listSync(followLinks: false);
   final names = {'main.dart'};
   for (final source in sources) {
     final name = source.uri.pathSegments.where((part) => part.isNotEmpty).last;
@@ -59,7 +60,9 @@ void createThemeHost({
         'greeter_ui': {'path': '${repoRoot.path}/packages/greeter_ui'},
       },
       if (preview)
-        'greeter_harness': {'path': '${repoRoot.path}/packages/greeter_harness'},
+        'greeter_harness': {
+          'path': '${repoRoot.path}/packages/greeter_harness',
+        },
       if (studio)
         'theme_studio': {'path': '${repoRoot.path}/packages/theme_studio'},
       'theme_sdk': {'path': '${repoRoot.path}/packages/theme_sdk'},

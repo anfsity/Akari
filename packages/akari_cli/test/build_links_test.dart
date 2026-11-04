@@ -2,13 +2,13 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-import '../lib/src/commands/development.dart';
-import '../lib/src/commands/plan.dart';
-import '../lib/src/commands/theme.dart';
-import '../lib/src/execution/model.dart';
-import '../lib/src/theme/build_links.dart';
-import '../lib/src/theme/model.dart';
-import '../lib/src/theme/project.dart';
+import 'package:akari_cli/src/commands/development.dart';
+import 'package:akari_cli/src/commands/plan.dart';
+import 'package:akari_cli/src/commands/theme.dart';
+import 'package:akari_cli/src/execution/model.dart';
+import 'package:akari_cli/src/theme/build_links.dart';
+import 'package:akari_cli/src/theme/model.dart';
+import 'package:akari_cli/src/theme/project.dart';
 
 void main() {
   late Directory repo;

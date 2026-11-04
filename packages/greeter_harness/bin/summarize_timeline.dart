@@ -1,3 +1,3 @@
-import '../lib/src/performance/summarize_timeline.dart' as command;
+import 'package:greeter_harness/src/performance/summarize_timeline.dart' as command;
 
 Future<void> main(List<String> arguments) => command.main(arguments);

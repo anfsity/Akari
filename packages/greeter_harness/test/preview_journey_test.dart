@@ -3,7 +3,6 @@ import 'package:theme_default/theme.dart';
 import 'package:greeter/app/app.dart';
 import 'package:greeter_harness/greeter_harness.dart';
 
-
 void main() {
   testWidgets(
     'preview scenarios release authentication state between journeys',

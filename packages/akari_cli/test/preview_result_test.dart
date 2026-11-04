@@ -3,9 +3,9 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-import '../lib/src/theme/preview_scenarios.dart';
-import '../lib/src/commands/theme.dart';
-import '../lib/src/execution/model.dart';
+import 'package:akari_cli/src/theme/preview_scenarios.dart';
+import 'package:akari_cli/src/commands/theme.dart';
+import 'package:akari_cli/src/execution/model.dart';
 
 void main() {
   test(

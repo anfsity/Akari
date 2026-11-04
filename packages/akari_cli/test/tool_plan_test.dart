@@ -3,9 +3,9 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-import '../lib/src/commands/development.dart';
-import '../lib/src/commands/plan.dart';
-import '../lib/src/execution/model.dart';
+import 'package:akari_cli/src/commands/development.dart';
+import 'package:akari_cli/src/commands/plan.dart';
+import 'package:akari_cli/src/execution/model.dart';
 
 void main() {
   late Directory root;

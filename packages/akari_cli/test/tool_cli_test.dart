@@ -3,17 +3,17 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-import '../lib/src/execution/paths.dart';
+import 'package:akari_cli/src/execution/paths.dart';
 
-import '../lib/src/commands/development.dart';
-import '../lib/src/commands/plan.dart';
-import '../lib/src/commands/theme.dart';
-import '../lib/src/commands/verification.dart';
-import '../lib/src/execution/model.dart';
-import '../lib/src/sdk_commands.dart';
-import '../lib/src/theme/host.dart';
-import '../lib/src/theme/model.dart';
-import '../lib/src/theme/project.dart';
+import 'package:akari_cli/src/commands/development.dart';
+import 'package:akari_cli/src/commands/plan.dart';
+import 'package:akari_cli/src/commands/theme.dart';
+import 'package:akari_cli/src/commands/verification.dart';
+import 'package:akari_cli/src/execution/model.dart';
+import 'package:akari_cli/src/sdk_commands.dart';
+import 'package:akari_cli/src/theme/host.dart';
+import 'package:akari_cli/src/theme/model.dart';
+import 'package:akari_cli/src/theme/project.dart';
 
 final _repoRoot = findRepositoryRoot();
 
@@ -596,6 +596,8 @@ sys.exit(1)
         'scene_schema.analyze',
         'scene_codegen.analyze',
         'theme_project.analyze',
+        'akari_cli.analyze',
+        'greeter_harness.analyze',
         'scene.analyze',
         'greeter_ui.analyze',
         'greeter_components.analyze',

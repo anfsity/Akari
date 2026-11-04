@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 
-import '../lib/src/cli/definition.dart';
+import 'package:akari_cli/src/cli/definition.dart';
 
 void main() {
   test('short and long options normalize to the same values', () {

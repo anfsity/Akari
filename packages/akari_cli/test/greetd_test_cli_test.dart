@@ -3,10 +3,10 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-import '../lib/src/execution/paths.dart';
+import 'package:akari_cli/src/execution/paths.dart';
 
-import '../lib/src/commands/greetd_test.dart';
-import '../lib/src/sdk_commands.dart';
+import 'package:akari_cli/src/commands/greetd_test.dart';
+import 'package:akari_cli/src/sdk_commands.dart';
 
 final _repoRoot = findRepositoryRoot();
 

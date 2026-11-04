@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-import '../lib/src/commands/performance.dart';
-import '../lib/src/theme/project.dart';
+import 'package:akari_cli/src/commands/performance.dart';
+import 'package:akari_cli/src/theme/project.dart';
 
 void main() {
   late Directory temporary;

@@ -1,8 +1,8 @@
 import 'dart:io';
 
-import '../lib/src/execution/paths.dart';
-import '../lib/src/theme/model.dart';
-import '../lib/src/theme/session.dart';
+import 'package:akari_cli/src/execution/paths.dart';
+import 'package:akari_cli/src/theme/model.dart';
+import 'package:akari_cli/src/theme/session.dart';
 
 Future<void> main(List<String> arguments) async {
   if (arguments.length != 4) {

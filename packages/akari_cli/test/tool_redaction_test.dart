@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 
-import '../lib/src/execution/redaction.dart';
+import 'package:akari_cli/src/execution/redaction.dart';
 
 void main() {
   test(
