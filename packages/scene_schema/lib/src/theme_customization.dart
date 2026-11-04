@@ -1,4 +1,4 @@
-import 'package:scene/scene.dart';
+import 'scene_document.dart';
 
 /// Theme-owned editing capabilities. Unlisted components and properties remain
 /// code-owned; this catalog does not replace the scene or component factory.

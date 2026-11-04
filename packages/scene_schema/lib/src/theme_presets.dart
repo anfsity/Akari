@@ -1,4 +1,4 @@
-import 'package:scene/scene.dart';
+import 'scene_document.dart';
 
 import 'theme_customization.dart';
 

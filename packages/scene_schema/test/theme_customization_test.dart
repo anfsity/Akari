@@ -1,0 +1,99 @@
+import 'package:test/test.dart';
+import 'package:scene_schema/scene_schema.dart';
+
+enum _Style { regular, large }
+
+const _text = ThemeTextProperty(
+  name: 'text',
+  label: 'Text',
+  defaultValue: 'Welcome',
+);
+const _style = ThemeChoiceProperty(
+  name: 'variant',
+  label: 'Text style',
+  defaultValue: _Style.regular,
+  choices: {_Style.regular: 'Regular', _Style.large: 'Large'},
+);
+const _catalog = ThemeComponentCatalog(
+  components: {
+    'label': ThemeComponentDefinition(
+      label: 'Label',
+      properties: [_text, _style],
+    ),
+  },
+);
+const _presets = ThemePresetCatalog(properties: [_style]);
+
+SceneDocument _getDocument(Map<String, String> properties) => SceneDocument(
+  id: 'test',
+  version: currentSceneVersion,
+  canvas: const SceneCanvas(),
+  background: const SceneBackground(kind: SceneBackgroundKind.solid),
+  nodes: [
+    SceneNode(
+      id: 'heading',
+      componentId: 'label',
+      rect: const SceneRect(x: 0, y: 0, width: 1, height: 1),
+      properties: properties,
+    ),
+  ],
+);
+
+void main() {
+  test('theme preset choices validate and preserve author defaults and private values', () {
+    final document = _getDocument({});
+    _presets.validateDocument(document);
+    expect(document.themeProperties, isEmpty);
+    expect(_style.getValue(document.themeProperties), _Style.regular);
+    final updated = document.copyWith(
+      themeProperties: {'variant': 'large', 'private': 'keep'},
+    );
+    final encoded = encodeSceneDocument(updated);
+    _presets.validateDocument(updated);
+    expect(encodeSceneDocument(updated), encoded);
+    expect(
+      () => _presets.validateDocument(
+        document.copyWith(themeProperties: {'variant': 'Large'}),
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test(
+    'omitted properties use runtime defaults without rewriting the scene',
+    () {
+      final document = _getDocument({});
+      _catalog.validateDocument(document);
+      expect(_text.getValue(document.nodes.single.properties), 'Welcome');
+      expect(_style.getValue(document.nodes.single.properties), _Style.regular);
+      expect(document.nodes.single.properties, isEmpty);
+    },
+  );
+
+  test('choices decode stable enum names rather than display labels', () {
+    expect(_style.getValue({'variant': 'large'}), _Style.large);
+    expect(
+      () => _catalog.validateDocument(_getDocument({'variant': 'Large'})),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          'Node "heading": Property "variant" must be one of: regular, large.',
+        ),
+      ),
+    );
+  });
+
+  test('partial opt-in preserves undeclared properties and components', () {
+    final document = _getDocument({'private': 'keep'});
+    final encoded = encodeSceneDocument(document);
+    _catalog.validateDocument(document);
+    _catalog.validateDocument(
+      document.copyWith(
+        nodes: [document.nodes.single.copyWith(componentId: 'custom')],
+      ),
+    );
+    expect(encodeSceneDocument(document), encoded);
+  });
+
+}

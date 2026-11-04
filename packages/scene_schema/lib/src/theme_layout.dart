@@ -1,4 +1,4 @@
-import 'package:scene/scene.dart';
+import 'scene_document.dart';
 
 /// Composition rules for one authored scene. A stable node ID identifies each
 /// slot; its template supplies insertion defaults, not overrides for live edits.

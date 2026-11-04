@@ -5,9 +5,6 @@ import 'package:scene/scene.dart';
 import 'greeter_host.dart';
 import 'palette_extractor.dart';
 import 'theme_components.dart';
-import 'theme_customization.dart';
-import 'theme_layout.dart';
-import 'theme_presets.dart';
 
 /// Studio supplies its authored document; the production host omits it to use
 /// the package's generated scene. Both paths must resolve the same choices.

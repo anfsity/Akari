@@ -41,62 +41,6 @@ SceneDocument _getDocument(Map<String, String> properties) => SceneDocument(
 );
 
 void main() {
-  test('theme preset choices validate and preserve author defaults and private values', () {
-    final document = _getDocument({});
-    _presets.validateDocument(document);
-    expect(document.themeProperties, isEmpty);
-    expect(_style.getValue(document.themeProperties), _Style.regular);
-    final updated = document.copyWith(
-      themeProperties: {'variant': 'large', 'private': 'keep'},
-    );
-    final encoded = encodeSceneDocument(updated);
-    _presets.validateDocument(updated);
-    expect(encodeSceneDocument(updated), encoded);
-    expect(
-      () => _presets.validateDocument(
-        document.copyWith(themeProperties: {'variant': 'Large'}),
-      ),
-      throwsFormatException,
-    );
-  });
-
-  test(
-    'omitted properties use runtime defaults without rewriting the scene',
-    () {
-      final document = _getDocument({});
-      _catalog.validateDocument(document);
-      expect(_text.getValue(document.nodes.single.properties), 'Welcome');
-      expect(_style.getValue(document.nodes.single.properties), _Style.regular);
-      expect(document.nodes.single.properties, isEmpty);
-    },
-  );
-
-  test('choices decode stable enum names rather than display labels', () {
-    expect(_style.getValue({'variant': 'large'}), _Style.large);
-    expect(
-      () => _catalog.validateDocument(_getDocument({'variant': 'Large'})),
-      throwsA(
-        isA<FormatException>().having(
-          (error) => error.message,
-          'message',
-          'Node "heading": Property "variant" must be one of: regular, large.',
-        ),
-      ),
-    );
-  });
-
-  test('partial opt-in preserves undeclared properties and components', () {
-    final document = _getDocument({'private': 'keep'});
-    final encoded = encodeSceneDocument(document);
-    _catalog.validateDocument(document);
-    _catalog.validateDocument(
-      document.copyWith(
-        nodes: [document.nodes.single.copyWith(componentId: 'custom')],
-      ),
-    );
-    expect(encodeSceneDocument(document), encoded);
-  });
-
   test('copying a theme preserves its editing catalog', () {
     final theme = ThemeDefinition(
       id: 'test',

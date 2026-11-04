@@ -1,5 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:theme_sdk/theme_sdk.dart';
+import 'package:test/test.dart';
+import 'package:scene_schema/scene_schema.dart';
 
 const _credential = SceneNode(
   id: 'credential',
