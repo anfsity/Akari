@@ -34,7 +34,11 @@ void createThemeHost({
     if (name == 'main.dart') continue;
     names.add(name);
     final link = Link('${lib.path}/$name');
-    if (!link.existsSync()) link.createSync(source.path);
+    if (!link.existsSync()) {
+      link.createSync(source.path);
+    } else if (link.targetSync() != source.path) {
+      link.updateSync(source.path);
+    }
   }
   for (final entity in lib.listSync(followLinks: false)) {
     final name = entity.uri.pathSegments.where((part) => part.isNotEmpty).last;

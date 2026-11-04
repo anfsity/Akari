@@ -280,7 +280,7 @@ runDirectory: 'run',
   });
 
   test(
-    'host synchronization preserves caches and unchanged file timestamps',
+    'host synchronization repairs moved sources and preserves caches and timestamps',
     () async {
       final project = await _createThemeProject(tempRoot);
       final theme = getThemePackage(project);
@@ -301,6 +301,8 @@ runDirectory: 'run',
         output: host,
         kind: ThemeHostKind.preview,
       );
+      // Cached hosts from before the app move still point at the old source root.
+      await Link('${host.path}/lib/app').update('${repository.path}/lib/app');
       final manifest = File('${host.path}/pubspec.yaml');
       final originalModified = DateTime.utc(2020);
       await manifest.setLastModified(originalModified);
