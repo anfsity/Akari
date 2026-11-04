@@ -583,6 +583,7 @@ sys.exit(1)
       selectedThemeOnly: false,
     ).steps;
 
+    expect(steps.map((step) => step.id).toSet(), hasLength(steps.length));
     expect(
       steps
           .where((step) => step.id.startsWith('scenes.generate_'))

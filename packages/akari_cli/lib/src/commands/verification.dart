@@ -90,13 +90,31 @@ RunPlan createVerificationPlan(
         'akari_cli',
       ])
         ..._getDartPackageVerificationSteps(repoRoot, packageName),
-      for (final packageName in ['scene', 'greeter_ui', 'greeter_harness'])
+      for (final packageName in [
+        'scene',
+        'greeter_ui',
+        'greeter_harness',
+        'greeter_components',
+        'theme_sdk',
+        'theme_studio',
+      ]) ...[
+        RunStep(
+          id: '$packageName.pub_get',
+          command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+          workingDirectory: 'packages/$packageName',
+        ),
         ..._getFlutterPackageVerificationSteps(
           repoRoot,
           Directory(getJoinedPath(repoRoot.path, 'packages/$packageName')),
           packageName,
         ),
-      ..._getThemeVerificationSteps(repoRoot, themes),
+      ],
+      for (final theme in themes)
+        ..._getFlutterPackageVerificationSteps(
+          repoRoot,
+          theme.directory,
+          theme.packageName,
+        ),
       RunStep(
         id: 'dbus.smoke',
         command: [
@@ -115,30 +133,6 @@ RunPlan createVerificationPlan(
   );
 }
 
-List<RunStep> _getThemeVerificationSteps(
-  Directory repoRoot,
-  List<ThemePackage> themes,
-) {
-  return [
-    for (final packageName in [
-      'greeter_components',
-      'theme_sdk',
-      'theme_studio',
-    ])
-      ..._getFlutterPackageVerificationSteps(
-        repoRoot,
-        Directory(getJoinedPath(repoRoot.path, 'packages/$packageName')),
-        packageName,
-      ),
-    for (final theme in themes)
-      ..._getFlutterPackageVerificationSteps(
-        repoRoot,
-        theme.directory,
-        theme.packageName,
-      ),
-  ];
-}
-
 List<RunStep> _getFlutterPackageVerificationSteps(
   Directory repoRoot,
   Directory directory,
@@ -154,11 +148,6 @@ List<RunStep> _getFlutterPackageVerificationSteps(
   final flutter = getFlutterCommand(repoRoot);
 
   return [
-    RunStep(
-      id: '$packageName.pub_get',
-      command: [...flutter, 'pub', 'get'],
-      workingDirectory: directory.path,
-    ),
     RunStep(
       id: '$packageName.analyze',
       command: [...flutter, 'analyze'],
