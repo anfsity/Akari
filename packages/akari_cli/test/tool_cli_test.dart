@@ -756,6 +756,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         'flutter',
         'dbus',
         'greeter_ui',
+        'greeter_harness',
         'theme_sdk',
         'theme_ocean',
       ]),
