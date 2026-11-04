@@ -1,5 +1,6 @@
 //! Wire messages and errors shared by real and mock greetd transports.
 
+#[cfg(any(not(feature = "mock"), test))]
 use std::io;
 
 use serde::Deserialize;
@@ -11,26 +12,32 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum GreetdError {
     #[error("GREETD_SOCK is not set")]
-    #[cfg_attr(feature = "mock", allow(dead_code))]
+    #[cfg(any(not(feature = "mock"), test))]
     SocketNotConfigured,
     #[error("could not connect to greetd")]
-    #[cfg_attr(feature = "mock", allow(dead_code))]
+    #[cfg(any(not(feature = "mock"), test))]
     Connect(#[source] io::Error),
     #[error("could not encode greetd request")]
+    #[cfg(any(not(feature = "mock"), test))]
     Encode(#[source] serde_json::Error),
     #[error("greetd request is too large")]
+    #[cfg(any(not(feature = "mock"), test))]
     RequestTooLarge,
     #[error("greetd socket I/O failed")]
+    #[cfg(any(not(feature = "mock"), test))]
     Io(#[source] io::Error),
     #[error("greetd request timed out")]
     Timeout,
     #[error("greetd request was cancelled")]
     Cancelled,
     #[error("greetd response frame is too large")]
+    #[cfg(any(not(feature = "mock"), test))]
     ResponseTooLarge,
     #[error("greetd response was truncated")]
+    #[cfg(any(not(feature = "mock"), test))]
     ResponseTruncated,
     #[error("greetd response was malformed")]
+    #[cfg(any(not(feature = "mock"), test))]
     Decode(#[source] serde_json::Error),
     #[error("unexpected greetd response: {0}")]
     UnexpectedResponse(String),
