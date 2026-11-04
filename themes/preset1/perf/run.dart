@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:akari_cli/akari_cli.dart';
 
-
 /// Run the performance journey in the same nested Sway environment as preview.
 /// The compositor report is retained alongside frame metrics so a result cannot
 /// silently describe the host desktop's different scale or software renderer.

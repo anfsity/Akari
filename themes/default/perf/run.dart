@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:akari_cli/akari_cli.dart';
 
-
 Future<void> main(List<String> arguments) async {
   try {
     final output = Directory(Platform.environment['AKARI_PERF_OUTPUT_DIR']!);

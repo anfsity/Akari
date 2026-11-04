@@ -1,8 +1,7 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
-import 'dart:ui' show PointerDeviceKind;
+import 'dart:ui' show FrameTiming, PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
