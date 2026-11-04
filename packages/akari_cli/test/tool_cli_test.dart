@@ -285,13 +285,13 @@ runDirectory: 'run',
       final project = await _createThemeProject(tempRoot);
       final theme = getThemePackage(project);
       final repository = Directory('${tempRoot.path}/repo');
-      await Directory('${repository.path}/lib/app').create(recursive: true);
-      await File('${repository.path}/lib/app/app.dart').writeAsString('first');
-      await Directory('${repository.path}/linux/flutter')
+      await Directory('${repository.path}/apps/greeter/lib/app').create(recursive: true);
+      await File('${repository.path}/apps/greeter/lib/app/app.dart').writeAsString('first');
+      await Directory('${repository.path}/apps/greeter/linux/flutter')
           .create(recursive: true);
-      final cmake = File('${repository.path}/linux/CMakeLists.txt');
+      final cmake = File('${repository.path}/apps/greeter/linux/CMakeLists.txt');
       await cmake.writeAsString('cmake');
-      await File('${repository.path}/pubspec.yaml').writeAsString(
+      await File('${repository.path}/apps/greeter/pubspec.yaml').writeAsString(
         'version: 1.0.0\nenvironment: {sdk: ^3.13.2}\ndependencies: {dbus: ^0.7.11}\n',
       );
       final host = Directory('${tempRoot.path}/host');
@@ -310,7 +310,7 @@ runDirectory: 'run',
       await Directory('${host.path}/build').create();
       await File('${host.path}/build/cache').writeAsString('cached');
       await File('${host.path}/linux/obsolete.cc').writeAsString('obsolete');
-      await File('${repository.path}/lib/app/app.dart').writeAsString('second');
+      await File('${repository.path}/apps/greeter/lib/app/app.dart').writeAsString('second');
       createThemeHost(
         repoRoot: repository,
         theme: theme,
@@ -544,7 +544,7 @@ sys.exit(1)
       );
       expect(
         steps.singleWhere((step) => step['id'] == 'flutter.analyze')['command'],
-        isNot(contains('tool/dev_main.dart')),
+        isNot(contains('apps/greeter/lib/main.dart')),
       );
     },
   );
@@ -690,7 +690,7 @@ sys.exit(1)
 
   test('preview launches an external theme using only its selected theme dependency', () async {
     final project = await _createThemeProject(tempRoot);
-    final platformManifest = File('pubspec.yaml');
+    final platformManifest = File('${_repoRoot.path}/apps/greeter/pubspec.yaml');
     final manifestBefore = await platformManifest.readAsString();
     final flutter = File('${tempRoot.path}/flutter');
     final dart = File('${tempRoot.path}/dart');

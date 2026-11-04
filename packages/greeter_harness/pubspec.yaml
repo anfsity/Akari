@@ -20,6 +20,6 @@ dependencies:
 dev_dependencies:
   flutter_lints: ^6.0.0
   greeter:
-    path: ../..
+    path: ../../apps/greeter
   theme_default:
     path: ../../themes/default

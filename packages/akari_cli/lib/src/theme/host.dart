@@ -26,7 +26,7 @@ void createThemeHost({
   final lib = Directory('${output.path}/lib')..createSync(recursive: true);
   final sources = studio
       ? const <FileSystemEntity>[]
-      : Directory('${repoRoot.path}/lib').listSync(followLinks: false);
+      : Directory('${repoRoot.path}/apps/greeter/lib').listSync(followLinks: false);
   final names = {'main.dart'};
   for (final source in sources) {
     final name = source.uri.pathSegments.where((part) => part.isNotEmpty).last;
@@ -40,12 +40,12 @@ void createThemeHost({
     if (!names.contains(name)) entity.deleteSync(recursive: true);
   }
   _syncDirectory(
-    Directory('${repoRoot.path}/linux'),
+    Directory('${repoRoot.path}/apps/greeter/linux'),
     Directory('${output.path}/linux'),
   );
 
   final platform = loadYaml(
-    File('${repoRoot.path}/pubspec.yaml').readAsStringSync(),
+    File('${repoRoot.path}/apps/greeter/pubspec.yaml').readAsStringSync(),
   ) as YamlMap;
   final manifest = {
     'name': 'greeter',

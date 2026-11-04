@@ -8,26 +8,21 @@
 !/.fvmrc
 !/.gitignore
 !/README.md
-!/pubspec.yaml
-!/pubspec.lock
 !/analysis_options.yaml
-!/.metadata
 !/LICENSE
 !/dartdoc_options.yaml
 
 # Flutter/Dart application code and tests.
-!/lib/
+!/apps/
+!/apps/**
 !/packages/
 !/packages/**
 !/themes/
 !/themes/**
-!/lib/**
 !/test/
 !/test/**
 
 # Linux runner and application resources.
-!/linux/
-!/linux/**
 
 # Backend
 !/crates/

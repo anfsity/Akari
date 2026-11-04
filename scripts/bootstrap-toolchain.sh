@@ -16,8 +16,8 @@ fvm install
 fvm use stable --force
 fvm flutter config --enable-linux-desktop
 
-fvm dart pub get --directory packages/akari_cli
-fvm flutter pub get
+(cd packages/akari_cli && fvm dart pub get)
+(cd apps/greeter && fvm flutter pub get)
 cargo fetch --manifest-path "$repo_root/crates/Cargo.toml" --locked
 printf '%s\n' 'Flutter toolchain ready.'
 fvm flutter doctor -v

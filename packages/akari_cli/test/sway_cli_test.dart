@@ -56,7 +56,7 @@ void main() {
     expect(command, contains(endsWith('scripts/debug-dbus.sh')));
     expect(command, contains(endsWith('scripts/sway-session.py')));
     expect(command, contains(endsWith('themes/fallback')));
-    expect(command, isNot(contains(contains('tool/dev_main.dart'))));
+    expect(command, isNot(contains(contains('apps/greeter/lib/main.dart'))));
     expect(steps.last['environment']['AKARI_BACKEND_MODE'], 'mock');
     expect(steps.last['dependencies'], ['backend.build', 'theme.host.pub_get']);
     expect(

@@ -12,18 +12,17 @@ dependencies:
   cupertino_icons: ^1.0.8
   dbus: ^0.7.11
   greeter_ui:
-    path: packages/greeter_ui
+    path: ../../packages/greeter_ui
   scene:
-    path: packages/scene
+    path: ../../packages/scene
   theme_sdk:
-    path: packages/theme_sdk
+    path: ../../packages/theme_sdk
+
+  theme_default:
+    path: ../../themes/default
 
 dev_dependencies:
-  akari_cli:
-    path: packages/akari_cli
   flutter_lints: ^6.0.0
-  theme_default:
-    path: themes/default
   flutter_test:
     sdk: flutter
 

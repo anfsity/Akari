@@ -62,88 +62,51 @@ RunPlan createVerificationPlan(
         ),
       ...createSceneGenerationSteps(repoRoot, themes),
       RunStep(
+        id: 'greeter.pub_get',
+        command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+        workingDirectory: 'apps/greeter',
+      ),
+      RunStep(
         id: 'flutter.analyze',
         command: [
           ...getFlutterCommand(repoRoot),
           'analyze',
-          'lib',
+          'lib/app',
+          'lib/infrastructure',
           'test',
-          'tool/src',
-          'packages/akari_cli/bin/akari.dart',
-          'packages/akari_cli/bin/theme_session.dart',
-          'tool/dbus_gateway_smoke.dart',
-          if (!selectedThemeOnly) 'tool/dev_main.dart',
+          if (!selectedThemeOnly) 'lib/main.dart',
         ],
+        workingDirectory: 'apps/greeter',
       ),
       RunStep(
         id: 'flutter.test',
         command: [...getFlutterCommand(repoRoot), 'test'],
+        workingDirectory: 'apps/greeter',
       ),
-      RunStep(
-        id: 'scene_schema.analyze',
-        command: [...getDartCommand(repoRoot), 'analyze'],
-        workingDirectory: 'packages/scene_schema',
-      ),
-      RunStep(
-        id: 'scene_schema.test',
-        command: [...getDartCommand(repoRoot), 'test'],
-        workingDirectory: 'packages/scene_schema',
-      ),
-      RunStep(
-        id: 'scene_codegen.analyze',
-        command: [...getDartCommand(repoRoot), 'analyze'],
-        workingDirectory: 'packages/scene_codegen',
-      ),
-      RunStep(
-        id: 'scene_codegen.test',
-        command: [...getDartCommand(repoRoot), 'test'],
-        workingDirectory: 'packages/scene_codegen',
-      ),
-      RunStep(
-        id: 'theme_project.pub_get',
-        command: [...getDartCommand(repoRoot), 'pub', 'get'],
-        workingDirectory: 'packages/theme_project',
-      ),
-      RunStep(
-        id: 'theme_project.analyze',
-        command: [...getDartCommand(repoRoot), 'analyze'],
-        workingDirectory: 'packages/theme_project',
-      ),
-      RunStep(
-        id: 'theme_project.test',
-        command: [...getDartCommand(repoRoot), 'test'],
-        workingDirectory: 'packages/theme_project',
-      ),
-      RunStep(
-        id: 'scene.analyze',
-        command: [...getFlutterCommand(repoRoot), 'analyze'],
-        workingDirectory: 'packages/scene',
-      ),
-      RunStep(
-        id: 'scene.test',
-        command: [...getFlutterCommand(repoRoot), 'test'],
-        workingDirectory: 'packages/scene',
-      ),
-      RunStep(
-        id: 'greeter_ui.analyze',
-        command: [...getFlutterCommand(repoRoot), 'analyze'],
-        workingDirectory: 'packages/greeter_ui',
-      ),
-      RunStep(
-        id: 'greeter_ui.test',
-        command: [...getFlutterCommand(repoRoot), 'test'],
-        workingDirectory: 'packages/greeter_ui',
-      ),
+      for (final packageName in [
+        'scene_schema',
+        'scene_codegen',
+        'theme_project',
+        'akari_cli',
+      ])
+        ..._getDartPackageVerificationSteps(repoRoot, packageName),
+      for (final packageName in ['scene', 'greeter_ui', 'greeter_harness'])
+        ..._getFlutterPackageVerificationSteps(
+          repoRoot,
+          Directory(getJoinedPath(repoRoot.path, 'packages/$packageName')),
+          packageName,
+        ),
       ..._getThemeVerificationSteps(repoRoot, themes),
       RunStep(
         id: 'dbus.smoke',
         command: [
           'bash',
-          'scripts/debug-dbus.sh',
+          '${repoRoot.path}/scripts/debug-dbus.sh',
           ...getFlutterCommand(repoRoot),
           'test',
-          'tool/dbus_gateway_smoke.dart',
+          'test/dbus_gateway_smoke.dart',
         ],
+        workingDirectory: 'apps/greeter',
         environment: {
           'AKARI_LOG_DIR': getJoinedPath(repoRoot.path, '$runDirectory/dbus'),
         },
@@ -157,11 +120,6 @@ List<RunStep> _getThemeVerificationSteps(
   List<ThemePackage> themes,
 ) {
   return [
-    RunStep(
-      id: 'theme_studio.pub_get',
-      command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
-      workingDirectory: 'packages/theme_studio',
-    ),
     for (final packageName in [
       'greeter_components',
       'theme_sdk',
@@ -197,6 +155,11 @@ List<RunStep> _getFlutterPackageVerificationSteps(
 
   return [
     RunStep(
+      id: '$packageName.pub_get',
+      command: [...flutter, 'pub', 'get'],
+      workingDirectory: directory.path,
+    ),
+    RunStep(
       id: '$packageName.analyze',
       command: [...flutter, 'analyze'],
       workingDirectory: directory.path,
@@ -206,6 +169,25 @@ List<RunStep> _getFlutterPackageVerificationSteps(
         id: '$packageName.test',
         command: [...flutter, 'test'],
         workingDirectory: directory.path,
+      ),
+  ];
+}
+
+List<RunStep> _getDartPackageVerificationSteps(
+  Directory repoRoot,
+  String packageName,
+) {
+  final dart = getDartCommand(repoRoot);
+  return [
+    for (final operation in [
+      ('pub_get', ['pub', 'get']),
+      ('analyze', ['analyze']),
+      ('test', ['test']),
+    ])
+      RunStep(
+        id: '$packageName.${operation.$1}',
+        command: [...dart, ...operation.$2],
+        workingDirectory: 'packages/$packageName',
       ),
   ];
 }

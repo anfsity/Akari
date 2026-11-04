@@ -18,8 +18,8 @@ check_command() {
 }
 
 printf '%s\n' "Akari toolchain: $repo_root"
-if [[ ! -f "$repo_root/pubspec.yaml" ]]; then
-  printf 'miss %-20s pubspec.yaml is missing\n' project
+if [[ ! -f "$repo_root/apps/greeter/pubspec.yaml" ]]; then
+  printf 'miss %-20s apps/greeter/pubspec.yaml is missing\n' project
   missing=1
 fi
 if [[ ! -f "$repo_root/crates/akari-backend/Cargo.toml" ]]; then
