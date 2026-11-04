@@ -5,7 +5,7 @@ description: Command targets, accepted options, display profiles, and execution 
 
 ## Commands and targets
 
-Run commands from the repository root with `fvm dart run tool/akari.dart COMMAND`, or install the [shell launcher](#shell-launcher-and-completion) and use `akari COMMAND`.
+Run commands from the repository root with `fvm dart run packages/akari_cli/bin/akari.dart COMMAND`, or install the [shell launcher](#shell-launcher-and-completion) and use `akari COMMAND`.
 
 | Command | Purpose | Command-specific options |
 | --- | --- | --- |
@@ -105,13 +105,13 @@ Then reboot to return to your previous display manager.
 Install the user-level `akari` wrapper (`~/.local/bin/akari`) and completion scripts (`~/.local/share/akari/`):
 
 ```sh
-fvm dart run tool/akari.dart install cli --shell zsh
+fvm dart run packages/akari_cli/bin/akari.dart install cli --shell zsh
 # Or for bash:
-fvm dart run tool/akari.dart install cli --shell bash
+fvm dart run packages/akari_cli/bin/akari.dart install cli --shell bash
 ```
 
 - Use `--prefix PATH` and `--rc PATH` to customize installation locations.
-- Re-run `install cli` if you move the repository or update CLI option definitions in `tool/src/cli/definition.dart`.
+- Re-run `install cli` if you move the repository or update CLI option definitions in `packages/akari_cli/lib/src/cli/definition.dart`.
 - Print raw completion scripts manually with `akari completion --shell zsh|bash`.
 
 ## Repository scripts
@@ -150,7 +150,7 @@ akari run sway --display-profile reference --sway-backend headless
 | --- | --- |
 | `auto` (default) | Imports the newest marked DRM snapshot from `/opt/akari-test/current-run/greeter/session-*/` into `${XDG_STATE_HOME:-~/.local/state}/akari/display-profiles/login.json`, or falls back to `reference`. |
 | `login` | Requires a valid imported or newly captured TTY login profile; fails if none exists. |
-| `reference` | Uses `config/sway/reference.json` (`1920x1080`, scale `1.0`), ignoring saved login captures. Required when overriding `--resolution` or `--scale` on a multi-monitor setup. |
+| `reference` | Uses `scripts/sway/reference.json` (`1920x1080`, scale `1.0`), ignoring saved login captures. Required when overriding `--resolution` or `--scale` on a multi-monitor setup. |
 
 ### Output verification & Hyprland compensation
 
@@ -164,11 +164,11 @@ For step-by-step usage, see [Test displays and scaling](../guides/display-testin
 
 `akari verify` checks shared packages, the Rust backend, Theme Studio, and all themes under `themes/` (or a single theme with `--theme PATH`).
 
-For direct IDE debugging without the CLI host generator, `tool/dev_main.dart` injects the default theme into the root project:
+For direct IDE debugging without the CLI host generator, `apps/greeter/lib/main.dart` injects the default theme into the root project:
 
 ```sh
-fvm dart run tool/akari.dart generate-scenes --theme themes/default
-fvm flutter run -d linux --target tool/dev_main.dart
+fvm dart run packages/akari_cli/bin/akari.dart generate-scenes --theme themes/default
+fvm flutter run -d linux --target apps/greeter/lib/main.dart
 ```
 
 ## Reports and build outputs
@@ -180,8 +180,8 @@ fvm flutter run -d linux --target tool/dev_main.dart
 ## Theme performance commands
 
 ```sh
-fvm dart run tool/akari.dart verify-perf --theme themes/default -- --cycles 5
-fvm dart run tool/akari.dart trace-perf --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart verify-perf --theme themes/default -- --cycles 5
+fvm dart run packages/akari_cli/bin/akari.dart trace-perf --theme themes/default
 ```
 
 `verify-perf` (`perf`) and `trace-perf` (`trace`) run the commands declared in the selected theme's `pubspec.yaml` `perf:` block and validate `result.json` inside `AKARI_PERF_OUTPUT_DIR` (`build/tool/runs/<run-id>/perf/`). See the [Performance protocol](theme-package.md#performance-protocol).
@@ -190,4 +190,4 @@ fvm dart run tool/akari.dart trace-perf --theme themes/default
 
 - **Host reuse**: Generated hosts under `build/tool/hosts/` retain Flutter and CMake caches across runs and pass `--no-pub` after resolving dependencies.
 - **Parallel jobs (`--jobs COUNT`)**: Bounds Cargo build tasks and CMake/Ninja C++ compile/link pools while building the Rust backend and Flutter frontend in parallel.
-- **Target isolation**: Mock and real Rust builds use separate directories (`backend/target/akari-mock/` and `backend/target/akari-real/`), and per-theme locks allow different themes to build in parallel.
+- **Target isolation**: Mock and real Rust builds use separate directories (`crates/target/akari-mock/` and `crates/target/akari-real/`), and per-theme locks allow different themes to build in parallel.

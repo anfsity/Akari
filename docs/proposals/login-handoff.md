@@ -6,7 +6,7 @@ The native login handoff coordinates seamless visual transitions and VT ownershi
 
 | Transition stage | Owner | Handoff behavior |
 | --- | --- | --- |
-| **Before Greeter Sway** | `scripts/splash.sh` + `akari-splash kms` | Starts the private D-Bus and waits for the backend, then runs `akari-splash kms` and waits for it to exit before starting Sway. Saves a snapshot (`splash.png`) displayed by `swaybg` while Flutter loads. |
+| **Before Greeter Sway** | `system/splash.sh` + `akari-splash kms` | Starts the private D-Bus and waits for the backend, then runs `akari-splash kms` and waits for it to exit before starting Sway. Saves a snapshot (`splash.png`) displayed by `swaybg` while Flutter loads. |
 | **Before User Desktop** | User-side session launcher (`session_launch.rs`) | After greeter exit, initializes `startup-*.log` and `session-*.log`, runs `akari-splash kms`, and `exec`s the desktop command directly so the desktop retains the launcher's PID and exit status. |
 
 - Signals (`SIGINT`, `SIGTERM`) and launcher exit cleanly terminate and reap child processes.

@@ -6,7 +6,7 @@
 
 | 过渡阶段 | 负责模块 | 交接行为 |
 | --- | --- | --- |
-| **登录界面 Sway 启动前** | `scripts/splash.sh` + `akari-splash kms` | 先启动私有 D-Bus 并等待后端就绪，再运行 `akari-splash kms`；待渲染进程退出并释放显示控制权后启动 Sway。同时保存静态快照（`splash.png`），在 Flutter 加载期间由 `swaybg` 作为背景展示。 |
+| **登录界面 Sway 启动前** | `system/splash.sh` + `akari-splash kms` | 先启动私有 D-Bus 并等待后端就绪，再运行 `akari-splash kms`；待渲染进程退出并释放显示控制权后启动 Sway。同时保存静态快照（`splash.png`），在 Flutter 加载期间由 `swaybg` 作为背景展示。 |
 | **用户桌面启动前** | 用户侧启动器（`session_launch.rs`） | 登录界面退出后，初始化 `startup-*.log` 与 `session-*.log`，运行 `akari-splash kms`，随后直接 `exec` 桌面命令，使桌面保留启动器的进程 PID 与退出码。 |
 
 - 收到退出信号（`SIGINT`、`SIGTERM`）或启动器退出时，会一并终止并回收子进程。

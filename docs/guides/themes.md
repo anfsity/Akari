@@ -28,7 +28,7 @@ The builder function name derives from the `pubspec.yaml` package name (`theme_o
 
 ## 2. Run and iterate
 
-Launch your new theme in a desktop window with hot reload enabled (using the `akari` launcher or `fvm dart run tool/akari.dart`):
+Launch your new theme in a desktop window with hot reload enabled (using the `akari` launcher or `fvm dart run packages/akari_cli/bin/akari.dart`):
 
 ```sh
 AKARI_WINDOW_MODE=windowed akari run --theme themes/ocean

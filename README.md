@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="splash/assets/akari-avatar.png" width="96" height="96" alt="Akari Logo" />
+  <img src="crates/akari-splash/assets/akari-avatar.png" width="96" height="96" alt="Akari Logo" />
 </p>
 
 <h1 align="center">Akari</h1>
@@ -72,20 +72,30 @@ bash scripts/bootstrap-toolchain.sh
 Run an isolated, resizable preview demonstrating authentication journeys (such as face unlock success and password fallback) without root privileges or a background daemon:
 
 ```sh
-fvm dart run tool/akari.dart preview --theme themes/fallback
+fvm dart run packages/akari_cli/bin/akari.dart preview --theme themes/fallback
 ```
 
 Use `--scenario` to test specific journeys, `--theme themes/default` to try the default theme, or follow the [theme development guide](docs/guides/themes.md) to create your own.
 
 ## The Akari CLI
 
-Akari includes a unified CLI (`tool/akari.dart`) that manages the complete development, verification, and deployment lifecycle.
+Akari includes a unified CLI (`packages/akari_cli/bin/akari.dart`) that manages the complete development, verification, and deployment lifecycle.
 
-You can invoke commands directly with `fvm dart run tool/akari.dart <command>`, or install the lightweight shell launcher and autocompletion:
+You can invoke commands directly with `fvm dart run packages/akari_cli/bin/akari.dart <command>`, or install the lightweight shell launcher and autocompletion:
 
 ```sh
-fvm dart run tool/akari.dart install cli --shell zsh   # or bash
+fvm dart run packages/akari_cli/bin/akari.dart install cli --shell zsh   # or bash
 ```
+
+The CLI is a pure Dart package. To build a native executable:
+
+```sh
+cd packages/akari_cli
+fvm dart pub get
+fvm dart compile exe bin/akari.dart -o ../../build/akari
+```
+
+Run the executable inside the checkout, or set `AKARI_REPO_ROOT` when invoking it elsewhere. Generated Flutter hosts remain under `build/tool/hosts/`.
 
 Once installed, use `akari <command>` directly from anywhere in the repository:
 

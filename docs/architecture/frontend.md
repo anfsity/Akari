@@ -69,7 +69,7 @@ Each theme is a standalone Dart package compiled into the executable:
 
 ### Single-engine multi-monitor views
 
-1. The native Linux runner (`linux/runner/my_application.cc`) creates one fullscreen `FlView` per connected monitor inside a single Flutter engine.
+1. The native Linux runner (`apps/greeter/linux/runner/my_application.cc`) creates one fullscreen `FlView` per connected monitor inside a single Flutter engine.
 2. `MyApp` renders sibling views via `ViewAnchor` and `ViewCollection`, sharing one `GreeterFeature` and one `credentialController`.
 3. Each monitor's `GreeterSceneAdapter` owns its local focus tree and wake animation, while GTK reports the active monitor through the `akari/displays` channel so only the focused display processes global keyboard submission.
 4. When a monitor is unplugged, the implicit root view migrates to a remaining output (or stays hidden until an output reconnects) without interrupting the active authentication attempt.

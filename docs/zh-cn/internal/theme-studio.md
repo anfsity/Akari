@@ -66,10 +66,10 @@ Theme Studio 是面向 Akari 编译主题的可视化场景编辑器。编辑器
 akari run studio --theme themes/default
 
 # 未安装 akari 启动器时：
-fvm dart run tool/akari.dart run studio --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart run studio --theme themes/default
 
 # 加载仓库外的独立主题包：
-fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
+fvm dart run packages/akari_cli/bin/akari.dart run studio --theme /path/to/theme --jobs 2
 ```
 
 - `studio` 是 `akari run` 的子目标（可通过 `akari run studio --help` 查看选项）。

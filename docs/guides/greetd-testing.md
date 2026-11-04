@@ -217,9 +217,9 @@ Back on your desktop, `akari run sway` automatically imports `display-profile.js
 Validate harness scripts without root privileges or stopping your display manager:
 
 ```sh
-python3 test/support/greetd_test_workflow_test.py
-python3 test/support/greetd_screenshot_test.py
-python3 test/support/display_profile_test.py
-python3 test/support/display_layout_test.py
-python3 test/support/sway_session_test.py
+python3 test/workflows/greetd_test_workflow_test.py
+python3 test/workflows/greetd_screenshot_test.py
+python3 test/workflows/display_profile_test.py
+python3 test/workflows/display_layout_test.py
+python3 test/workflows/sway_session_test.py
 ```

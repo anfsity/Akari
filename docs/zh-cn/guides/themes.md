@@ -28,7 +28,7 @@ cp -R themes/fallback themes/ocean
 
 ## 2. 实时预览与迭代
 
-以窗口模式启动主题并开启热重载（可直接使用 `akari` 启动器或 `fvm dart run tool/akari.dart`）：
+以窗口模式启动主题并开启热重载（可直接使用 `akari` 启动器或 `fvm dart run packages/akari_cli/bin/akari.dart`）：
 
 ```sh
 AKARI_WINDOW_MODE=windowed akari run --theme themes/ocean

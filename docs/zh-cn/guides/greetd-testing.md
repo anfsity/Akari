@@ -225,9 +225,9 @@ akari greetd-test logs --run current --file screenshot
 无需 root 权限或停止显示管理器，即可运行以下测试校验脚本控制流：
 
 ```sh
-python3 test/support/greetd_test_workflow_test.py
-python3 test/support/greetd_screenshot_test.py
-python3 test/support/display_profile_test.py
-python3 test/support/display_layout_test.py
-python3 test/support/sway_session_test.py
+python3 test/workflows/greetd_test_workflow_test.py
+python3 test/workflows/greetd_screenshot_test.py
+python3 test/workflows/display_profile_test.py
+python3 test/workflows/display_layout_test.py
+python3 test/workflows/sway_session_test.py
 ```

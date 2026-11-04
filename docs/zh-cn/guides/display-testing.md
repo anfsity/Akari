@@ -22,7 +22,7 @@ description: 检查多屏、缩放和截图，对比桌面预览与真实登录�
 ## 检查多显示器状态同步
 
 ```sh
-fvm dart run tool/akari.dart run --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart run --theme themes/default
 ```
 
 全屏模式下，Akari 会按每台显示器的逻辑尺寸与缩放打开独立视图。可按以下清单验证多屏行为：
@@ -43,14 +43,14 @@ fvm dart run tool/akari.dart run --theme themes/default
 1. **尚未捕获真实登录配置时**，使用内置的 `1920x1080`（缩放 `1.0`）参考配置启动：
 
    ```sh
-   fvm dart run tool/akari.dart run sway --theme themes/default \
+   fvm dart run packages/akari_cli/bin/akari.dart run sway --theme themes/default \
      --display-profile reference
    ```
 
 2. **完成[独立 greetd 测试](greetd-testing.md)并生成显示快照后**，回到桌面直接复用该真实登录配置：
 
    ```sh
-   fvm dart run tool/akari.dart run sway --theme themes/default \
+   fvm dart run packages/akari_cli/bin/akari.dart run sway --theme themes/default \
      --display-profile login
    ```
 
@@ -64,7 +64,7 @@ fvm dart run tool/akari.dart run --theme themes/default
 使用 `--sway-backend headless` 可在不依赖桌面环境的情况下渲染指定分辨率与缩放：
 
 ```sh
-fvm dart run tool/akari.dart run sway --theme themes/default \
+fvm dart run packages/akari_cli/bin/akari.dart run sway --theme themes/default \
   --display-profile reference --sway-backend headless \
   --resolution 1920x1080 --scale 1.6
 ```

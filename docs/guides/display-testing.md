@@ -22,7 +22,7 @@ Run these commands from the repository root after [environment setup](../getting
 ## Check shared state across multiple monitors
 
 ```sh
-fvm dart run tool/akari.dart run --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart run --theme themes/default
 ```
 
 In fullscreen mode, Akari opens one view per connected monitor using each output's logical size and scale. Verify the following behaviors:
@@ -41,14 +41,14 @@ Set `AKARI_WINDOW_MODE=windowed` before `run` if you only need a single resizabl
 1. **Without a saved TTY capture**, start with the built-in `1920x1080` (scale `1.0`) reference profile:
 
    ```sh
-   fvm dart run tool/akari.dart run sway --theme themes/default \
+   fvm dart run packages/akari_cli/bin/akari.dart run sway --theme themes/default \
      --display-profile reference
    ```
 
 2. **After running a [standalone greetd test](greetd-testing.md)**, replay the captured hardware display profile on your desktop:
 
    ```sh
-   fvm dart run tool/akari.dart run sway --theme themes/default \
+   fvm dart run packages/akari_cli/bin/akari.dart run sway --theme themes/default \
      --display-profile login
    ```
 
@@ -62,7 +62,7 @@ Set `AKARI_WINDOW_MODE=windowed` before `run` if you only need a single resizabl
 Use `--sway-backend headless` to render an exact resolution and scale without requiring an active Wayland desktop:
 
 ```sh
-fvm dart run tool/akari.dart run sway --theme themes/default \
+fvm dart run packages/akari_cli/bin/akari.dart run sway --theme themes/default \
   --display-profile reference --sway-backend headless \
   --resolution 1920x1080 --scale 1.6
 ```

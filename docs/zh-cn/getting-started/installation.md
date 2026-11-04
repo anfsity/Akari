@@ -46,14 +46,14 @@ Akari 目前支持在 Linux 上构建与运行。开始开发或预览前，请�
 
 ## 安装 `akari` 命令行启动器
 
-将 `akari` 命令和自动补全安装到用户目录，省去每次输入 `fvm dart run tool/akari.dart`：
+将 `akari` 命令和自动补全安装到用户目录，省去每次输入 `fvm dart run packages/akari_cli/bin/akari.dart`：
 
 ```sh
 # zsh 用户
-fvm dart run tool/akari.dart install cli --shell zsh
+fvm dart run packages/akari_cli/bin/akari.dart install cli --shell zsh
 
 # bash 用户
-fvm dart run tool/akari.dart install cli --shell bash
+fvm dart run packages/akari_cli/bin/akari.dart install cli --shell bash
 ```
 
 打开新终端（或按命令提示加载环境脚本）即可直接使用 `akari`。

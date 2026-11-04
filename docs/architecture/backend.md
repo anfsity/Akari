@@ -3,7 +3,9 @@ title: Backend code guide
 description: Locate the Rust owners of process lifetime, authentication, and transport.
 ---
 
-The Rust backend (`backend/`) is an application crate whose external interface is the [D-Bus contract](../reference/dbus.md).
+The Rust backend (`crates/akari-backend/`) is an application crate whose external interface is the [D-Bus contract](../reference/dbus.md).
+
+The `crates/Cargo.toml` workspace shares one `Cargo.lock` and Rust edition with `akari-splash`. The crate is named `akari-backend`; its installed executable remains `backend`.
 
 ## Module map
 
@@ -11,8 +13,13 @@ The Rust backend (`backend/`) is an application crate whose external interface i
 | --- | --- |
 | `main.rs` | Entrypoint mode dispatch (D-Bus service vs. user-side session launcher), signal handling, and graceful shutdown |
 | `service.rs` | `io.akari.Greeter1` D-Bus interface, authentication actor supervision, and `systemd-logind` power calls |
-| `auth.rs` | Private child module of `service`; serializes authentication commands, `attempt_id` ownership, and `greetd` handoff |
-| `greetd.rs` | Framed JSON Unix socket transport (`GREETD_SOCK`) and mock backend implementation |
+| `auth/handle.rs` | D-Bus-facing command handles and supervision of the actor task |
+| `auth/actor.rs` | Single command queue, serialized acceptance, and operation replies |
+| `auth/attempt.rs` | Attempt resources, transport operations, cleanup, and ordered state/prompt signals |
+| `auth/caller_watch.rs` | Caller disconnect observation and cancellation without retaining the actor queue |
+| `greetd/protocol.rs` | Protocol messages and shared transport errors |
+| `greetd/transport.rs` | Real Unix socket transport, bounded framing, and zeroized credential buffers |
+| `greetd/mock.rs` | Deterministic transport compiled only with the `mock` feature |
 | `state.rs` | Pure authentication state machine (`AuthState`) and transition validation |
 | `session_catalog.rs` | `.desktop` session discovery (`/usr/share/wayland-sessions`, `/usr/share/xsessions`) and `TryExec` validation |
 | `session_launch.rs` | User login-shell forwarding (`--start-session` / `--exec-desktop`), argv preservation, locale checks, and session logs |
@@ -22,7 +29,7 @@ The Rust backend (`backend/`) is an application crate whose external interface i
 
 ### Service & actor lifecycle
 
-- The process supervises both the D-Bus server and the single authentication actor (`auth.rs`).
+- The process supervises both the D-Bus server and the single authentication actor (`auth/actor.rs`).
 - Each authentication attempt receives a unique generation token (`attempt_id`). Signals and client calls must match the active `attempt_id`; cancellation or client disconnect invalidates it immediately.
 - Power actions (`PowerAction`) run in an independent state domain without blocking or cancelling active PAM prompts.
 - On shutdown (`SIGINT`, `SIGTERM`, or D-Bus disconnect), the backend stops accepting new calls, cancels in-flight `greetd` I/O, and releases the greeter so `greetd` can spawn the selected desktop.
@@ -41,7 +48,7 @@ See [User session environment](../guides/greetd-testing.md#user-session-environm
 Generate and browse local `rustdoc` pages (including private modules and items):
 
 ```sh
-cargo doc --manifest-path backend/Cargo.toml --no-deps --document-private-items
+cargo doc --manifest-path crates/akari-backend/Cargo.toml --no-deps --document-private-items
 ```
 
-Generated HTML is written to `backend/target/doc/`. Keep module-level invariants and resource ownership in `//!` and `///` doc comments, and document cross-module flows in this handbook.
+Generated HTML is written to `crates/target/doc/`. Keep module-level invariants and resource ownership in `//!` and `///` doc comments, and document cross-module flows in this handbook.

@@ -234,5 +234,5 @@ stateDiagram-v2
 
 ## 6. 模拟后端与日志诊断
 
-- **模拟后端（Mock Backend）**：使用 `cargo run --manifest-path backend/Cargo.toml --features mock` 构建（`akari run` 默认使用）。在隔离的 `dbus-run-session` 中实现完整的 `io.akari.Greeter1` 接口，输入密码 `"password"` 即可模拟认证通过。
+- **模拟后端（Mock Backend）**：使用 `cargo run --manifest-path crates/akari-backend/Cargo.toml --features mock` 构建（`akari run` 默认使用）。在隔离的 `dbus-run-session` 中实现完整的 `io.akari.Greeter1` 接口，输入密码 `"password"` 即可模拟认证通过。
 - **结构化诊断日志**：默认日志级别为 `info`，通过 `attempt_id`、操作名、调用方与状态串联完整认证链路，同时严格过滤所有 PAM 提示正文与用户输入内容。

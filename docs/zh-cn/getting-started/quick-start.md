@@ -11,10 +11,10 @@ description: 快速体验主题预览、模拟后端交互运行与生产版本�
 
 ```sh
 # 预览静态精简的 fallback 主题
-fvm dart run tool/akari.dart preview --theme themes/fallback
+fvm dart run packages/akari_cli/bin/akari.dart preview --theme themes/fallback
 
 # 预览默认主题
-fvm dart run tool/akari.dart preview --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart preview --theme themes/default
 ```
 
 `preview` 命令无需启动后台服务或调用 PAM，直接在纯前端模拟认证流程。它会依次演示人脸识别成功（`face-success`）与密码认证回退（`password-fallback`）两条典型交互旅程，并在完成后自动退出。
@@ -25,7 +25,7 @@ fvm dart run tool/akari.dart preview --theme themes/default
 :::tip[预览原生 Splash 加载画面]
 如果只需调试原生启动动画（不加载完整登录界面），可运行：
 ```sh
-fvm dart run tool/akari.dart run splash
+fvm dart run packages/akari_cli/bin/akari.dart run splash
 ```
 按 `Escape` 或直接关闭窗口退出。
 :::
@@ -36,10 +36,10 @@ fvm dart run tool/akari.dart run splash
 
 ```sh
 # 默认全屏运行（覆盖所有已连接显示器）
-fvm dart run tool/akari.dart run --theme themes/fallback
+fvm dart run packages/akari_cli/bin/akari.dart run --theme themes/fallback
 
 # 以桌面窗口模式运行，方便日常调试
-AKARI_WINDOW_MODE=windowed fvm dart run tool/akari.dart run --theme themes/fallback
+AKARI_WINDOW_MODE=windowed fvm dart run packages/akari_cli/bin/akari.dart run --theme themes/fallback
 ```
 
 模拟后端实现了完整的 D-Bus 接口规范，但不会触碰真实系统账户或启动实际桌面环境：
@@ -60,7 +60,7 @@ AKARI_WINDOW_MODE=windowed fvm dart run tool/akari.dart run --theme themes/fallb
 以 release 模式编译主题包、原生 Splash 模块与正式版 Rust 后端服务：
 
 ```sh
-fvm dart run tool/akari.dart build --theme themes/fallback --jobs 4
+fvm dart run packages/akari_cli/bin/akari.dart build --theme themes/fallback --jobs 4
 ```
 
 构建完成后，符号链接会生成在 `build/out/` 下：

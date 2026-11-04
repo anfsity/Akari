@@ -162,7 +162,7 @@ How the CLI builds and runs a theme:
 ### Caching and concurrency
 
 - Host projects preserve Flutter and CMake/Ninja build caches across runs.
-- Rust mock and production backends use separate target directories (`backend/target/akari-mock/` and `backend/target/akari-real/`).
+- Rust mock and production backends use separate target directories (`crates/target/akari-mock/` and `crates/target/akari-real/`).
 - Commands targeting the same theme serialize on a per-theme lock; different themes can build concurrently.
 
 ## Performance protocol

@@ -234,5 +234,5 @@ stateDiagram-v2
 
 ## 6. Mock backend & diagnostics
 
-- **Mock backend**: Built with `cargo run --manifest-path backend/Cargo.toml --features mock` (used automatically by `akari run`). Implements `io.akari.Greeter1` on a private bus (`dbus-run-session`) without PAM or `greetd`, accepting `"password"` for authentication.
+- **Mock backend**: Built with `cargo run --manifest-path crates/akari-backend/Cargo.toml --features mock` (used automatically by `akari run`). Implements `io.akari.Greeter1` on a private bus (`dbus-run-session`) without PAM or `greetd`, accepting `"password"` for authentication.
 - **Structured logging**: Default log level is `info`. Logs correlate `attempt_id`, operation, caller, and state while redacting all PAM prompt bodies and credential responses.

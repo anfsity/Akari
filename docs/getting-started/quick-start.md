@@ -11,10 +11,10 @@ Run an automated UI walkthrough in a single resizable desktop window:
 
 ```sh
 # Minimal static fallback theme
-fvm dart run tool/akari.dart preview --theme themes/fallback
+fvm dart run packages/akari_cli/bin/akari.dart preview --theme themes/fallback
 
 # Default theme
-fvm dart run tool/akari.dart preview --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart preview --theme themes/default
 ```
 
 `preview` drives frontend authentication events without starting a backend, camera, or PAM session. By default, it runs both `face-success` and `password-fallback` journeys and exits automatically.
@@ -25,7 +25,7 @@ fvm dart run tool/akari.dart preview --theme themes/default
 :::tip[Preview the native splash]
 To inspect the standalone loading screen without launching the greeter, run:
 ```sh
-fvm dart run tool/akari.dart run splash
+fvm dart run packages/akari_cli/bin/akari.dart run splash
 ```
 Press `Escape` or close the window to exit.
 :::
@@ -36,10 +36,10 @@ Start the Flutter greeter and Rust mock backend over an isolated private D-Bus s
 
 ```sh
 # Fullscreen across connected monitors (default)
-fvm dart run tool/akari.dart run --theme themes/fallback
+fvm dart run packages/akari_cli/bin/akari.dart run --theme themes/fallback
 
 # Windowed mode for desktop iteration
-AKARI_WINDOW_MODE=windowed fvm dart run tool/akari.dart run --theme themes/fallback
+AKARI_WINDOW_MODE=windowed fvm dart run packages/akari_cli/bin/akari.dart run --theme themes/fallback
 ```
 
 The mock backend exercises the production D-Bus transport without touching system accounts:
@@ -60,7 +60,7 @@ For multi-monitor focus, hotplug, nested Sway scaling, or fixed-resolution scree
 Compile the selected theme and the production Rust backend in release mode:
 
 ```sh
-fvm dart run tool/akari.dart build --theme themes/fallback --jobs 4
+fvm dart run packages/akari_cli/bin/akari.dart build --theme themes/fallback --jobs 4
 ```
 
 Successful builds link outputs under `build/out/`:

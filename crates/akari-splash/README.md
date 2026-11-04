@@ -5,9 +5,9 @@ The CPU renderer and cached layout are shared by the desktop window and Linux
 DRM/KMS outputs. No browser, Flutter engine or authentication service runs here.
 
 ```sh
-cargo build --locked --manifest-path splash/Cargo.toml
-splash/target/debug/akari-splash window --hold
-splash/target/debug/akari-splash window --snapshot /tmp/akari-splash.png
+cargo build --locked --manifest-path crates/akari-splash/Cargo.toml
+crates/target/debug/akari-splash window --hold
+crates/target/debug/akari-splash window --snapshot /tmp/akari-splash.png
 ```
 
 The default background is pure black (`#000000`), matching the login compositor.
@@ -55,8 +55,8 @@ Quicksand's license is in `assets/OFL.txt`; the portrait is the selected generat
 artwork from the earlier local visual study, copied without modification.
 
 ```sh
-cargo test --locked --manifest-path splash/Cargo.toml
-cargo clippy --locked --manifest-path splash/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path crates/akari-splash/Cargo.toml
+cargo clippy --locked --manifest-path crates/akari-splash/Cargo.toml --all-targets -- -D warnings
 ```
 
 Window testing does not validate real VT handoff. Hardware acceptance must cover

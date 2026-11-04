@@ -33,12 +33,12 @@ Theme authors own visual presentation (backgrounds, layout, typography, animatio
 
 | Module | Role |
 | --- | --- |
-| `backend/src/main.rs` | Service startup, signal handling, and user-side session launcher entrypoints |
-| `backend/src/service.rs` | `io.akari.Greeter1` D-Bus server and `systemd-logind` power calls |
-| `backend/src/auth.rs` | Single `AuthActor` serializing commands, cancellation, and `attempt_id` ownership |
-| `backend/src/greetd.rs` | Framed JSON Unix socket transport (`GREETD_SOCK`) and mock implementation |
-| `backend/src/state.rs` | Pure `AuthState` transition machine |
-| `backend/src/users.rs` & `session_catalog.rs` | Display-safe user and `.desktop` session discovery |
+| `crates/akari-backend/src/main.rs` | Service startup, signal handling, and user-side session launcher entrypoints |
+| `crates/akari-backend/src/service.rs` | `io.akari.Greeter1` D-Bus server and `systemd-logind` power calls |
+| `crates/akari-backend/src/auth/actor.rs` | Single `AuthActor` serializing commands, cancellation, and `attempt_id` ownership |
+| `crates/akari-backend/src/greetd/transport.rs` | Framed JSON Unix socket transport (`GREETD_SOCK`) and mock implementation |
+| `crates/akari-backend/src/state.rs` | Pure `AuthState` transition machine |
+| `crates/akari-backend/src/users.rs` & `session_catalog.rs` | Display-safe user and `.desktop` session discovery |
 
 ### Authentication & handoff lifecycle
 

@@ -16,13 +16,32 @@ flowchart TD
     Bridge --> Logind[systemd-logind]
 ```
 
+```mermaid
+flowchart TD
+    Schema[scene_schema: pure Dart contracts] --> Codegen[scene_codegen]
+    Schema --> Project[theme_project: discovery and synthesis]
+    Project --> CLI[akari_cli: pure Dart tools]
+    Project --> Studio[theme_studio: internal editing domains]
+    Schema --> Scene[scene: Flutter runtime]
+    Scene --> SDK[theme_sdk: public theme API]
+    SDK --> Components[greeter_components]
+    SDK --> UI[greeter_ui]
+    SDK --> Studio
+    Components --> Themes[Independent theme packages]
+    SDK --> Themes
+    UI --> App[apps/greeter: native runner and D-Bus]
+    UI --> Harness[greeter_harness: preview and metrics]
+```
+
+主题包和生成宿主使用可独立解析的路径依赖，不启用 Pub Workspace。`theme_sdk` 重导出纯数据声明契约；Studio 编辑和资源逻辑继续留在包内，待真实第二调用方出现后再按需下沉。
+
 ## 职责边界划分
 
 | 层级 | 所属模块 | 核心职责 |
 | --- | --- | --- |
-| **构建边界** | 主题包 + CLI（`tool/`） | 每个主题包独立维护其 `*.scene.json`、样式配置（Tokens）、本地资源与组件实现。CLI 依据所选主题驱动代码生成（`*.scene.g.dart`），并组装直接导入该主题 Builder 的编译宿主。 |
+| **构建边界** | 主题包 + CLI（`packages/akari_cli/`） | 每个主题包独立维护其 `*.scene.json`、样式配置（Tokens）、本地资源与组件实现。CLI 依据所选主题驱动代码生成（`*.scene.g.dart`），并组装直接导入该主题 Builder 的编译宿主。 |
 | **前端边界** | Flutter 应用 + `greeter_ui` + `scene` | `GreeterFeature` 驱动登录业务流、管理凭据控制器并分发类型化命令；`GreeterSceneAdapter` 将认证状态投影为场景谓词（`ScenePredicate`）与数据插槽（Slots）；`SceneRuntime` 负责归一化坐标布局、2.5D 几何变换与节点进出场动效。 |
-| **后端边界** | Rust 桥接服务（`backend/`） | 负责与 `greetd` Unix Socket 通信、驱动 PAM 认证流程、维护认证会话生命周期（`attempt_id`）、发现与校验 `.desktop` 桌面环境，并通过 `systemd-logind` 执行电源操作。所有能力均通过私有会话总线上的 [D-Bus 接口规范](../reference/dbus.md) 暴露。 |
+| **后端边界** | Rust 桥接服务（`crates/akari-backend/`） | 负责与 `greetd` Unix Socket 通信、驱动 PAM 认证流程、维护认证会话生命周期（`attempt_id`）、发现与校验 `.desktop` 桌面环境，并通过 `systemd-logind` 执行电源操作。所有能力均通过私有会话总线上的 [D-Bus 接口规范](../reference/dbus.md) 暴露。 |
 
 :::note
 主题包完全与底层的 `greetd`、PAM 及 D-Bus 细节解耦，仅需从 `GreeterHost` 读取安全的展示状态并触发对应的语义操作回调。

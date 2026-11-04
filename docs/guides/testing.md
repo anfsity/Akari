@@ -11,10 +11,10 @@ Run static analysis, Rust checks, and unit/widget test suites across shared pack
 
 ```sh
 # Check the entire repository and all built-in themes
-fvm dart run tool/akari.dart verify
+fvm dart run packages/akari_cli/bin/akari.dart verify
 
 # Scope theme checks to a single theme while keeping shared + backend checks
-fvm dart run tool/akari.dart verify --theme themes/fallback
+fvm dart run packages/akari_cli/bin/akari.dart verify --theme themes/fallback
 ```
 
 What to focus on when writing tests:
@@ -22,16 +22,16 @@ What to focus on when writing tests:
 - **Avoid brittle layout assertions**: Do not assert hardcoded pixel coordinates; check reachability, minimum hit target sizes, focus order, and absence of overflow instead.
 
 :::note
-`test/login_cli_test.dart` also invokes `test/support/login_workflow_test.py` to test deployment, rollback, and recovery in simulated systemd environments without touching your host display manager.
+`test/login_cli_test.dart` also invokes `test/workflows/login_workflow_test.py` to test deployment, rollback, and recovery in simulated systemd environments without touching your host display manager.
 :::
 
 ## Mock D-Bus & UI walkthroughs
 
 | Workflow | Command | When to use |
 | --- | --- | --- |
-| Automated UI walkthrough | `fvm dart run tool/akari.dart preview --theme themes/fallback` | Run `face-success` and `password-fallback` journeys in one window and exit |
-| Interactive mock session | `fvm dart run tool/akari.dart run --theme themes/fallback` | Exercise the full Flutter + D-Bus + Rust mock backend path with hot reload |
-| Nested or headless Sway | `fvm dart run tool/akari.dart run sway --display-profile reference` | Test compositor scaling and fixed-resolution screenshots ([guide](display-testing.md)) |
+| Automated UI walkthrough | `fvm dart run packages/akari_cli/bin/akari.dart preview --theme themes/fallback` | Run `face-success` and `password-fallback` journeys in one window and exit |
+| Interactive mock session | `fvm dart run packages/akari_cli/bin/akari.dart run --theme themes/fallback` | Exercise the full Flutter + D-Bus + Rust mock backend path with hot reload |
+| Nested or headless Sway | `fvm dart run packages/akari_cli/bin/akari.dart run sway --display-profile reference` | Test compositor scaling and fixed-resolution screenshots ([guide](display-testing.md)) |
 | Real TTY login | `akari greetd-test ...` | Test actual PAM, DRM/KMS splash, and session launch ([guide](greetd-testing.md)) |
 
 ## Native display regressions
@@ -40,12 +40,12 @@ Opt-in Python regression suites launch real Flutter windows inside isolated head
 
 ### Multi-monitor & hotplug regression
 
-Build a demo bundle from `tool/dev_main.dart` (do not use `preview` binaries, which exit after their test journey) and run the workflow script:
+Build a demo bundle from `apps/greeter/lib/main.dart` (do not use `preview` binaries, which exit after their test journey) and run the workflow script:
 
 ```sh
-fvm dart run tool/akari.dart generate-scenes --theme themes/default
-fvm flutter build linux --release --target tool/dev_main.dart --dart-define=AKARI_BACKEND=demo
-python3 test/support/multi_display_workflow_test.py \
+fvm dart run packages/akari_cli/bin/akari.dart generate-scenes --theme themes/default
+fvm flutter build linux --release --target apps/greeter/lib/main.dart --dart-define=AKARI_BACKEND=demo
+python3 test/workflows/multi_display_workflow_test.py \
   --app build/linux/x64/release/bundle/greeter
 ```
 
@@ -56,7 +56,7 @@ This verifies mixed DPI scales, pointer focus switching across views, monitor ho
 1. Build the default theme and mock backend by starting a headless Sway session once:
 
    ```sh
-   fvm dart run tool/akari.dart run sway --theme themes/default \
+   fvm dart run packages/akari_cli/bin/akari.dart run sway --theme themes/default \
      --display-profile reference --sway-backend headless \
      --report build/tool/native-sway.json
    ```
@@ -64,7 +64,7 @@ This verifies mixed DPI scales, pointer focus switching across views, monitor ho
 2. Press `q` after startup, read `artifacts.executable` and `artifacts.backend_executable` from `build/tool/native-sway.json`, and run:
 
    ```sh
-   python3 test/support/sway_native_workflow_test.py \
+   python3 test/workflows/sway_native_workflow_test.py \
      --app /path/to/greeter/bundle/greeter \
      --backend /path/to/mock/backend
    ```
@@ -76,8 +76,8 @@ This tests all four combinations of outer and inner scales (`1.0` and `1.6`) and
 Execute a theme's declared performance gate or timeline trace:
 
 ```sh
-fvm dart run tool/akari.dart verify-perf --theme themes/default
-fvm dart run tool/akari.dart trace-perf --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart verify-perf --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart trace-perf --theme themes/default
 ```
 
 Each theme declares its own runner and thresholds in `pubspec.yaml` (see the [Performance protocol](../reference/theme-package.md#performance-protocol)).

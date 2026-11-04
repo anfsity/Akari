@@ -69,7 +69,7 @@ SceneRuntime
 
 ### 单引擎多显示器架构
 
-1. Linux 原生运行器（`linux/runner/my_application.cc`）在单个 Flutter Engine 中为每台已连接显示器创建一个全屏 `FlView`。
+1. Linux 原生运行器（`apps/greeter/linux/runner/my_application.cc`）在单个 Flutter Engine 中为每台已连接显示器创建一个全屏 `FlView`。
 2. `MyApp` 通过 `ViewAnchor` 和 `ViewCollection` 渲染多个同级视图，所有显示器共享同一个 `GreeterFeature` 与同一个 `credentialController`。
 3. 每台显示器的 `GreeterSceneAdapter` 独立管理本屏幕的焦点树与唤醒动画；GTK 通过 `akari/displays` 通道上报当前激活的窗口，确保只有焦点所在屏幕响应全局键盘提交。
 4. 拔除显示器时，隐式根视图会自动迁移到剩余显示器（或保持隐藏直至显示器重连），不会打断正在进行的后端认证会话。

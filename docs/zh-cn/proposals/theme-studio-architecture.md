@@ -33,12 +33,12 @@ Theme Runtime（宿主组件、自定义主题 Widget、布局、动效与输入
 
 | 模块 | 职责 |
 | --- | --- |
-| `backend/src/main.rs` | 服务启动、信号处理与用户侧桌面启动器入口分发 |
-| `backend/src/service.rs` | `io.akari.Greeter1` D-Bus 服务暴露与 `systemd-logind` 电源调用 |
-| `backend/src/auth.rs` | 单一 `AuthActor`，负责命令串行化、取消操作与 `attempt_id` 事务所有权 |
-| `backend/src/greetd.rs` | `greetd` Unix Socket JSON 协议帧传输（`GREETD_SOCK`）与模拟实现 |
-| `backend/src/state.rs` | 纯身份验证状态机（`AuthState`）与转换校验 |
-| `backend/src/users.rs` 与 `session_catalog.rs` | 面向界面安全展示的系统用户与 `.desktop` 会话目录扫描 |
+| `crates/akari-backend/src/main.rs` | 服务启动、信号处理与用户侧桌面启动器入口分发 |
+| `crates/akari-backend/src/service.rs` | `io.akari.Greeter1` D-Bus 服务暴露与 `systemd-logind` 电源调用 |
+| `crates/akari-backend/src/auth/actor.rs` | 单一 `AuthActor`，负责命令串行化、取消操作与 `attempt_id` 事务所有权 |
+| `crates/akari-backend/src/greetd/transport.rs` | `greetd` Unix Socket JSON 协议帧传输（`GREETD_SOCK`）与模拟实现 |
+| `crates/akari-backend/src/state.rs` | 纯身份验证状态机（`AuthState`）与转换校验 |
+| `crates/akari-backend/src/users.rs` 与 `session_catalog.rs` | 面向界面安全展示的系统用户与 `.desktop` 会话目录扫描 |
 
 ### 身份验证与桌面交接生命周期
 

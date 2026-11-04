@@ -153,7 +153,7 @@ CLI 构建与运行主题的流程：
 ### 缓存与并发锁
 
 - 宿主项目在多次运行之间保留 Flutter 与原生 CMake/Ninja 编译缓存。
-- Rust 模拟后端与正式后端分别使用独立的目标目录：`backend/target/akari-mock/` 与 `backend/target/akari-real/`。
+- Rust 模拟后端与正式后端分别使用独立的目标目录：`crates/target/akari-mock/` 与 `crates/target/akari-real/`。
 - 针对同一主题的命令通过进程锁串行执行；不同主题之间可并行构建。
 
 <a id="performance-protocol"></a>

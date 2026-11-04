@@ -7,7 +7,7 @@ description: 查命令、选项、显示配置和运行报告。
 
 ## 命令与目标
 
-在仓库根目录执行 `fvm dart run tool/akari.dart COMMAND`；安装[命令行启动器](#shell-launcher-and-completion)后，可直接运行 `akari COMMAND`。
+在仓库根目录执行 `fvm dart run packages/akari_cli/bin/akari.dart COMMAND`；安装[命令行启动器](#shell-launcher-and-completion)后，可直接运行 `akari COMMAND`。
 
 | 命令 | 用途 | 命令专属选项 |
 | --- | --- | --- |
@@ -111,13 +111,13 @@ sudo python3 /opt/akari/manage.py disable
 在用户目录安装绑定当前仓库的 `akari` 启动器（`~/.local/bin/akari`）与补全脚本（`~/.local/share/akari/`）：
 
 ```sh
-fvm dart run tool/akari.dart install cli --shell zsh
+fvm dart run packages/akari_cli/bin/akari.dart install cli --shell zsh
 # 或使用 bash：
-fvm dart run tool/akari.dart install cli --shell bash
+fvm dart run packages/akari_cli/bin/akari.dart install cli --shell bash
 ```
 
 - 可通过 `--prefix PATH` 和 `--rc PATH` 自定义安装路径与 Shell 配置文件。
-- 若移动了仓库位置，或修改了 `tool/src/cli/definition.dart` 中的命令定义，请重新执行 `install cli`。
+- 若移动了仓库位置，或修改了 `packages/akari_cli/lib/src/cli/definition.dart` 中的命令定义，请重新执行 `install cli`。
 - 使用 `akari completion --shell zsh|bash` 可直接输出补全脚本内容。
 
 ## 仓库脚本
@@ -158,7 +158,7 @@ akari run sway --display-profile reference --sway-backend headless
 | --- | --- |
 | `auto`（默认） | 自动从 `/opt/akari-test/current-run/greeter/session-*/` 导入最新的 DRM 登录快照至 `${XDG_STATE_HOME:-~/.local/state}/akari/display-profiles/login.json`；若无快照则回退到 `reference`。 |
 | `login` | 强制使用已导入或新捕获的真实 TTY 登录快照；若不存在有效快照则直接报错。 |
-| `reference` | 固定使用 `config/sway/reference.json`（`1920x1080`，缩放 `1.0`）。在多屏环境下使用 `--resolution` 或 `--scale` 单输出覆盖时必须指定此模式。 |
+| `reference` | 固定使用 `scripts/sway/reference.json`（`1920x1080`，缩放 `1.0`）。在多屏环境下使用 `--resolution` 或 `--scale` 单输出覆盖时必须指定此模式。 |
 
 ### 输出校验与 Hyprland 缩放补偿
 
@@ -172,11 +172,11 @@ akari run sway --display-profile reference --sway-backend headless
 
 `akari verify` 会检查共享包、Rust 后端、Theme Studio 以及 `themes/` 下的全部主题（或通过 `--theme PATH` 指定单个主题）。
 
-如需在 IDE 中直接调试根项目入口，可使用默认注入 `themes/default` 的 `tool/dev_main.dart`：
+如需在 IDE 中直接调试根项目入口，可使用默认注入 `themes/default` 的 `apps/greeter/lib/main.dart`：
 
 ```sh
-fvm dart run tool/akari.dart generate-scenes --theme themes/default
-fvm flutter run -d linux --target tool/dev_main.dart
+fvm dart run packages/akari_cli/bin/akari.dart generate-scenes --theme themes/default
+fvm flutter run -d linux --target apps/greeter/lib/main.dart
 ```
 
 ## 报告与构建输出
@@ -188,8 +188,8 @@ fvm flutter run -d linux --target tool/dev_main.dart
 ## 主题性能命令
 
 ```sh
-fvm dart run tool/akari.dart verify-perf --theme themes/default -- --cycles 5
-fvm dart run tool/akari.dart trace-perf --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart verify-perf --theme themes/default -- --cycles 5
+fvm dart run packages/akari_cli/bin/akari.dart trace-perf --theme themes/default
 ```
 
 `verify-perf`（`perf`）与 `trace-perf`（`trace`）会执行所选主题在 `pubspec.yaml` 的 `perf:` 块中声明的命令，并校验 `AKARI_PERF_OUTPUT_DIR`（`build/tool/runs/<run-id>/perf/`）下的 `result.json`。详见[主题性能约定](theme-package.md#performance-protocol)。
@@ -198,4 +198,4 @@ fvm dart run tool/akari.dart trace-perf --theme themes/default
 
 - **宿主缓存复用**：`build/tool/hosts/` 下的生成宿主会保留 Flutter 与 CMake 缓存，并在解析依赖后传入 `--no-pub` 加速后续运行。
 - **并行任务数（`--jobs COUNT`）**：在并行编译 Rust 后端与 Flutter 前端时，通过 CMake Ninja pool 限制 Cargo 与原生 C++ 编译/链接并发数。
-- **构建目录隔离**：模拟后端与正式后端分别使用 `backend/target/akari-mock/` 和 `backend/target/akari-real/`，同一主题通过进程锁串行执行，不同主题可并行构建。
+- **构建目录隔离**：模拟后端与正式后端分别使用 `crates/target/akari-mock/` 和 `crates/target/akari-real/`，同一主题通过进程锁串行执行，不同主题可并行构建。

@@ -11,10 +11,10 @@ Akari 将测试划分为仓库快速校验、模拟 D-Bus 会话、隔离合成�
 
 ```sh
 # 检查全部共享包、后端及所有内置主题
-fvm dart run tool/akari.dart verify
+fvm dart run packages/akari_cli/bin/akari.dart verify
 
 # 仅针对指定主题运行主题测试，同时保留共享包与后端检查
-fvm dart run tool/akari.dart verify --theme themes/fallback
+fvm dart run packages/akari_cli/bin/akari.dart verify --theme themes/fallback
 ```
 
 编写测试时的原则：
@@ -22,16 +22,16 @@ fvm dart run tool/akari.dart verify --theme themes/fallback
 - **避免脆弱的像素坐标断言**：不要断言固定的像素位置；应验证控件可达性、最小点击热区、焦点顺序以及内容不溢出。
 
 :::note
-`test/login_cli_test.dart` 还会调用 `test/support/login_workflow_test.py`，在模拟的 systemd 与账户环境中验证部署、回滚与异常恢复，不会修改宿主机的显示管理器。
+`test/login_cli_test.dart` 还会调用 `test/workflows/login_workflow_test.py`，在模拟的 systemd 与账户环境中验证部署、回滚与异常恢复，不会修改宿主机的显示管理器。
 :::
 
 ## 模拟会话与合成器调试
 
 | 测试方式 | 命令 | 适用场景 |
 | --- | --- | --- |
-| 自动 UI 流程演示 | `fvm dart run tool/akari.dart preview --theme themes/fallback` | 在单窗口中自动运行一次人脸成功与密码回退流程并退出 |
-| 交互式模拟后端 | `fvm dart run tool/akari.dart run --theme themes/fallback` | 通过私有 D-Bus 联调 Flutter 前端与 Rust 模拟后端，支持热重载 |
-| 嵌套 / 无头 Sway | `fvm dart run tool/akari.dart run sway --display-profile reference` | 验证显示器缩放还原与固定分辨率截图（详见[显示测试](display-testing.md)） |
+| 自动 UI 流程演示 | `fvm dart run packages/akari_cli/bin/akari.dart preview --theme themes/fallback` | 在单窗口中自动运行一次人脸成功与密码回退流程并退出 |
+| 交互式模拟后端 | `fvm dart run packages/akari_cli/bin/akari.dart run --theme themes/fallback` | 通过私有 D-Bus 联调 Flutter 前端与 Rust 模拟后端，支持热重载 |
+| 嵌套 / 无头 Sway | `fvm dart run packages/akari_cli/bin/akari.dart run sway --display-profile reference` | 验证显示器缩放还原与固定分辨率截图（详见[显示测试](display-testing.md)） |
 | 真实 TTY 登录 | `akari greetd-test ...` | 验证真实 PAM、DRM/KMS 启动画面与桌面启动（详见[独立 greetd 测试](greetd-testing.md)） |
 
 <a id="native-display-regressions"></a>
@@ -42,12 +42,12 @@ fvm dart run tool/akari.dart verify --theme themes/fallback
 
 ### 多显示器生命周期与焦点回归
 
-使用 `tool/dev_main.dart` 构建持久运行的演示包（不要使用运行完即退出的 `preview` 产物），然后执行回归脚本：
+使用 `apps/greeter/lib/main.dart` 构建持久运行的演示包（不要使用运行完即退出的 `preview` 产物），然后执行回归脚本：
 
 ```sh
-fvm dart run tool/akari.dart generate-scenes --theme themes/default
-fvm flutter build linux --release --target tool/dev_main.dart --dart-define=AKARI_BACKEND=demo
-python3 test/support/multi_display_workflow_test.py \
+fvm dart run packages/akari_cli/bin/akari.dart generate-scenes --theme themes/default
+fvm flutter build linux --release --target apps/greeter/lib/main.dart --dart-define=AKARI_BACKEND=demo
+python3 test/workflows/multi_display_workflow_test.py \
   --app build/linux/x64/release/bundle/greeter
 ```
 
@@ -58,7 +58,7 @@ python3 test/support/multi_display_workflow_test.py \
 1. 先运行一次无头 Sway 会话以生成登录界面与模拟后端构建产物：
 
    ```sh
-   fvm dart run tool/akari.dart run sway --theme themes/default \
+   fvm dart run packages/akari_cli/bin/akari.dart run sway --theme themes/default \
      --display-profile reference --sway-backend headless \
      --report build/tool/native-sway.json
    ```
@@ -66,7 +66,7 @@ python3 test/support/multi_display_workflow_test.py \
 2. 启动后按 `q` 退出，从 `build/tool/native-sway.json` 中读取 `artifacts.executable` 与 `artifacts.backend_executable`，替换到以下命令中执行：
 
    ```sh
-   python3 test/support/sway_native_workflow_test.py \
+   python3 test/workflows/sway_native_workflow_test.py \
      --app /path/to/greeter/bundle/greeter \
      --backend /path/to/mock/backend
    ```
@@ -78,8 +78,8 @@ python3 test/support/multi_display_workflow_test.py \
 运行主题在 `pubspec.yaml` 中声明的性能门槛校验或耗时追踪：
 
 ```sh
-fvm dart run tool/akari.dart verify-perf --theme themes/default
-fvm dart run tool/akari.dart trace-perf --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart verify-perf --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart trace-perf --theme themes/default
 ```
 
 交互步骤、测量指标与通过标准由主题包自行定义（详见[性能约定](../reference/theme-package.md#performance-protocol)）。

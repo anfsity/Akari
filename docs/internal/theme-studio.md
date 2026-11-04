@@ -11,14 +11,14 @@ Theme Studio is the visual Linux scene editor for compiled Akari themes. Its edi
 akari run studio --theme themes/default
 
 # Without the installed launcher:
-fvm dart run tool/akari.dart run studio --theme themes/default
+fvm dart run packages/akari_cli/bin/akari.dart run studio --theme themes/default
 
 # With an external theme package:
-fvm dart run tool/akari.dart run studio --theme /path/to/theme --jobs 2
+fvm dart run packages/akari_cli/bin/akari.dart run studio --theme /path/to/theme --jobs 2
 ```
 
 - `studio` is a target of `akari run` (`akari run studio --help`).
-- Studio always runs in `debug` mode with simulated display data and no backend/D-Bus dependency (`--mode` and `--backend` are not accepted).
+- Studio always runs in `debug` mode with simulated display data and no crates/akari-backend/D-Bus dependency (`--mode` and `--backend` are not accepted).
 - Saving Dart or asset files hot reloads the preview while preserving your current editor document and undo history. Use **Reload from disk** to adopt external file changes.
 
 > [!TIP]

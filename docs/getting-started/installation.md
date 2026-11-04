@@ -46,14 +46,14 @@ Akari builds and runs on Linux. Complete the steps below before running previews
 
 ## Install the `akari` launcher
 
-Install a user-level `akari` command and shell completion so you do not need to type `fvm dart run tool/akari.dart`:
+Install a user-level `akari` command and shell completion so you do not need to type `fvm dart run packages/akari_cli/bin/akari.dart`:
 
 ```sh
 # For zsh
-fvm dart run tool/akari.dart install cli --shell zsh
+fvm dart run packages/akari_cli/bin/akari.dart install cli --shell zsh
 
 # For bash
-fvm dart run tool/akari.dart install cli --shell bash
+fvm dart run packages/akari_cli/bin/akari.dart install cli --shell bash
 ```
 
 Open a new terminal (or source the environment file printed by the installer) to activate `akari`.
