@@ -22,7 +22,7 @@ fvm dart run packages/akari_cli/bin/akari.dart verify --theme themes/fallback
 - **避免脆弱的像素坐标断言**：不要断言固定的像素位置；应验证控件可达性、最小点击热区、焦点顺序以及内容不溢出。
 
 :::note
-`test/login_cli_test.dart` 还会调用 `test/workflows/login_workflow_test.py`，在模拟的 systemd 与账户环境中验证部署、回滚与异常恢复，不会修改宿主机的显示管理器。
+`packages/akari_cli/test/login_cli_test.dart` 还会调用 `test/workflows/login_workflow_test.py`，在模拟的 systemd 与账户环境中验证部署、回滚与异常恢复，不会修改宿主机的显示管理器。
 :::
 
 ## 模拟会话与合成器调试
@@ -46,9 +46,9 @@ fvm dart run packages/akari_cli/bin/akari.dart verify --theme themes/fallback
 
 ```sh
 fvm dart run packages/akari_cli/bin/akari.dart generate-scenes --theme themes/default
-fvm flutter build linux --release --target apps/greeter/lib/main.dart --dart-define=AKARI_BACKEND=demo
+(cd apps/greeter && fvm flutter build linux --release --dart-define=AKARI_BACKEND=demo)
 python3 test/workflows/multi_display_workflow_test.py \
-  --app build/linux/x64/release/bundle/greeter
+  --app apps/greeter/build/linux/x64/release/bundle/greeter
 ```
 
 该脚本会验证混合 DPI 缩放、跨屏幕指针焦点切换、热插拔（含拔除主显示器、拔除全部显示器后重连）以及单窗口模式。

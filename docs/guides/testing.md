@@ -22,7 +22,7 @@ What to focus on when writing tests:
 - **Avoid brittle layout assertions**: Do not assert hardcoded pixel coordinates; check reachability, minimum hit target sizes, focus order, and absence of overflow instead.
 
 :::note
-`test/login_cli_test.dart` also invokes `test/workflows/login_workflow_test.py` to test deployment, rollback, and recovery in simulated systemd environments without touching your host display manager.
+`packages/akari_cli/test/login_cli_test.dart` also invokes `test/workflows/login_workflow_test.py` to test deployment, rollback, and recovery in simulated systemd environments without touching your host display manager.
 :::
 
 ## Mock D-Bus & UI walkthroughs
@@ -44,9 +44,9 @@ Build a demo bundle from `apps/greeter/lib/main.dart` (do not use `preview` bina
 
 ```sh
 fvm dart run packages/akari_cli/bin/akari.dart generate-scenes --theme themes/default
-fvm flutter build linux --release --target apps/greeter/lib/main.dart --dart-define=AKARI_BACKEND=demo
+(cd apps/greeter && fvm flutter build linux --release --dart-define=AKARI_BACKEND=demo)
 python3 test/workflows/multi_display_workflow_test.py \
-  --app build/linux/x64/release/bundle/greeter
+  --app apps/greeter/build/linux/x64/release/bundle/greeter
 ```
 
 This verifies mixed DPI scales, pointer focus switching across views, monitor hotplug (including removing all monitors and reconnecting), and single-window mode.

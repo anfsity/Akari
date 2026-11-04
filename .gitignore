@@ -36,8 +36,6 @@
 !/docs/**
 !/scripts/
 !/scripts/**
-!/tool/
-!/tool/**
 !/.github/
 !/.github/**
 
