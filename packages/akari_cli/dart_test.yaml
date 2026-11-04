@@ -1,2 +1,2 @@
 # CLI cases launch real processes and may compile Dart subprocesses repeatedly.
-timeout: 2m
+timeout: 5m
