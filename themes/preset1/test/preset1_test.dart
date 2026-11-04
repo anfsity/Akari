@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:greeter_ui/greeter_ui.dart';
 import 'package:theme_preset1/preset_visuals.dart';
 import 'package:theme_preset1/theme.dart';
-import 'package:theme_sdk/theme_sdk.dart';
 
 const _weatherFrameSize = Size(1920, 1080);
 
