@@ -584,6 +584,12 @@ sys.exit(1)
     ).steps;
 
     expect(steps.map((step) => step.id).toSet(), hasLength(steps.length));
+    final smoke = steps.singleWhere((step) => step.id == 'dbus.smoke');
+    expect(
+      smoke.environment['AKARI_BACKEND_BIN'],
+      getAbsolutePath(tempRoot, getBackendExecutablePath(BackendMode.mock, BuildMode.debug)),
+    );
+    expect(steps.indexWhere((step) => step.id == 'backend.build'), lessThan(steps.indexOf(smoke)));
     expect(
       steps
           .where((step) => step.id.startsWith('scenes.generate_'))

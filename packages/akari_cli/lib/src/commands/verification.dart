@@ -3,9 +3,11 @@ import 'dart:io';
 import '../execution/model.dart';
 import '../execution/paths.dart';
 import '../sdk_commands.dart';
+import '../theme/model.dart';
 import '../theme/project.dart';
 import '../theme/scene_generation.dart';
 import 'plan.dart';
+import 'theme.dart' show createBackendBuildStep;
 
 RunPlan createVerificationPlan(
   Directory repoRoot,
@@ -115,6 +117,7 @@ RunPlan createVerificationPlan(
           theme.directory,
           theme.packageName,
         ),
+      createBackendBuildStep(BackendMode.mock, BuildMode.debug, null),
       RunStep(
         id: 'dbus.smoke',
         command: [
@@ -126,6 +129,10 @@ RunPlan createVerificationPlan(
         ],
         workingDirectory: 'apps/greeter',
         environment: {
+          'AKARI_BACKEND_BIN': getAbsolutePath(
+            repoRoot,
+            getBackendExecutablePath(BackendMode.mock, BuildMode.debug),
+          ),
           'AKARI_LOG_DIR': getJoinedPath(repoRoot.path, '$runDirectory/dbus'),
         },
       ),

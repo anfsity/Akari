@@ -35,7 +35,7 @@ RunPlan createBuildPlan(
       },
     },
     steps: [
-      _createBackendBuildStep(BackendMode.real, mode, jobs),
+      createBackendBuildStep(BackendMode.real, mode, jobs),
       if (platform == 'linux') _createSplashBuildStep(mode, jobs),
       ..._createHostPreparationSteps(
         repoRoot,
@@ -121,7 +121,7 @@ RunPlan createThemeRunPlan(
       },
     },
     steps: [
-      if (hasBackend) _createBackendBuildStep(backend, mode, jobs),
+      if (hasBackend) createBackendBuildStep(backend, mode, jobs),
       ..._createHostPreparationSteps(
         repoRoot,
         theme,
@@ -310,7 +310,7 @@ RunStep _createSplashBuildStep(BuildMode mode, int? jobs) => RunStep(
   dependencies: const [],
 );
 
-RunStep _createBackendBuildStep(
+RunStep createBackendBuildStep(
   BackendMode backend,
   BuildMode mode,
   int? jobs,
