@@ -8,7 +8,7 @@ import 'package:scene_schema/scene_schema.dart';
 import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 
-import '../project.dart';
+import 'project.dart';
 
 class SynthesizedTheme {
   const SynthesizedTheme({
