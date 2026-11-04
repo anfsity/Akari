@@ -86,7 +86,7 @@ def main():
                     session = outer / f'inner-{inner_scale}'
                     profile = json.loads(subprocess.check_output([
                         sys.executable, str(ROOT / 'scripts/greetd-test/display_profile.py'),
-                        '--reference', str(ROOT / 'config/sway/reference.json'),
+                        '--reference', str(ROOT / 'scripts/sway/reference.json'),
                         '--state', str(root / 'state'), '--display-profile', 'reference',
                         '--scale', str(inner_scale), '--dry-run']))
                     screenshot = session / 'screenshots/WL-1.png'

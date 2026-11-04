@@ -30,8 +30,8 @@
 **/target/
 
 # Project-owned configuration, documentation, and tools.
-!/config/
-!/config/**
+!/system/
+!/system/**
 !/docs/
 !/docs/**
 !/scripts/

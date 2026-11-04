@@ -664,7 +664,7 @@ elif command == 'swaymsg':
                             'AKARI_LOG_DIR': str(self.root), 'FIXTURE': str(self.root)}
 
     def run_greeter(self, **environment):
-        return subprocess.run(['bash', str(REPOSITORY / 'scripts/login/run-greeter.sh')],
+        return subprocess.run(['bash', str(REPOSITORY / 'system/run-greeter.sh')],
                               env={**self.environment, **environment}, text=True,
                               capture_output=True, timeout=5)
 
@@ -677,9 +677,9 @@ elif command == 'swaymsg':
     def test_launch_pins_release_and_publishes_readable_real_login_logs(self):
         release = self.root / 'release'
         (release / 'scripts').mkdir(parents=True)
-        (release / 'scripts/splash.sh').write_text((REPOSITORY / 'scripts/splash.sh').read_text())
+        (release / 'scripts/splash.sh').write_text((REPOSITORY / 'system/splash.sh').read_text())
         (self.root / 'logs').mkdir()
-        source = (REPOSITORY / 'scripts/login/launch.sh').read_text()
+        source = (REPOSITORY / 'system/launch.sh').read_text()
         (release / 'launch.sh').write_text(source.replace(
             '/var/log/akari/greeter', str(self.root / 'logs')))
         (release / 'akari-splash').write_text('#!/bin/sh\nprintf "prepared\\n"\n')
@@ -737,7 +737,7 @@ print(json.dumps({{'release': os.environ['AKARI_RELEASE'],
             os.kill(pid, 0)
 
     def test_termination_cleans_up_frontend(self):
-        process = subprocess.Popen(['bash', str(REPOSITORY / 'scripts/login/run-greeter.sh')],
+        process = subprocess.Popen(['bash', str(REPOSITORY / 'system/run-greeter.sh')],
                                    env={**self.environment, 'LONG_FRONTEND': '1'})
         try:
             deadline = time.monotonic() + 3

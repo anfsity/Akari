@@ -200,7 +200,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     await completion.writeAsString(getShellCompletion('zsh'));
     await Directory('${temp.path}/theme with spaces').create();
     final result = await Process.run('python3', [
-      '${_repoRoot.path}/test/support/zsh_completion_probe.py',
+      '${_repoRoot.path}/test/probes/zsh_completion_probe.py',
       completion.path,
       temp.path,
     ]);

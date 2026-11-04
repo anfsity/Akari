@@ -117,7 +117,7 @@ elif name == 'app':
         handler.chmod(0o755)
         for name in ['sway', 'swaymsg', 'hyprctl', 'grim', 'app']:
             (self.bin / name).symlink_to(handler)
-        reference = json.loads((ROOT / 'config/sway/reference.json').read_text())
+        reference = json.loads((ROOT / 'scripts/sway/reference.json').read_text())
         self.profile = {'source': reference['source'], 'outputs': reference['outputs'],
                         'selection': 'reference', 'custom': False}
         self.environment = {**os.environ, 'PATH': f'{self.bin}:{os.environ["PATH"]}',

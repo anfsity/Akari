@@ -154,7 +154,7 @@ def start_session(directory, backend, command):
     directory.mkdir(parents=True, exist_ok=True)
     screenshots.mkdir()
     config = directory / 'sway.conf'
-    base = Path(__file__).resolve().parents[1] / 'config/sway/debug.conf'
+    base = Path(__file__).resolve().parents[1] / 'scripts/sway/debug.conf'
     config.write_text(base.read_text() + '\n' + '\n'.join(
         get_output_commands(target, configure_mode=not hyprland)) + '\n')
     report = {'source': profile['source'], 'custom': profile['custom'],

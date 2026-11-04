@@ -44,7 +44,7 @@ sys.exit(int(os.environ.get('RESULT', '0')))
         self.launcher = self.root / 'launch.sh'
         self.launcher.write_text(f'''#!/bin/bash
 set -euo pipefail
-exec /bin/bash '{REPOSITORY}/scripts/splash.sh' '{sys.executable}' -c '
+exec /bin/bash '{REPOSITORY}/system/splash.sh' '{sys.executable}' -c '
 import os, pathlib
 root = pathlib.Path(os.environ["FIXTURE"])
 pidfile = root / "renderer.pid"
@@ -149,7 +149,7 @@ finally:
     (root / 'compositor-released').touch()
 ''')
         process = subprocess.Popen(
-            ['bash', str(REPOSITORY / 'scripts/splash.sh'), sys.executable, str(compositor)],
+            ['bash', str(REPOSITORY / 'system/splash.sh'), sys.executable, str(compositor)],
             env=self.environment, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             deadline = time.monotonic() + 3

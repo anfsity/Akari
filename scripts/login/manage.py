@@ -393,13 +393,14 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
         shutil.copy2(backend, release / 'backend')
         shutil.copy2(splash, release / 'akari-splash')
         for name in ['launch.sh', 'run-greeter.sh']:
-            shutil.copy2(source / 'scripts/login' / name, release / name)
+            shutil.copy2(source / 'system' / name, release / name)
             (release / name).chmod(0o755)
         (release / 'scripts').mkdir()
         # Reuse the tested D-Bus and output-layout implementations. The test
         # lifecycle remains entirely separate from this deployment.
-        for name in ['debug-dbus.sh', 'lib.sh', 'splash.sh']:
+        for name in ['debug-dbus.sh', 'lib.sh']:
             shutil.copy2(source / 'scripts' / name, release / 'scripts' / name)
+        shutil.copy2(source / 'system/splash.sh', release / 'scripts/splash.sh')
         for name in ['display-layout.py', 'display_profile.py']:
             shutil.copy2(source / 'scripts/greetd-test' / name, release / name)
         # Developer umasks must not make the installed bundle unreadable to
@@ -409,7 +410,7 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
         for name in ['greetd.toml', 'sway.conf']:
             target = CONFIGURATION / name
             if not target.exists():
-                shutil.copy2(source / 'scripts/login' / name, target)
+                shutil.copy2(source / 'system' / name, target)
                 target.chmod(0o644)
                 created_configs.append(target)
         if layout is not None and not (CONFIGURATION / 'display-layout.json').exists():
@@ -417,7 +418,7 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
             shutil.copy2(layout, target)
             target.chmod(0o644)
             created_configs.append(target)
-        shutil.copy2(source / 'scripts/login/akari.service', UNIT)
+        shutil.copy2(source / 'system/akari.service', UNIT)
         UNIT.chmod(0o644)
         run_systemctl('daemon-reload')
         update_pam(keyring_pam)

@@ -56,24 +56,9 @@ const repositoryScripts = [
     'Shared Bash functions; source from another script.',
   ),
   ScriptDefinition(
-    'splash.sh',
-    ScriptKind.internal,
-    'VT splash then command; requires AKARI_SPLASH_BIN, AKARI_LOG_DIR and a real VT.',
-  ),
-  ScriptDefinition(
     'login/manage.py',
     ScriptKind.tool,
     'Manage installed login resources; mutations require root.',
-  ),
-  ScriptDefinition(
-    'login/launch.sh',
-    ScriptKind.internal,
-    'Installed greetd entrypoint; requires the deployed release layout and greeter account.',
-  ),
-  ScriptDefinition(
-    'login/run-greeter.sh',
-    ScriptKind.internal,
-    'Sway child; requires the installed AKARI_RELEASE, AKARI_APP, AKARI_LOG_DIR, AKARI_SPLASH_BIN and private bus.',
   ),
   ScriptDefinition(
     'greetd-test/install.sh',

@@ -105,7 +105,7 @@ Future<void> main(List<String> arguments) async {
   ]) {
     test('$workflow isolates systemd and runtime boundaries', () async {
       final result = await Process.run('python3', [
-        '${_repoRoot.path}/test/support/$workflow',
+        '${_repoRoot.path}/test/workflows/$workflow',
       ]);
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
     });

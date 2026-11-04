@@ -31,7 +31,7 @@ Future<void> main() async {
   final profile = await Process.run('python3', [
     '${root.path}/scripts/greetd-test/display_profile.py',
     '--reference',
-    '${root.path}/config/sway/reference.json',
+    '${root.path}/scripts/sway/reference.json',
     '--state',
     '${output.path}/display-state',
     '--display-profile',

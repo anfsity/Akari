@@ -85,7 +85,7 @@ elif name == 'chmod':
             target.chmod(0o755)
         (self.root / "frontend").mkdir()
         (self.root / 'scripts').mkdir()
-        shutil.copy2(SOURCE.parent / 'splash.sh', self.root / 'scripts/splash.sh')
+        shutil.copy2(SOURCE.parents[1] / 'system/splash.sh', self.root / 'scripts/splash.sh')
         for path in [self.root / "frontend/greeter", self.root / "backend"]:
             path.touch()
             path.chmod(0o755)
@@ -227,8 +227,10 @@ class InstallerTest(unittest.TestCase):
         layout_script = self.source / 'display-layout.py'
         layout_script.write_text(layout_script.read_text().replace(
             '/run/user/{os.getuid()}', str(self.root / 'runtime') + '/{os.getuid()}'))
-        for name in ["lib.sh", "debug-dbus.sh", "splash.sh"]:
+        for name in ["lib.sh", "debug-dbus.sh"]:
             shutil.copy2(SOURCE.parent / name, self.repo / "scripts" / name)
+        (self.repo / 'system').mkdir()
+        shutil.copy2(SOURCE.parents[1] / 'system/splash.sh', self.repo / 'system/splash.sh')
         (self.repo / "source-version").write_text("new")
         self.bin = self.root / "bin"
         self.bin.mkdir()

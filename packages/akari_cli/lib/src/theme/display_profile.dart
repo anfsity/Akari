@@ -24,7 +24,7 @@ Future<Map<String, Object?>> resolveDisplayProfile(
   final result = await Process.run('python3', [
     getJoinedPath(repoRoot.path, 'scripts/greetd-test/display_profile.py'),
     '--reference',
-    getJoinedPath(repoRoot.path, 'config/sway/reference.json'),
+    getJoinedPath(repoRoot.path, 'scripts/sway/reference.json'),
     '--state',
     '$state/akari/display-profiles',
     '--display-profile',

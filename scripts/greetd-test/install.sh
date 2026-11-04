@@ -83,6 +83,6 @@ if [[ -n "$layout" ]]; then
   chmod 0644 "$test_root/display-layout.json"
 fi
 install -d -m 0755 "$test_root/scripts"
-install -m 0755 "$repo_root/scripts/debug-dbus.sh" "$repo_root/scripts/lib.sh" "$repo_root/scripts/splash.sh" "$test_root/scripts/"
+install -m 0755 "$repo_root/scripts/debug-dbus.sh" "$repo_root/scripts/lib.sh" "$repo_root/system/splash.sh" "$test_root/scripts/"
 echo "Installed test files; previous version: $backup"
 echo 'No display manager was started or stopped.'

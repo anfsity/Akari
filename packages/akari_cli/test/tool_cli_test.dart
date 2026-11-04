@@ -53,7 +53,7 @@ runDirectory: 'run',
 }
 ''');
     final result = await Process.run('python3', [
-      '${_repoRoot.path}/test/support/interactive_run_probe.py',
+      '${_repoRoot.path}/test/probes/interactive_run_probe.py',
       '${_repoRoot.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
       '--packages=${_repoRoot.path}/packages/akari_cli/.dart_tool/package_config.json',
       runner.path,

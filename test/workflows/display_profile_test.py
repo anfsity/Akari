@@ -35,7 +35,7 @@ class DisplayProfileTest(unittest.TestCase):
         (self.installation / 'current-run').symlink_to(self.run)
         (self.run / 'config.json').write_text(json.dumps({'source': 'greetd-login'}))
         self.state = self.root / 'state'
-        self.reference = ROOT / 'config/sway/reference.json'
+        self.reference = ROOT / 'scripts/sway/reference.json'
 
     def capture(self, raw=None, name='session-one', timestamp=None, source='greetd-login'):
         session = self.run / 'greeter' / name
