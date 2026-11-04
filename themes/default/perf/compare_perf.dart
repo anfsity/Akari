@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'frame_metrics.dart';
+import 'package:greeter_harness/performance.dart';
 
 const _regressionThreshold = 1.20;
 const _maximumUnmatchedFrameRatio = 0.20;

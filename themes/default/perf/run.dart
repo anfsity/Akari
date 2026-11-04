@@ -78,7 +78,7 @@ Future<void> main(List<String> arguments) async {
       await _execute([
         ...dart,
         'run',
-        'perf/summarize_timeline.dart',
+        'greeter_harness:summarize_timeline',
         '--input',
         '${output.path}/scene_interactions_timeline.json',
       ], themeDirectory);
@@ -88,7 +88,7 @@ Future<void> main(List<String> arguments) async {
     await _execute([
       ...dart,
       'run',
-      'perf/aggregate_perf.dart',
+      'greeter_harness:aggregate_perf',
       '--output',
       '${output.path}/scene_report.json',
       for (final report in reports) ...['--input', report],

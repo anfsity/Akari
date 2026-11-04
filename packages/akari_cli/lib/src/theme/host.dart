@@ -35,14 +35,6 @@ void createThemeHost({
     final link = Link('${lib.path}/$name');
     if (!link.existsSync()) link.createSync(source.path);
   }
-  if (preview) {
-    names.add('akari_preview');
-    final link = Link('${lib.path}/akari_preview');
-    if (FileSystemEntity.typeSync(link.path, followLinks: false) ==
-        FileSystemEntityType.notFound) {
-      link.createSync('${repoRoot.path}/tool/preview');
-    }
-  }
   for (final entity in lib.listSync(followLinks: false)) {
     final name = entity.uri.pathSegments.where((part) => part.isNotEmpty).last;
     if (!names.contains(name)) entity.deleteSync(recursive: true);
@@ -66,6 +58,8 @@ void createThemeHost({
         'dbus': platform['dependencies']['dbus'],
         'greeter_ui': {'path': '${repoRoot.path}/packages/greeter_ui'},
       },
+      if (preview)
+        'greeter_harness': {'path': '${repoRoot.path}/packages/greeter_harness'},
       if (studio)
         'theme_studio': {'path': '${repoRoot.path}/packages/theme_studio'},
       'theme_sdk': {'path': '${repoRoot.path}/packages/theme_sdk'},
@@ -140,8 +134,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:greeter/akari_preview/journey.dart';
-import 'package:greeter/akari_preview/scenarios.dart';
+import 'package:greeter_harness/greeter_harness.dart';
+import 'package:greeter/app/app.dart';
 import 'package:${theme.packageName}/theme.dart' show ${theme.builderName};
 
 void main() {
@@ -153,7 +147,7 @@ void main() {
   for (final scenario in previewScenarioNames.where((name) => selected == 'all' || selected == name)) {
     testWidgets(scenario, (tester) async {
       try {
-        await runPreviewScenario(tester, ${theme.builderName}, scenario);
+        await runPreviewScenario(tester, (gateway) => MyApp(themeBuilder: ${theme.builderName}, gateway: gateway), scenario);
         results[scenario] = 'passed';
       } catch (_) {
         results[scenario] = 'failed';

@@ -1,0 +1,25 @@
+name: greeter_harness
+description: Shared preview journeys and frame/timeline performance tools for Akari.
+publish_to: none
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  akari_cli:
+    path: ../akari_cli
+  greeter_ui:
+    path: ../greeter_ui
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  greeter:
+    path: ../..
+  theme_default:
+    path: ../../themes/default

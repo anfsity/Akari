@@ -16,6 +16,8 @@ dependencies:
     path: ../../packages/theme_sdk
 
 dev_dependencies:
+  greeter_harness:
+    path: ../../packages/greeter_harness
   akari_cli:
     path: ../../packages/akari_cli
   greeter:

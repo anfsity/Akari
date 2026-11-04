@@ -3,16 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:greeter/app/app.dart';
 import 'package:greeter_ui/greeter_ui.dart';
-import 'package:theme_sdk/theme_sdk.dart' show ThemeBuilder;
 
 /// Exercise the real app in one window with controlled authentication events.
 /// Stage assertions decide when to advance; pauses only make motion observable.
 /// Tests intercept the platform exit so the next scenario can reuse the engine.
 Future<void> runPreviewScenario(
   WidgetTester tester,
-  ThemeBuilder themeBuilder,
+  Widget Function(GreeterGateway gateway) createApp,
   String scenario,
 ) async {
   final gateway = _PreviewGateway();
@@ -28,7 +26,7 @@ Future<void> runPreviewScenario(
   );
   try {
     await tester.pumpWidget(
-      MyApp(themeBuilder: themeBuilder, gateway: gateway),
+      createApp(gateway),
     );
     final feature = tester
         .widget<GreeterSceneAdapter>(find.byType(GreeterSceneAdapter))

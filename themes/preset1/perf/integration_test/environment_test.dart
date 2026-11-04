@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:ui' show FramePhase, FrameTiming, PlatformDispatcher;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
+import 'package:greeter_harness/greeter_harness.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:greeter/app/app.dart';
 import 'package:integration_test/integration_test.dart';
@@ -17,37 +17,8 @@ void main() {
   testWidgets('measures animated environment and dispersed login in Sway', (
     tester,
   ) async {
-    final phases = <String, List<FrameTiming>>{};
-    final framePhases = <int, String>{};
-    var phase = 'warmup';
-    var collecting = true;
-    void onFrame(Duration _) {
-      if (collecting) {
-        final frameNumber = PlatformDispatcher.instance.frameData.frameNumber;
-        if (frameNumber >= 0) {
-          framePhases[frameNumber] = phase;
-        }
-      }
-    }
-
-    void onTimings(List<FrameTiming> timings) {
-      for (final timing in timings) {
-        if (timing.frameNumber < 0) {
-          continue;
-        }
-        final captured = framePhases.remove(timing.frameNumber);
-        if (captured != null && captured != 'warmup') {
-          phases.putIfAbsent(captured, () => []).add(timing);
-        }
-      }
-    }
-
-    SchedulerBinding.instance.addPersistentFrameCallback(onFrame);
-    SchedulerBinding.instance.addTimingsCallback(onTimings);
-    addTearDown(() {
-      collecting = false;
-      SchedulerBinding.instance.removeTimingsCallback(onTimings);
-    });
+    final recorder = FrameTimingRecorder(activePhase: 'warmup')..start();
+    addTearDown(recorder.stop);
 
     Future<void> wait([int milliseconds = 1400]) =>
         Future<void>.delayed(Duration(milliseconds: milliseconds));
@@ -64,14 +35,14 @@ void main() {
     await tester.pumpWidget(MyApp(themeBuilder: buildPreset1Theme));
     await wait(2500);
     for (var cycle = 0; cycle < 3; cycle++) {
-      phase = 'dormant';
+      recorder.activePhase = 'dormant';
       await wait(2500);
       if (cycle == 0) {
         await capture('dormant');
         await wait(500);
         await capture('dormant_rain');
       }
-      phase = 'wake';
+      recorder.activePhase = 'wake';
       await sendKey('space');
       await wait();
       if (cycle == 0) {
@@ -81,7 +52,7 @@ void main() {
         await tester.tap(find.text('Alice').last);
         await wait(500);
       }
-      phase = 'typing';
+      recorder.activePhase = 'typing';
       await tester.tap(find.byType(TextField));
       for (final character in 'secret'.split('')) {
         final result = await Process.run('wtype', [character]);
@@ -94,13 +65,13 @@ void main() {
       );
       await wait();
       if (cycle == 0) await capture('login');
-      phase = 'session_menu';
+      recorder.activePhase = 'session_menu';
       await tester.tap(find.byTooltip('Choose a session'));
       await wait();
       if (cycle == 0) await capture('session_menu');
       await sendKey('Escape');
       await wait(500);
-      phase = 'error';
+      recorder.activePhase = 'error';
       await tester.tap(find.byType(TextField));
       await wait(200);
       expect(
@@ -120,16 +91,17 @@ void main() {
       await wait();
       expect(find.byIcon(Icons.refresh).hitTestable(), findsOneWidget);
       if (cycle == 0) await capture('error');
-      phase = 'recovery';
+      recorder.activePhase = 'recovery';
       await tester.tap(find.byIcon(Icons.refresh));
       await wait();
       await sendKey('Escape');
       await wait();
     }
-    phase = 'warmup';
+    recorder.activePhase = 'warmup';
     await wait(1500); // Drain delayed engine timing batches before summarizing.
     final summaries = {
-      for (final entry in phases.entries) entry.key: _getSummary(entry.value),
+      for (final entry in recorder.phaseTimings.entries)
+        if (entry.key != 'warmup') entry.key: _getSummary(entry.value),
     };
     final view = PlatformDispatcher.instance.implicitView!;
     final report = {

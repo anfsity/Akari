@@ -2,20 +2,18 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
-import 'dart:ui' show PlatformDispatcher, PointerDeviceKind;
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
     show debugProfileLayoutsEnabled, debugProfilePaintsEnabled;
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
 
 import 'package:greeter/app/app.dart';
 
 import 'package:theme_default/theme.dart';
 
-import '../frame_metrics.dart';
+import 'package:greeter_harness/greeter_harness.dart';
 
 const _frameInterval = Duration(microseconds: 16667);
 const _captureTimelineDiagnostics = bool.fromEnvironment(
@@ -31,74 +29,20 @@ const _reportPath = String.fromEnvironment(
 );
 
 void main() {
-  final binding = _ScenePerformanceBinding();
+  final binding = PerformanceTestBinding();
 
   testWidgets('captures scene interaction frame timings', (tester) async {
-    final interactionTimings = <FrameTiming>[];
-    final phaseTimings = <String, List<FrameTiming>>{'startup': []};
-    final phaseAtFrameStart = <int, ({String phase, bool actionResponse})>{};
-    final actionResponseTimings = {
-      for (final phase in measuredInteractionPhases) phase: <FrameTiming>[],
-    };
-    var unmatchedFrameCount = 0;
-    var timingFrameCount = 0;
-    var activePhase = 'startup';
-    var captureFramePhases = true;
-    Completer<void>? actionFrame;
-    void onFrame(Duration _) {
-      if (captureFramePhases) {
-        final frameNumber = PlatformDispatcher.instance.frameData.frameNumber;
-        if (frameNumber < 0) {
-          return;
-        }
-        phaseAtFrameStart[frameNumber] = (
-          phase: activePhase,
-          actionResponse: actionFrame != null,
-        );
-        actionFrame?.complete();
-        actionFrame = null;
-      }
-    }
-
-    void onTimings(List<FrameTiming> batch) {
-      // Timings arrive in delayed batches, possibly after the active phase has
-      // changed. Correlate with the phase recorded at frame start by engine
-      // frame number; callback arrival time would misattribute transition work.
-      for (final timing in batch) {
-        timingFrameCount++;
-        final frame = timing.frameNumber < 0
-            ? null
-            : phaseAtFrameStart.remove(timing.frameNumber);
-        if (frame == null) {
-          unmatchedFrameCount++;
-          continue;
-        }
-        final phase = frame.phase;
-        phaseTimings.putIfAbsent(phase, () => []).add(timing);
-        if (measuredInteractionPhases.contains(phase)) {
-          interactionTimings.add(timing);
-        }
-        if (frame.actionResponse) {
-          actionResponseTimings[phase]?.add(timing);
-        }
-      }
-    }
+    final recorder = FrameTimingRecorder(
+      activePhase: 'startup',
+      interactionPhases: measuredInteractionPhases.toSet(),
+    )..start();
+    addTearDown(recorder.stop);
 
     Future<void> capturePhase(
       String phase,
       Future<void> Function() interaction,
     ) async {
-      activePhase = phase;
-      // Capture one response frame per action before later animation frames.
-      // Its UI-thread cost stays measurable even when transitions dominate p95.
-      final firstFrame = Completer<void>();
-      actionFrame = firstFrame;
-      try {
-        await interaction();
-        await firstFrame.future.timeout(const Duration(seconds: 10));
-      } finally {
-        actionFrame = null;
-      }
+      await recorder.captureAction(phase, interaction);
       await tester.pumpAndSettle(_frameInterval);
       await Future<void>.delayed(const Duration(milliseconds: 150));
     }
@@ -175,10 +119,6 @@ void main() {
       );
     }
 
-    SchedulerBinding.instance.addPersistentFrameCallback(onFrame);
-    SchedulerBinding.instance.addTimingsCallback(onTimings);
-    addTearDown(() => SchedulerBinding.instance.removeTimingsCallback(onTimings));
-
     if (_captureTimelineDiagnostics) {
       // Widget/layout/paint instrumentation adds overhead. Enable it only for
       // the separate diagnostic trace, not normal performance gate measurements.
@@ -199,33 +139,32 @@ void main() {
       await captureJourney();
     }
 
-    activePhase = 'settled_idle';
+    recorder.activePhase = 'settled_idle';
     await Future<void>.delayed(const Duration(milliseconds: 500));
     await tester.pumpAndSettle(_frameInterval);
-    final settledIdleFrames = phaseTimings['settled_idle']?.length ?? 0;
+    final settledIdleFrames = recorder.phaseTimings['settled_idle']?.length ?? 0;
     await Future<void>.delayed(const Duration(milliseconds: 1000));
     final staticBackgroundFrames =
-        (phaseTimings['settled_idle']?.length ?? 0) - settledIdleFrames;
+        (recorder.phaseTimings['settled_idle']?.length ?? 0) - settledIdleFrames;
 
-    captureFramePhases = false;
-    phaseAtFrameStart.clear();
+    recorder.stop();
 
     final report = <String, Object?>{
       'frame_budget_ms': _frameInterval.inMicroseconds / 1000,
-      'observed_frame_count': timingFrameCount,
-      ..._summarize(interactionTimings),
+      'observed_frame_count': recorder.observedFrameCount,
+      ..._summarize(recorder.interactionTimings),
       'phases': {
         for (final phase in reportedPhases)
-          phase: _summarize(phaseTimings[phase] ?? const <FrameTiming>[]),
+          phase: _summarize(recorder.phaseTimings[phase] ?? const <FrameTiming>[]),
       },
       'action_response_frames': {
         for (final phase in measuredInteractionPhases)
-          phase: _summarize(actionResponseTimings[phase]!),
+          phase: _summarize(recorder.actionResponseTimings[phase] ?? const <FrameTiming>[]),
       },
       'phase_match': {
         'matching_method': 'frame_number',
-        'unmatched_frame_count': unmatchedFrameCount,
-        'matched_frame_count': timingFrameCount - unmatchedFrameCount,
+        'unmatched_frame_count': recorder.unmatchedFrameCount,
+        'matched_frame_count': recorder.observedFrameCount - recorder.unmatchedFrameCount,
       },
       'static_background_scheduled_frames': staticBackgroundFrames,
     };
@@ -235,47 +174,6 @@ void main() {
     await output.writeAsString(jsonEncode(report));
     binding.reportData = report;
   });
-}
-
-/// Allow application-requested frames without the live test binding's extra
-/// frame after every draw. That automatic reschedule otherwise keeps a static
-/// scene rendering and makes the idle and vsync measurements describe the test
-/// harness. Requests made by application code during a draw still pass through.
-class _ScenePerformanceBinding extends IntegrationTestWidgetsFlutterBinding {
-  _ScenePerformanceBinding() {
-    framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.benchmarkLive;
-  }
-
-  @override
-  void handleDrawFrame() => _runWithFramePolicy(
-    LiveTestWidgetsFlutterBindingFramePolicy.benchmark,
-    super.handleDrawFrame,
-  );
-
-  @override
-  void scheduleFrame() => _runWithFramePolicy(
-    LiveTestWidgetsFlutterBindingFramePolicy.benchmarkLive,
-    super.scheduleFrame,
-  );
-
-  @override
-  void scheduleForcedFrame() => _runWithFramePolicy(
-    LiveTestWidgetsFlutterBindingFramePolicy.benchmarkLive,
-    super.scheduleForcedFrame,
-  );
-
-  void _runWithFramePolicy(
-    LiveTestWidgetsFlutterBindingFramePolicy policy,
-    VoidCallback action,
-  ) {
-    final previous = framePolicy;
-    framePolicy = policy;
-    try {
-      action();
-    } finally {
-      framePolicy = previous;
-    }
-  }
 }
 
 Map<String, Object?> _summarize(Iterable<FrameTiming> frames) {

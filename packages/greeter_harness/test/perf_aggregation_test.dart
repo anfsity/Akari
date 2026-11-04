@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../perf/aggregate_perf.dart' as aggregate;
-import '../perf/frame_metrics.dart';
+import '../lib/src/performance/aggregate_perf.dart' as aggregate;
+import '../lib/src/performance/frame_metrics.dart';
 
 void main() {
   late Directory directory;
