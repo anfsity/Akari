@@ -1,17 +1,21 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-import '../tool/src/commands/development.dart';
-import '../tool/src/commands/plan.dart';
-import '../tool/src/commands/theme.dart';
-import '../tool/src/commands/verification.dart';
-import '../tool/src/execution/model.dart';
-import '../tool/src/sdk_commands.dart';
-import '../tool/src/theme/host.dart';
-import '../tool/src/theme/model.dart';
-import '../tool/src/theme/project.dart';
+import '../lib/src/execution/paths.dart';
+
+import '../lib/src/commands/development.dart';
+import '../lib/src/commands/plan.dart';
+import '../lib/src/commands/theme.dart';
+import '../lib/src/commands/verification.dart';
+import '../lib/src/execution/model.dart';
+import '../lib/src/sdk_commands.dart';
+import '../lib/src/theme/host.dart';
+import '../lib/src/theme/model.dart';
+import '../lib/src/theme/project.dart';
+
+final _repoRoot = findRepositoryRoot();
 
 void main() {
   late Directory tempRoot;
@@ -30,9 +34,9 @@ void main() {
     final runner = File('${tempRoot.path}/interactive.dart');
     await runner.writeAsString('''
 import 'dart:io';
-import '${Directory.current.uri}tool/src/execution/model.dart';
-import '${Directory.current.uri}tool/src/commands/development.dart';
-import '${Directory.current.uri}tool/src/commands/plan.dart';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/execution/model.dart';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/commands/development.dart';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/commands/plan.dart';
 Future<void> main() async {
   exitCode = await runPlan(RunPlan(
 command: 'interactive',
@@ -49,9 +53,9 @@ runDirectory: 'run',
 }
 ''');
     final result = await Process.run('python3', [
-      '${Directory.current.path}/test/support/interactive_run_probe.py',
-      '${Directory.current.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
-      '--packages=${Directory.current.path}/.dart_tool/package_config.json',
+      '${_repoRoot.path}/test/support/interactive_run_probe.py',
+      '${_repoRoot.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
+      '--packages=${_repoRoot.path}/packages/akari_cli/.dart_tool/package_config.json',
       runner.path,
     ], workingDirectory: tempRoot.path);
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
@@ -151,7 +155,7 @@ runDirectory: 'run',
       final theme = getThemePackage(project);
       final host = Directory('${tempRoot.path}/studio');
       createThemeHost(
-        repoRoot: Directory.current,
+        repoRoot: _repoRoot,
         theme: theme,
         output: host,
         kind: ThemeHostKind.studio,
@@ -194,7 +198,7 @@ runDirectory: 'run',
     );
     final host = Directory('${tempRoot.path}/primary-scene-host');
     createThemeHost(
-      repoRoot: Directory.current,
+      repoRoot: _repoRoot,
       theme: theme,
       output: host,
       kind: ThemeHostKind.studio,
@@ -348,7 +352,7 @@ runDirectory: 'run',
     () async {
       final project = await _createThemeProject(tempRoot);
       final plan = createBuildPlan(
-        Directory.current,
+        _repoRoot,
         getThemePackage(project),
         mode: BuildMode.release,
         jobs: 4,
@@ -628,7 +632,7 @@ sys.exit(1)
     expect(steps.last['id'], 'theme.preview');
     expect(steps.where((step) => step['id'] == 'backend.build'), isEmpty);
     expect(
-      Directory('${Directory.current.path}/${plan['run_directory']}')
+      Directory('${_repoRoot.path}/${plan['run_directory']}')
           .existsSync(),
       isFalse,
     );
@@ -697,7 +701,7 @@ if sys.argv[1] == 'test':
     path = next(argument.split('=', 2)[2] for argument in sys.argv if argument.startswith('--dart-define=AKARI_PREVIEW_RESULT='))
     pathlib.Path(path).write_text(json.dumps({'face-success': 'passed', 'password-fallback': 'passed'}))
 ''');
-    final dartCommand = getDartCommand(Directory.current);
+    final dartCommand = getDartCommand(_repoRoot);
     await dart.writeAsString('''#!/bin/sh
 if [ "\$1" = run ] && [ "\$2" = build_runner ]; then
   exit 0
@@ -719,7 +723,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
     expect(result.exitCode, 0, reason: result.stderr);
     final report = jsonDecode(result.stdout) as Map<String, dynamic>;
     final runDirectory = Directory(
-      '${Directory.current.path}/${report['artifacts']['run_directory']}',
+      '${_repoRoot.path}/${report['artifacts']['run_directory']}',
     );
     addTearDown(() => runDirectory.delete(recursive: true));
     expect(report['status'], 'passed');
@@ -735,7 +739,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
     });
     expect(await platformManifest.readAsString(), manifestBefore);
     final host = Directory(
-      '${Directory.current.path}/${report['artifacts']['host_project']}',
+      '${_repoRoot.path}/${report['artifacts']['host_project']}',
     );
     addTearDown(() => host.delete(recursive: true));
     final hostManifest = jsonDecode(
@@ -778,7 +782,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
       expect(report['status'], 'passed');
       final runDirectory =
           (report['artifacts'] as Map<String, dynamic>)['run_directory'];
-      final runPath = '${Directory.current.path}/$runDirectory';
+      final runPath = '${_repoRoot.path}/$runDirectory';
       addTearDown(() async {
         final directory = Directory(runPath);
         if (directory.existsSync()) {
@@ -789,10 +793,10 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
       expect(steps, hasLength(1));
       for (final step in steps) {
         final stdoutLog = File(
-          '${Directory.current.path}/${step['stdout_log']}',
+          '${_repoRoot.path}/${step['stdout_log']}',
         );
         final stderrLog = File(
-          '${Directory.current.path}/${step['stderr_log']}',
+          '${_repoRoot.path}/${step['stderr_log']}',
         );
         expect(await stdoutLog.readAsString(), 'fake sdk stdout\n');
         expect(await stderrLog.readAsString(), 'fake sdk stderr\n');
@@ -868,7 +872,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         isTrue,
       );
       expect(
-        Directory('${Directory.current.path}/${plan['run_directory']}')
+        Directory('${_repoRoot.path}/${plan['run_directory']}')
             .existsSync(),
         isFalse,
       );
@@ -935,15 +939,15 @@ perf:
               ? containsAll(['run', 'perf/custom.dart'])
               : containsAll(['python3', 'trace with spaces.py']),
         );
-        expect(perf['environment']['AKARI_REPO_ROOT'], Directory.current.path);
+        expect(perf['environment']['AKARI_REPO_ROOT'], _repoRoot.path);
         final output = plan['artifacts']['performance_output'];
         expect(output, '${plan['run_directory']}/perf');
         expect(
           perf['environment']['AKARI_PERF_OUTPUT_DIR'],
-          '${Directory.current.path}/$output',
+          '${_repoRoot.path}/$output',
         );
         expect(
-          Directory('${Directory.current.path}/${plan['run_directory']}')
+          Directory('${_repoRoot.path}/${plan['run_directory']}')
               .existsSync(),
           isFalse,
         );
@@ -998,14 +1002,14 @@ sys.exit(int(sys.argv[1]))
           expect(result.exitCode, code, reason: result.stderr);
           final report = jsonDecode(result.stdout) as Map<String, dynamic>;
           final runDirectory = Directory(
-            '${Directory.current.path}/${report['artifacts']['run_directory']}',
+            '${_repoRoot.path}/${report['artifacts']['run_directory']}',
           );
           addTearDown(() => runDirectory.delete(recursive: true));
           expect(runIds.add(report['run_id'] as String), isTrue);
           expect(report['status'], code == 0 ? 'passed' : 'failed');
           expect(report.containsKey('performance'), isFalse);
           final artifact = File(
-            '${Directory.current.path}/${report['theme_artifacts']['custom']}',
+            '${_repoRoot.path}/${report['theme_artifacts']['custom']}',
           );
           expect(jsonDecode(await artifact.readAsString()), [
             '$code',
@@ -1015,12 +1019,12 @@ sys.exit(int(sys.argv[1]))
           final steps = (report['steps'] as List).cast<Map<String, dynamic>>();
           expect(steps.last['exit_code'], code);
           expect(
-            await File('${Directory.current.path}/${steps.last['stdout_log']}')
+            await File('${_repoRoot.path}/${steps.last['stdout_log']}')
                 .readAsString(),
             'theme stdout\n',
           );
           expect(
-            await File('${Directory.current.path}/${steps.last['stderr_log']}')
+            await File('${_repoRoot.path}/${steps.last['stderr_log']}')
                 .readAsString(),
             'theme stderr\n',
           );
@@ -1067,7 +1071,7 @@ perf:
       expect(result.exitCode, code == 0 ? 1 : code, reason: result.stderr);
       final report = jsonDecode(result.stdout) as Map<String, dynamic>;
       final runDirectory = Directory(
-        '${Directory.current.path}/${report['artifacts']['run_directory']}',
+        '${_repoRoot.path}/${report['artifacts']['run_directory']}',
       );
       addTearDown(() => runDirectory.delete(recursive: true));
       expect(report['status'], 'failed');
@@ -1235,7 +1239,7 @@ Future<ProcessResult> _runTool(
   Map<String, String> environment = const {},
   Set<String> unsetEnvironmentVariables = const {},
 }) {
-  final dartCommand = getDartCommand(Directory.current);
+  final dartCommand = getDartCommand(_repoRoot);
   final childEnvironment = {...Platform.environment};
   for (final key in unsetEnvironmentVariables) {
     childEnvironment.remove(key);
@@ -1243,8 +1247,8 @@ Future<ProcessResult> _runTool(
   childEnvironment.addAll(environment);
   return Process.run(
     dartCommand.first,
-    [...dartCommand.skip(1), 'tool/akari.dart', ...arguments],
-    workingDirectory: Directory.current.path,
+    [...dartCommand.skip(1), 'packages/akari_cli/bin/akari.dart', ...arguments],
+    workingDirectory: _repoRoot.path,
     environment: childEnvironment,
     includeParentEnvironment: false,
   );

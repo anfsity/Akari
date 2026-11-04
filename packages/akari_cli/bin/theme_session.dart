@@ -1,18 +1,19 @@
 import 'dart:io';
 
-import 'src/theme/model.dart';
-import 'src/theme/session.dart';
+import '../lib/src/execution/paths.dart';
+import '../lib/src/theme/model.dart';
+import '../lib/src/theme/session.dart';
 
 Future<void> main(List<String> arguments) async {
   if (arguments.length != 4) {
     stderr.writeln(
-      'Usage: dart tool/theme_session.dart THEME HOST MODE demo|real',
+      'Usage: dart packages/akari_cli/bin/theme_session.dart THEME HOST MODE demo|real',
     );
     exitCode = 2;
     return;
   }
   exitCode = await ThemeSession(
-    repoRoot: File.fromUri(Platform.script).parent.parent,
+    repoRoot: findRepositoryRoot(),
     theme: Directory(arguments[0]),
     host: Directory(arguments[1]),
     mode: BuildMode.values.byName(arguments[2]),

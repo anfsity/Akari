@@ -1,5 +1,5 @@
 import '../theme/model.dart';
-import '../../preview/scenarios.dart';
+import '../theme/preview_scenarios.dart';
 
 enum CommandGroup {
   development('Development and preview'),

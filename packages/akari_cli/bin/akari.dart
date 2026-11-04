@@ -1,10 +1,10 @@
 import 'dart:io';
 
-import 'src/cli/arguments.dart';
-import 'src/cli/definition.dart';
-import 'src/cli/dispatch.dart';
-import 'src/cli/usage.dart';
-import 'src/theme/display_profile.dart';
+import '../lib/src/cli/arguments.dart';
+import '../lib/src/cli/definition.dart';
+import '../lib/src/cli/dispatch.dart';
+import '../lib/src/cli/usage.dart';
+import '../lib/src/theme/display_profile.dart';
 
 Future<void> main(List<String> arguments) async {
   try {

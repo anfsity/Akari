@@ -2,9 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-import '../tool/src/sdk_commands.dart';
+import '../lib/src/execution/paths.dart';
+
+import '../lib/src/sdk_commands.dart';
+
+final _repoRoot = findRepositoryRoot();
 
 void main() {
   test(
@@ -101,12 +105,12 @@ pathlib.Path(${jsonEncode(generated.path)}).write_text(content)
 ''');
     final chmod = await Process.run('chmod', ['+x', flutter.path, dart.path]);
     expect(chmod.exitCode, 0);
-    final sdk = getDartCommand(Directory.current);
+    final sdk = getDartCommand(_repoRoot);
     final process = await Process.start(
       sdk.first,
       [
         ...sdk.skip(1),
-        'tool/theme_session.dart',
+        'packages/akari_cli/bin/theme_session.dart',
         theme.path,
         temporary.path,
         'debug',
@@ -223,12 +227,12 @@ finally:
         (await Process.run('chmod', ['+x', flutter.path, dart.path])).exitCode,
         0,
       );
-      final sdk = getDartCommand(Directory.current);
+      final sdk = getDartCommand(_repoRoot);
       final process = await Process.start(
         sdk.first,
         [
           ...sdk.skip(1),
-          'tool/theme_session.dart',
+          'packages/akari_cli/bin/theme_session.dart',
           theme.path,
           temporary.path,
           'debug',

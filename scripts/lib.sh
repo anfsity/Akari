@@ -64,9 +64,9 @@ akari_run_dev_cli() {
   if [[ -n "$AKARI_RESOLVED_DART_BIN" && -x "$AKARI_RESOLVED_DART_BIN" ]]; then
     # Preserve the caller's cwd: relative --theme and --report paths belong to
     # the invocation directory, while the entrypoint itself is repository-bound.
-    exec "$AKARI_RESOLVED_DART_BIN" "$repo_root/tool/akari.dart" "$@"
+    exec "$AKARI_RESOLVED_DART_BIN" "$repo_root/packages/akari_cli/bin/akari.dart" "$@"
   fi
 
   cd -- "$repo_root"
-  exec fvm dart run tool/akari.dart "$@"
+  exec fvm dart run packages/akari_cli/bin/akari.dart "$@"
 }

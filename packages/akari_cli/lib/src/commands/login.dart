@@ -83,7 +83,7 @@ Future<int> runLoginCommand(
   final build = operation == 'install'
       ? [
           ...getDartCommand(repoRoot),
-          '${repoRoot.path}/tool/akari.dart',
+          '${repoRoot.path}/packages/akari_cli/bin/akari.dart',
           'build',
           '--theme',
           Directory(values['--theme'] ?? '${repoRoot.path}/themes/default')

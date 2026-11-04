@@ -258,7 +258,7 @@ if name == 'dart':
     repo = pathlib.Path(os.getcwd())
     theme = os.environ.get('SELECTED_THEME', str(repo / 'themes/default'))
     bundle = 'build/out/' + os.environ.get('THEME_NAME', 'default')
-    assert args == [str(repo / 'tool/akari.dart'), 'build', '--theme',
+    assert args == [str(repo / 'packages/akari_cli/bin/akari.dart'), 'build', '--theme',
                     theme, '--mode', 'release', '--platform', 'linux',
                     '--jobs', '4', '--format', 'json'], args
     assert os.environ['HOME'] == str(root / 'builder-home')

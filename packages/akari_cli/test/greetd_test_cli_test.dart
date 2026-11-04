@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-import '../tool/src/commands/greetd_test.dart';
-import '../tool/src/sdk_commands.dart';
+import '../lib/src/execution/paths.dart';
+
+import '../lib/src/commands/greetd_test.dart';
+import '../lib/src/sdk_commands.dart';
+
+final _repoRoot = findRepositoryRoot();
 
 void main() {
   late Directory temporary;
@@ -47,8 +51,8 @@ elif name == 'systemctl':
     runner = File('${temporary.path}/runner.dart');
     await runner.writeAsString('''
 import 'dart:io';
-import '${Directory.current.uri}tool/src/commands/greetd_test.dart';
-import '${Directory.current.uri}tool/src/cli/definition.dart';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/commands/greetd_test.dart';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/cli/definition.dart';
 Future<void> main(List<String> arguments) async {
   try {
     exitCode = await runGreetdTestCommand(
@@ -73,7 +77,7 @@ Future<void> main(List<String> arguments) async {
     List<String> arguments, {
     Map<String, String> environment = const {},
   }) {
-    final dart = getDartCommand(Directory.current);
+    final dart = getDartCommand(_repoRoot);
     return Process.run(
       dart.first,
       [...dart.skip(1), runner.path, ...arguments],
@@ -81,7 +85,7 @@ Future<void> main(List<String> arguments) async {
       environment: {
         'PATH': '${bin.path}:${Platform.environment['PATH']}',
         'INSTALLATION': installation.path,
-        'REPOSITORY': Directory.current.path,
+        'REPOSITORY': _repoRoot.path,
         'CALLS': '${temporary.path}/calls.json',
         ...environment,
       },
@@ -95,7 +99,7 @@ Future<void> main(List<String> arguments) async {
   }
 
   test('CLI help and grammar expose scoped greetd-test operations', () async {
-    final dart = getDartCommand(Directory.current);
+    final dart = getDartCommand(_repoRoot);
     for (final target in [
       '',
       'install',
@@ -106,7 +110,7 @@ Future<void> main(List<String> arguments) async {
     ]) {
       final result = await Process.run(dart.first, [
         ...dart.skip(1),
-        'tool/akari.dart',
+        'packages/akari_cli/bin/akari.dart',
         'greetd-test',
         if (target.isNotEmpty) target,
         '--help',
@@ -149,7 +153,7 @@ Future<void> main(List<String> arguments) async {
         [
           '--',
           'bash',
-          '${Directory.current.path}/scripts/greetd-test/install.sh',
+          '${_repoRoot.path}/scripts/greetd-test/install.sh',
           installation.path,
           '${temporary.path}/$theme',
         ],
@@ -189,13 +193,13 @@ Future<void> main(List<String> arguments) async {
   test(
     'top-level dispatch bypasses development state for lifecycle commands',
     () async {
-      final dart = getDartCommand(Directory.current);
+      final dart = getDartCommand(_repoRoot);
       for (final target in ['install', 'start', 'restore']) {
         final result = await Process.run(
           dart.first,
           [
             ...dart.skip(1),
-            '${Directory.current.path}/tool/akari.dart',
+            '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
             'greetd-test',
             target,
             if (target == 'install') ...['--theme', 'relative theme'],
@@ -244,7 +248,7 @@ Future<void> main(List<String> arguments) async {
         expect(
           plan['invocation'],
           contains(
-            'AKARI_DART_BIN=${Directory.current.path}/SDK with spaces/bin/dart',
+            'AKARI_DART_BIN=${_repoRoot.path}/SDK with spaces/bin/dart',
           ),
         );
         expect((plan['invocation'] as List).last, installation.path);

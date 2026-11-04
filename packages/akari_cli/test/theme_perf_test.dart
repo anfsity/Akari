@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-import '../tool/src/commands/performance.dart';
-import '../tool/src/theme/project.dart';
+import '../lib/src/commands/performance.dart';
+import '../lib/src/theme/project.dart';
 
 void main() {
   late Directory temporary;

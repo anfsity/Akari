@@ -1,18 +1,22 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-import '../tool/src/sdk_commands.dart';
+import '../lib/src/execution/paths.dart';
+
+import '../lib/src/sdk_commands.dart';
+
+final _repoRoot = findRepositoryRoot();
 
 void main() {
   test(
     'standalone splash holds one renderer without preparing a theme',
     () async {
-      final dart = getDartCommand(Directory.current);
+      final dart = getDartCommand(_repoRoot);
       final result = await Process.run(dart.first, [
         ...dart.skip(1),
-        'tool/akari.dart',
+        'packages/akari_cli/bin/akari.dart',
         'run',
         'splash',
         '--light',

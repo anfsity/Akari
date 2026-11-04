@@ -30,3 +30,24 @@ Directory findUserHomeDirectory({
   return Directory(home);
 }
 
+
+/// Source entrypoints locate their checkout by ancestry; compiled executables
+/// can use the invocation directory or an explicit AKARI_REPO_ROOT.
+Directory findRepositoryRoot() {
+  final configured = Platform.environment['AKARI_REPO_ROOT'];
+  final starts = configured == null
+      ? [File.fromUri(Platform.script).parent.absolute, Directory.current]
+      : [Directory(configured).absolute];
+  for (var directory in starts) {
+    while (true) {
+      if (File(getJoinedPath(directory.path, 'crates/Cargo.toml')).existsSync() &&
+          File(getJoinedPath(directory.path, 'packages/akari_cli/pubspec.yaml')).existsSync()) {
+        return directory;
+      }
+      final parent = directory.parent;
+      if (parent.path == directory.path) break;
+      directory = parent;
+    }
+  }
+  throw StateError('Could not locate the Akari repository root. Set AKARI_REPO_ROOT.');
+}

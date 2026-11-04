@@ -16,6 +16,8 @@ dependencies:
     path: ../../packages/theme_sdk
 
 dev_dependencies:
+  akari_cli:
+    path: ../../packages/akari_cli
   yaml: ^3.1.3
   greeter:
     path: ../..

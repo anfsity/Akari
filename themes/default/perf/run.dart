@@ -1,10 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import '../../../tool/src/sdk_commands.dart';
-import '../../../tool/src/theme/host.dart';
-import '../../../tool/src/theme/model.dart';
-import '../../../tool/src/theme/project.dart';
+import 'package:akari_cli/akari_cli.dart';
+
 
 Future<void> main(List<String> arguments) async {
   try {

@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-import '../tool/src/sdk_commands.dart';
+import '../lib/src/execution/paths.dart';
+
+import '../lib/src/sdk_commands.dart';
+
+final _repoRoot = findRepositoryRoot();
 
 void main() {
   late Directory temporary;
@@ -53,8 +57,8 @@ elif command == 'python3':
     runner = File('${temporary.path}/runner.dart');
     await runner.writeAsString('''
 import 'dart:io';
-import '${Directory.current.uri}tool/src/commands/login.dart';
-import '${Directory.current.uri}tool/src/cli/definition.dart';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/commands/login.dart';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/cli/definition.dart';
 Future<void> main(List<String> arguments) async {
   try {
     final name = ['install', 'uninstall'].contains(arguments.first)
@@ -78,7 +82,7 @@ Future<void> main(List<String> arguments) async {
     List<String> arguments, {
     Map<String, String> environment = const {},
   }) {
-    final dart = getDartCommand(Directory.current);
+    final dart = getDartCommand(_repoRoot);
     return Process.run(
       dart.first,
       [...dart.skip(1), runner.path, ...arguments],
@@ -86,7 +90,7 @@ Future<void> main(List<String> arguments) async {
       environment: {
         'PATH': '${bin.path}:${Platform.environment['PATH']}',
         'FIXTURE': temporary.path,
-        'REPOSITORY': Directory.current.path,
+        'REPOSITORY': _repoRoot.path,
         'INSTALLATION': installation.path,
         'AKARI_DART_BIN': '${bin.path}/builder',
         ...environment,
@@ -101,7 +105,7 @@ Future<void> main(List<String> arguments) async {
   ]) {
     test('$workflow isolates systemd and runtime boundaries', () async {
       final result = await Process.run('python3', [
-        '${Directory.current.path}/test/support/$workflow',
+        '${_repoRoot.path}/test/support/$workflow',
       ]);
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
     });
@@ -116,7 +120,7 @@ Future<void> main(List<String> arguments) async {
       expect(
         jsonDecode(await File('${temporary.path}/build.json').readAsString()),
         [
-          '${Directory.current.path}/tool/akari.dart',
+          '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
           'build',
           '--theme',
           '${temporary.path}/$theme',
@@ -135,18 +139,18 @@ Future<void> main(List<String> arguments) async {
         [
           '--',
           'python3',
-          '${Directory.current.path}/scripts/login/manage.py',
+          '${_repoRoot.path}/scripts/login/manage.py',
           'install',
           '--keyring',
           'auto',
           '--source',
-          Directory.current.path,
+          _repoRoot.path,
           '--bundle',
-          '${Directory.current.path}/fixture bundle',
+          '${_repoRoot.path}/fixture bundle',
           '--backend',
-          '${Directory.current.path}/fixture backend',
+          '${_repoRoot.path}/fixture backend',
           '--splash',
-          '${Directory.current.path}/fixture splash',
+          '${_repoRoot.path}/fixture splash',
         ],
       );
       expect(File('${temporary.path}/unexpected').existsSync(), isFalse);
@@ -227,7 +231,7 @@ Future<void> main(List<String> arguments) async {
           [
             '--',
             'python3',
-            '${Directory.current.path}/scripts/login/manage.py',
+            '${_repoRoot.path}/scripts/login/manage.py',
             'configure-keyring',
             '--keyring',
             'gnome',
@@ -250,7 +254,7 @@ Future<void> main(List<String> arguments) async {
           [
             '--',
             'python3',
-            '${Directory.current.path}/scripts/login/manage.py',
+            '${_repoRoot.path}/scripts/login/manage.py',
             'uninstall',
             '--scope',
             'all',
@@ -271,7 +275,7 @@ Future<void> main(List<String> arguments) async {
         [
           '--',
           'python3',
-          '${Directory.current.path}/scripts/login/manage.py',
+          '${_repoRoot.path}/scripts/login/manage.py',
           operation,
         ],
       );
@@ -326,7 +330,7 @@ Future<void> main(List<String> arguments) async {
             invocation.first,
             installed
                 ? '${installation.path}/manage.py'
-                : '${Directory.current.path}/scripts/login/manage.py',
+                : '${_repoRoot.path}/scripts/login/manage.py',
           );
           if (arguments.first == 'logs') {
             expect(
@@ -373,7 +377,7 @@ Future<void> main(List<String> arguments) async {
   test(
     'top-level help and dispatch expose production and shell installations',
     () async {
-      final dart = getDartCommand(Directory.current);
+      final dart = getDartCommand(_repoRoot);
       for (final words in [
         ['install'],
         ['install', 'cli'],
@@ -390,7 +394,7 @@ Future<void> main(List<String> arguments) async {
       ]) {
         final help = await Process.run(dart.first, [
           ...dart.skip(1),
-          '${Directory.current.path}/tool/akari.dart',
+          '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
           ...words,
           '--help',
         ]);
@@ -408,7 +412,7 @@ Future<void> main(List<String> arguments) async {
       ]) {
         final result = await Process.run(dart.first, [
           ...dart.skip(1),
-          '${Directory.current.path}/tool/akari.dart',
+          '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
           ...words,
           '--dry-run',
         ], workingDirectory: temporary.path);

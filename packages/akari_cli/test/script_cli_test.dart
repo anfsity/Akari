@@ -1,15 +1,19 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-import '../tool/src/cli/definition.dart';
-import '../tool/src/cli/scripts.dart';
-import '../tool/src/sdk_commands.dart';
+import '../lib/src/execution/paths.dart';
+
+import '../lib/src/cli/definition.dart';
+import '../lib/src/cli/scripts.dart';
+import '../lib/src/sdk_commands.dart';
+
+final _repoRoot = findRepositoryRoot();
 
 void main() {
   test('every script is classified and bound commands reference a tool', () {
-    final scripts = findRepositoryScripts(Directory.current);
+    final scripts = findRepositoryScripts(_repoRoot);
     expect(
       scripts.map((script) => script.path).toSet(),
       repositoryScripts.map((script) => script.path).toSet(),
@@ -35,15 +39,15 @@ sys.exit(7)
       final runner = File('${root.path}/runner.dart');
       await runner.writeAsString('''
 import 'dart:io';
-import '${Directory.current.uri}tool/src/cli/arguments.dart';
-import '${Directory.current.uri}tool/src/cli/definition.dart';
-import '${Directory.current.uri}tool/src/commands/scripts.dart';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/cli/arguments.dart';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/cli/definition.dart';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/commands/scripts.dart';
 Future<void> main(List<String> arguments) async {
   final (command, remaining) = getCliInvocation(arguments);
   exitCode = await runScriptCommand(command, CliArguments(remaining), Directory.current);
 }
 ''');
-      final dart = getDartCommand(Directory.current);
+      final dart = getDartCommand(_repoRoot);
       const arguments = ['--help', r'$(touch unexpected)', 'path with spaces'];
       for (final command in [
         ['script', 'run', 'verify-docs.py'],
@@ -64,11 +68,11 @@ Future<void> main(List<String> arguments) async {
   );
 
   test('script discovery and dry runs work outside the repository', () async {
-    final dart = getDartCommand(Directory.current);
+    final dart = getDartCommand(_repoRoot);
     Future<ProcessResult> run(List<String> arguments) =>
         Process.run(dart.first, [
           ...dart.skip(1),
-          '${Directory.current.path}/tool/akari.dart',
+          '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
           ...arguments,
         ], workingDirectory: Directory.systemTemp.path);
     final inventory = await run(['script', 'list', '--format', 'json']);
@@ -88,7 +92,7 @@ Future<void> main(List<String> arguments) async {
     expect(plan.exitCode, 0, reason: '${plan.stderr}');
     expect((jsonDecode(plan.stdout as String) as Map)['invocation'], [
       'python3',
-      '${Directory.current.path}/scripts/greetd-test/display-layout.py',
+      '${_repoRoot.path}/scripts/greetd-test/display-layout.py',
       'capture',
     ]);
     for (final path in ['../outside.sh', 'lib.sh', 'unknown.sh']) {

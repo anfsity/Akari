@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-import '../tool/src/commands/development.dart';
-import '../tool/src/commands/plan.dart';
-import '../tool/src/execution/model.dart';
+import '../lib/src/commands/development.dart';
+import '../lib/src/commands/plan.dart';
+import '../lib/src/execution/model.dart';
 
 void main() {
   late Directory root;

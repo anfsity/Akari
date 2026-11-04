@@ -18,7 +18,7 @@ Future<int> runCliCommand(CliCommand command, CliArguments input) async {
   if (command.scriptPath != null ||
       command.name == 'script list' ||
       command.name == 'script run') {
-    return runScriptCommand(command, input, _findRepoRoot());
+    return runScriptCommand(command, input, findRepositoryRoot());
   }
   switch (command.name) {
     case 'script':
@@ -39,7 +39,7 @@ Future<int> runCliCommand(CliCommand command, CliArguments input) async {
     case 'login disable-gaze':
     case 'login status':
     case 'login logs':
-      return runLoginCommand(command, arguments, repoRoot: _findRepoRoot());
+      return runLoginCommand(command, arguments, repoRoot: findRepositoryRoot());
     case 'greetd-test install':
     case 'greetd-test start':
     case 'greetd-test restore':
@@ -49,7 +49,7 @@ Future<int> runCliCommand(CliCommand command, CliArguments input) async {
         command,
         arguments,
         repoRoot: command.name == 'greetd-test install'
-            ? _findRepoRoot()
+            ? findRepositoryRoot()
             : null,
       );
     case 'completion':
@@ -57,7 +57,7 @@ Future<int> runCliCommand(CliCommand command, CliArguments input) async {
       stdout.write(getShellCompletion(values['--shell'] ?? 'zsh'));
       return 0;
     case 'install cli':
-      final repoRoot = _findRepoRoot();
+      final repoRoot = findRepositoryRoot();
       final values = getCliOptionValues(command, arguments);
       final shell = values['--shell'] ?? 'zsh';
       final home = findUserHomeDirectory(
@@ -74,29 +74,10 @@ Future<int> runCliCommand(CliCommand command, CliArguments input) async {
       );
       return 0;
     default:
-      final repoRoot = _findRepoRoot();
+      final repoRoot = findRepositoryRoot();
       return runDevelopmentCommand(
         DevCommandOptions.parse(command, input),
         repoRoot,
       );
-  }
-}
-
-Directory _findRepoRoot() {
-  var directory = File.fromUri(Platform.script).parent.absolute;
-  while (true) {
-    final hasRootManifest = File(getJoinedPath(directory.path, 'pubspec.yaml'))
-        .existsSync();
-    final hasBackendManifest = File(
-      getJoinedPath(directory.path, 'crates/akari-backend/Cargo.toml'),
-    ).existsSync();
-    if (hasRootManifest && hasBackendManifest) {
-      return directory;
-    }
-    final parent = directory.parent;
-    if (parent.path == directory.path) {
-      throw StateError('Could not locate the Akari repository root.');
-    }
-    directory = parent;
   }
 }

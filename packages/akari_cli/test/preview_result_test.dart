@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-import '../tool/preview/scenarios.dart';
-import '../tool/src/commands/theme.dart';
-import '../tool/src/execution/model.dart';
+import '../lib/src/theme/preview_scenarios.dart';
+import '../lib/src/commands/theme.dart';
+import '../lib/src/execution/model.dart';
 
 void main() {
   test(

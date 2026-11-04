@@ -1,12 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-import '../tool/src/commands/development.dart';
-import '../tool/src/commands/plan.dart';
-import '../tool/src/execution/model.dart';
-import '../tool/src/theme/display_profile.dart';
+import '../lib/src/execution/paths.dart';
+
+import '../lib/src/commands/development.dart';
+import '../lib/src/commands/plan.dart';
+import '../lib/src/execution/model.dart';
+import '../lib/src/theme/display_profile.dart';
+
+final _repoRoot = findRepositoryRoot();
 
 void main() {
   late Directory temp;
@@ -16,8 +20,8 @@ void main() {
   tearDown(() => temp.delete(recursive: true));
 
   Future<ProcessResult> runTool(List<String> arguments) => Process.run(
-    '${Directory.current.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
-    ['tool/akari.dart', ...arguments],
+    '${_repoRoot.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
+    ['packages/akari_cli/bin/akari.dart', ...arguments],
     environment: {'XDG_STATE_HOME': temp.path},
   );
 

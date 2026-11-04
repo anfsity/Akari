@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-import '../tool/src/cli/installation.dart';
-import '../tool/src/cli/completion.dart';
+import '../lib/src/execution/paths.dart';
+
+import '../lib/src/cli/installation.dart';
+import '../lib/src/cli/completion.dart';
+
+final _repoRoot = findRepositoryRoot();
 
 void main() {
   late Directory temp;
@@ -196,7 +200,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     await completion.writeAsString(getShellCompletion('zsh'));
     await Directory('${temp.path}/theme with spaces').create();
     final result = await Process.run('python3', [
-      '${Directory.current.path}/test/support/zsh_completion_probe.py',
+      '${_repoRoot.path}/test/support/zsh_completion_probe.py',
       completion.path,
       temp.path,
     ]);
@@ -238,7 +242,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     await rc.writeAsString('# existing configuration\n');
     for (var index = 0; index < 2; index++) {
       await installCli(
-        repoRoot: Directory.current,
+        repoRoot: _repoRoot,
         prefix: prefix,
         rcFile: rc,
         shell: 'bash',
@@ -260,7 +264,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       workingDirectory: temp.path,
       environment: {
         'AKARI_DART_BIN':
-            '${Directory.current.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
+            '${_repoRoot.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
       },
     );
     expect(result.exitCode, 0, reason: result.stderr);
@@ -278,7 +282,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       workingDirectory: temp.path,
       environment: {
         'AKARI_DART_BIN':
-            '${Directory.current.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
+            '${_repoRoot.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
       },
     );
     expect(studio.exitCode, 0, reason: studio.stderr);
@@ -302,7 +306,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     final prefix = Directory('${temp.path}/prefix');
     final rc = File('${temp.path}/.zshrc');
     await installCli(
-      repoRoot: Directory.current,
+      repoRoot: _repoRoot,
       prefix: prefix,
       rcFile: rc,
       shell: 'zsh',
@@ -335,7 +339,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     final rc = File('${temp.path}/.bashrc');
     await expectLater(
       installCli(
-        repoRoot: Directory.current,
+        repoRoot: _repoRoot,
         prefix: prefix,
         rcFile: rc,
         shell: 'bash',

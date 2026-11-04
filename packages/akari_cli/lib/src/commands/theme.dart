@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../execution/model.dart';
-import '../../preview/scenarios.dart';
+import '../theme/preview_scenarios.dart';
 import '../execution/paths.dart';
 import '../sdk_commands.dart';
 import '../theme/build_links.dart';
@@ -146,7 +146,7 @@ RunPlan createThemeRunPlan(
             getJoinedPath(repoRoot.path, 'scripts/debug-dbus.sh'),
           ],
           ...getDartCommand(repoRoot),
-          getJoinedPath(repoRoot.path, 'tool/theme_session.dart'),
+          getJoinedPath(repoRoot.path, 'packages/akari_cli/bin/theme_session.dart'),
           theme.directory.path,
           getAbsolutePath(repoRoot, host),
           mode.name,
