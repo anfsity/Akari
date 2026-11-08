@@ -1,9 +1,9 @@
 ---
 title: Theme package contract
-description: Package structure, build rules, and performance protocol for Akari themes.
+description: Package structure, authoring catalogs, build rules, and performance protocol for Akari themes.
 ---
 
-Akari themes are standalone Dart/Flutter packages. Built-in themes live under `themes/` (`themes/default/` and `themes/fallback/`), while third-party themes can live outside the repository.
+Akari themes are standalone Dart/Flutter packages. Built-in themes live under `themes/` (`themes/default/`, `themes/fallback/`, and `themes/preset1/`), while third-party or synthesized themes can live outside the repository.
 
 ## Project structure
 
@@ -21,39 +21,36 @@ my_theme/
 
 ### Naming and dependency rules
 
-Projects may select their initial editing scene explicitly:
-
-```yaml
-akari:
-  scene: lib/composition.scene.json
-```
-
-The path must identify a scene inside `lib/`. Studio and the CLI list it first;
-without this field, scene paths retain their alphabetical order. Synthesized
-themes use this field to reopen the edited composition.
-
 | Rule | Requirement |
 | --- | --- |
 | Package & builder name | Read from `pubspec.yaml` (independent of folder name). `theme_ocean` must export `buildOceanTheme` from `lib/theme.dart`. |
 | Required dependencies | `theme_sdk` and `scene` in `dependencies`; `scene_codegen` and `build_runner: ^2.16.2` in `dev_dependencies`. |
 | Component sharing | May depend on `greeter_components`, but **must not** import another concrete theme package. |
 | Asset paths | Must use Flutter package paths (`packages/theme_ocean/assets/wallpaper.jpg`). |
-| Return contract | `build<Name>Theme` returns a `ThemeDefinition` bundling the generated `SceneDocument`, `ThemeBundle`, and component factory. |
+| Return contract | `build<Name>Theme` returns a `ThemeDefinition` bundling the `SceneDocument`, `ThemeBundle`, component factory, and optional authoring catalogs. |
 
 :::note
 External theme repositories must point their SDK path dependencies at a local Akari checkout.
 :::
 
-The builder accepts `SceneDocument? document`. Use the supplied document when
-present, otherwise use the package's generated scene. Studio passes its current
-document, including `themeProperties`; production omits the argument. Resolve
-tokens and components from that document so saved choices render identically.
+### Primary scene & builder arguments
+
+When a theme contains multiple `*.scene.json` files, you can declare which scene opens first in Theme Studio and CLI workflows in `pubspec.yaml`:
+
+```yaml
+akari:
+  scene: lib/composition.scene.json
+```
+
+The path must resolve inside `lib/`. Without `akari.scene`, scenes are listed in alphabetical order.
+
+The exported builder accepts an optional `SceneDocument? document` parameter:
+- **In production**: `document` is omitted, and the builder uses the compiled `<name>SceneDocument` from `*.scene.g.dart`.
+- **In Theme Studio**: Studio passes the live edited `SceneDocument` (including `themeProperties`) so preset and token changes render identically in the canvas and in production.
 
 ## Declaring editable component properties
 
-Themes can opt into visual editing with `ThemeDefinition.componentCatalog`.
-The catalog belongs to the theme package; Studio does not infer supported
-properties from a node's current JSON or prescribe a global component vocabulary.
+Themes can expose typed inspector controls in Theme Studio via `ThemeDefinition.componentCatalog`. Each component entry lists `ThemeTextProperty` or `ThemeChoiceProperty<Enum>` declarations:
 
 ```dart
 enum HeadingStyle { regular, large }
@@ -79,25 +76,32 @@ const catalog = ThemeComponentCatalog(
 );
 ```
 
-Pass `componentCatalog: catalog` when constructing the theme. Components read
-`headingStyle.getValue(node.properties)` and `headingText.getValue(node.properties)`
-so runtime and editor share defaults and choices. Choice values persist as enum
-names, independent of display labels; keep those names stable and include the
-default in `choices`. Text values follow the scene's non-empty string contract.
+- **Shared defaults & reading**: Pass `componentCatalog: catalog` to `ThemeDefinition`, and read values inside your widgets with `headingStyle.getValue(node.properties)` and `headingText.getValue(node.properties)`.
+- **Stable persistence**: Choice properties serialize enum `.name` strings into `node.properties` (independent of UI display labels). Include `defaultValue` in `choices` and keep enum member names stable.
+- **Validation**: Call `catalog.validateDocument(document)` in your theme builder before constructing tokens or widgets. Missing properties fall back to their declared defaults without mutating the JSON, while unsupported choice values throw a `FormatException` naming the node and property. Unlisted components and properties remain untouched.
 
-At a theme's document-loading boundary, call `catalog.validateDocument(document)`
-before rendering. Studio uses the same validation before accepting a document or
-edit. Missing properties use their declared defaults without rewriting JSON;
-invalid choices raise `FormatException` with the node and property name.
-Unlisted components and properties are preserved. The catalog is optional and
-does not change the scene format, authentication, or the component factory.
+## Declaring theme-wide presets
+
+Themes can expose global style choices (such as color palettes, control materials, or motion profiles) through `ThemeDefinition.presetCatalog`:
+
+```dart
+enum OceanPalette { deep, coral }
+
+const oceanPalette = ThemeChoiceProperty(
+  name: 'palette',
+  label: 'Palette',
+  defaultValue: OceanPalette.deep,
+  choices: {OceanPalette.deep: 'Deep sea', OceanPalette.coral: 'Coral'},
+);
+const presets = ThemePresetCatalog(properties: [oceanPalette]);
+```
+
+- Pass `presetCatalog: presets` to `ThemeDefinition` and call `presets.validateDocument(document)` in your theme builder.
+- Selected values are stored as strings in the scene's root `themeProperties` map (`oceanPalette.getValue(document.themeProperties)`) and appear under **Compose → Theme presets** in Theme Studio.
 
 ## Declaring layout slots
 
-`ThemeDefinition.layout` optionally describes composition for one `sceneId`.
-Each `ThemeLayoutSlot` has a label, a complete `defaultNode` insertion template,
-and an `isRequired` presence rule. The template's stable node ID identifies the
-slot; another component cannot occupy that ID. Node IDs in a layout must be unique.
+`ThemeDefinition.layout` optionally defines semantic component slots and switchable layout arrangements (`presets`) for a specific `sceneId`:
 
 ```dart
 const layout = ThemeLayoutDefinition(
@@ -114,21 +118,22 @@ const layout = ThemeLayoutDefinition(
       ),
     ),
   ],
+  presets: {
+    'split': ThemeLayoutPreset(label: 'Split view'),
+    'centered': ThemeLayoutPreset(
+      label: 'Centered column',
+      rects: {
+        'caption': SceneRect(x: 0.3, y: 0.2, width: 0.4, height: 0.1),
+      },
+    ),
+  },
 );
 ```
 
-Pass `layout: layout` to the theme and call `layout.validateDocument(document)`
-at its document-loading boundary alongside property validation. Other scene IDs
-remain unrestricted. Templates must satisfy the scene schema and component
-catalog, including focus, visibility, and interaction settings. Keep insertion
-templates independent of the editable scene: saving or removing a node must not
-remove the ability to insert it again after rebuilding.
-
-Templates apply only when adding a slot. Existing node positions and properties,
-and nodes outside the layout, remain authored scene data. Required slots cannot
-be removed through Studio; `findMissingRequiredSlots(document)` identifies gaps
-in imported scenes so Studio can repair them. Missing slots do not make loading
-fail. This presence rule does not validate an entire authentication flow.
+- **Slot identity & templates**: Each `ThemeLayoutSlot` reserves a unique `defaultNode.id` and `componentId`. Its `defaultNode` provides the complete insertion template (geometry, properties, motion, focus, and visibility) when toggling a component on in Studio's **Compose** tab. Keep slot templates in Dart code so removing a node from JSON does not prevent re-inserting it later.
+- **Required slots (`isRequired: true`)**: Studio prevents deleting required slots and offers a one-click **Add required** repair action if an imported scene is missing any (`layout.findMissingRequiredSlots(document)`).
+- **Layout presets (`presets`)**: Each `ThemeLayoutPreset` supplies alternative `SceneRect` positions keyed by slot node ID (omitted IDs reuse the base slot rectangle). Switching layout presets in Studio updates slot geometry while preserving customized properties, optional slot omissions, and custom layers.
+- **Validation**: Call `layout.validateDocument(document)` in your theme builder. Scenes with a different `id` are unaffected.
 
 ## Build and preview lifecycle
 
@@ -149,12 +154,12 @@ akari preview --theme /path/to/my_theme --dry-run
 How the CLI builds and runs a theme:
 
 1. Resolves the selected theme's dependencies and generates `*.scene.g.dart`.
-2. Creates a reusable Flutter host project under `build/tool/hosts/<encoded-canonical-theme-path>/<demo-or-real>/` that links shared greeter source and imports the theme's builder directly.
+2. Creates a reusable Flutter host project under `build/tool/hosts/<encoded-canonical-theme-path>/<real|demo|studio>/` that links shared greeter sources and imports the theme's builder directly.
 3. Compiles theme code and assets into the Linux executable (runtime loading of uncompiled Dart code is not supported).
 
 | Command | Mode & transport | Behavior |
 | --- | --- | --- |
-| `build` | Release, production Rust backend | Publishes symlinks at `build/out/<theme>` and `build/out/backend`. |
+| `build` | Release, production Rust backend + native splash | Publishes symlinks at `build/out/<theme>`, `build/out/backend`, and `build/out/akari-splash`. |
 | `run` | Debug (default), private D-Bus + mock backend (`--backend real` for production transport) | Supports hot reload (`r`), hot restart (`R`), and quit (`q`). Fullscreen by default; set `AKARI_WINDOW_MODE=windowed` for a window. |
 | `preview` | Debug, no backend or hot reload | Runs `face-success` and `password-fallback` (or `--scenario`) in one window and exits. |
 | `run splash` | Standalone window | Previews the native loading screen until closed. |
@@ -172,8 +177,8 @@ Themes own their performance entrypoints, interaction journeys, metrics, and pas
 ```yaml
 perf:
   version: 1
-  verify: [dart, run, perf/verify.dart]
-  trace: [dart, run, perf/trace.dart]
+  verify: [dart, run, perf/run.dart, verify]
+  trace: [dart, run, perf/run.dart, trace]
 ```
 
 ### Execution contract
@@ -201,5 +206,5 @@ akari trace-perf --theme /path/to/theme
   Artifact names must be unique and paths must resolve inside `AKARI_PERF_OUTPUT_DIR`. Validated paths are recorded in the CLI run report's `theme_artifacts` map.
 
 :::tip
-`themes/default` implements both `verify` and `trace` under `themes/default/perf/`. `themes/fallback` omits `perf:` and does not inherit another theme's thresholds.
+`themes/default` implements both `verify` and `trace` under `themes/default/perf/`, and `themes/preset1` implements `verify` under `themes/preset1/perf/`. `themes/fallback` omits `perf:` and does not inherit another theme's thresholds.
 :::

@@ -1,9 +1,9 @@
 ---
 title: 主题包约定
-description: Akari 主题包的目录结构、构建规则与性能测试协议。
+description: Akari 主题包的目录结构、可视化定制契约、构建规则与性能测试协议。
 ---
 
-Akari 主题是独立的 Dart/Flutter 包。内置主题位于 `themes/`（`themes/default/` 与 `themes/fallback/`），第三方主题也可以存放在仓库外部。
+Akari 主题是独立的 Dart/Flutter 包。内置主题位于 `themes/`（`themes/default/`、`themes/fallback/` 与 `themes/preset1/`），第三方主题或由 Studio 合成的主题也可以存放在仓库外部。
 
 ## 项目结构
 
@@ -21,36 +21,36 @@ my_theme/
 
 ### 命名与依赖规则
 
-项目可显式指定首次编辑的场景：
-
-```yaml
-akari:
-  scene: lib/composition.scene.json
-```
-
-该路径必须指向 `lib/` 内的场景。Studio 与 CLI 会将它排在场景列表首位；
-省略此字段时沿用路径的字母排序。合成主题通过此字段重新打开编辑后的作品。
-
 | 规则项 | 约定要求 |
 | --- | --- |
 | 包名与 Builder 命名 | 从 `pubspec.yaml` 读取（与目录名无关）。例如 `theme_ocean` 必须在 `lib/theme.dart` 中导出 `buildOceanTheme`。 |
 | 必需依赖 | `dependencies` 包含 `theme_sdk` 与 `scene`；`dev_dependencies` 包含 `scene_codegen` 与 `build_runner: ^2.16.2`。 |
 | 组件复用边界 | 可显式依赖 `greeter_components`，但**不得**直接导入另一个具体主题包。 |
 | 资源引用路径 | 统一使用 Flutter 包路径格式（如 `packages/theme_ocean/assets/wallpaper.jpg`）。 |
-| 返回值契约 | `build<Name>Theme` 返回 `ThemeDefinition`，内含生成的 `SceneDocument`、`ThemeBundle` 与组件工厂。 |
+| 返回值契约 | `build<Name>Theme` 返回 `ThemeDefinition`，内含 `SceneDocument`、`ThemeBundle`、组件工厂及可选的编辑器声明目录。 |
 
 :::note
 存放在仓库外部的主题项目，需将 `pubspec.yaml` 中的 SDK 路径依赖指向本地 Akari 仓库对应目录。
 :::
 
-Builder 接受 `SceneDocument? document`：传入时使用该文档，否则使用主题包生成的场景。
-Studio 会传入包含 `themeProperties` 的当前编辑文档，正式运行时则省略此参数。
-主题应从这份文档解析样式与组件配置，确保保存后的选择在预览与正式运行时一致。
+### 主场景配置与 Builder 参数
+
+当主题包内包含多个 `*.scene.json` 文件时，可在 `pubspec.yaml` 中显式指定默认打开的主场景：
+
+```yaml
+akari:
+  scene: lib/composition.scene.json
+```
+
+该路径必须位于 `lib/` 下。Studio 与 CLI 会将其排在场景列表首位（合成主题也通过此字段默认打开编辑后的场景）；未配置时按文件名字母顺序排列。
+
+导出的 Builder 函数接受可选的 `SceneDocument? document` 参数：
+- **正式运行**：不传入 `document`，Builder 默认使用 `*.scene.g.dart` 中生成的 `<name>SceneDocument`。
+- **Theme Studio 编辑**：Studio 传入当前正在编辑的 `SceneDocument`（含 `themeProperties`），使画布预览与生产环境共用完全相同的样式与组件解析逻辑。
 
 ## 声明组件的可编辑属性
 
-主题通过可选的 `ThemeDefinition.componentCatalog` 开放可视化编辑能力。
-属性声明由主题包维护；Studio 不会从节点当前的 JSON 猜测支持的属性，也不规定全局组件名称。
+主题可通过 `ThemeDefinition.componentCatalog` 向 Theme Studio 开放类型化的组件属性控件。每个组件可声明一组文本属性（`ThemeTextProperty`）或枚举单选属性（`ThemeChoiceProperty<Enum>`）：
 
 ```dart
 enum HeadingStyle { regular, large }
@@ -76,22 +76,32 @@ const catalog = ThemeComponentCatalog(
 );
 ```
 
-构造主题时传入 `componentCatalog: catalog`。组件通过
-`headingStyle.getValue(node.properties)` 和 `headingText.getValue(node.properties)`
-读取配置，让运行时与编辑器共享默认值和可选项。枚举选项以枚举名称保存，与界面标签无关；
-作者应保持名称稳定，并将默认值包含在 `choices` 中。文本沿用场景的非空字符串约定。
+- **共享默认值与读取**：构造 `ThemeDefinition` 时传入 `componentCatalog: catalog`，并在组件内部通过 `headingStyle.getValue(node.properties)` 和 `headingText.getValue(node.properties)` 读取属性值。
+- **枚举名称持久化**：枚举属性将枚举成员的 `.name` 字符串写入 `node.properties`（与界面显示标签解耦）。请保持枚举名称稳定，并确保 `defaultValue` 包含在 `choices` 映射中。
+- **边界校验**：在主题 Builder 入口调用 `catalog.validateDocument(document)`。未填写的属性自动回退至默认值而不会改写 JSON；非法枚举值则会抛出带节点与属性名称的 `FormatException`。未在目录中声明的组件与额外属性均原样保留。
 
-主题应在载入场景的边界调用 `catalog.validateDocument(document)`，然后再进行渲染。
-Studio 在接收场景和编辑结果时使用同一校验。缺失属性使用声明的默认值，不会因此改写 JSON；
-无效选项会抛出包含节点和属性名称的 `FormatException`。
-未声明的组件和属性原样保留。该声明不改变场景格式、认证流程或组件工厂。
+## 声明主题级全局预设
+
+主题可通过 `ThemeDefinition.presetCatalog` 声明全局外观选项（如配色方案、控件材质或动效风格）：
+
+```dart
+enum OceanPalette { deep, coral }
+
+const oceanPalette = ThemeChoiceProperty(
+  name: 'palette',
+  label: 'Palette',
+  defaultValue: OceanPalette.deep,
+  choices: {OceanPalette.deep: 'Deep sea', OceanPalette.coral: 'Coral'},
+);
+const presets = ThemePresetCatalog(properties: [oceanPalette]);
+```
+
+- 构造 `ThemeDefinition` 时传入 `presetCatalog: presets`，并在主题 Builder 入口调用 `presets.validateDocument(document)`。
+- 选中的预设值以字符串形式保存在场景根级的 `themeProperties` 中（通过 `oceanPalette.getValue(document.themeProperties)` 读取），并在 Theme Studio 的 **Compose → Theme presets** 面板中自动生成选择控件。
 
 ## 声明布局插槽
 
-可选的 `ThemeDefinition.layout` 描述一个 `sceneId` 对应的组件装配规则。
-每个 `ThemeLayoutSlot` 包含显示名称、完整的 `defaultNode` 添加模板，以及
-`isRequired` 必需标记。模板中稳定的节点 ID 标识该插槽，其他组件不能占用这个 ID。
-布局中的节点 ID 必须唯一。
+`ThemeDefinition.layout` 可为指定的 `sceneId` 定义组件装配插槽（`slots`）以及可切换的多套预设布局（`presets`）：
 
 ```dart
 const layout = ThemeLayoutDefinition(
@@ -108,18 +118,22 @@ const layout = ThemeLayoutDefinition(
       ),
     ),
   ],
+  presets: {
+    'split': ThemeLayoutPreset(label: 'Split view'),
+    'centered': ThemeLayoutPreset(
+      label: 'Centered column',
+      rects: {
+        'caption': SceneRect(x: 0.3, y: 0.2, width: 0.4, height: 0.1),
+      },
+    ),
+  },
 );
 ```
 
-构造主题时传入 `layout: layout`，并在载入场景时与属性校验一起调用
-`layout.validateDocument(document)`。其他场景 ID 不受该布局约束。
-模板应满足场景格式和组件属性声明，并包含正确的焦点、显隐和交互配置。
-添加模板应独立于可编辑场景维护，避免保存或移除节点后，重新构建就失去再次添加它的能力。
-
-模板只在添加插槽时使用。已有节点的位置和属性、布局外的节点继续属于场景创作数据。
-Studio 禁止移除已存在的必需插槽；通过 `findMissingRequiredSlots(document)`
-查询导入场景中缺失的必需项，供界面修复。缺失项不会导致载入失败。
-该标记只约束组件是否存在，不验证完整的认证流程。
+- **插槽标识与插入模板**：每个 `ThemeLayoutSlot` 通过唯一的 `defaultNode.id` 绑定固定的 `componentId`。当用户在 Studio 的 **Compose** 面板中开启某个可选组件时，编辑器会按 `defaultNode` 模板插入完整节点（含默认位置、属性、动效、焦点与显隐条件）。模板保存在主题 Dart 代码中，因此即使从 JSON 中移除节点并重新构建，依然可以随时重新添加。
+- **必需控件保护（`isRequired: true`）**：Studio 禁止删除已存在的必需插槽；若打开的外部场景缺少必需插槽，可通过 `layout.findMissingRequiredSlots(document)` 检测并在侧栏顶部提供一键补齐（**Add required**）。
+- **多套布局预设（`presets`）**：每个 `ThemeLayoutPreset` 按插槽节点 ID 提供替代的 `SceneRect` 位置（未列出的插槽沿用基础位置）。在 Studio 中切换布局预设会更新插槽几何位置并补齐缺失的必需控件，同时保留用户已修改的组件属性、已关闭的可选插槽与自定义图层。
+- **边界校验**：在主题 Builder 入口调用 `layout.validateDocument(document)`；其他 `sceneId` 的场景不受该布局约束。
 
 ## 构建与预览机制
 
@@ -140,12 +154,12 @@ akari preview --theme /path/to/my_theme --dry-run
 CLI 构建与运行主题的流程：
 
 1. 解析所选主题的依赖，并将场景 JSON 生成为 `*.scene.g.dart`。
-2. 在 `build/tool/hosts/<encoded-canonical-theme-path>/<demo-or-real>/` 下生成可复用的 Flutter 宿主项目，链接共享应用源码并直接导入所选主题的 Builder。
+2. 在 `build/tool/hosts/<encoded-canonical-theme-path>/<real|demo|studio>/` 下生成可复用的 Flutter 宿主项目，链接共享应用源码并直接导入所选主题的 Builder。
 3. 将主题代码与资源静态编译进 Linux 可执行文件（不支持在运行时动态加载未编译的 Dart 代码）。
 
 | 命令 | 默认模式与通信 | 行为说明 |
 | --- | --- | --- |
-| `build` | Release 模式 + 正式版 Rust 后端 | 构建完成后更新 `build/out/<theme>` 与 `build/out/backend` 符号链接。 |
+| `build` | Release 模式 + 正式版后端 + 原生 Splash | 构建完成后更新 `build/out/<theme>`、`build/out/backend` 与 `build/out/akari-splash` 符号链接。 |
 | `run` | Debug 模式 + 私有 D-Bus 与模拟后端（`--backend real` 切换正式通信） | 支持保存后热重载（`r`）、热重启（`R`）与退出（`q`）。默认全屏，设置 `AKARI_WINDOW_MODE=windowed` 切换窗口模式。 |
 | `preview` | Debug 模式，无后端、无热重载 | 在单窗口中依次自动演示 `face-success` 与 `password-fallback`（可通过 `--scenario` 单选），完成后自动退出。 |
 | `run splash` | 独立窗口 | 单独预览原生启动加载动画，直至手动关闭。 |
@@ -165,8 +179,8 @@ CLI 构建与运行主题的流程：
 ```yaml
 perf:
   version: 1
-  verify: [dart, run, perf/verify.dart]
-  trace: [dart, run, perf/trace.dart]
+  verify: [dart, run, perf/run.dart, verify]
+  trace: [dart, run, perf/run.dart, trace]
 ```
 
 ### 执行协议
@@ -194,5 +208,5 @@ akari trace-perf --theme /path/to/theme
   产物名称必须唯一，路径必须位于输出目录内部。CLI 校验通过后会将路径记录到运行报告的 `theme_artifacts` 字段中。
 
 :::tip
-`themes/default` 在 `themes/default/perf/` 下实现了完整的 `verify` 与 `trace` 脚本；`themes/fallback` 未配置 `perf:`，也不会继承其他主题的性能阈值。
+`themes/default` 在 `themes/default/perf/` 下同时实现了 `verify` 与 `trace`，`themes/preset1` 在 `themes/preset1/perf/` 下实现了 `verify`；`themes/fallback` 未配置 `perf:`，也不会继承其他主题的性能阈值。
 :::

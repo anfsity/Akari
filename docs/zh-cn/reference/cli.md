@@ -30,11 +30,15 @@ description: 查命令、选项、显示配置和运行报告。
 | `login enable-gaze` / `disable-gaze` | 在标准 Arch greetd 上启用 Gaze 人脸认证或恢复密码栈 | `--dry-run` |
 | `login status` | 查看部署状态与 systemd 服务状态 | `--format` |
 | `login logs` | 查看服务 journal 或最新登录界面会话日志 | `--component`、`--lines`（`-n`）、`--follow`（`-f`） |
+| `greetd-test install` | 构建、备份并安装独立 TTY 登录测试环境 | `--theme`、`--dry-run` |
+| `greetd-test start` | 挂载自动恢复计时器并启动独立测试服务 | `--scale`、`--log-dir`、`--dry-run` |
+| `greetd-test restore` | 调用独立恢复脚本立即切回原显示管理器 | `--dry-run` |
+| `greetd-test status` | 查看测试安装状态、服务、恢复计时器与日志路径 | `--format` |
+| `greetd-test logs` | 无需 `sudo` 查看测试启动、会话、截图或恢复日志 | `--run`、`--file`、`--lines`（`-n`）、`--follow`（`-f`） |
 | `toolchain check` / `setup` | 检查或初始化开发环境依赖 | `--dry-run` |
 | `docs build-api` / `verify` | 构建 Dart API 文档或校验已构建的文档站点 | `--dry-run`；`verify` 在 `--` 后传入站点目录 |
 | `script list` / `run` | 查看并调用仓库 `scripts/` 下的辅助脚本 | `list --format`、`run SCRIPT --dry-run -- 参数` |
 | `completion` | 输出 Shell 补全脚本 | `--shell` |
-| `greetd-test` | 管理独立 TTY 真实登录测试 | 详见[独立 greetd 测试](../guides/greetd-testing.md) |
 
 ### 通用选项与约定
 
@@ -120,6 +124,19 @@ fvm dart run packages/akari_cli/bin/akari.dart install cli --shell bash
 - 若移动了仓库位置，或修改了 `packages/akari_cli/lib/src/cli/definition.dart` 中的命令定义，请重新执行 `install cli`。
 - 使用 `akari completion --shell zsh|bash` 可直接输出补全脚本内容。
 
+### 编译独立原生 CLI 可执行文件
+
+`packages/akari_cli` 是纯 Dart 包，也可以直接编译为原生二进制文件：
+
+```sh
+cd packages/akari_cli
+fvm dart pub get
+mkdir -p ../../build
+fvm dart compile exe bin/akari.dart -o ../../build/akari
+```
+
+在仓库目录内可直接运行 `build/akari`；若在其他工作目录下调用，请通过 `AKARI_REPO_ROOT` 指定仓库根目录。
+
 ## 仓库脚本
 
 在仓库根目录下查找并运行 `scripts/` 中的辅助脚本：
@@ -133,7 +150,7 @@ akari script run greetd-test/display-layout.py -- capture
 
 ## 构建、预览和运行
 
-- **`build`**：解析主题依赖、生成场景代码、在 `build/tool/hosts/` 下准备可复用宿主，并编译 release 前端包与正式版 Rust 后端。
+- **`build`**：解析主题依赖、生成场景代码、在 `build/tool/hosts/` 下准备可复用宿主，并编译 release 前端包、正式版 Rust 后端与原生 Splash 启动画面。
 - **`run`**：在私有 D-Bus 会话中启动登录界面与 Rust 模拟后端（`--backend real` 切换正式通信）。支持保存后热重载；默认全屏（`AKARI_WINDOW_MODE=windowed` 切换窗口模式）。
 - **`preview`**：在无边框单窗口中依次自动演示 `face-success` 与 `password-fallback`（可通过 `--scenario NAME` 单选），完成后自动退出。
 - **`run splash`**：打开独立窗口预览原生启动加载动画，按 `Escape` 或关闭窗口退出。
@@ -172,7 +189,7 @@ akari run sway --display-profile reference --sway-backend headless
 
 `akari verify` 会检查共享包、Rust 后端、Theme Studio 以及 `themes/` 下的全部主题（或通过 `--theme PATH` 指定单个主题）。
 
-如需在 IDE 中直接调试根项目入口，可使用默认注入 `themes/default` 的 `apps/greeter/lib/main.dart`：
+如需在 IDE 中直接调试独立应用入口，可使用默认注入 `themes/default` 的 `apps/greeter/lib/main.dart`：
 
 ```sh
 fvm dart run packages/akari_cli/bin/akari.dart generate-scenes --theme themes/default
@@ -183,7 +200,7 @@ fvm flutter run -d linux --target apps/greeter/lib/main.dart
 
 - **运行报告**：每次 CLI 运行都会在 `build/tool/runs/<run-id>/` 下生成 `report.json`（Schema v1）、`events.jsonl` 及各步骤的 `stdout`/`stderr` 日志。可通过 `--format json` 输出到标准输出，或用 `--report PATH` 写入指定文件。
 - **执行演练（Dry Run）**：`--dry-run` 以 JSON 格式打印计划的步骤图与产物路径，不执行实际构建或创建运行目录。
-- **构建产物符号链接**：Linux 构建成功后，会在 `build/out/<theme-name>` 和 `build/out/backend` 创建指向构建缓存的相对符号链接。
+- **构建产物符号链接**：Linux 构建成功后，会在 `build/out/<theme-name>`、`build/out/backend` 和 `build/out/akari-splash` 创建指向构建缓存的相对符号链接。
 
 ## 主题性能命令
 

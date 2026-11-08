@@ -28,11 +28,15 @@ Run commands from the repository root with `fvm dart run packages/akari_cli/bin/
 | `login enable-gaze` / `disable-gaze` | Enable Gaze face auth on stock Arch greetd or restore password stack | `--dry-run` |
 | `login status` | Inspect deployment and systemd service state | `--format` |
 | `login logs` | Read the service journal or latest greeter session logs | `--component`, `--lines` (`-n`), `--follow` (`-f`) |
+| `greetd-test install` | Build, back up, and install the standalone TTY test harness | `--theme`, `--dry-run` |
+| `greetd-test start` | Arm recovery timers and start the standalone test service | `--scale`, `--log-dir`, `--dry-run` |
+| `greetd-test restore` | Restore the prior display manager using the installed recovery script | `--dry-run` |
+| `greetd-test status` | Inspect test installation, service, recovery timer, and log paths | `--format` |
+| `greetd-test logs` | Read test startup, greeter, screenshot, or recovery logs without `sudo` | `--run`, `--file`, `--lines` (`-n`), `--follow` (`-f`) |
 | `toolchain check` / `setup` | Verify or initialize development dependencies | `--dry-run` |
 | `docs build-api` / `verify` | Generate Dart API docs or verify a built handbook directory | `--dry-run`, site path after `--` for `verify` |
 | `script list` / `run` | List or invoke repository helper scripts | `list --format`, `run SCRIPT --dry-run -- args` |
 | `completion` | Print a shell completion script | `--shell` |
-| `greetd-test` | Manage standalone TTY login testing | See [Standalone greetd testing](../guides/greetd-testing.md) |
 
 ### Shared flags & conventions
 
@@ -114,6 +118,19 @@ fvm dart run packages/akari_cli/bin/akari.dart install cli --shell bash
 - Re-run `install cli` if you move the repository or update CLI option definitions in `packages/akari_cli/lib/src/cli/definition.dart`.
 - Print raw completion scripts manually with `akari completion --shell zsh|bash`.
 
+### Compiling a standalone CLI executable
+
+Because `packages/akari_cli` is a pure Dart package, you can also compile a native CLI binary:
+
+```sh
+cd packages/akari_cli
+fvm dart pub get
+mkdir -p ../../build
+fvm dart compile exe bin/akari.dart -o ../../build/akari
+```
+
+Run `build/akari` inside the checkout, or set `AKARI_REPO_ROOT` when invoking it from another directory.
+
 ## Repository scripts
 
 Discover and run helper scripts under `scripts/` with the repository root as working directory:
@@ -127,7 +144,7 @@ akari script run greetd-test/display-layout.py -- capture
 
 ## Build, preview, and run
 
-- **`build`**: Resolves dependencies, generates scene code, builds the reusable Flutter host under `build/tool/hosts/`, and compiles the release bundle + production Rust backend.
+- **`build`**: Resolves dependencies, generates scene code, builds the reusable Flutter host under `build/tool/hosts/`, and compiles the release bundle, production Rust backend, and native splash screen.
 - **`run`**: Starts the Flutter greeter and Rust mock backend (`--backend real` for production transport) on a private D-Bus session. Supports hot reload on Dart/asset/JSON saves. Fullscreen by default (`AKARI_WINDOW_MODE=windowed` for a window).
 - **`preview`**: Runs `face-success` and `password-fallback` (or `--scenario NAME`) once in an undecorated window using controlled frontend events and exits.
 - **`run splash`**: Opens a standalone preview window of the native loading screen until closed.
@@ -164,7 +181,7 @@ For step-by-step usage, see [Test displays and scaling](../guides/display-testin
 
 `akari verify` checks shared packages, the Rust backend, Theme Studio, and all themes under `themes/` (or a single theme with `--theme PATH`).
 
-For direct IDE debugging without the CLI host generator, `apps/greeter/lib/main.dart` injects the default theme into the root project:
+For direct IDE debugging without the CLI host generator, `apps/greeter/lib/main.dart` injects the default theme into the standalone greeter app:
 
 ```sh
 fvm dart run packages/akari_cli/bin/akari.dart generate-scenes --theme themes/default
@@ -175,7 +192,7 @@ fvm flutter run -d linux --target apps/greeter/lib/main.dart
 
 - **Run reports**: Every CLI run writes `report.json` (schema v1), `events.jsonl`, and per-step stdout/stderr logs under `build/tool/runs/<run-id>/`. Use `--format json` to print the report to stdout or `--report PATH` to copy it to a custom file.
 - **Dry runs**: `--dry-run` outputs the planned step graph and artifact paths as JSON without executing commands or creating run directories.
-- **Build symlinks**: Successful Linux builds create relative symlinks at `build/out/<theme-name>` and `build/out/backend` pointing into the active build cache.
+- **Build symlinks**: Successful Linux builds create relative symlinks at `build/out/<theme-name>`, `build/out/backend`, and `build/out/akari-splash` pointing into the active build cache.
 
 ## Theme performance commands
 
