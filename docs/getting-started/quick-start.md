@@ -57,7 +57,7 @@ For multi-monitor focus, hotplug, nested Sway scaling, or fixed-resolution scree
 
 ## 3. Build a release bundle
 
-Compile the selected theme and the production Rust backend in release mode:
+Compile the selected theme, the production Rust backend, and the native splash screen in release mode:
 
 ```sh
 fvm dart run packages/akari_cli/bin/akari.dart build --theme themes/fallback --jobs 4
@@ -67,6 +67,7 @@ Successful builds link outputs under `build/out/`:
 
 - `build/out/fallback`: complete Flutter Linux bundle (distribute the entire directory together).
 - `build/out/backend`: production Rust backend executable.
+- `build/out/akari-splash`: native DRM/KMS and windowed startup splash executable.
 
 :::note
 `build` only compiles artifacts; it does not modify system services. To test real PAM login in a TTY, follow [Standalone greetd testing](../guides/greetd-testing.md).

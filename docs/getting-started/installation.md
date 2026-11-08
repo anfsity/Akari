@@ -32,7 +32,7 @@ Akari builds and runs on Linux. Complete the steps below before running previews
    bash scripts/bootstrap-toolchain.sh
    ```
 
-   `bootstrap-toolchain.sh` installs the Flutter version from `.fvmrc`, enables Flutter Linux desktop support, resolves root Dart packages, and fetches locked Cargo dependencies.
+   `bootstrap-toolchain.sh` installs the Flutter version from `.fvmrc`, enables Flutter Linux desktop support, resolves `packages/akari_cli` and `apps/greeter` dependencies, and fetches locked Cargo workspace dependencies.
 
 2. Verify your environment:
 

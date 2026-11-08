@@ -32,7 +32,7 @@ Akari 目前支持在 Linux 上构建与运行。开始开发或预览前，请�
    bash scripts/bootstrap-toolchain.sh
    ```
 
-   该脚本会安装 `.fvmrc` 指定的 Flutter SDK、启用 Linux 桌面支持，并拉取 Dart 与 Cargo 锁定的依赖。
+   该脚本会安装 `.fvmrc` 指定的 Flutter SDK、启用 Linux 桌面支持，并拉取 `packages/akari_cli`、`apps/greeter` 及 `crates/` Cargo Workspace 的锁定依赖。
 
 2. 检查工具链状态：
 

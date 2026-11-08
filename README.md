@@ -87,7 +87,7 @@ You can invoke commands directly with `fvm dart run packages/akari_cli/bin/akari
 fvm dart run packages/akari_cli/bin/akari.dart install cli --shell zsh   # or bash
 ```
 
-The CLI is a pure Dart package. To build a native executable:
+You can also compile the CLI into a standalone native executable:
 
 ```sh
 cd packages/akari_cli
@@ -96,7 +96,7 @@ mkdir -p ../../build
 fvm dart compile exe bin/akari.dart -o ../../build/akari
 ```
 
-Run the executable inside the checkout, or set `AKARI_REPO_ROOT` when invoking it elsewhere. Generated Flutter hosts remain under `build/tool/hosts/`.
+Run `build/akari` from within the checkout, or set `AKARI_REPO_ROOT` when invoking it from another directory.
 
 Once installed, use `akari <command>` directly from anywhere in the repository:
 
@@ -107,7 +107,7 @@ Once installed, use `akari <command>` directly from anywhere in the repository:
 | **`akari run studio`** | Launch the visual Theme Studio scene editor |
 | **`akari run sway`** | Test inside nested or headless Sway with custom DPI scaling |
 | **`akari run splash`** | Preview the standalone native loading animation |
-| **`akari build`** | Compile the selected Flutter theme bundle and the Rust backend |
+| **`akari build`** | Compile the selected Flutter theme bundle, Rust backend, and native splash |
 | **`akari verify`** | Run analyzer, Rust checks, and unit tests across all packages |
 | **`akari generate-scenes`** | Compile `*.scene.json` definitions into typed Dart code |
 | **`akari install`** | Build and deploy Akari to `/opt/akari` as system greeter |

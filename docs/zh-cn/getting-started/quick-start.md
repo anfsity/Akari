@@ -67,6 +67,7 @@ fvm dart run packages/akari_cli/bin/akari.dart build --theme themes/fallback --j
 
 - `build/out/fallback`：完整的 Flutter Linux 程序包（包含资源与动态库，分发或部署时需保留整个目录）。
 - `build/out/backend`：正式版 Rust 后端二进制文件。
+- `build/out/akari-splash`：原生 DRM/KMS 与窗口化启动加载画面可执行文件。
 
 :::note
 `build` 仅编译生成二进制产物，不会修改系统登录服务。如需在真实 TTY 下验证登录，请参考[独立 greetd 测试](../guides/greetd-testing.md)。
