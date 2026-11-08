@@ -4,6 +4,10 @@ A desktop launched through Akari inherits the user's login environment, and serv
 
 ## 1. Architecture goals
 
+- **Complete login profile inheritance**: Evaluate POSIX profiles (`/etc/profile`, `~/.profile`) and the user's native login shell configuration (`.zprofile`, `.bash_profile`, or login `fish` config) without running interactive-only shell RC files (`.zshrc`, `.bashrc`).
+- **Lossless desktop command execution**: Forward the selected `.desktop` `Exec=` argument vector through the login shell without word-splitting, globbing, or shell-specific quoting hazards.
+- **Deterministic service activation environment**: Ensure `PATH`, locale variables, and display endpoints (`WAYLAND_DISPLAY`, `DISPLAY`, `XAUTHORITY`) reach `systemd --user` and D-Bus activation environments before dependent user services start, while keeping transient greeter variables (`AKARI_*`, greeter `XDG_SESSION_ID` / `XDG_VTNR`) isolated.
+
 ## 2. Startup order & ownership
 
 ```text
@@ -47,7 +51,7 @@ greetd / PAM
 ### Session manager integration
 
 - **Managed desktops (GNOME, Plasma, UWSM)**: Retain their native lifecycle (`uwsm finalize`, graphical targets, and teardown). Akari never wraps an already managed entry in a second manager.
-- **Direct compositor sessions (e.g., plain Hyprland)**: Rely on the compositor's own activation-environment import (`dbus-update-activation-environment --systemd`). Note that asynchronous startup callbacks in user rice (such as unmodified end-4 Lua scripts) cannot order upstream apps launched before environment publication completes.
+- **Direct compositor sessions (e.g., plain Hyprland)**: Rely on the compositor's own activation-environment import (`dbus-update-activation-environment --systemd`). If user configuration launches background apps asynchronously, it should publish the activation environment before spawning dependent processes.
 
 ## 5. Acceptance checklist
 

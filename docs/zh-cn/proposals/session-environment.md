@@ -4,6 +4,10 @@
 
 ## 1. 架构目标
 
+- **完整继承登录配置**：加载 POSIX Profile（`/etc/profile`、`~/.profile`）与用户原生 login shell 的登录配置文件（如 `.zprofile`、`.bash_profile` 或非交互 `fish` 配置），同时避免执行仅面向交互式终端的 `.zshrc` 或 `.bashrc`。
+- **桌面命令参数无损透传**：在跨越不同 Shell（POSIX shell、`zsh`、`fish`）转发 `.desktop` 的 `Exec=` 参数数组时，确保不发生二次分词、通配符展开或转义丢失。
+- **确定性的服务激活环境**：确保 `PATH`、Locale 变量与显示端点（`WAYLAND_DISPLAY`、`DISPLAY`、`XAUTHORITY`）在依赖服务启动前发布至 `systemd --user` 与 D-Bus 激活环境，同时隔离登录界面内部的临时变量（`AKARI_*` 及 Greeter 会话的 `XDG_SESSION_ID` / `XDG_VTNR`）。
+
 ## 2. 启动顺序与职责划分
 
 ```text
@@ -47,7 +51,7 @@ greetd / PAM
 ### 会话管理器与直接启动的合成器
 
 - **托管桌面会话（GNOME、Plasma、UWSM）**：保持各自原生的会话生命周期（如 `uwsm finalize`、systemd graphical target 与退出清理），Akari 不会在已有会话管理器外再套一层包装。
-- **直接启动的合成器会话（如直接启动 Hyprland）**：依赖合成器自身的环境导入机制（如 `dbus-update-activation-environment --systemd`）。注意：若用户自定义配置（如未修改的 end-4 Lua 脚本）采用异步回调并发启动应用，新增回调无法约束上游已提前启动的子进程顺序。
+- **直接启动的合成器会话（如直接启动 Hyprland）**：依赖合成器自身的环境导入机制（如 `dbus-update-activation-environment --systemd`）。若用户配置中包含异步自启动脚本，应确保在完成激活环境发布后再拉起依赖这些变量的后台应用。
 
 ## 5. 实机验收清单
 
