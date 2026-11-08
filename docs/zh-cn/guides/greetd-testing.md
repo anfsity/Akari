@@ -46,26 +46,17 @@ description: 构建与安装真实登录测试工具、捕获显示器布局、�
 
 ## 人脸认证
 
-### 架构分离与职责边界
+### PAM 集成边界
 
-Akari 自身**不实现也不负责任何生物特征识别算法、传感器硬件驱动或人脸模型管理**。
+Akari 通过 `greetd` 与标准 Linux **PAM（Pluggable Authentication Modules）** 机制对接人脸及生物特征识别：
 
-在系统架构上，Akari 仅仅是通过 `greetd` 接入 Linux 标准的 **PAM（Pluggable Authentication Modules）** 机制：
-
-- **职责彻底分离**：生物识别的所有细节（如打开摄像头、活体检测、特征比对）均由专有的 PAM 模块和外部守护进程在特权层级独立完成。
-- **展示层隔离**：Akari 的前端与后端均运行在非特权沙箱中，既不采集任何硬件数据，也不接触用户的生物特征信息。
-
-### 工作原理
-
-1. **状态透明透传**：当唤醒登录界面并选定账户后，Akari 触发系统 PAM 流程。在 PAM 模块执行比对期间，若发出任何状态消息，Akari 会通过 D-Bus 实时捕获并直观展示在界面上。
-2. **免密直接登入**：若生物认证成功，PAM 向上返回成功信号，Akari 立即调用桌面合成器启动用户会话，无需输入密码。
-3. **同会话无缝回退**：若比对超时或识别未命中，PAM 栈会自动转向下一条认证规则（通常是密码验证）。Akari 在同一次认证尝试（保持相同的 `attempt_id`）中无缝将焦点恢复到密码输入框，交互无需重新开始。
+- **PAM 独立负责生物识别**：摄像头访问、活体检测与特征比对均由对应的 PAM 模块及系统守护进程完成。Flutter 前端与 Rust 后端均运行在非特权展示空间，不直接访问传感器硬件或生物特征模板。
+- **状态透传与免密登入**：唤醒登录界面并选定账户后，Akari 启动 PAM 会话并将模块发出的 `info` / `error` 状态提示通过 D-Bus 实时显示在界面上；若生物认证直接通过，Akari 立即启动用户桌面。
+- **密码无缝回退**：若识别超时或未命中，PAM 会继续执行栈中的下一条规则（通常为密码验证），Akari 在同一 `attempt_id` 会话内将焦点切换至密码输入框。
 
 ### 参考实现：Gaze
 
-在 Akari 的开发与验收体系中，我们选用 [Gaze](https://github.com/GunduLabs/gaze) 作为**官方验证的参考实现（Reference Implementation）**。
-
-为了免去在 Arch Linux 等环境上手动配置危险 PAM 文件的繁琐步骤，Akari CLI 提供了外挂式管理命令（`akari login enable-gaze` 与 `akari login disable-gaze`），用于安全、可逆地将 Gaze 子栈编排至 `/etc/pam.d/greetd`。
+Akari 采用 [Gaze](https://github.com/GunduLabs/gaze) 作为验证参考实现，并通过 `akari login enable-gaze` 与 `akari login disable-gaze` 命令将 Gaze 子栈安全编排至 `/etc/pam.d/greetd`（支持自动备份与回滚）。
 
 ### 安装并验证 Gaze
 

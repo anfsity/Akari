@@ -42,26 +42,17 @@ On real VTs, `akari-splash` renders a pure black (`#000000`) loading screen via 
 
 ## Facial authentication
 
-### Architectural separation & boundaries
+### PAM integration boundary
 
-Akari **does not implement or manage biometric algorithms, sensor hardware, or facial recognition models**.
+Akari integrates with facial and biometric authentication through the standard Linux **PAM (Pluggable Authentication Modules)** stack via `greetd`:
 
-Architecturally, Akari simply interfaces with the standard Linux **PAM (Pluggable Authentication Modules)** mechanism via `greetd`:
-
-- **Complete decoupling**: All biometric operations (camera access, liveness detection, model inference) are handled independently by dedicated PAM modules and external daemons.
-- **Presentation isolation**: Both the Flutter frontend and the Rust backend run in unprivileged presentation space; they never capture sensor frames or touch biometric templates.
-
-### How it works
-
-1. **Transparent status forwarding**: When the greeter wakes with a selected user, Akari initiates the PAM conversation. Any status messages emitted by the active PAM module are forwarded via D-Bus and displayed on screen.
-2. **Direct session launch**: If biometric verification succeeds, PAM returns an authenticated status and Akari immediately launches the user desktop without prompting for credentials.
-3. **Seamless password fallback**: If recognition times out or fails, PAM continues through its configured stack to password verification. Akari restores keyboard focus to the password field within the exact same attempt (`attempt_id`).
+- **PAM-owned biometrics**: Camera access, liveness detection, and model inference run inside dedicated PAM modules and their system daemons. Neither the Flutter frontend nor the Rust backend accesses sensor hardware or biometric templates.
+- **Status forwarding & direct login**: When the greeter wakes with a selected user, Akari starts the PAM conversation and forwards any `info` or `error` status messages over D-Bus. If PAM succeeds without requesting input, Akari launches the user desktop immediately.
+- **Password fallback**: If recognition times out or fails, PAM advances to the next module in its stack (typically password authentication) and Akari focuses the credential field under the same `attempt_id`.
 
 ### Reference implementation: Gaze
 
-Throughout development and integration testing, Akari uses [Gaze](https://github.com/GunduLabs/gaze) as its **validated reference implementation**.
-
-To avoid manual edits to `/etc/pam.d/greetd`, the Akari CLI provides safe orchestration helpers (`akari login enable-gaze` and `akari login disable-gaze`) that route authentication through an isolated `akari-gaze` sub-stack with atomic backups and easy rollback.
+Akari validates facial authentication against [Gaze](https://github.com/GunduLabs/gaze) and includes CLI helpers (`akari login enable-gaze` and `akari login disable-gaze`) that configure an isolated `akari-gaze` PAM substack with automatic backups and rollback.
 
 ### Install and verify Gaze
 
