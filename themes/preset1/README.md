@@ -1,58 +1,37 @@
-# Preset 1 — Life / Death
+# Preset 1 — Life / Death (`theme_preset1`)
 
-A fully procedural interpretation of the supplied diagonal life/death wallpaper.
-The background, cherry branches, blossoms, light streaks, rain, rising petals
-and angular weekday lettering are hand-authored Canvas drawing. Wet glass and
-flowing water use a fragment shader sampling the painted light streaks.
-Space Grotesk body text includes its OFL license.
+`theme_preset1` is a procedural canvas and fragment-shader theme built around a diagonal light/dark composition. The background, cherry branches, blossoms, light streaks, rain, rising petals, and angular weekday lettering are rendered on Flutter's `Canvas`, while wet glass refraction and flowing water are driven by a fragment shader.
 
-Dormant mode keeps the mirrored clock composition. Waking reveals a second
-composition: identity in the pale field, desktop choice on the dark right side,
-borderless credential text below the branch, and a separate continuation arrow.
-There is no login panel. Native text editing and the shared greeter components
-retain prompt handling, password masking, authentication recovery and power
-actions. Escape closes a menu first; otherwise it returns to dormant mode and
-clears credentials. Tab follows account → desktop → credential → continue → power.
+## Interaction & layout
 
-Sway is the visual reference for both dormant and login modes. Components scale
-from their authored scene bounds, keeping text and icons proportional to the
-composition rather than fixed at small logical sizes on larger Sway viewports.
-Choice menus anchor to the visible controls, and their native popup text uses
-the Material 3 label style.
+- **Dormant & waking states**: Dormant mode displays a mirrored clock composition. Waking reveals the login controls directly across the artwork—account identity in the pale upper-left field, session selection on the dark right side, borderless credential input below the branch, and a continuation arrow—without a traditional card panel.
+- **Keyboard & focus**: `Escape` closes an open popup menu first, or returns to dormant mode and clears typed credentials. `Tab` traverses `account → session → credential → continue → power`.
+- **Proportional scaling**: Controls scale relative to their authored scene bounds (`1920×1080` reference space), keeping typography and icons proportional across monitor resolutions and DPI scales.
 
-From the repository root:
+## Architecture & shader pipeline
+
+| File | Responsibility |
+| --- | --- |
+| `lib/preset1.scene.json` | Authored scene layout, visibility predicates, and default background parameters |
+| `lib/theme.dart` | `buildPreset1Theme` entrypoint, `ThemeTokens`, and `BackgroundParameter` declarations |
+| `lib/preset_visuals.dart` | Procedural artwork rasterization, particle weather simulation, and shader painting |
+| `lib/preset_components.dart` | Dispersed account, session, credential, status, and power widgets |
+| `lib/weekday_lettering.dart` | Angular custom-painted weekday typography |
+| `lib/shaders/wet_surface.frag` | Wet glass refraction, chromatic dispersion, and diagonal water current (`packages/theme_preset1/shaders/wet_surface.frag`) |
+
+- **Cached background raster**: Smooth gradients and blurred light streaks are rasterized once into a `960×540` texture (under 2 MiB of RGBA pixels) shared by the static background and the water shader, while blossoms, lettering, and particles render at native display resolution.
+- **Continuous weather loop**: A single weather controller drives 170 petals, 630 fine raindrops, 90 distant streaks, sliding glass drops, and the diagonal water current across a seamless 120-second loop without rebuilding widgets. Reduced motion, disabled ticker mode, and hidden lifecycle states pause the controller automatically.
+- **Editable shader parameters**: Exposes `refraction` (`0..3`), `density` (`0..2`), `speed` (`0.1..4`), and `dispersion` (`0..4`) to Theme Studio's **Effects** inspector.
+
+## Running & verification
+
+Run inside nested Sway from the repository root:
 
 ```sh
 akari run sway --theme themes/preset1 --display-profile reference --mode profile
 ```
 
-On a Hyprland monitor at scale 1.6 this selects standalone scale 1 and produces
-**inner Sway scale 0.625**. Check `effective_target` and `actual` in the generated
-display report. `--scale 0.625` would apply the host compensation again. The
-mock backend accepts `password`; it does not start a real desktop session.
-
-The scene is editable in `lib/preset1.scene.json`. The static artwork and the
-weather use the same 1920×1080 coordinate space and adapt to the scene bounds.
-`lib/preset_visuals.dart` owns drawing and animation; component presentation is
-in `lib/preset_components.dart`; display lettering is in `lib/weekday_lettering.dart`.
-`lib/shaders/wet_surface.frag` owns glass refraction and the diagonal water current.
-
-The artwork is rasterized once into a 960×540 texture shared by the still
-background and the water shader. Only smooth gradients and blurred light
-streaks enter that texture; blossoms, lettering and particles retain their
-display resolution. Reusing the raster avoids another set of blur render
-targets whenever Studio zooms or resizes the canvas. The environment owns the
-texture (under 2 MiB of RGBA pixels) and shader for its lifetime and releases
-both when removed. Blossoms keep their own repaint boundary. A single weather
-controller drives 170 petals, 630 fine raindrops and 90 longer distant streaks, sliding glass
-drops and the water current without rebuilding widgets. Rain falls quickly;
-glass drops slide slowly with varying speeds, curved trails and refracted rims.
-Small condensation beads stay on the glass while highlights and ripples travel
-along the diagonal current underneath. The 120-second loop is continuous across
-the wrap. Reduced motion, disabled ticker mode and hidden application lifecycle
-states stop the controller. Clocks update once a minute.
-
-Verification:
+Run static analysis, widget/shader tests, and the automated Sway performance gate:
 
 ```sh
 cd themes/preset1
@@ -62,28 +41,4 @@ cd ../..
 akari verify-perf --theme themes/preset1
 ```
 
-The performance runner requires a Wayland desktop, Sway, grim and wtype. It
-creates its own nested Sway with the same display-profile resolution and host
-scale compensation as `run sway`, runs a profile build through three journeys,
-and records screenshots plus frame timings for dormant animation, waking,
-typing, menus, errors and recovery. Engine frame numbers associate delayed
-timings with the phase that actually produced the frame.
-Both choice menus and two dormant frames 500 ms apart are retained for visual
-verification of anchoring and falling rain.
-
-Each phase requires at least 90 samples, p95 build under 8 ms, p95 raster under
-12 ms, p95 total frame latency under 33.334 ms, p95 frame interval under 25 ms,
-and fewer than 20% of frames exceeding a 16.667 ms total budget. Reports and
-screenshots are registered in the CLI run report. Widget tests also cover
-800×600, 1280×720, 1920×1080, 2467×1580 and 2560×1080, interrupted transitions,
-menu anchoring and focus, proportional controls, credential clearing, service
-recovery, visible rain movement and stopping weather animation. Rendered surface
-tests also check water flow, independent glass-drop movement, diagonal clipping,
-loop continuity and texture alignment at different viewport scales.
-
-The 2026-10-09 wet-surface Sway profile run passed all three journeys with 2,564
-measured frames at inner scale 0.625 and a Flutter render size of 2467×1580.
-All phases had a 16.667 ms p95 frame interval; build p95 ranged from 1.308 to
-1.787 ms, raster p95 from 5.460 to 6.110 ms, and total latency p95 from 8.483
-to 14.135 ms. Twenty-two frames exceeded 16.667 ms (0.86%). These are measurements
-from the local nested compositor, not a guarantee for other GPUs or display sizes.
+The performance gate launches an isolated nested Sway session in profile mode, runs three interactive login journeys, and verifies frame build/raster/interval budgets (`>= 90` samples per phase, p95 build `< 8 ms`, p95 raster `< 12 ms`, p95 total latency `< 33.334 ms`, p95 interval `< 25 ms`, and `< 20%` of frames over `16.667 ms`).
