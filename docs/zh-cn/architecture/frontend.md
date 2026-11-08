@@ -35,15 +35,18 @@ SceneRuntime
 
 ## 2. 主题包与场景文档模型
 
-每个主题都是独立编译进可执行文件的 Dart 包，由以下平台包提供支撑：
+每个主题都是独立编译进可执行文件的 Dart 包，由以下共享平台包提供支撑：
 
 | 包路径 | 职责 |
 | --- | --- |
-| `packages/scene_schema` | 不依赖 Flutter 的 `SceneDocument` 模型、条件求值器与 JSON 编解码器 |
-| `packages/scene` | `SceneRuntime`、`ThemeBundle`、背景与动效注册表（重新导出 `scene_schema`） |
+| `packages/scene_schema` | 不依赖 Flutter 的 `SceneDocument` 模型、条件求值器、组件/布局/预设契约与 JSON 编解码器 |
+| `packages/scene` | `SceneRuntime`、`ThemeBundle`、Frame 与响应式断点布局、样式 Token、便携式 Shader 背景与动效/轨道播放（重新导出 `scene_schema`） |
 | `packages/scene_codegen` | `build_runner` 生成器：校验 `*.scene.json` 并输出 `*.scene.g.dart` |
-| `packages/theme_sdk` | `ThemeDefinition`、`GreeterHost` 与各区域状态插槽定义 |
+| `packages/theme_sdk` | `ThemeDefinition`、`GreeterHost`、各区域状态插槽与壁纸取色工具（重新导出 `scene`） |
 | `packages/greeter_components` | 可选的标准可复用组件集（`StandardGreeterComponents`） |
+| `packages/greeter_ui` | `GreeterFeature` 业务状态机、类型化命令与 `GreeterSceneAdapter` |
+| `packages/theme_project` | 纯 Dart 项目校验、主场景发现与独立主题项目合成 |
+| `packages/greeter_harness` | 共享预览旅程（`face-success`、`password-fallback`）与帧性能汇总 |
 
 ### 场景节点核心约束
 
@@ -56,14 +59,15 @@ SceneRuntime
 `SceneRuntime` 在节点级别隔离重建（Rebuild）与重绘（Repaint）：
 
 - **局部订阅与独立重绘**：每个场景节点外层自动包裹独立的 `RepaintBoundary`。主题组件通过 `SceneRegion` 仅订阅自身所需的 `GreeterHost` Slot；节点的 `visibleWhen` 变化由各自的节点宿主独立响应，不会触发整棵场景树重建。
-- **退出动画与预热生命周期**：当节点的 `visibleWhen` 变为 `false` 时，节点会屏蔽指针与焦点输入并反向播放退出动画。`SceneRuntime` 默认在动画结束后卸载隐藏子树；登录界面的 `ThemeDefinition` 为降低唤醒延迟启用了 `prewarmHiddenNodes`，因此隐藏组件仍保持挂载，定时器与订阅也继续存活。主题组件应控制隐藏时的工作量，并在销毁时释放资源。
+- **退出动画与预热生命周期**：当节点的 `visibleWhen` 变为 `false` 时，节点会屏蔽指针与焦点输入并反向播放退出动画。`SceneRuntime` 默认在动画结束后卸载隐藏子树；登录界面的 `ThemeDefinition` 为降低唤醒延迟启用了 `prewarmHiddenNodes`，使隐藏组件保持挂载以免唤醒时承担首次创建开销。主题组件应在隐藏时保持低开销，并在 `dispose()` 中释放自有订阅。
 - **可交互节点约束**：经过 2.5D 变换的可交互节点仍强制保持最小点击热区（`minHitTarget`）、安全区域回退和确定性的键盘焦点顺序。
 
-### 背景、动效与模糊策略
+### 布局、背景、动效与模糊策略
 
-- **背景渲染器**：内置提供 `image` 和 `solid`（`video` 与 `custom` 为编译期扩展点）。
-- **动效预设**：支持 `none`、`fade`、`fadeSlide`、`fadeScale`、`hoverLift` 和 `focusGlow`。`SceneMotionBuilder` 只接收由 `SceneRuntime` 统一驱动的 `Animation<double>`，禁止使用全局 `AnimatedSwitcher` 或全屏动画遮罩。
-- **模糊（Blur）**：画布背景的 `blurSigma` 只模糊一次并随背景重绘边界缓存；局部毛玻璃面板可使用受限的 `BackdropFilter`，并在低功耗或减少动效模式下自动回退为半透明纯色。
+- **容器 Frame、基础图元与资源图层**：除主题提供的自定义组件外，`SceneRuntime` 原生支持容器 Frame（`absolute`、`row`、`column` 自动布局、`proportional`/`fill`/`hug` 尺寸模式与视口 `breakpoints` 断点）、便携式基础图元（`text`、`rectangle`、`circle`）、图片/SVG 资源图层，以及可复用的视觉样式 `styleTokens`。
+- **背景渲染器与着色器**：内置提供 `image`、`solid` 与便携式 Fragment `shader` 背景渲染器（支持 Uniform 绑定、纹理采样器与自定义 `background.parameters`），同时保留 `video` 与 `custom` 编译期扩展点。
+- **动效、关键帧轨道与状态响应**：支持进出场与交互预设（`none`、`fade`、`fadeSlide`、`fadeScale`、`hoverLift`、`focusGlow`）、节点级时序 `motionTiming`（时长、延迟、三次贝塞尔曲线）、属性关键帧轨道 `tracks`（`opacity`、`translateX`、`translateY`、`scale`、`rotation`）以及由状态谓词触发的 `stateEffects` / `transitions`（`shake`、`pulse`）。`SceneMotionBuilder` 只接收由 `SceneRuntime` 统一驱动的 `Animation<double>`，不使用全局 `AnimatedSwitcher` 或全屏动画遮罩。
+- **模糊（Blur）**：画布背景的 `blurSigma` 随背景重绘边界缓存并在唤醒过渡期间平滑插值；局部毛玻璃面板可使用受限的 `BackdropFilter`，并在低功耗或减少动效模式下回退为纯色填充。
 
 ## 4. 多显示器同步与休眠状态
 

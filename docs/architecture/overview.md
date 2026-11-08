@@ -33,7 +33,7 @@ flowchart TD
     UI --> Harness[greeter_harness: preview and metrics]
 ```
 
-Theme packages and generated hosts use independent path dependencies, without Pub workspace resolution. `theme_sdk` re-exports the pure authoring contracts. Studio editing and resource code remain inside Studio until another real caller needs them.
+Theme packages and generated hosts resolve path dependencies independently without a root Pub workspace. `theme_sdk` re-exports the scene runtime and authoring contracts so theme packages only need to depend on the SDK and scene libraries.
 
 ## Ownership boundaries
 

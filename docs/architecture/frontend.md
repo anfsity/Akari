@@ -35,15 +35,18 @@ Strict separation of concerns:
 
 ## 2. Theme packages & scene documents
 
-Each theme is a standalone Dart package compiled into the executable:
+Each theme is a standalone Dart package compiled into the executable, supported by the shared frontend packages:
 
 | Package | Role |
 | --- | --- |
-| `packages/scene_schema` | Flutter-free `SceneDocument` model, predicate evaluator, and JSON codec |
-| `packages/scene` | `SceneRuntime`, `ThemeBundle`, background/motion registries (re-exports `scene_schema`) |
+| `packages/scene_schema` | Flutter-free `SceneDocument` model, predicate evaluator, component/layout/preset contracts, and JSON codec |
+| `packages/scene` | `SceneRuntime`, `ThemeBundle`, frame/breakpoint layout, style tokens, portable shader backgrounds, and motion/track playback (re-exports `scene_schema`) |
 | `packages/scene_codegen` | `build_runner` generator that validates `*.scene.json` and emits `*.scene.g.dart` |
-| `packages/theme_sdk` | `ThemeDefinition`, `GreeterHost`, and typed slot contracts |
+| `packages/theme_sdk` | `ThemeDefinition`, `GreeterHost`, typed state slots, and wallpaper palette extraction (re-exports `scene`) |
 | `packages/greeter_components` | Optional reusable widget set (`StandardGreeterComponents`) |
+| `packages/greeter_ui` | `GreeterFeature` business state machine, typed commands, and `GreeterSceneAdapter` |
+| `packages/theme_project` | Pure Dart project validation, primary-scene discovery, and independent theme synthesis |
+| `packages/greeter_harness` | Shared preview journeys (`face-success`, `password-fallback`) and frame performance aggregation |
 
 ### Scene node invariants
 
@@ -56,14 +59,15 @@ Each theme is a standalone Dart package compiled into the executable:
 `SceneRuntime` enforces fast, isolated updates across the scene tree:
 
 - **Targeted rebuilds & repaints**: Each scene node is wrapped in a `RepaintBoundary`. Theme widgets subscribe to specific `GreeterHost` listenables via `SceneRegion`, and visibility changes are handled per node without rebuilding the entire scene tree.
-- **Exit transitions and prewarming**: When `visibleWhen` becomes `false`, the node stops accepting pointer/focus input and reverses its exit animation. By default, `SceneRuntime` unmounts the hidden subtree after the transition. The greeter's `ThemeDefinition` enables `prewarmHiddenNodes` to reduce wake latency, so hidden components remain mounted with their timers and subscriptions alive. Theme components must keep this hidden work inexpensive and release resources when disposed.
-- **Interactive invariants**: Transformed interactive nodes still enforce minimum hit target sizes (`minHitTarget`), safe-area fallback, and deterministic `focusOrder` traversal.
+- **Exit transitions and prewarming**: When `visibleWhen` becomes `false`, the node stops accepting pointer/focus input and reverses its exit animation. By default, `SceneRuntime` unmounts the hidden subtree after the transition. The greeter's `ThemeDefinition` enables `prewarmHiddenNodes` to reduce wake latency, keeping hidden components mounted so wake transitions do not pay initial widget creation cost. Theme components should keep hidden state idle and release subscriptions in `dispose()`.
+- **Interactive invariants**: Transformed interactive nodes enforce minimum hit target sizes (`minHitTarget`), safe-area fallback, and deterministic `focusOrder` traversal.
 
-### Backgrounds, motion, and blur
+### Layout, backgrounds, motion, and blur
 
-- **Background renderers**: Built-in `image` and `solid` renderers (`video` and `custom` are compile-time extension points).
-- **Motion presets**: `none`, `fade`, `fadeSlide`, `fadeScale`, `hoverLift`, and `focusGlow`. `SceneMotionBuilder` wraps a node using an externally driven `Animation<double>` owned by `SceneRuntime`—global `AnimatedSwitcher` or fullscreen animated overlays are not used.
-- **Blur**: Static canvas `blurSigma` is cached once with the background repaint boundary. Bounded glass panels may use `BackdropFilter` with a solid fallback in reduced-motion or low-power modes.
+- **Frames, primitives, and asset layers**: Alongside theme-provided widgets, `SceneRuntime` directly renders layout frames (`absolute`, `row`, and `column` with `proportional`/`fill`/`hug` sizing and viewport `breakpoints`), portable primitives (`text`, `rectangle`, `circle`), image/SVG asset layers, and shared visual `styleTokens`.
+- **Background renderers & shaders**: Built-in `image`, `solid`, and portable fragment `shader` renderers (supporting uniform bindings, texture samplers, and custom `background.parameters`), plus compile-time `video` and `custom` renderer extension points.
+- **Motion, keyframe tracks, and state transitions**: Supports presence presets (`none`, `fade`, `fadeSlide`, `fadeScale`, `hoverLift`, `focusGlow`), per-node `motionTiming` (duration, delay, cubic Bezier curve), keyframe property `tracks` (`opacity`, `translateX`, `translateY`, `scale`, `rotation`), and predicate-triggered `stateEffects` / `transitions` (`shake`, `pulse`). `SceneMotionBuilder` wraps each node using an externally driven `Animation<double>` owned by `SceneRuntime`—global `AnimatedSwitcher` or fullscreen animated overlays are not used.
+- **Blur**: Canvas `blurSigma` is cached with the background repaint boundary and animated across wake transitions. Bounded glass panels may use `BackdropFilter` with a solid fallback in reduced-motion or low-power modes.
 
 ## 4. Multi-display & dormant state behavior
 

@@ -18,22 +18,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Schema[scene_schema: pure Dart contracts] --> Codegen[scene_codegen]
-    Schema --> Project[theme_project: discovery and synthesis]
-    Project --> CLI[akari_cli: pure Dart tools]
-    Project --> Studio[theme_studio: internal editing domains]
-    Schema --> Scene[scene: Flutter runtime]
-    Scene --> SDK[theme_sdk: public theme API]
-    SDK --> Components[greeter_components]
-    SDK --> UI[greeter_ui]
+    Schema["scene_schema：纯 Dart 场景与契约"] --> Codegen["scene_codegen：代码生成"]
+    Schema --> Project["theme_project：项目发现与主题合成"]
+    Project --> CLI["akari_cli：纯 Dart 命令行工具"]
+    Project --> Studio["theme_studio：可视化编辑器"]
+    Schema --> Scene["scene：Flutter 场景运行时"]
+    Scene --> SDK["theme_sdk：公开主题 API"]
+    SDK --> Components["greeter_components：通用组件"]
+    SDK --> UI["greeter_ui：业务状态与适配"]
     SDK --> Studio
-    Components --> Themes[Independent theme packages]
+    Components --> Themes["独立主题包（themes/*）"]
     SDK --> Themes
-    UI --> App[apps/greeter: native runner and D-Bus]
-    UI --> Harness[greeter_harness: preview and metrics]
+    UI --> App["apps/greeter：原生宿主与 D-Bus"]
+    UI --> Harness["greeter_harness：预览旅程与性能采集"]
 ```
 
-主题包和生成宿主使用可独立解析的路径依赖，不启用 Pub Workspace。`theme_sdk` 重导出纯数据声明契约；Studio 编辑和资源逻辑继续留在包内，待真实第二调用方出现后再按需下沉。
+主题包与生成的 Flutter 宿主均通过独立路径依赖解析，不依赖根级 Pub Workspace。`theme_sdk` 重新导出了场景运行时与声明契约，使主题包只需依赖核心 SDK 与场景库。
 
 ## 职责边界划分
 

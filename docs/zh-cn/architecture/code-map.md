@@ -62,4 +62,4 @@ description: 了解 Akari 各部分代码的位置和职责。
 
 ## 公开包导入约定
 
-请始终从各包的根入口文件导入（`theme_sdk.dart`、`scene.dart`、`scene_schema.dart`、`greeter_components.dart`）。`lib/src/` 下均属内部实现细节。完整公开符号请查阅[生成的 API 参考](../reference/api.md)。
+请始终从各包的根入口文件导入（`theme_sdk.dart`、`scene.dart`、`scene_schema.dart`、`theme_project.dart`、`greeter_ui.dart`、`greeter_components.dart`、`akari_cli.dart`、`greeter_harness.dart`、`theme_studio.dart`）。`lib/src/` 下均属内部实现细节。完整公开符号请查阅[生成的 API 参考](../reference/api.md)。

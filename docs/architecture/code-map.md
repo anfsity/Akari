@@ -62,4 +62,4 @@ description: Where to read and change each part of Akari.
 
 ## Public package entrypoints
 
-Always import package root libraries (`theme_sdk.dart`, `scene.dart`, `scene_schema.dart`, `theme_project.dart`, `greeter_ui.dart`, `greeter_components.dart`, `akari_cli.dart`, `greeter_harness.dart`). Treat `lib/src/` as private implementation detail. Browse the [API reference](../reference/api.md) for exported symbols.
+Always import package root libraries (`theme_sdk.dart`, `scene.dart`, `scene_schema.dart`, `theme_project.dart`, `greeter_ui.dart`, `greeter_components.dart`, `akari_cli.dart`, `greeter_harness.dart`, `theme_studio.dart`). Treat `lib/src/` as private implementation detail. Browse the [API reference](../reference/api.md) for exported symbols.
