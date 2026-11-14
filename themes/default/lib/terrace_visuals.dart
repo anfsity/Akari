@@ -92,8 +92,12 @@ class _TerraceBackdropState extends State<_TerraceBackdrop> {
         onHover: reducedMotion
             ? null
             : (event) => _target.value = Offset(
-                (event.localPosition.dx / constraints.maxWidth - 0.5) * 12,
-                (event.localPosition.dy / constraints.maxHeight - 0.5) * 8,
+                constraints.maxWidth > 0
+                    ? (event.localPosition.dx / constraints.maxWidth - 0.5) * 12
+                    : 0,
+                constraints.maxHeight > 0
+                    ? (event.localPosition.dy / constraints.maxHeight - 0.5) * 8
+                    : 0,
               ),
         onExit: reducedMotion
             ? null

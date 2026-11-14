@@ -143,7 +143,9 @@ bool isInvertibleEditingPlane(Matrix4 matrix) {
 }
 
 bool hasResizableProjection(SceneNode node, Size size) =>
-    isInvertibleEditingPlane(sceneNodeTransformMatrix(node.transform, size));
+    isInvertibleEditingPlane(
+      calculateSceneNodeTransformMatrix(node.transform, size),
+    );
 
 Map<NodeResizeHandle, Offset> calculateHandlePoints({
   required Rect rect,
@@ -170,13 +172,16 @@ SceneNode calculateResizedNode({
   required double minHitTarget,
   double? gridSize,
 }) {
-  final rect = sceneNodeRect(
+  final rect = getSceneNodeRect(
     node: source,
     sceneSize: canvasSize,
     safeArea: EdgeInsets.zero,
     minHitTarget: minHitTarget,
   );
-  final matrix = sceneNodeTransformMatrix(source.transform, rect.size);
+  final matrix = calculateSceneNodeTransformMatrix(
+    source.transform,
+    rect.size,
+  );
   final alignment = handle.alignment;
   final start = MatrixUtils.transformPoint(
     matrix,
@@ -245,7 +250,7 @@ SceneNode calculateResizedNode({
     final origin =
         fixedPoint -
         MatrixUtils.transformPoint(
-          sceneNodeTransformMatrix(source.transform, size),
+          calculateSceneNodeTransformMatrix(source.transform, size),
           anchor.alongSize(size),
         );
     return SceneRect(

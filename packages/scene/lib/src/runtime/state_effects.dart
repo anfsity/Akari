@@ -46,7 +46,7 @@ class _SceneStateEffectsState extends State<SceneStateEffects>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _reduced = MediaQuery.disableAnimationsOf(context);
+    _reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     _updatePredicates();
   }
 
@@ -122,7 +122,7 @@ class _SceneStateEffectsState extends State<SceneStateEffects>
         final triggered = findSceneStateTransition(
           widget.node,
           playback.from,
-          widget.activePredicates,
+          widget.predicatesListenable?.value ?? widget.activePredicates,
         );
         if (!_reduced && triggered != null) {
           rule = triggered;

@@ -11,7 +11,7 @@ const _source = SceneNode(
 );
 
 Offset _getAnchor(SceneNode node, Alignment alignment) {
-  final rect = sceneNodeRect(
+  final rect = getSceneNodeRect(
     node: node,
     sceneSize: _canvas,
     safeArea: EdgeInsets.zero,
@@ -19,7 +19,7 @@ Offset _getAnchor(SceneNode node, Alignment alignment) {
   );
   return rect.topLeft +
       MatrixUtils.transformPoint(
-        sceneNodeTransformMatrix(node.transform, rect.size),
+        calculateSceneNodeTransformMatrix(node.transform, rect.size),
         alignment.alongSize(rect.size),
       );
 }
@@ -72,7 +72,7 @@ void main() {
         source.rect.width * _canvas.width,
         source.rect.height * _canvas.height,
       );
-      final matrix = sceneNodeTransformMatrix(transform, rectSize);
+      final matrix = calculateSceneNodeTransformMatrix(transform, rectSize);
       final delta =
           MatrixUtils.transformPoint(
             matrix,

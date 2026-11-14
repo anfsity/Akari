@@ -3,9 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:scene/scene.dart';
 
 void main() {
-  group('sceneNodeRect', () {
+  group('getSceneNodeRect', () {
     test('maps a normalized rect into scene coordinates', () {
-      final rect = sceneNodeRect(
+      final rect = getSceneNodeRect(
         node: _node(const SceneRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4)),
         sceneSize: const Size(1000, 500),
         safeArea: EdgeInsets.zero,
@@ -16,7 +16,7 @@ void main() {
     });
 
     test('expands interactive nodes to the minimum hit target', () {
-      final rect = sceneNodeRect(
+      final rect = getSceneNodeRect(
         node: _node(
           const SceneRect(x: 0, y: 0, width: 0.01, height: 0.01),
           interactive: true,
@@ -31,7 +31,7 @@ void main() {
     });
 
     test('insets the available area by the safe area', () {
-      final rect = sceneNodeRect(
+      final rect = getSceneNodeRect(
         node: _node(const SceneRect(x: 0, y: 0, width: 1, height: 1)),
         sceneSize: const Size(1000, 500),
         safeArea: const EdgeInsets.all(50),
@@ -42,9 +42,9 @@ void main() {
     });
   });
 
-  group('sceneNodeTransformMatrix', () {
+  group('calculateSceneNodeTransformMatrix', () {
     test('is the identity for an identity transform', () {
-      final matrix = sceneNodeTransformMatrix(
+      final matrix = calculateSceneNodeTransformMatrix(
         const SceneTransform(),
         const Size(100, 50),
       );
@@ -53,7 +53,7 @@ void main() {
     });
 
     test('rotates around the pivot', () {
-      final matrix = sceneNodeTransformMatrix(
+      final matrix = calculateSceneNodeTransformMatrix(
         const SceneTransform(rotationZ: 90),
         const Size(100, 50),
       );
@@ -68,7 +68,7 @@ void main() {
     });
 
     test('scales around the pivot', () {
-      final matrix = sceneNodeTransformMatrix(
+      final matrix = calculateSceneNodeTransformMatrix(
         const SceneTransform(scaleX: 2),
         const Size(100, 50),
       );
@@ -79,7 +79,7 @@ void main() {
     });
 
     test('translates in scene units', () {
-      final matrix = sceneNodeTransformMatrix(
+      final matrix = calculateSceneNodeTransformMatrix(
         const SceneTransform(translateX: 12, translateY: -8),
         const Size(100, 50),
       );

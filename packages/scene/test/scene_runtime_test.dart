@@ -1114,6 +1114,60 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('gated'), findsNothing);
   });
+
+  testWidgets('reads initial visibility from activePredicatesListenable and allows font load retries', (
+    tester,
+  ) async {
+    final predicates = ValueNotifier<Set<ScenePredicate>>({
+      ScenePredicate.isDormant,
+    });
+    addTearDown(predicates.dispose);
+    final doc = _document(
+      nodes: const [
+        SceneNode(
+          id: 'dormant_only',
+          componentId: 'badge',
+          rect: SceneRect(x: 0, y: 0, width: .2, height: .2),
+          visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      _runtime(
+        doc,
+        activePredicates: const {},
+        activePredicatesListenable: predicates,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('dormant_only'), findsOneWidget);
+
+    var attempts = 0;
+    await expectLater(
+      registerSceneFont(
+        source: 'retry-test-font',
+        revision: '1',
+        loadBytes: () async {
+          attempts++;
+          throw StateError('transient read failure');
+        },
+      ),
+      throwsStateError,
+    );
+    expect(attempts, 1);
+    await expectLater(
+      registerSceneFont(
+        source: 'retry-test-font',
+        revision: '1',
+        loadBytes: () async {
+          attempts++;
+          throw StateError('second failure');
+        },
+      ),
+      throwsStateError,
+    );
+    expect(attempts, 2);
+  });
 }
 
 SceneDocument _document({required List<SceneNode> nodes}) {

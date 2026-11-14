@@ -106,6 +106,11 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
   ui.Image? _surfaceImage;
   bool _visible = true;
 
+  Duration _getWeatherDuration() {
+    final safeSpeed = widget.speed > 0 ? widget.speed : 1.0;
+    return Duration(milliseconds: (120000 / safeSpeed).round());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -116,7 +121,7 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
         lifecycle == AppLifecycleState.inactive;
     _weather = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: (120000 / widget.speed).round()),
+      duration: _getWeatherDuration(),
     );
     _painter = PresetWeatherPainter(_weather);
     WidgetsBinding.instance.addObserver(this);
@@ -124,33 +129,40 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
   }
 
   Future<void> _createSurface() async {
-    final program = await ui.FragmentProgram.fromAsset(
-      'packages/theme_preset1/shaders/wet_surface.frag',
-    );
-    if (!mounted) return;
-    final recorder = ui.PictureRecorder();
-    const PresetArtworkPainter().paint(Canvas(recorder), _surfaceTextureSize);
-    final picture = recorder.endRecording();
-    final ui.Image image;
+    ui.Image? image;
     try {
-      image = await picture.toImage(
-        _surfaceTextureSize.width.toInt(),
-        _surfaceTextureSize.height.toInt(),
+      final program = await ui.FragmentProgram.fromAsset(
+        'packages/theme_preset1/shaders/wet_surface.frag',
       );
-    } finally {
-      picture.dispose();
+      if (!mounted) return;
+      final recorder = ui.PictureRecorder();
+      const PresetArtworkPainter().paint(
+        Canvas(recorder),
+        _surfaceTextureSize,
+      );
+      final picture = recorder.endRecording();
+      try {
+        image = await picture.toImage(
+          _surfaceTextureSize.width.toInt(),
+          _surfaceTextureSize.height.toInt(),
+        );
+      } finally {
+        picture.dispose();
+      }
+      if (!mounted) {
+        image.dispose();
+        return;
+      }
+      final shader = program.fragmentShader()
+        ..setImageSampler(0, image, filterQuality: FilterQuality.low);
+      setState(() {
+        _surfaceImage = image;
+        _surfaceShader = shader;
+        _updateSurfacePainter();
+      });
+    } on Object {
+      image?.dispose();
     }
-    if (!mounted) {
-      image.dispose();
-      return;
-    }
-    final shader = program.fragmentShader()
-      ..setImageSampler(0, image, filterQuality: FilterQuality.low);
-    setState(() {
-      _surfaceImage = image;
-      _surfaceShader = shader;
-      _updateSurfacePainter();
-    });
   }
 
   void _updateSurfacePainter() {
@@ -170,9 +182,7 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
     super.didUpdateWidget(old);
     if (old.speed != widget.speed) {
       _weather.stop();
-      _weather.duration = Duration(
-        milliseconds: (120000 / widget.speed).round(),
-      );
+      _weather.duration = _getWeatherDuration();
       _updateWeather();
     }
     if (old.refraction != widget.refraction ||

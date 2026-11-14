@@ -38,6 +38,7 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
     with SingleTickerProviderStateMixin {
   ui.FragmentShader? _shader;
   List<ui.Image> _textures = [];
+  final List<(ImageStream, ImageStreamListener)> _pendingStreams = [];
   late final Ticker _clock = createTicker(
     (elapsed) => setState(() => _time = elapsed),
   );
@@ -105,24 +106,48 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
     }
   }
 
-  Future<ui.Image> _loadTexture(String asset) async {
-    final image = (widget.resolveImage?.call(asset) ?? AssetImage(asset))
-        .resolve(createLocalImageConfiguration(context));
+  void _cancelPendingStreams() {
+    for (final (stream, listener) in _pendingStreams) {
+      stream.removeListener(listener);
+    }
+    _pendingStreams.clear();
+  }
+
+  Future<ui.Image> _loadTexture(
+    String asset,
+    ImageConfiguration configuration,
+  ) async {
+    final stream = (widget.resolveImage?.call(asset) ?? AssetImage(asset))
+        .resolve(configuration);
     final completer = Completer<ui.Image>();
-    final listener = ImageStreamListener(
-      (info, _) => completer.complete(info.image.clone()),
-      onError: (Object error, StackTrace? stack) =>
-          completer.completeError(error, stack),
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener(
+      (info, _) {
+        if (!completer.isCompleted) {
+          completer.complete(info.image.clone());
+        }
+      },
+      onError: (Object error, StackTrace? stack) {
+        if (!completer.isCompleted) {
+          completer.completeError(error, stack);
+        }
+      },
     );
-    image.addListener(listener);
+    final entry = (stream, listener);
+    _pendingStreams.add(entry);
+    stream.addListener(listener);
     try {
       return await completer.future;
     } finally {
-      image.removeListener(listener);
+      _pendingStreams.remove(entry);
+      stream.removeListener(listener);
     }
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    _cancelPendingStreams();
+    final configuration = createLocalImageConfiguration(context);
     final revision = ++_revision;
     final definition = widget.shader;
     _shader?.dispose();
@@ -140,13 +165,8 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
           );
       shader = program.fragmentShader();
       for (final texture in definition.textures) {
-        textures.add(await _loadTexture(texture.asset));
-      }
-      for (var i = 0; i < definition.uniforms.length; i++) {
-        shader.setFloat(i, 0);
-      }
-      for (var i = 0; i < textures.length; i++) {
-        shader.setImageSampler(i, textures[i]);
+        if (!mounted || revision != _revision) break;
+        textures.add(await _loadTexture(texture.asset, configuration));
       }
       if (!mounted || revision != _revision) {
         shader.dispose();
@@ -154,6 +174,12 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
           texture.dispose();
         }
         return;
+      }
+      for (var i = 0; i < definition.uniforms.length; i++) {
+        shader.setFloat(i, 0);
+      }
+      for (var i = 0; i < textures.length; i++) {
+        shader.setImageSampler(i, textures[i]);
       }
       setState(() {
         _shader?.dispose();
@@ -175,6 +201,7 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
   @override
   void dispose() {
     _revision++;
+    _cancelPendingStreams();
     widget.predicatesListenable?.removeListener(_refreshState);
     _clock.dispose();
     _shader?.dispose();
@@ -186,21 +213,29 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
 
   @override
   Widget build(BuildContext context) {
-    if (_shader == null) return const SizedBox.expand();
+    final shader = _shader;
+    if (shader == null) return const SizedBox.expand();
     final predicates =
         widget.predicatesListenable?.value ?? widget.activePredicates;
+    final usesPointer = widget.shader.uniforms.any(
+      (uniform) =>
+          uniform.source == SceneUniformSource.pointerX ||
+          uniform.source == SceneUniformSource.pointerY,
+    );
+    final paint = CustomPaint(
+      painter: _ShaderPainter(
+        shader: shader,
+        definition: widget.shader,
+        time: _reduced ? Duration.zero : widget.elapsed ?? _time,
+        pointer: _pointer,
+        predicates: predicates,
+      ),
+      child: const SizedBox.expand(),
+    );
+    if (!usesPointer) return paint;
     return MouseRegion(
       onHover: (event) => setState(() => _pointer = event.localPosition),
-      child: CustomPaint(
-        painter: _ShaderPainter(
-          shader: _shader,
-          definition: widget.shader,
-          time: _reduced ? Duration.zero : widget.elapsed ?? _time,
-          pointer: _pointer,
-          predicates: predicates,
-        ),
-        child: const SizedBox.expand(),
-      ),
+      child: paint,
     );
   }
 }
@@ -213,15 +248,13 @@ class _ShaderPainter extends CustomPainter {
     required this.pointer,
     required this.predicates,
   });
-  final ui.FragmentShader? shader;
+  final ui.FragmentShader shader;
   final SceneShader definition;
   final Duration time;
   final Offset pointer;
   final Set<ScenePredicate> predicates;
   @override
   void paint(Canvas canvas, Size size) {
-    final shader = this.shader;
-    if (shader == null) return;
     for (var index = 0; index < definition.uniforms.length; index++) {
       final uniform = definition.uniforms[index];
       final value = switch (uniform.source) {
@@ -242,5 +275,10 @@ class _ShaderPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ShaderPainter old) => true;
+  bool shouldRepaint(_ShaderPainter old) =>
+      old.shader != shader ||
+      old.definition != definition ||
+      old.time != time ||
+      old.pointer != pointer ||
+      !setEquals(old.predicates, predicates);
 }

@@ -62,26 +62,24 @@ class SceneBackgroundEffects extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) {
-    Widget content = child;
-    if (background.blurSigma > 0) {
-      // ImageFiltered paints outside the child's bounds; clip it so a larger
-      // sigma does not grow the background beyond the scene rectangle.
-      content = ClipRect(
-        child: ImageFiltered(
-          imageFilter: ui.ImageFilter.blur(
-            sigmaX: background.blurSigma,
-            sigmaY: background.blurSigma,
-            tileMode: TileMode.clamp,
-          ),
-          child: content,
-        ),
-      );
-    }
-
     return Stack(
       fit: StackFit.expand,
       children: [
-        content,
+        // ImageFiltered paints outside the child's bounds; clip it so a larger
+        // sigma does not grow the background beyond the scene rectangle.
+        // Keep the wrapper mounted across sigma == 0 transitions so stateful
+        // shader or image children are not unmounted during wake/sleep ramps.
+        ClipRect(
+          child: ImageFiltered(
+            enabled: background.blurSigma > 0,
+            imageFilter: ui.ImageFilter.blur(
+              sigmaX: background.blurSigma,
+              sigmaY: background.blurSigma,
+              tileMode: TileMode.clamp,
+            ),
+            child: child,
+          ),
+        ),
         ColoredBox(
           color: Color(background.color)
               .withValues(alpha: background.scrimOpacity.clamp(0, 1)),

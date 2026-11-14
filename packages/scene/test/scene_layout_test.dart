@@ -260,4 +260,45 @@ void main() {
     );
     expect(geometry['input']!.rect, const Rect.fromLTWH(10, 10, 280, 44));
   });
+
+  test('flex maxWidth redistributes remaining space and hug handles non-layout components', () {
+    final scene = document(const [
+      SceneNode(
+        id: 'frame',
+        componentId: 'frame',
+        rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+        layout: SceneLayout(
+          direction: SceneLayoutDirection.row,
+          mainAlignment: SceneMainAlignment.end,
+        ),
+      ),
+      SceneNode(
+        id: 'capped',
+        componentId: 'panel',
+        parentId: 'frame',
+        rect: SceneRect(x: 0, y: 0, width: .1, height: .1),
+        sizing: SceneSizing(height: 40, flex: 1, maxWidth: 120),
+      ),
+      SceneNode(
+        id: 'growing',
+        componentId: 'panel',
+        parentId: 'frame',
+        rect: SceneRect(x: 0, y: 0, width: .1, height: .1),
+        sizing: SceneSizing(height: 40, flex: 1),
+      ),
+      SceneNode(
+        id: 'badge',
+        componentId: 'badge',
+        rect: SceneRect(x: 0, y: 0, width: .2, height: .1),
+        sizing: SceneSizing(widthMode: SceneSizeMode.hug),
+      ),
+    ]);
+    final geometry = calculateSceneLayout(
+      document: scene,
+      size: const Size(500, 200),
+    );
+    expect(geometry['capped']!.rect.width, 120);
+    expect(geometry['growing']!.rect.width, 380);
+    expect(geometry['badge']!.rect.width, 100);
+  });
 }

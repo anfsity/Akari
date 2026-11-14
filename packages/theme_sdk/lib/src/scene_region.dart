@@ -42,10 +42,12 @@ class ScaledNodeRegion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    assert(scale > 0, 'ScaledNodeRegion scale must be positive.');
+    final effectiveScale = scale > 0 ? scale : 1.0;
     return FittedBox(
       child: SizedBox(
-        width: node.rect.width * canvas.referenceWidth / scale,
-        height: node.rect.height * canvas.referenceHeight / scale,
+        width: node.rect.width * canvas.referenceWidth / effectiveScale,
+        height: node.rect.height * canvas.referenceHeight / effectiveScale,
         child: child,
       ),
     );

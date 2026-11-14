@@ -23,7 +23,7 @@ class PresetComponents implements GreeterThemeComponents {
         compact: node.properties['variant'] == 'compact',
       ),
       'inscription' => _PresetInscription(
-        title: node.properties['title']!,
+        title: node.properties['title'] ?? '',
         subtitle: node.properties['subtitle'] ?? '',
         light: node.properties['tone'] == 'light',
       ),

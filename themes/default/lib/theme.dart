@@ -139,8 +139,8 @@ ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {
         TerraceMotion.gentle => const {
           SceneMotionPreset.fade: FadeMotionBuilder(),
           SceneMotionPreset.fadeSlide: FadeMotionBuilder(),
-          SceneMotionPreset.hoverLift: FadeMotionBuilder(),
-          SceneMotionPreset.focusGlow: FadeMotionBuilder(),
+          SceneMotionPreset.hoverLift: HoverLiftMotionBuilder(),
+          SceneMotionPreset.focusGlow: FocusGlowMotionBuilder(),
         },
         TerraceMotion.terrace => const {
           SceneMotionPreset.fade: TerraceFadeMotion(),

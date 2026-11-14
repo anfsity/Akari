@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:scene_schema/scene_schema.dart';
 
+import 'node_style.dart';
 import 'node_transform.dart';
 import 'scene_font.dart';
 
@@ -97,16 +98,13 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
             TextPainter(
               text: TextSpan(
                 text: node.properties['text'] ?? 'Text',
-                style: TextStyle(
-                  fontSize: style.fontSize == 0 ? 14 : style.fontSize,
+                style: getResolvedSceneTextStyle(
+                  style,
                   fontFamily:
                       (fontFamilies ??
                       sceneFontFamilies.value)[style.fontAsset],
-                  fontWeight: style.fontWeight == 0
-                      ? FontWeight.normal
-                      : FontWeight.values[style.fontWeight ~/ 100 - 1],
-                  letterSpacing: style.letterSpacing,
-                  height: style.lineHeight,
+                  defaultFontSize: 14,
+                  defaultFontWeight: FontWeight.normal,
                 ),
               ),
               textDirection: TextDirection.ltr,
@@ -117,8 +115,7 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
             );
         natural = painter.size;
         painter.dispose();
-      } else {
-        final layout = node.layout!;
+      } else if (node.layout case final layout?) {
         final potential = constrain(
           node,
           Size(
@@ -181,6 +178,8 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
           }
         }
         natural = Size(w + layout.padding * 2, h + layout.padding * 2);
+      } else {
+        natural = Size(width, height);
       }
       if (s.widthMode == SceneSizeMode.hug) width = natural.width;
       if (s.heightMode == SceneSizeMode.hug) height = natural.height;
@@ -220,6 +219,10 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
       row ? node.sizing.minWidth : node.sizing.minHeight,
       node.interactive ? minHitTarget : 0,
     );
+    double maximum(SceneNode node) => math.max(
+      minimum(node),
+      (row ? node.sizing.maxWidth : node.sizing.maxHeight) ?? double.infinity,
+    );
     final positions = <String, Rect>{};
     if (layout.direction == SceneLayoutDirection.absolute) {
       for (final node in nodes) {
@@ -240,15 +243,20 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
       );
       var crossCursor = 0.0;
       for (final line in lines) {
-        final fixed = line.fold<double>(
-          math.max(0, line.length - 1) * layout.gap,
-          (sum, node) =>
-              sum +
-              (flex(node) > 0 ? minimum(node) : mainSize(sizes[node.id]!)),
+        final extents = _allocateFlexLineExtents(
+          line: line,
+          availableMain: main,
+          gap: layout.gap,
+          flexFactor: flex,
+          minimumExtent: minimum,
+          maximumExtent: maximum,
+          naturalExtent: (node) => mainSize(sizes[node.id]!),
         );
-        final totalFlex = line.fold<double>(0, (sum, node) => sum + flex(node));
-        final remaining = math.max(0.0, main - fixed);
-        final spare = totalFlex > 0 ? 0.0 : remaining;
+        final usedMain = extents.values.fold<double>(
+          math.max(0, line.length - 1) * layout.gap,
+          (sum, extent) => sum + extent,
+        );
+        final spare = math.max(0.0, main - usedMain);
         var cursor = switch (layout.mainAlignment) {
           SceneMainAlignment.center => spare / 2,
           SceneMainAlignment.end => spare,
@@ -268,9 +276,7 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
             : (row ? content.height : content.width);
         for (final node in line) {
           final natural = sizes[node.id]!;
-          final extent = flex(node) > 0
-              ? minimum(node) + remaining * flex(node) / totalFlex
-              : mainSize(natural);
+          final extent = extents[node.id]!;
           final across = layout.crossAlignment == SceneCrossAlignment.stretch
               ? cross
               : crossSize(natural);
@@ -298,7 +304,7 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
       final rect = positions[node.id]!;
       final transform = parentTransform.clone()
         ..translateByDouble(rect.left, rect.top, 0, 1)
-        ..multiply(sceneNodeTransformMatrix(node.transform, rect.size));
+        ..multiply(calculateSceneNodeTransformMatrix(node.transform, rect.size));
       result[node.id] = SceneNodeGeometry(
         node: node,
         rect: rect,
@@ -325,5 +331,63 @@ Map<String, SceneNodeGeometry> calculateSceneLayout({
     const SceneLayout(),
     document.canvas.useSafeArea ? safeArea : EdgeInsets.zero,
   );
+  return result;
+}
+
+Map<String, double> _allocateFlexLineExtents({
+  required List<SceneNode> line,
+  required double availableMain,
+  required double gap,
+  required double Function(SceneNode) flexFactor,
+  required double Function(SceneNode) minimumExtent,
+  required double Function(SceneNode) maximumExtent,
+  required double Function(SceneNode) naturalExtent,
+}) {
+  final result = <String, double>{};
+  final unresolved = <SceneNode>[];
+  var consumed = math.max(0, line.length - 1) * gap;
+  for (final node in line) {
+    if (flexFactor(node) > 0) {
+      unresolved.add(node);
+    } else {
+      final extent = naturalExtent(node);
+      result[node.id] = extent;
+      consumed += extent;
+    }
+  }
+  while (unresolved.isNotEmpty) {
+    final minSum = unresolved.fold<double>(
+      0,
+      (sum, node) => sum + minimumExtent(node),
+    );
+    final totalFlex = unresolved.fold<double>(
+      0,
+      (sum, node) => sum + flexFactor(node),
+    );
+    final extra = math.max(0.0, availableMain - consumed - minSum);
+    var clampedAny = false;
+    final nextUnresolved = <SceneNode>[];
+    for (final node in unresolved) {
+      final share = minimumExtent(node) + extra * flexFactor(node) / totalFlex;
+      final max = maximumExtent(node);
+      if (share > max) {
+        result[node.id] = max;
+        consumed += max;
+        clampedAny = true;
+      } else {
+        nextUnresolved.add(node);
+      }
+    }
+    if (!clampedAny) {
+      for (final node in nextUnresolved) {
+        result[node.id] =
+            minimumExtent(node) + extra * flexFactor(node) / totalFlex;
+      }
+      break;
+    }
+    unresolved
+      ..clear()
+      ..addAll(nextUnresolved);
+  }
   return result;
 }

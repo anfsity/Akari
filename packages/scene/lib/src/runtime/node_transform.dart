@@ -3,10 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:scene_schema/scene_schema.dart';
 
-/// The axis-aligned rect a node occupies in the scene before its transform.
+/// Returns the axis-aligned rect a node occupies in the scene before its transform.
 ///
 /// Includes the minimum hit target applied to interactive nodes.
-Rect sceneNodeRect({
+Rect getSceneNodeRect({
   required SceneNode node,
   required Size sceneSize,
   required EdgeInsets safeArea,
@@ -27,12 +27,12 @@ Rect sceneNodeRect({
   return Rect.fromLTWH(left, top, width, height);
 }
 
-/// The effective transform applied to a node's child.
+/// Calculates the effective transform applied to a node's child.
 ///
 /// The matrix is expressed in the node's local coordinates, whose origin is
 /// the node rect's top-left corner, and already includes the pivot alignment.
 /// A caller can pass it straight to `Transform` without an `alignment`.
-Matrix4 sceneNodeTransformMatrix(SceneTransform transform, Size size) {
+Matrix4 calculateSceneNodeTransformMatrix(SceneTransform transform, Size size) {
   if (transform.isIdentity) {
     return Matrix4.identity();
   }

@@ -54,6 +54,42 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('keeps child state mounted across blurSigma zero transitions', (
+    tester,
+  ) async {
+    Widget buildEffects(double blurSigma) => Directionality(
+      textDirection: TextDirection.ltr,
+      child: SizedBox(
+        width: 200,
+        height: 100,
+        child: SceneBackgroundEffects(
+          background: SceneBackground(
+            kind: SceneBackgroundKind.solid,
+            blurSigma: blurSigma,
+          ),
+          child: const _StatefulChild(),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(buildEffects(0));
+    final initialState = tester.state(find.byType(_StatefulChild));
+    await tester.pumpWidget(buildEffects(12));
+    expect(tester.state(find.byType(_StatefulChild)), same(initialState));
+  });
+}
+
+class _StatefulChild extends StatefulWidget {
+  const _StatefulChild();
+
+  @override
+  State<_StatefulChild> createState() => _StatefulChildState();
+}
+
+class _StatefulChildState extends State<_StatefulChild> {
+  @override
+  Widget build(BuildContext context) => const SizedBox.expand();
 }
 
 ImageProvider _memoryImage(String asset) {

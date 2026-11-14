@@ -158,10 +158,12 @@ class SceneRuntime extends StatelessWidget {
     SceneNode node,
   ) {
     node = geometry[node.id]!.node;
+    final effectivePredicates =
+        activePredicatesListenable?.value ?? activePredicates;
     final visibleWhen = node.visibleWhen;
     final visible =
         visibleWhen == null ||
-        evaluateSceneCondition(visibleWhen, activePredicates);
+        evaluateSceneCondition(visibleWhen, effectivePredicates);
     final reducedMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
     final layout = node.layout;
@@ -228,12 +230,9 @@ class SceneRuntime extends StatelessWidget {
                 alignment: Alignment.topLeft,
                 child: Text(
                   node.properties['text'] ?? 'Text',
-                  style: TextStyle(
-                    fontSize:
-                        document.styleTokens[node.styleToken]?.fontSize == 0 ||
-                            document.styleTokens[node.styleToken] == null
-                        ? 14
-                        : document.styleTokens[node.styleToken]!.fontSize,
+                  style: getResolvedSceneTextStyle(
+                    document.styleTokens[node.styleToken] ?? const SceneStyle(),
+                    defaultFontSize: 14,
                   ),
                 ),
               )
@@ -296,7 +295,7 @@ class SceneRuntime extends StatelessWidget {
       width: rect.width,
       height: rect.height,
       child: Transform(
-        transform: sceneNodeTransformMatrix(node.transform, rect.size),
+        transform: calculateSceneNodeTransformMatrix(node.transform, rect.size),
         child: contentBoundary,
       ),
     );
@@ -415,8 +414,9 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
       );
     }
     if (widget.spec.curve != oldWidget.spec.curve ||
-        (widget.node.motionTiming != oldWidget.node.motionTiming ||
-            widget.node.tracks != oldWidget.node.tracks)) {
+        widget.spec.duration != oldWidget.spec.duration ||
+        widget.node.motionTiming != oldWidget.node.motionTiming ||
+        widget.node.tracks != oldWidget.node.tracks) {
       _progress = _controller.drive(
         CurveTween(
           curve: getSceneMotionCurve(

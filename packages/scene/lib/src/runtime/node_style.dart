@@ -66,16 +66,7 @@ class _SceneStyleViewState extends State<SceneStyleView> {
     final radius = BorderRadius.circular(style.radius);
     final angle = style.gradientAngle * math.pi / 180;
     Widget content = DefaultTextStyle.merge(
-      style: TextStyle(
-        color: style.textColor == null ? null : Color(style.textColor!),
-        fontSize: style.fontSize == 0 ? null : style.fontSize,
-        fontFamily: family,
-        fontWeight: style.fontWeight == 0
-            ? null
-            : FontWeight.values[style.fontWeight ~/ 100 - 1],
-        letterSpacing: style.letterSpacing,
-        height: style.lineHeight,
-      ),
+      style: getResolvedSceneTextStyle(style, fontFamily: family),
       child: widget.child,
     );
     content = BackdropFilter(
@@ -103,10 +94,12 @@ class _SceneStyleViewState extends State<SceneStyleView> {
                     end: Alignment(math.cos(angle), math.sin(angle)),
                     colors: [Color(style.fill), Color(style.gradientEnd!)],
                   ),
-            border: Border.all(
-              color: Color(style.border),
-              width: style.borderWidth,
-            ),
+            border: style.borderWidth > 0
+                ? Border.all(
+                    color: Color(style.border),
+                    width: style.borderWidth,
+                  )
+                : null,
             boxShadow: [
               if (style.shadowBlur > 0)
                 BoxShadow(
@@ -145,18 +138,30 @@ class SceneStyleScope extends InheritedWidget {
       oldWidget.style != style || oldWidget.fontFamily != fontFamily;
 }
 
+TextStyle getResolvedSceneTextStyle(
+  SceneStyle style, {
+  String? fontFamily,
+  double? defaultFontSize,
+  FontWeight? defaultFontWeight,
+}) => TextStyle(
+  color: style.textColor == null ? null : Color(style.textColor!),
+  fontSize: style.fontSize == 0 ? defaultFontSize : style.fontSize,
+  fontFamily: fontFamily,
+  fontWeight: style.fontWeight == 0
+      ? defaultFontWeight
+      : FontWeight.values[style.fontWeight ~/ 100 - 1],
+  letterSpacing: style.letterSpacing,
+  height: style.lineHeight,
+);
+
 /// Components with explicit typography can opt into authored text overrides.
 TextStyle getSceneTextStyle(BuildContext context, TextStyle fallback) {
   final scope = context.dependOnInheritedWidgetOfExactType<SceneStyleScope>();
   final style = scope?.style;
-  return fallback.copyWith(
-    color: style?.textColor == null ? null : Color(style!.textColor!),
-    fontSize: style == null || style.fontSize == 0 ? null : style.fontSize,
-    fontFamily: scope?.fontFamily,
-    fontWeight: style == null || style.fontWeight == 0
-        ? null
-        : FontWeight.values[style.fontWeight ~/ 100 - 1],
-    letterSpacing: style?.letterSpacing,
-    height: style?.lineHeight,
+  if (style == null) {
+    return fallback.copyWith(fontFamily: scope?.fontFamily);
+  }
+  return fallback.merge(
+    getResolvedSceneTextStyle(style, fontFamily: scope?.fontFamily),
   );
 }

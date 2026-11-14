@@ -242,7 +242,9 @@ class _TerraceMenuState<T> extends State<_TerraceMenu<T>> {
       button.getTransformTo(overlay),
       Offset.zero & button.size,
     );
-    final scale = anchor.width / button.size.width;
+    final scale = button.size.width > 0
+        ? anchor.width / button.size.width
+        : 1.0;
     setState(() => _open = true);
     await navigator.push(
       _TerraceChoiceRoute<T>(

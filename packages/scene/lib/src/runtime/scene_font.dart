@@ -9,6 +9,7 @@ final _fontFamilies = ValueNotifier<Map<String, String>>(const {});
 ValueListenable<Map<String, String>> get sceneFontFamilies => _fontFamilies;
 
 final _fontLoads = <String, Future<String>>{};
+var _nextFontId = 0;
 
 Future<String> registerSceneFont({
   required String source,
@@ -16,11 +17,21 @@ Future<String> registerSceneFont({
   String? asset,
   required Future<ByteData> Function() loadBytes,
 }) async {
-  final family = await _fontLoads.putIfAbsent('$source:$revision', () async {
-    final family = 'akari-font-${_fontLoads.length}';
-    await (FontLoader(family)..addFont(loadBytes())).load();
-    return family;
+  final key = '$source:$revision';
+  late final Future<String> pending;
+  pending = _fontLoads.putIfAbsent(key, () async {
+    final family = 'akari-font-${_nextFontId++}';
+    try {
+      await (FontLoader(family)..addFont(loadBytes())).load();
+      return family;
+    } on Object {
+      if (identical(_fontLoads[key], pending)) {
+        _fontLoads.remove(key);
+      }
+      rethrow;
+    }
   });
+  final family = await pending;
   if (asset != null && _fontFamilies.value[asset] != family) {
     _fontFamilies.value = {..._fontFamilies.value, asset: family};
   }
