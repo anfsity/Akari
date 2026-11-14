@@ -29,4 +29,30 @@ void main() {
     await File('${directory.path}/greeter.json').writeAsString('not json');
     expect(await store.findSelectedSessionId(), isNull);
   });
+
+  test('serializes concurrent writes atomically and leaves no temp files', () async {
+    await Future.wait([
+      store.saveSelectedSessionId('wayland:first'),
+      store.saveSelectedSessionId('wayland:second'),
+      store.saveSelectedSessionId('wayland:final'),
+    ]);
+
+    expect(await store.findSelectedSessionId(), 'wayland:final');
+    final names = directory
+        .listSync()
+        .map((entity) => entity.uri.pathSegments.last)
+        .toList();
+    expect(names, ['greeter.json']);
+  });
+
+  test('refuses to follow a symlinked target file', () async {
+    final victim = File('${directory.path}/victim.json')
+      ..writeAsStringSync('untouched');
+    final link = Link('${directory.path}/greeter.json')
+      ..createSync(victim.path);
+    final symlinkedStore = FileSessionStore(file: File(link.path));
+
+    await symlinkedStore.saveSelectedSessionId('wayland:sway');
+    expect(await victim.readAsString(), 'untouched');
+  });
 }

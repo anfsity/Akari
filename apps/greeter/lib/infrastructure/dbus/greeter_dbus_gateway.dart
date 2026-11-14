@@ -1,54 +1,89 @@
 import 'dart:async';
 
 import 'package:dbus/dbus.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:greeter_ui/greeter_ui.dart';
 
 const _busName = 'io.akari.Greeter';
 const _objectPath = '/io/akari/Greeter';
 const _interfaceName = 'io.akari.Greeter1';
 
+typedef DBusClientFactory = DBusClient Function();
+typedef DBusSignalStreamFactory = Stream<DBusSignal> Function(DBusClient client);
+
 /// D-Bus implementation of the Feature gateway.
 ///
 /// This class owns transport values and signal subscriptions only. It maps
 /// them into typed frontend events before they reach Feature.
 class DBusGreeterGateway implements GreeterGateway {
-  DBusGreeterGateway()
-    : _client = DBusClient.session(),
-      _events = StreamController<GreeterEvent>.broadcast() {
-    _object = DBusRemoteObject(
-      _client,
+  DBusGreeterGateway({
+    DBusClientFactory? clientFactory,
+    @visibleForTesting DBusSignalStreamFactory? signalStreamFactory,
+  }) : _clientFactory = clientFactory ?? DBusClient.session,
+       _signalStreamFactory = signalStreamFactory ?? _createSignalStream,
+       _events = StreamController<GreeterEvent>.broadcast() {
+    _connection = _connect();
+  }
+
+  final DBusClientFactory _clientFactory;
+  final DBusSignalStreamFactory _signalStreamFactory;
+  final StreamController<GreeterEvent> _events;
+  late _DBusConnection _connection;
+  bool _closed = false;
+
+  static Stream<DBusSignal> _createSignalStream(DBusClient client) =>
+      DBusSignalStream(
+        client,
+        sender: _busName,
+        path: DBusObjectPath(_objectPath),
+        interface: _interfaceName,
+        signature: DBusSignature('sss'),
+      );
+
+  _DBusConnection _connect() {
+    final client = _clientFactory();
+    final object = DBusRemoteObject(
+      client,
       name: _busName,
       path: DBusObjectPath(_objectPath),
     );
+    late final _DBusConnection connection;
     // One stream keeps Prompt and StateChanged in the order the backend emitted
     // them. Per-signal streams can interleave, letting a stale PromptPending
     // arrive after the Prompt and reset the credential field to a waiting state.
-    _signalSubscription =
-        DBusSignalStream(
-          _client,
-          sender: _busName,
-          path: DBusObjectPath(_objectPath),
-          interface: _interfaceName,
-          signature: DBusSignature('sss'),
-        ).listen(
-          _onSignal,
-          onError: (Object error, StackTrace stackTrace) =>
-              _handleDisconnection(),
-          onDone: _handleDisconnection,
-        );
+    final signalSubscription = _signalStreamFactory(client).listen(
+      (signal) => _onSignal(connection, signal),
+      onError: (Object error, StackTrace stackTrace) =>
+          _handleDisconnection(connection),
+      onDone: () => _handleDisconnection(connection),
+    );
+    final nameOwnerSubscription = client.nameOwnerChanged.listen(
+      (event) {
+        if (event.name == _busName && (event.newOwner?.isEmpty ?? true)) {
+          _handleDisconnection(connection);
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) =>
+          _handleDisconnection(connection),
+      onDone: () => _handleDisconnection(connection),
+    );
+    connection = _DBusConnection(
+      client: client,
+      object: object,
+      signalSubscription: signalSubscription,
+      nameOwnerSubscription: nameOwnerSubscription,
+    );
+    return connection;
   }
-
-  final DBusClient _client;
-  final StreamController<GreeterEvent> _events;
-  late final StreamSubscription<DBusSignal> _signalSubscription;
-  late final DBusRemoteObject _object;
-  bool _closed = false;
 
   @override
   Stream<GreeterEvent> get events => _events.stream;
 
   @override
   Future<BackendStateSnapshot> getState() async {
+    if (!_closed && _connection.disconnected) {
+      await _reconnect();
+    }
     final response = await _call(
       'GetState',
       replySignature: DBusSignature('ss'),
@@ -146,19 +181,30 @@ class DBusGreeterGateway implements GreeterGateway {
     GreeterErrorKind errorKind = GreeterErrorKind.transport,
     DBusSignature? replySignature,
   }) async {
+    if (_closed) {
+      throw const GreeterGatewayException(serviceUnavailableMessage);
+    }
+    final connection = _connection;
     try {
-      return await _object.callMethod(
+      return await connection.object.callMethod(
         _interfaceName,
         method,
         values,
         replySignature: replySignature,
       );
     } on Object catch (error) {
+      if (_isTransportError(error)) {
+        _handleDisconnection(connection);
+        throw const GreeterGatewayException(serviceUnavailableMessage);
+      }
       throw GreeterGatewayException(_getDisplayError(error), kind: errorKind);
     }
   }
 
-  void _onSignal(DBusSignal signal) {
+  void _onSignal(_DBusConnection connection, DBusSignal signal) {
+    if (_closed || !identical(connection, _connection) || _events.isClosed) {
+      return;
+    }
     try {
       switch (signal.name) {
         case 'Prompt':
@@ -183,12 +229,40 @@ class DBusGreeterGateway implements GreeterGateway {
     } on Object {
       // Malformed protocol input leaves the conversation unusable. Report
       // loss of service rather than guessing how to answer a prompt.
+      _handleDisconnection(connection);
+    }
+  }
+
+  void _handleDisconnection(_DBusConnection connection) {
+    if (_closed ||
+        !identical(connection, _connection) ||
+        connection.disconnected) {
+      return;
+    }
+    connection.disconnected = true;
+    if (!_events.isClosed) {
       _events.add(const BackendDisconnected());
     }
   }
 
-  void _handleDisconnection() {
-    if (!_closed) _events.add(const BackendDisconnected());
+  Future<void> _reconnect() async {
+    final previous = _connection;
+    previous.disconnected = true;
+    await _closeConnection(previous);
+    if (_closed) {
+      return;
+    }
+    _connection = _connect();
+  }
+
+  Future<void> _closeConnection(_DBusConnection connection) async {
+    await connection.signalSubscription.cancel();
+    await connection.nameOwnerSubscription.cancel();
+    try {
+      await connection.client.close();
+    } on Object {
+      // Closing an already-broken socket is best-effort.
+    }
   }
 
   PromptKind _getPromptKind(String value) {
@@ -227,6 +301,29 @@ class DBusGreeterGateway implements GreeterGateway {
     };
   }
 
+  bool _isTransportError(Object error) {
+    if (error is! DBusErrorException) {
+      return true;
+    }
+    if (error is DBusServiceUnknownException ||
+        error is DBusUnknownObjectException ||
+        error is DBusUnknownInterfaceException ||
+        error is DBusUnknownMethodException ||
+        error is DBusTimeoutException ||
+        error is DBusTimedOutException) {
+      return true;
+    }
+    return switch (error.response.errorName) {
+      'org.freedesktop.DBus.Error.ServiceUnknown' ||
+      'org.freedesktop.DBus.Error.NameHasNoOwner' ||
+      'org.freedesktop.DBus.Error.NoReply' ||
+      'org.freedesktop.DBus.Error.Timeout' ||
+      'org.freedesktop.DBus.Error.TimedOut' ||
+      'org.freedesktop.DBus.Error.Disconnected' => true,
+      _ => false,
+    };
+  }
+
   String _getDisplayError(Object error) {
     // Backend method messages are display-safe under the Greeter1 contract.
     // Other exception strings may contain transport internals or payloads.
@@ -242,8 +339,22 @@ class DBusGreeterGateway implements GreeterGateway {
       return;
     }
     _closed = true;
-    await _signalSubscription.cancel();
-    await _client.close();
+    await _closeConnection(_connection);
     await _events.close();
   }
+}
+
+class _DBusConnection {
+  _DBusConnection({
+    required this.client,
+    required this.object,
+    required this.signalSubscription,
+    required this.nameOwnerSubscription,
+  });
+
+  final DBusClient client;
+  final DBusRemoteObject object;
+  final StreamSubscription<DBusSignal> signalSubscription;
+  final StreamSubscription<DBusNameOwnerChangedEvent> nameOwnerSubscription;
+  bool disconnected = false;
 }

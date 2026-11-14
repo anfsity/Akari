@@ -12,6 +12,7 @@ struct _MyApplication {
   GHashTable* monitor_windows;
   GtkWindow* primary_window;
   GdkMonitor* primary_monitor;
+  gboolean monitor_signals_connected;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
@@ -132,9 +133,13 @@ static void monitor_removed_cb(GdkDisplay* display, GdkMonitor* monitor,
                                MyApplication* self) {
   GtkWindow* window =
       GTK_WINDOW(g_hash_table_lookup(self->monitor_windows, monitor));
+  if (window == nullptr) {
+    return;
+  }
   g_debug("Removed greeter output; primary=%d, remaining=%d",
           window == self->primary_window, gdk_display_get_n_monitors(display));
   g_hash_table_remove(self->monitor_windows, monitor);
+  GtkWindow* promoted_primary = nullptr;
   if (window == self->primary_window) {
     // Keep the implicit view alive: it owns the app root and engine lifecycle.
     // Replace a surviving output's secondary window with this primary window.
@@ -153,6 +158,7 @@ static void monitor_removed_cb(GdkDisplay* display, GdkMonitor* monitor,
     self->primary_monitor = replacement;
     g_hash_table_insert(self->monitor_windows, g_object_ref(replacement),
                         window);
+    promoted_primary = window;
   } else {
     gtk_widget_destroy(GTK_WIDGET(window));
   }
@@ -163,6 +169,13 @@ static void monitor_removed_cb(GdkDisplay* display, GdkMonitor* monitor,
   g_hash_table_iter_init(&iterator, self->monitor_windows);
   while (g_hash_table_iter_next(&iterator, &key, &value)) {
     fullscreen_on_monitor(GTK_WINDOW(value), GDK_MONITOR(key));
+  }
+  if (promoted_primary != nullptr) {
+    gtk_window_present(promoted_primary);
+    GtkWidget* child = gtk_bin_get_child(GTK_BIN(promoted_primary));
+    if (child != nullptr) {
+      gtk_widget_grab_focus(child);
+    }
   }
 }
 
@@ -183,12 +196,15 @@ static void my_application_activate(GApplication* application) {
   }
 
   GdkDisplay* display = gdk_display_get_default();
-  g_signal_connect_object(display, "monitor-added",
-                          G_CALLBACK(monitor_added_cb), self,
-                          G_CONNECT_DEFAULT);
-  g_signal_connect_object(display, "monitor-removed",
-                          G_CALLBACK(monitor_removed_cb), self,
-                          G_CONNECT_DEFAULT);
+  if (!self->monitor_signals_connected) {
+    self->monitor_signals_connected = TRUE;
+    g_signal_connect_object(display, "monitor-added",
+                            G_CALLBACK(monitor_added_cb), self,
+                            G_CONNECT_DEFAULT);
+    g_signal_connect_object(display, "monitor-removed",
+                            G_CALLBACK(monitor_removed_cb), self,
+                            G_CONNECT_DEFAULT);
+  }
   for (int index = 0; index < gdk_display_get_n_monitors(display); index++) {
     monitor_added_cb(display, gdk_display_get_monitor(display, index), self);
   }

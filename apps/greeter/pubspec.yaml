@@ -9,12 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
   dbus: ^0.7.11
   greeter_ui:
     path: ../../packages/greeter_ui
-  scene:
-    path: ../../packages/scene
   theme_sdk:
     path: ../../packages/theme_sdk
 

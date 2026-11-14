@@ -34,40 +34,68 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   static const _displayChannel = MethodChannel('akari/displays');
   final _credentialController = TextEditingController();
-  late final GreeterFeature _feature;
+  late GreeterFeature _feature;
   late ThemeDefinition _theme;
   late List<FlutterView> _views;
   late int _activeViewId;
   Color? _themeSeed;
 
-  @override
-  void initState() {
-    super.initState();
-    _views = WidgetsBinding.instance.platformDispatcher.views.toList();
-    _activeViewId =
-        WidgetsBinding.instance.platformDispatcher.implicitView!.viewId;
-    WidgetsBinding.instance.addObserver(this);
-    // Active display focus is tracked via dual mechanisms: GTK reports window
-    // focus changes over the akari/displays MethodChannel, while Listener
-    // taps activate views directly during in-engine pointer hit testing.
-    _displayChannel.setMethodCallHandler((call) async {
-      if (call.method == 'focusView') {
-        _activateView(call.arguments as int);
-      }
-    });
+  int _findDefaultViewId(List<FlutterView> views) =>
+      WidgetsBinding.instance.platformDispatcher.implicitView?.viewId ??
+      (views.isEmpty ? 0 : views.first.viewId);
+
+  GreeterFeature _createFeature() {
     final backendMode = const String.fromEnvironment(
       'AKARI_BACKEND',
       defaultValue: 'demo',
     );
-    _feature = GreeterFeature(
+    return GreeterFeature(
       gateway:
           widget.gateway ??
           (backendMode == 'demo' ? DemoGreeterGateway() : DBusGreeterGateway()),
       sessionStore: widget.sessionStore,
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _views = WidgetsBinding.instance.platformDispatcher.views.toList();
+    _activeViewId = _findDefaultViewId(_views);
+    WidgetsBinding.instance.addObserver(this);
+    // Active display focus is tracked via dual mechanisms: GTK reports window
+    // focus changes over the akari/displays MethodChannel, while Listener
+    // taps activate views directly during in-engine pointer hit testing.
+    _displayChannel.setMethodCallHandler((call) async {
+      if (call.method != 'focusView') {
+        throw MissingPluginException(
+          'Unsupported display channel method: ${call.method}',
+        );
+      }
+      if (call.arguments case final int viewId) {
+        _activateView(viewId);
+      }
+    });
+    _feature = _createFeature();
     _theme = widget.themeBuilder();
     unawaited(_loadThemeSeed());
     unawaited(_feature.initialize());
+  }
+
+  @override
+  void didUpdateWidget(MyApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(widget.gateway, oldWidget.gateway) ||
+        widget.sessionStore != oldWidget.sessionStore) {
+      _feature.dispose();
+      _credentialController.clear();
+      _feature = _createFeature();
+      unawaited(_feature.initialize());
+    }
+    if (!identical(widget.themeBuilder, oldWidget.themeBuilder)) {
+      _theme = widget.themeBuilder(seed: _themeSeed);
+      unawaited(_loadThemeSeed());
+    }
   }
 
   Future<void> _loadThemeSeed() async {
@@ -104,16 +132,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     setState(() {
       _views = views;
       if (!views.any((view) => view.viewId == _activeViewId)) {
-        _activeViewId =
-            WidgetsBinding.instance.platformDispatcher.implicitView!.viewId;
+        _activeViewId = _findDefaultViewId(views);
       }
     });
   }
 
   void _activateView(int viewId) {
-    if (_activeViewId != viewId) {
-      setState(() => _activeViewId = viewId);
+    if (!mounted ||
+        _activeViewId == viewId ||
+        !_views.any((view) => view.viewId == viewId)) {
+      return;
     }
+    setState(() => _activeViewId = viewId);
   }
 
   @override
