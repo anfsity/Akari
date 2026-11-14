@@ -36,6 +36,7 @@ pub fn run(options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> Resul
         surface: None,
         scene: None,
         next_frame: Instant::now(),
+        pending_redraw: false,
         error: None,
     };
     event_loop.run_app(&mut app)?;
@@ -53,6 +54,7 @@ struct Preview {
     surface: Option<Surface<Rc<Window>, Rc<Window>>>,
     scene: Option<Scene>,
     next_frame: Instant,
+    pending_redraw: bool,
     error: Option<Box<dyn std::error::Error>>,
 }
 
@@ -66,17 +68,21 @@ impl Preview {
         let context = Context::new(Rc::clone(&window))?;
         self.surface = Some(Surface::new(&context, Rc::clone(&window))?);
         self.window = Some(window);
+        self.pending_redraw = false;
         Ok(())
     }
 
     fn close(&mut self) {
+        self.pending_redraw = false;
         self.surface.take();
         self.window.take();
     }
 
     fn present(&mut self) -> Result {
         self.next_frame = Instant::now() + Duration::from_millis(33);
-        let window = self.window.as_ref().unwrap();
+        let Some(window) = self.window.as_ref() else {
+            return Ok(());
+        };
         let size = window.inner_size();
         let (Some(width), Some(height)) =
             (NonZeroU32::new(size.width), NonZeroU32::new(size.height))
@@ -94,9 +100,10 @@ impl Preview {
                 self.options.dark,
             )?);
         }
-        let surface = self.surface.as_mut().unwrap();
+        let (Some(surface), Some(scene)) = (self.surface.as_mut(), self.scene.as_mut()) else {
+            return Ok(());
+        };
         surface.resize(width, height)?;
-        let scene = self.scene.as_mut().unwrap();
         scene.draw(self.timing.get_elapsed(Instant::now()).as_secs_f32());
         if let Some(path) = self.options.snapshot.take() {
             scene.save_png(path)?;
@@ -132,6 +139,7 @@ impl ApplicationHandler for Preview {
                 event_loop.exit()
             }
             WindowEvent::RedrawRequested => {
+                self.pending_redraw = false;
                 if let Err(error) = self.present() {
                     self.error = Some(error);
                     event_loop.exit();
@@ -145,15 +153,67 @@ impl ApplicationHandler for Preview {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        if self.stop.load(Ordering::Relaxed) || self.timing.is_finished(Instant::now()) {
+        let now = Instant::now();
+        if self.stop.load(Ordering::Relaxed) || self.timing.is_finished(now) {
             event_loop.exit();
             return;
         }
-        if Instant::now() >= self.next_frame
-            && let Some(window) = self.window.as_ref()
-        {
-            window.request_redraw();
+        match plan_frame_wait(self.window.is_some(), self.pending_redraw, now, self.next_frame) {
+            FrameWaitPlan::Wait => event_loop.set_control_flow(ControlFlow::Wait),
+            FrameWaitPlan::RequestRedrawAndWait => {
+                if let Some(window) = self.window.as_ref() {
+                    self.pending_redraw = true;
+                    window.request_redraw();
+                }
+                event_loop.set_control_flow(ControlFlow::Wait);
+            }
+            FrameWaitPlan::WaitUntil(deadline) => {
+                event_loop.set_control_flow(ControlFlow::WaitUntil(deadline));
+            }
         }
-        event_loop.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FrameWaitPlan {
+    Wait,
+    RequestRedrawAndWait,
+    WaitUntil(Instant),
+}
+
+fn plan_frame_wait(
+    has_window: bool,
+    pending_redraw: bool,
+    now: Instant,
+    next_frame: Instant,
+) -> FrameWaitPlan {
+    if !has_window || pending_redraw {
+        return FrameWaitPlan::Wait;
+    }
+    if now >= next_frame {
+        return FrameWaitPlan::RequestRedrawAndWait;
+    }
+    FrameWaitPlan::WaitUntil(next_frame)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frame_wait_avoids_busy_spinning_without_window_or_with_pending_redraw() {
+        let now = Instant::now();
+        let past = now - Duration::from_millis(5);
+        assert_eq!(plan_frame_wait(false, false, now, past), FrameWaitPlan::Wait);
+        assert_eq!(plan_frame_wait(true, true, now, past), FrameWaitPlan::Wait);
+        assert_eq!(
+            plan_frame_wait(true, false, now, past),
+            FrameWaitPlan::RequestRedrawAndWait
+        );
+        let future = now + Duration::from_millis(33);
+        assert_eq!(
+            plan_frame_wait(true, false, now, future),
+            FrameWaitPlan::WaitUntil(future)
+        );
     }
 }

@@ -148,6 +148,41 @@ impl Drop for Session {
     }
 }
 
+fn should_continue_presentation(
+    activation: Activation,
+    stop: &AtomicBool,
+    timing: &Presentation,
+    now: Instant,
+) -> bool {
+    activation == Activation::Enabled && !stop.load(Ordering::Relaxed) && !timing.is_finished(now)
+}
+
+fn dispatch_seat(seat: &mut Seat, timeout_ms: i32, stop: &AtomicBool) -> Result {
+    let deadline =
+        (timeout_ms > 0).then(|| Instant::now() + Duration::from_millis(timeout_ms as u64));
+    loop {
+        let remaining = match deadline {
+            Some(deadline) => {
+                let Some(left) = deadline.checked_duration_since(Instant::now()) else {
+                    return Ok(());
+                };
+                i32::try_from(left.as_millis()).unwrap_or(i32::MAX)
+            }
+            None => timeout_ms,
+        };
+        match seat.dispatch(remaining) {
+            Ok(_) => return Ok(()),
+            // Termination signals interrupt poll(2) before stopping the loop.
+            Err(error) if io::Error::from(error).kind() == io::ErrorKind::Interrupted => {
+                if stop.load(Ordering::Relaxed) {
+                    return Ok(());
+                }
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+}
+
 pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> Result {
     let (mut session, terminal) = Session::open()?;
     let activation_deadline = Instant::now() + Duration::from_secs(3);
@@ -155,15 +190,15 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
         if Instant::now() >= activation_deadline {
             return Err("seat activation timed out".into());
         }
-        session.seat.dispatch(20)?;
+        dispatch_seat(&mut session.seat, 20, &stop)?;
     }
     if session.activation.get() != Activation::Enabled || stop.load(Ordering::Relaxed) {
         return Ok(());
     }
     session.display.borrow_mut().terminal = Some(Terminal::enter_graphics(terminal)?);
     for path in get_card_paths()? {
-        session.seat.dispatch(0)?;
-        if session.activation.get() != Activation::Enabled {
+        dispatch_seat(&mut session.seat, 0, &stop)?;
+        if session.activation.get() != Activation::Enabled || stop.load(Ordering::Relaxed) {
             return Ok(());
         }
         match session.seat.open_device(&path) {
@@ -177,8 +212,12 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
                 };
                 if let Err(error) = card.create_outputs(&renderer, options.dark) {
                     eprintln!("event=splash_card_unavailable path={path:?} error={error}");
+                    card.close(&mut session.seat);
+                } else if card.outputs.is_empty() {
+                    card.close(&mut session.seat);
+                } else {
+                    session.display.borrow_mut().cards.push(card);
                 }
-                session.display.borrow_mut().cards.push(card);
             }
             Err(error) => eprintln!("event=splash_card_unavailable path={path:?} error={error}"),
         }
@@ -194,11 +233,13 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
     }
     let mut timing = Presentation::new(options.duration);
     loop {
-        session.seat.dispatch(0)?;
-        if session.activation.get() != Activation::Enabled
-            || stop.load(Ordering::Relaxed)
-            || timing.is_finished(Instant::now())
-        {
+        dispatch_seat(&mut session.seat, 0, &stop)?;
+        if !should_continue_presentation(
+            session.activation.get(),
+            &stop,
+            &timing,
+            Instant::now(),
+        ) {
             break;
         }
         let mut display = session.display.borrow_mut();
@@ -206,8 +247,16 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
             card.present(&mut timing, &mut options.snapshot)?;
         }
         drop(display);
+        if !should_continue_presentation(
+            session.activation.get(),
+            &stop,
+            &timing,
+            Instant::now(),
+        ) {
+            break;
+        }
         // Dispatch instead of sleeping so VT revocation is acknowledged promptly.
-        session.seat.dispatch(33)?;
+        dispatch_seat(&mut session.seat, 33, &stop)?;
     }
     drop(session);
     eprintln!("event=splash_released");
@@ -424,5 +473,45 @@ impl Card {
         if let Err(error) = seat.close_device(self.device.seat_device) {
             eprintln!("event=splash_close_device_failed error={error}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn presentation_stops_on_disable_signal_or_duration() {
+        let stop = AtomicBool::new(false);
+        let mut timing = Presentation::new(Some(Duration::ZERO));
+        let now = Instant::now();
+        assert!(should_continue_presentation(
+            Activation::Enabled,
+            &stop,
+            &timing,
+            now
+        ));
+        timing.mark_presented(now);
+        assert!(!should_continue_presentation(
+            Activation::Enabled,
+            &stop,
+            &timing,
+            now
+        ));
+
+        let timing = Presentation::new(Some(Duration::from_secs(5)));
+        assert!(!should_continue_presentation(
+            Activation::Disabled,
+            &stop,
+            &timing,
+            now
+        ));
+        stop.store(true, Ordering::Relaxed);
+        assert!(!should_continue_presentation(
+            Activation::Enabled,
+            &stop,
+            &timing,
+            now
+        ));
     }
 }
