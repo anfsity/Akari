@@ -36,10 +36,19 @@ _akari() {
 ''',
     subcommandCases,
     '''  esac
-  if [[ \$command == 'script run' ]] && (( CURRENT == 4 )); then
-    local -a scripts=(${repositoryScripts.where((script) => script.kind != ScriptKind.library).map((script) => encodeShellArgument(script.path)).join(' ')})
-    _describe 'script' scripts
-    return
+  if [[ \$command == 'script run' ]] && (( CURRENT >= 4 )) && [[ "\$words[CURRENT]" != -* ]]; then
+    local has_script=0 idx
+    for (( idx = 4; idx < CURRENT; idx++ )); do
+      if [[ "\${words[idx]}" != -* ]]; then
+        has_script=1
+        break
+      fi
+    done
+    if (( ! has_script )); then
+      local -a scripts=(${repositoryScripts.where((script) => script.kind != ScriptKind.library).map((script) => encodeShellArgument(script.path)).join(' ')})
+      _describe 'script' scripts
+      return
+    fi
   fi
 ''',
     r'''  local -a options
@@ -132,9 +141,18 @@ String _getBashCompletion() {
 ''',
     subcommandCases,
     '''  esac
-  if [[ \$command == 'script run' ]] && (( COMP_CWORD == 3 )); then
-    mapfile -t COMPREPLY < <(compgen -W ${encodeShellArgument(repositoryScripts.where((script) => script.kind != ScriptKind.library).map((script) => script.path).join(' '))} -- "\$cur")
-    return 0
+  if [[ \$command == 'script run' ]] && (( COMP_CWORD >= 3 )) && [[ "\$cur" != -* ]]; then
+    local has_script=0 idx
+    for (( idx = 3; idx < COMP_CWORD; idx++ )); do
+      if [[ "\${COMP_WORDS[idx]}" != -* ]]; then
+        has_script=1
+        break
+      fi
+    done
+    if (( ! has_script )); then
+      mapfile -t COMPREPLY < <(compgen -W ${encodeShellArgument(repositoryScripts.where((script) => script.kind != ScriptKind.library).map((script) => script.path).join(' '))} -- "\$cur")
+      return 0
+    fi
   fi
 ''',
     r'''  local option="$prev" value="$cur" prefix='' candidate options
@@ -157,7 +175,7 @@ String _getBashCompletion() {
   fi
   return 0
 }
-complete -o filenames -F _akari akari
+complete -F _akari akari
 ''',
   ].join();
 }
@@ -186,15 +204,19 @@ ${options.where((option) => option.valueName != null).map(_encodeBashOptionValue
 
 String _encodeBashOptionValueCompletion(CliOption option) {
   var completion = '';
-  if (option.values.isNotEmpty || option.valueName == 'PATH') {
+  final isPath = option.valueName == 'PATH';
+  if (option.values.isNotEmpty || isPath) {
     final generator = option.values.isNotEmpty
         ? '-W ${encodeShellArgument(option.values.join(' '))}'
         : option.directory
         ? '-d'
         : '-f';
+    final filenamesHook = isPath
+        ? '          compopt -o filenames 2>/dev/null || true\n'
+        : '';
     completion =
         '''          while IFS= read -r candidate; do COMPREPLY+=("\$prefix\$candidate"); done < <(compgen $generator -- "\$value")
-''';
+$filenamesHook''';
   }
   return '''        ${option.spellings.join('|')})
 $completion          return 0;;

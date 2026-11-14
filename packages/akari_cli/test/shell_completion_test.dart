@@ -45,6 +45,16 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(await completeBashWords(['akari', 'script', 'run', 'check']), [
       'check-toolchain.sh',
     ]);
+    expect(
+      await completeBashWords([
+        'akari',
+        'script',
+        'run',
+        '--dry-run',
+        'check',
+      ]),
+      ['check-toolchain.sh'],
+    );
     expect(await completeBashWords(['akari', 'script', 'run', 'lib']), isEmpty);
     expect(
       await completeBashWords([

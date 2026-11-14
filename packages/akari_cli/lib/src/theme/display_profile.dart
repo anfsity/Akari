@@ -72,5 +72,3 @@ Future<RunCompletion> getDisplayCompletion(File file, RunResult result) async {
     );
   }
 }
-
-const collectDisplayResult = getDisplayCompletion;

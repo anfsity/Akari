@@ -98,7 +98,7 @@ void main() {
           steps: const [
             RunStep(id: 'check', command: ['true']),
           ],
-          collectResult: (result) async {
+          getCompletion: (result) async {
             expect(result.isPassed, true);
             expect(await File('$directory/report.json').exists(), false);
             final events = await File('$directory/events.jsonl').readAsLines();

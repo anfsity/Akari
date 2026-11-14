@@ -38,18 +38,28 @@ Future<int> runScriptCommand(
   }
   final String path;
   final List<String> arguments;
+  final Map<String, String> values;
   if (command.scriptPath case final script?) {
-    getCliOptionValues(command, input.options);
+    values = getCliOptionValues(command, input.options);
     path = script;
     arguments = input.theme;
   } else {
-    if (input.options.isEmpty || input.options.first.startsWith('-')) {
+    final positional = <String>[];
+    final optionArguments = <String>[];
+    for (final argument in input.options) {
+      if (argument.startsWith('-')) {
+        optionArguments.add(argument);
+      } else {
+        positional.add(argument);
+      }
+    }
+    values = getCliOptionValues(command, optionArguments);
+    if (positional.length != 1) {
       throw const FormatException(
-        'Usage: akari script run SCRIPT [--dry-run] -- [arguments]',
+        'Usage: akari script run [--dry-run] SCRIPT -- [arguments]',
       );
     }
-    path = input.options.first;
-    getCliOptionValues(command, input.options.skip(1).toList());
+    path = positional.single;
     arguments = input.theme;
   }
   final script = getRepositoryScript(path);
@@ -61,7 +71,7 @@ Future<int> runScriptCommand(
     '${repoRoot.path}/scripts/${script.path}',
     ...arguments,
   ];
-  if (input.options.contains('--dry-run')) {
+  if (values.containsKey('--dry-run')) {
     stdout.writeln(
       jsonEncode({
         'command': command.name,

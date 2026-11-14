@@ -132,7 +132,9 @@ Future<int> runLoginCommand(
 
   stderr.writeln('Building the production theme and backend without root...');
   final process = await Process.start(build.first, build.skip(1).toList());
-  final output = process.stdout.transform(utf8.decoder).join();
+  final output = process.stdout
+      .transform(const Utf8Decoder(allowMalformed: true))
+      .join();
   final errors = stderr.addStream(process.stderr);
   final result = await process.exitCode;
   await errors;

@@ -272,8 +272,6 @@ Future<RunCompletion> getPreviewCompletion(
   }
 }
 
-const collectPreviewResult = getPreviewCompletion;
-
 RunPlan createSplashRunPlan(
   Directory repoRoot, {
   required BuildMode mode,

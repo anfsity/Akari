@@ -160,5 +160,3 @@ Future<RunCompletion> getPerformanceCompletion(
     return RunCompletion(error: '$error', failureExitCode: failureExitCode);
   }
 }
-
-const collectPerformanceResult = getPerformanceCompletion;

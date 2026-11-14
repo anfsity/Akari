@@ -23,7 +23,7 @@ void main() {
         durationMs: 0,
       );
       expect(
-        (await collectPreviewResult(
+        (await getPreviewCompletion(
           manifest,
           previewScenarioNames,
           successfulProcess,
@@ -38,7 +38,7 @@ void main() {
       ]) {
         await manifest.writeAsString(jsonEncode(data));
         expect(
-          (await collectPreviewResult(
+          (await getPreviewCompletion(
             manifest,
             previewScenarioNames,
             successfulProcess,
@@ -48,7 +48,7 @@ void main() {
       }
       await manifest.writeAsString(jsonEncode({'face-success': 'passed'}));
       expect(
-        (await collectPreviewResult(manifest, [
+        (await getPreviewCompletion(manifest, [
           'face-success',
         ], successfulProcess)).error,
         isNull,

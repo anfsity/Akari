@@ -84,13 +84,27 @@ Future<void> main(List<String> arguments) async {
     final plan = await run([
       'script',
       'run',
-      'greetd-test/display-layout.py',
       '--dry-run',
+      'greetd-test/display-layout.py',
       '--',
       'capture',
     ]);
     expect(plan.exitCode, 0, reason: '${plan.stderr}');
     expect((jsonDecode(plan.stdout as String) as Map)['invocation'], [
+      'python3',
+      '${_repoRoot.path}/scripts/greetd-test/display-layout.py',
+      'capture',
+    ]);
+    final suffixDryRun = await run([
+      'script',
+      'run',
+      'greetd-test/display-layout.py',
+      '--dry-run',
+      '--',
+      'capture',
+    ]);
+    expect(suffixDryRun.exitCode, 0, reason: '${suffixDryRun.stderr}');
+    expect((jsonDecode(suffixDryRun.stdout as String) as Map)['invocation'], [
       'python3',
       '${_repoRoot.path}/scripts/greetd-test/display-layout.py',
       'capture',

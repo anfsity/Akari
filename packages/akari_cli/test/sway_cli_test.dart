@@ -172,8 +172,8 @@ void main() {
                 },
               ),
             ],
-            collectResult: (result) =>
-                collectDisplayResult(displayFile, result),
+            getCompletion: (result) =>
+                getDisplayCompletion(displayFile, result),
           ),
           format: RunOutputFormat.text,
           reportPath: null,
@@ -196,7 +196,7 @@ void main() {
         command: 'run sway',
         artifactPaths: {'display_report': 'missing/display-report.json'},
         steps: const [],
-        collectResult: (result) => collectDisplayResult(
+        getCompletion: (result) => getDisplayCompletion(
           File('${temp.path}/missing/display-report.json'),
           result,
         ),
