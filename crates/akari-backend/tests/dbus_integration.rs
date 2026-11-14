@@ -1288,3 +1288,64 @@ async fn assert_mock_power(proxy: &Proxy<'_>) {
     let after: (String, String) = proxy.call("GetState", &()).await.unwrap();
     assert_eq!(after, before);
 }
+
+#[tokio::test]
+async fn failed_previous_cancel_does_not_block_replacement_and_prompts_are_sanitized() {
+    let _guard = lock_test_bus().await;
+    let directory = temp_dir("replace-sanitized");
+    let socket = directory.join("greetd.sock");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let server = spawn_server(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        assert_eq!(read_request(&mut stream).await["type"], "create_session");
+        send_secret_prompt(&mut stream).await;
+        assert_eq!(read_request(&mut stream).await["type"], "cancel_session");
+        write_response(
+            &mut stream,
+            serde_json::json!({
+                "type": "error",
+                "error_type": "error",
+                "description": "stale worker cancel error"
+            }),
+        )
+        .await;
+
+        let (mut stream, _) = listener.accept().await.unwrap();
+        assert_eq!(read_request(&mut stream).await["type"], "create_session");
+        let dirty = format!("Prompt:\r\u{001b}[31m{}\n{}", "a", "z".repeat(600));
+        write_response(
+            &mut stream,
+            serde_json::json!({
+                "type": "auth_message",
+                "auth_message_type": "visible",
+                "auth_message": dirty,
+            }),
+        )
+        .await;
+        assert_eq!(read_request(&mut stream).await["type"], "cancel_session");
+        write_response(&mut stream, serde_json::json!({"type": "success"})).await;
+    });
+    let _backend = start_backend(&socket);
+    let connection = connect_backend().await;
+    let proxy = create_proxy(&connection).await;
+    let mut prompts = proxy.receive_signal("Prompt").await.unwrap();
+
+    let first: String = proxy.call("BeginAuthentication", &("alice",)).await.unwrap();
+    let _ = prompts.next().await.unwrap();
+    wait_for_state(&proxy, "WaitingForInput").await;
+
+    let second: String = proxy.call("BeginAuthentication", &("bob",)).await.unwrap();
+    assert_ne!(first, second);
+    let prompt = tokio::time::timeout(Duration::from_secs(2), prompts.next())
+        .await
+        .unwrap()
+        .unwrap();
+    let (attempt_id, _, text): (String, String, String) = prompt.body().deserialize().unwrap();
+    assert_eq!(attempt_id, second);
+    assert!(!text.contains('\r'));
+    assert!(!text.contains('\u{001b}'));
+    assert_eq!(text.chars().count(), 512);
+
+    proxy.call::<_, _, ()>("Cancel", &(second,)).await.unwrap();
+    server.finish().await;
+}

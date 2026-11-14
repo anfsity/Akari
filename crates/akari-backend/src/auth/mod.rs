@@ -11,4 +11,5 @@ mod attempt;
 mod caller_watch;
 mod handle;
 
+pub(crate) use attempt::sanitize_detail;
 pub(crate) use handle::{AuthActorHandle, AuthActorTask};

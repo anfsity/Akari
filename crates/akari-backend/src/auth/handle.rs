@@ -1,5 +1,10 @@
 //! D-Bus-facing commands and the observed lifetime of the authentication actor.
 
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
+
 use tokio::{
     sync::{mpsc, oneshot, watch},
     task::JoinHandle,
@@ -15,6 +20,7 @@ use crate::session_catalog::SessionEntry;
 
 const COMMAND_BUFFER: usize = 16;
 type CommandSender = mpsc::Sender<AuthCommand>;
+pub(super) type BeginSequenceMap = Arc<Mutex<HashMap<String, u64>>>;
 
 /// Handle used by D-Bus methods to communicate with the single authentication owner.
 #[derive(Clone, Debug)]
@@ -22,6 +28,7 @@ pub(crate) struct AuthActorHandle {
     commands: CommandSender,
     snapshot: watch::Receiver<AuthSnapshot>,
     control: watch::Receiver<Option<AttemptControl>>,
+    latest_begin: BeginSequenceMap,
 }
 
 impl AuthActorHandle {
@@ -31,11 +38,13 @@ impl AuthActorHandle {
         let (snapshot_sender, snapshot) = watch::channel(AuthSnapshot::idle());
         let (control_sender, control) = watch::channel(None);
         let shutdown = CancellationToken::new();
+        let latest_begin = Arc::new(Mutex::new(HashMap::new()));
         let task = tokio::spawn(run_actor(
             receiver,
             commands.downgrade(),
             snapshot_sender,
             control_sender,
+            Arc::clone(&latest_begin),
             shutdown.clone(),
         ));
         let runtime = AuthActorTask { task, shutdown };
@@ -44,6 +53,7 @@ impl AuthActorHandle {
                 commands,
                 snapshot,
                 control,
+                latest_begin,
             },
             runtime,
         )
@@ -84,10 +94,17 @@ impl AuthActorHandle {
         username: String,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<String> {
+        let sequence = {
+            let mut sequences = self.latest_begin.lock().expect("begin sequence mutex");
+            let next = sequences.get(&caller).copied().unwrap_or(0) + 1;
+            sequences.insert(caller.clone(), next);
+            next
+        };
         self.interrupt_current(None, &caller);
         self.send_with(|reply| AuthCommand::Begin {
             caller,
             username,
+            sequence,
             emitter,
             reply,
         })
@@ -250,6 +267,7 @@ pub(super) enum AuthCommand {
     Begin {
         caller: String,
         username: String,
+        sequence: u64,
         emitter: SignalEmitter<'static>,
         reply: oneshot::Sender<fdo::Result<String>>,
     },

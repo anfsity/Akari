@@ -8,11 +8,24 @@ use zbus::fdo;
 use super::{
     attempt::{
         ActorState, AttemptControl, AuthSnapshot, begin_session_resolution, cancel_current,
-        create_attempt, fail_session_resolution, handle_respond, handle_start_session,
-        report_session_unavailable, run_authentication, validate_owned_attempt,
+        create_attempt, fail_session_resolution, finish_cancellation, handle_respond,
+        handle_start_session, report_session_unavailable, run_authentication,
+        validate_owned_attempt,
     },
-    handle::AuthCommand,
+    handle::{AuthCommand, BeginSequenceMap},
 };
+
+fn consume_begin_sequence(latest_begin: &BeginSequenceMap, caller: &str, sequence: u64) -> bool {
+    let mut sequences = latest_begin.lock().expect("begin sequence mutex");
+    match sequences.get(caller).copied() {
+        Some(latest) if latest > sequence => true,
+        Some(_) => {
+            sequences.remove(caller);
+            false
+        }
+        None => false,
+    }
+}
 
 fn send_reply<T>(reply: oneshot::Sender<fdo::Result<T>>, result: fdo::Result<T>) {
     if let Err(error) = &result {
@@ -28,6 +41,7 @@ pub(super) async fn run_actor(
     command_sender: mpsc::WeakSender<AuthCommand>,
     snapshots: watch::Sender<AuthSnapshot>,
     controls: watch::Sender<Option<AttemptControl>>,
+    latest_begin: BeginSequenceMap,
     shutdown: CancellationToken,
 ) {
     // Only external handles keep the command channel alive. Disconnect watchers
@@ -64,12 +78,13 @@ pub(super) async fn run_actor(
                 AuthCommand::Begin {
                     caller,
                     username,
+                    sequence,
                     emitter,
                     reply,
                 } => {
                     let attempt_id = match create_attempt(
                         &mut actor,
-                        caller,
+                        caller.clone(),
                         username.clone(),
                         &emitter,
                         &command_sender,
@@ -78,14 +93,21 @@ pub(super) async fn run_actor(
                     {
                         Ok(attempt_id) => attempt_id,
                         Err(error) => {
+                            let _ = consume_begin_sequence(&latest_begin, &caller, sequence);
                             send_reply(reply, Err(error));
                             return;
                         }
                     };
+                    let superseded = consume_begin_sequence(&latest_begin, &caller, sequence);
                     // Bind the UI to the attempt before PAM starts waiting for
                     // a camera or other passive factor. Protocol failures are
                     // then reported through the attempt's state signals.
                     send_reply(reply, Ok(attempt_id.clone()));
+                    if superseded {
+                        let _ =
+                            finish_cancellation(&mut actor, &attempt_id, Some(&emitter)).await;
+                        return;
+                    }
                     let _ = run_authentication(&mut actor, &attempt_id, &username, emitter).await;
                 }
                 AuthCommand::Respond {
@@ -184,4 +206,27 @@ pub(super) async fn run_actor(
     }
 
     let _ = cancel_current(&mut actor, None, None, false, None).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::HashMap,
+        sync::{Arc, Mutex},
+    };
+
+    use super::consume_begin_sequence;
+
+    #[test]
+    fn pipelined_begin_sequence_detects_superseding_caller_calls_and_cleans_latest() {
+        let latest = Arc::new(Mutex::new(HashMap::from([
+            (":1.1".to_owned(), 2_u64),
+            (":1.2".to_owned(), 1_u64),
+        ])));
+        assert!(consume_begin_sequence(&latest, ":1.1", 1));
+        assert!(!consume_begin_sequence(&latest, ":1.1", 2));
+        assert!(!latest.lock().unwrap().contains_key(":1.1"));
+        assert!(!consume_begin_sequence(&latest, ":1.2", 1));
+        assert!(latest.lock().unwrap().is_empty());
+    }
 }

@@ -157,7 +157,14 @@ pub(super) async fn create_attempt(
             "authentication belongs to another D-Bus caller".to_owned(),
         ));
     }
-    cancel_current(actor, None, None, false, None).await?;
+    if let Err(error) = cancel_current(actor, None, None, false, None).await {
+        tracing::warn!(
+            %caller,
+            %error,
+            "previous attempt transport cancellation failed during replacement"
+        );
+    }
+    debug_assert_eq!(actor.auth.get_state(), AuthState::Idle);
 
     let cancellation = actor.shutdown.child_token();
     let watcher_token = CancellationToken::new();
@@ -650,7 +657,7 @@ pub(super) async fn cancel_current(
     }
 }
 
-async fn finish_cancellation(
+pub(super) async fn finish_cancellation(
     actor: &mut ActorState,
     attempt_id: &str,
     emitter: Option<&SignalEmitter<'static>>,
@@ -733,7 +740,7 @@ async fn emit_prompt_best_effort(
         emitter,
         attempt_id.to_owned(),
         prompt_kind.to_owned(),
-        text,
+        sanitize_detail(&text),
     )
     .await
     {
@@ -823,7 +830,7 @@ fn sanitize_event_detail(event: StateEvent) -> StateEvent {
     }
 }
 
-fn sanitize_detail(detail: &str) -> String {
+pub(crate) fn sanitize_detail(detail: &str) -> String {
     // Error text crosses the D-Bus boundary, so remove control characters and
     // cap its size before retaining or displaying it.
     detail
