@@ -479,11 +479,10 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
   }
 
   void _handleStatus(AnimationStatus status) {
-    if (status == AnimationStatus.dismissed &&
-        !_visible &&
-        !widget.prewarmHiddenNodes) {
+    if (status == AnimationStatus.dismissed && !_visible) {
       // Dismissal can occur while another lifecycle method is building. The
-      // next frame removes the exited subtree without mutating that build.
+      // next frame removes the exited subtree or pauses prewarmed tickers
+      // without mutating that build.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {});
@@ -539,16 +538,25 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
     // Exiting nodes remain visible until motion settles, but stop accepting
     // input immediately. Keep these wrappers mounted on both sides of the
     // transition: removing them would discard prewarmed component state and
-    // rebuild input, focus and menu subtrees on every wake.
-    return IgnorePointer(
-      ignoring: !_visible,
-      child: ExcludeFocus(
-        excluding: !_visible,
-        child: ExcludeSemantics(
+    // rebuild input, focus and menu subtrees on every wake. Once dismissed,
+    // pause descendant tickers so prewarmed animations stay idle while hidden.
+    final tickersEnabled =
+        TickerMode.valuesOf(context).enabled &&
+        (_visible ||
+            (_animatesPresence &&
+                _controller.status != AnimationStatus.dismissed));
+    return TickerMode(
+      enabled: tickersEnabled,
+      child: IgnorePointer(
+        ignoring: !_visible,
+        child: ExcludeFocus(
           excluding: !_visible,
-          child: _animatesPresence
-              ? animated
-              : Opacity(opacity: _visible ? 1 : 0, child: animated),
+          child: ExcludeSemantics(
+            excluding: !_visible,
+            child: _animatesPresence
+                ? animated
+                : Opacity(opacity: _visible ? 1 : 0, child: animated),
+          ),
         ),
       ),
     );

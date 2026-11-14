@@ -127,9 +127,14 @@ class AccountPortrait extends StatelessWidget {
   }
 
   Widget _getInitial() {
+    final initial =
+        (user.displayName.characters.firstOrNull ??
+                user.id.characters.firstOrNull ??
+                '?')
+            .toUpperCase();
     return Center(
       child: Text(
-        user.displayName.characters.first.toUpperCase(),
+        initial,
         style: TextStyle(
           color: accent,
           fontSize: fontSize,

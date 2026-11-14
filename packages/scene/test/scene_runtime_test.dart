@@ -1168,6 +1168,64 @@ void main() {
     );
     expect(attempts, 2);
   });
+
+  testWidgets('disables TickerMode inside prewarmed nodes when hidden', (
+    tester,
+  ) async {
+    final document = _document(
+      nodes: const [
+        SceneNode(
+          id: 'spinner',
+          componentId: 'spinner',
+          rect: SceneRect(x: 0.2, y: 0.2, width: 0.2, height: 0.2),
+          visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
+          motion: SceneMotionPreset.fade,
+        ),
+      ],
+    );
+    final predicates = ValueNotifier(<ScenePredicate>{});
+    addTearDown(predicates.dispose);
+    bool? observedTickerEnabled;
+
+    final theme = ThemeBundle(
+      tokens: _tokens(),
+      backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
+      motions: const {SceneMotionPreset.fade: FadeMotionBuilder()},
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SceneRuntime(
+            document: document,
+            theme: theme,
+            activePredicates: const {},
+            activePredicatesListenable: predicates,
+            prewarmHiddenNodes: true,
+            nodeBuilder: (context, _) => Builder(
+              builder: (context) {
+                observedTickerEnabled = TickerMode.valuesOf(context).enabled;
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(observedTickerEnabled, isFalse);
+
+    predicates.value = {ScenePredicate.isDormant};
+    await tester.pump();
+    expect(observedTickerEnabled, isTrue);
+    await tester.pumpAndSettle();
+
+    predicates.value = <ScenePredicate>{};
+    await tester.pump();
+    // Stays enabled through exit motion until dismissal completes.
+    expect(observedTickerEnabled, isTrue);
+    await tester.pumpAndSettle();
+    expect(observedTickerEnabled, isFalse);
+  });
 }
 
 SceneDocument _document({required List<SceneNode> nodes}) {

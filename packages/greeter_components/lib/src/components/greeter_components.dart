@@ -62,6 +62,7 @@ class StandardGreeterComponents implements GreeterThemeComponents {
           auth: auth,
           controller: host.credentialController,
           focusNode: host.credentialFocusNode,
+          onSubmitted: (_) => host.onRespondToPrompt(),
           textAlign: textAlign,
         ),
       ),

@@ -59,30 +59,6 @@ class _SessionMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final menuItems = [
-      for (final item in session.sessions)
-        PopupMenuItem<SessionSummary>(
-          value: item,
-          // Apply the choice on activation while the popup is dismissing, so
-          // the selected label does not wait for the reverse route transition.
-          onTap: () => onSelect(item),
-          child: Row(
-            children: [
-              Icon(
-                session.selected?.id == item.id
-                    ? Icons.check_circle
-                    : Icons.desktop_windows_outlined,
-                size: 18,
-                color: session.selected?.id == item.id
-                    ? scheme.primary
-                    : scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 12),
-              Text(item.name),
-            ],
-          ),
-        ),
-    ];
     return LayoutBuilder(
       builder: (context, constraints) => PopupMenuButton<SessionSummary>(
         tooltip: 'Choose a session',
@@ -99,7 +75,30 @@ class _SessionMenu extends StatelessWidget {
           side: BorderSide(color: scheme.outlineVariant),
         ),
         constraints: BoxConstraints(minWidth: constraints.maxWidth),
-        itemBuilder: (context) => menuItems,
+        itemBuilder: (context) => [
+          for (final item in session.sessions)
+            PopupMenuItem<SessionSummary>(
+              value: item,
+              // Apply the choice on activation while the popup is dismissing, so
+              // the selected label does not wait for the reverse route transition.
+              onTap: () => onSelect(item),
+              child: Row(
+                children: [
+                  Icon(
+                    session.selected?.id == item.id
+                        ? Icons.check_circle
+                        : Icons.desktop_windows_outlined,
+                    size: 18,
+                    color: session.selected?.id == item.id
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(item.name),
+                ],
+              ),
+            ),
+        ],
         child: _PillSurface(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,

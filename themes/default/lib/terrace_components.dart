@@ -54,6 +54,7 @@ class TerraceComponents implements GreeterThemeComponents {
             auth: auth,
             controller: theme.host.credentialController,
             focusNode: theme.host.credentialFocusNode,
+            onSubmitted: (_) => theme.host.onRespondToPrompt(),
             textAlign: _controls.textAlign,
           );
           if (material == TerraceMaterial.frosted) {

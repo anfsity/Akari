@@ -218,6 +218,7 @@ class _PresetCredential extends StatelessWidget {
             auth: auth,
             controller: host.credentialController,
             focusNode: host.credentialFocusNode,
+            onSubmitted: (_) => host.onRespondToPrompt(),
           ),
         ),
         ListenableBuilder(

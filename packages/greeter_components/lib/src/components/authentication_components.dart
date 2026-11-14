@@ -8,6 +8,7 @@ class CredentialField extends StatelessWidget {
     required this.auth,
     required this.controller,
     required this.focusNode,
+    this.onSubmitted,
     this.textAlign = TextAlign.center,
     super.key,
   });
@@ -15,6 +16,7 @@ class CredentialField extends StatelessWidget {
   final AuthPromptSlots auth;
   final TextEditingController controller;
   final FocusNode focusNode;
+  final ValueChanged<String>? onSubmitted;
   final TextAlign textAlign;
 
   @override
@@ -72,7 +74,8 @@ class CredentialField extends StatelessWidget {
           focusNode: focusNode,
           enabled: enabled,
           obscureText: auth.prompt?.kind == PromptKind.secret || !enabled,
-          textInputAction: TextInputAction.done,
+          textInputAction: onSubmitted != null ? TextInputAction.done : null,
+          onSubmitted: onSubmitted,
           textAlign: textAlign,
           textAlignVertical: TextAlignVertical.center,
           style: TextStyle(
@@ -111,10 +114,14 @@ class _IdentityScanState extends State<_IdentityScan>
     duration: const Duration(milliseconds: 2400),
   );
 
+  bool _areAnimationsDisabled(BuildContext context) =>
+      (MediaQuery.maybeDisableAnimationsOf(context) ?? false) ||
+      !TickerMode.valuesOf(context).enabled;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
+    if (_areAnimationsDisabled(context)) {
       _animation.stop();
       _animation.value = 0;
       return;
@@ -138,7 +145,7 @@ class _IdentityScanState extends State<_IdentityScan>
         painter: _IdentityScanPainter(
           animation: _animation,
           color: Theme.of(context).colorScheme.primary,
-          animate: !MediaQuery.disableAnimationsOf(context),
+          animate: !_areAnimationsDisabled(context),
         ),
       ),
     ),
@@ -262,15 +269,18 @@ class PrimaryAction extends StatelessWidget {
         ? (
             () => onRetry(GreeterRecovery.reconnectService),
             const Icon(Icons.refresh, size: 30),
+            'Reconnect greeter service',
           )
         : switch (auth.mode) {
             AuthMode.prompting => (
               onRespond,
               const Icon(Icons.arrow_forward, size: 30),
+              'Submit response',
             ),
             AuthMode.sessionSelection => (
               onStartSession,
               const Icon(Icons.arrow_forward, size: 30),
+              'Start session',
             ),
             AuthMode.submitting => (
               null,
@@ -282,10 +292,12 @@ class PrimaryAction extends StatelessWidget {
                   color: resolvedForeground,
                 ),
               ),
+              'Authenticating',
             ),
             AuthMode.error when error != null => (
               () => onRetry(error.recovery),
               const Icon(Icons.refresh, size: 30),
+              'Retry authentication',
             ),
             AuthMode.error ||
             AuthMode.userSelection ||
@@ -294,24 +306,32 @@ class PrimaryAction extends StatelessWidget {
     if (action == null) {
       return const SizedBox.shrink();
     }
-    final (onPressed, icon) = action;
+    final (onPressed, icon, label) = action;
 
     return Center(
       child: AspectRatio(
         aspectRatio: 1,
-        child: FilledButton(
-          onPressed: onPressed,
-          style: FilledButton.styleFrom(
-            shape: const CircleBorder(),
-            padding: EdgeInsets.zero,
-            backgroundColor: background,
-            foregroundColor: resolvedForeground,
-            disabledBackgroundColor: filled
-                ? colorScheme.primary.withValues(alpha: 0.4)
-                : Colors.transparent,
-            disabledForegroundColor: resolvedForeground.withValues(alpha: 0.5),
+        child: Tooltip(
+          message: label,
+          child: Semantics(
+            button: true,
+            enabled: onPressed != null,
+            label: label,
+            child: FilledButton(
+              onPressed: onPressed,
+              style: FilledButton.styleFrom(
+                shape: const CircleBorder(),
+                padding: EdgeInsets.zero,
+                backgroundColor: background,
+                foregroundColor: resolvedForeground,
+                disabledBackgroundColor: filled
+                    ? colorScheme.primary.withValues(alpha: 0.4)
+                    : Colors.transparent,
+                disabledForegroundColor: resolvedForeground.withValues(alpha: 0.5),
+              ),
+              child: icon,
+            ),
           ),
-          child: icon,
         ),
       ),
     );
