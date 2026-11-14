@@ -47,6 +47,7 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
   String? _selectedAsset;
   String? _error;
   bool _busy = false;
+  int _loadGeneration = 0;
   @override
   void initState() {
     super.initState();
@@ -55,31 +56,39 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
       _selectedAsset = shader.asset;
       _uniforms = shader.uniforms;
       _textures = shader.textures;
-      _loadSource(shader.asset);
+      _busy = true;
+      _loadSource(shader.asset, initial: true);
     }
   }
 
-  Future<void> _loadSource(String asset) async {
-    setState(() => _busy = true);
+  Future<void> _loadSource(String asset, {bool initial = false}) async {
+    final generation = ++_loadGeneration;
+    if (!initial) {
+      setState(() => _busy = true);
+    }
     try {
       final source = await widget.assets.loadTextAsset(asset);
-      if (mounted) {
-        setState(() {
-          _selectedAsset = asset;
-          _source.text = source;
-          _compiled = null;
-          _program = null;
-          _error = null;
-        });
-      }
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _selectedAsset = asset;
+        _source.text = source;
+        _compiled = null;
+        _program = null;
+        _error = null;
+      });
     } on Object catch (error) {
-      if (mounted) setState(() => _error = '$error');
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _error = '$error');
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _busy = false);
+      }
     }
   }
 
   Future<void> _compile() async {
+    final generation = ++_loadGeneration;
     setState(() {
       _busy = true;
       _error = null;
@@ -93,7 +102,7 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
             : widget.assets.findFile(_selectedAsset!)?.parent,
       );
       final program = await widget.assets.shaderCompiler.loadCompiled(compiled);
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       final old = {for (final uniform in _uniforms) uniform.name: uniform};
       final textures = {
         for (final texture in _textures) texture.name: texture.asset,
@@ -121,9 +130,13 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
         }
       });
     } on Object catch (error) {
-      if (mounted) setState(() => _error = '$error');
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _error = '$error');
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -176,6 +189,17 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
           'Choose an image for each sampler before applying.',
         );
       }
+      final candidateBackground = widget.editor.document.background.copyWith(
+        kind: SceneBackgroundKind.custom,
+        shader: SceneShader(
+          asset: 'packages/${widget.assets.packageName}/assets/playground.frag',
+          uniforms: _uniforms,
+          textures: _textures,
+        ),
+      );
+      // Validate before importing files or editing pubspec.yaml so invalid
+      // scene updates leave assets and the manifest untouched.
+      widget.editor.validateScene(background: candidateBackground);
       staging = await Directory.systemTemp.createTemp('akari-shader-source-');
       final source = File('${staging.path}/playground.frag');
       await source.writeAsString(compiled.source);
@@ -189,13 +213,8 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
       );
       widget.assets.shaderCompiler.retainProgram(asset, compiled, program);
       widget.editor.updateScene(
-        background: widget.editor.document.background.copyWith(
-          kind: SceneBackgroundKind.custom,
-          shader: SceneShader(
-            asset: asset,
-            uniforms: _uniforms,
-            textures: _textures,
-          ),
+        background: candidateBackground.copyWith(
+          shader: candidateBackground.shader!.copyWith(asset: asset),
         ),
       );
       widget.onAssetsChanged();

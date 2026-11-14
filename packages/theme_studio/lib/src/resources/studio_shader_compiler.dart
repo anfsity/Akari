@@ -5,6 +5,8 @@ import 'dart:ui' as ui;
 
 import 'package:theme_sdk/theme_sdk.dart';
 
+import 'confined_path.dart';
+
 class StudioCompiledShader {
   const StudioCompiledShader({
     required this.source,
@@ -31,6 +33,15 @@ class StudioShaderCompiler {
   final Directory? assetDirectory;
   final _programs =
       <String, ({String source, Future<ui.FragmentProgram> program})>{};
+  final _dispatchLocks = <String, Future<void>>{};
+
+  static final _localIncludePattern = RegExp(
+    r'^\s*#\s*include\s+"([^"]*)"',
+    multiLine: true,
+  );
+  static int _nextCacheId = 0;
+  static int _activeTempLoads = 0;
+  static final _cleanedCaches = <String>{};
 
   String _findCompiler() {
     if (compilerPath != null) return compilerPath!;
@@ -55,10 +66,66 @@ class StudioShaderCompiler {
     );
   }
 
+  Directory _resolveIncludeDirectory(Directory? includeDirectory) {
+    if (includeDirectory == null) return directory;
+    if (!directory.existsSync() || !includeDirectory.existsSync()) {
+      throw const FormatException(
+        'Shader include directory must stay inside the current theme.',
+      );
+    }
+    final rootPath = directory.resolveSymbolicLinksSync();
+    if (!isCanonicalPathWithin(
+      rootPath,
+      includeDirectory.resolveSymbolicLinksSync(),
+    )) {
+      throw const FormatException(
+        'Shader include directory must stay inside the current theme.',
+      );
+    }
+    return includeDirectory;
+  }
+
+  void _validateLocalIncludes(String source, Directory includeDir) {
+    final checkSymlinks = directory.existsSync() && includeDir.existsSync();
+    final rootPath = checkSymlinks ? directory.resolveSymbolicLinksSync() : '';
+    final includePath = checkSymlinks
+        ? includeDir.resolveSymbolicLinksSync()
+        : '';
+    for (final match in _localIncludePattern.allMatches(source)) {
+      final included = match.group(1)!;
+      final segments = parseSafeRelativeSegments(included);
+      if (segments == null) {
+        throw FormatException(
+          'Shader #include path must stay within the current theme: $included',
+        );
+      }
+      if (!checkSymlinks) continue;
+      final candidate = '$includePath/${segments.join(Platform.pathSeparator)}';
+      if (FileSystemEntity.typeSync(candidate, followLinks: false) ==
+          FileSystemEntityType.notFound) {
+        continue;
+      }
+      try {
+        final resolved = File(candidate).resolveSymbolicLinksSync();
+        if (!isCanonicalPathWithin(rootPath, resolved)) {
+          throw FormatException(
+            'Shader #include path must stay within the current theme: $included',
+          );
+        }
+      } on FileSystemException {
+        throw FormatException(
+          'Shader #include path must stay within the current theme: $included',
+        );
+      }
+    }
+  }
+
   Future<StudioCompiledShader> compile(
     String source, {
     Directory? includeDirectory,
   }) async {
+    final resolvedIncludeDir = _resolveIncludeDirectory(includeDirectory);
+    _validateLocalIncludes(source, resolvedIncludeDir);
     final compiler = File(_findCompiler());
     final staging = await Directory.systemTemp.createTemp('akari-shader-');
     try {
@@ -77,7 +144,7 @@ class StudioShaderCompiler {
         '--reflection-json=$reflection',
         '--input=${input.path}',
         '--input-type=frag',
-        '--include=${includeDirectory?.path ?? directory.path}',
+        '--include=${resolvedIncludeDir.path}',
         '--include=${compiler.parent.path}/shader_lib',
         '--verbose',
       ]);
@@ -131,23 +198,35 @@ class StudioShaderCompiler {
         Directory(
           '${File(Platform.resolvedExecutable).parent.path}/data/flutter_assets',
         );
-    if (!await root.exists()) {
+    if (!root.existsSync()) {
       throw const FileSystemException(
         'A desktop Studio bundle is required for live shader previews.',
       );
     }
     final cache = Directory('${root.path}/.akari-studio-shaders');
-    await cache.create();
+    if (_activeTempLoads == 0 && _cleanedCaches.add(cache.path)) {
+      if (cache.existsSync()) cache.deleteSync(recursive: true);
+    }
+    _activeTempLoads++;
     final file = File(
-      '${cache.path}/${DateTime.now().microsecondsSinceEpoch}.frag',
+      '${cache.path}/shader-${DateTime.now().microsecondsSinceEpoch}-${_nextCacheId++}.frag',
     );
     try {
+      await cache.create(recursive: true);
       await file.writeAsBytes(compiled.bytes);
       return await ui.FragmentProgram.fromAsset(
         '.akari-studio-shaders/${file.uri.pathSegments.last}',
       );
     } finally {
       if (await file.exists()) await file.delete();
+      _activeTempLoads--;
+      if (_activeTempLoads == 0 && await cache.exists()) {
+        try {
+          await cache.delete(recursive: true);
+        } on FileSystemException {
+          // Another process or handle may hold the directory briefly.
+        }
+      }
     }
   }
 
@@ -162,19 +241,48 @@ class StudioShaderCompiler {
     );
   }
 
+  Future<T> _synchronized<T>(String asset, Future<T> Function() action) {
+    final previous = _dispatchLocks[asset] ?? Future<void>.value();
+    final current = previous.then((_) => action(), onError: (_) => action());
+    late final Future<void> sentinel;
+    sentinel = current.then((_) {}, onError: (_) {}).whenComplete(() {
+      if (identical(_dispatchLocks[asset], sentinel)) {
+        _dispatchLocks.remove(asset);
+      }
+    });
+    _dispatchLocks[asset] = sentinel;
+    return current;
+  }
+
   Future<ui.FragmentProgram> loadFile(String asset, File file) async {
-    final source = await file.readAsString();
-    final cached = _programs[asset];
-    if (cached != null && cached.source == source) return cached.program;
-    final future = compile(
-      source,
-      includeDirectory: file.parent,
-    ).then(loadCompiled);
-    _programs[asset] = (source: source, program: future);
+    final pending = await _synchronized(asset, () async {
+      final source = await file.readAsString();
+      final cached = _programs[asset];
+      if (cached != null && cached.source == source) {
+        return (program: cached.program);
+      }
+      late final Future<ui.FragmentProgram> future;
+      future = _compileAndLoadFile(file, source, () {
+        if (identical(_programs[asset]?.program, future)) {
+          _programs.remove(asset);
+        }
+      });
+      _programs[asset] = (source: source, program: future);
+      return (program: future);
+    });
+    return await pending.program;
+  }
+
+  Future<ui.FragmentProgram> _compileAndLoadFile(
+    File file,
+    String source,
+    void Function() evictIfCurrent,
+  ) async {
     try {
-      return await future;
+      final compiled = await compile(source, includeDirectory: file.parent);
+      return await loadCompiled(compiled);
     } on Object {
-      _programs.remove(asset);
+      evictIfCurrent();
       rethrow;
     }
   }

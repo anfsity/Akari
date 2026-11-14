@@ -122,14 +122,15 @@ class _StudioSettingsState extends State<StudioSettings> {
     if (_background == SceneBackgroundKind.image && asset.isEmpty) {
       throw const FormatException('Choose or import a background image first.');
     }
-    return SceneBackground(
+    return widget.document.background.copyWith(
       kind: _background,
       asset: asset.isEmpty ? null : asset,
       color: decodeSceneColor(_fields['Background color']!.text.trim()),
       blurSigma: _getNumber('Background blur'),
       scrimOpacity: _getNumber('Scrim opacity'),
-      rendererId: widget.document.background.rendererId,
-      parameters: widget.document.background.parameters,
+      shader: _background == SceneBackgroundKind.custom
+          ? widget.document.background.shader
+          : null,
     );
   }
 
@@ -487,6 +488,7 @@ class _StudioSettingsState extends State<StudioSettings> {
         builder: (context, _) {
           final asset = _fields['Background asset']!.text.trim();
           final color = _getBackgroundColor();
+          final shader = widget.document.background.shader;
           return Container(
             height: 132,
             clipBehavior: Clip.antiAlias,
@@ -513,6 +515,9 @@ class _StudioSettingsState extends State<StudioSettings> {
                     child: Text(
                       _background == SceneBackgroundKind.solid
                           ? 'Solid color'
+                          : _background == SceneBackgroundKind.custom &&
+                                shader != null
+                          ? 'Custom shader: ${shader.asset.split('/').last}'
                           : 'Theme background',
                       style: TextStyle(
                         color: color != null && color.computeLuminance() < 0.4
@@ -525,6 +530,13 @@ class _StudioSettingsState extends State<StudioSettings> {
         },
       ),
       const Gap(16),
+      if (_background == SceneBackgroundKind.custom &&
+          widget.document.background.shader != null) ...[
+        Text('Shader: ${widget.document.background.shader!.asset}')
+            .small()
+            .muted(),
+        const Gap(16),
+      ],
       if (_background == SceneBackgroundKind.image) ...[
         if (widget.assetPaths.isNotEmpty) ...[
           ListenableBuilder(

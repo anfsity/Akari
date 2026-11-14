@@ -202,4 +202,51 @@ flutter:
       isEmpty,
     );
   });
+
+  test('findFile and importFile reject traversal, separators, leading dots, and escaping symlinks', () {
+    final outside = Directory.systemTemp.createTempSync('studio-assets-outside-');
+    addTearDown(() => outside.deleteSync(recursive: true));
+    final secret = File('${outside.path}/secret.txt')
+      ..writeAsStringSync('top-secret');
+    final assetsDir = Directory('${directory.path}/assets')..createSync();
+    Link('${assetsDir.path}/escape_link').createSync(outside.path);
+    Link('${assetsDir.path}/file_link.txt').createSync(secret.path);
+    Link('${assetsDir.path}/dangling_link.txt').createSync('${outside.path}/none.txt');
+
+    expect(assets.findFile('packages/test/../../secret.txt'), isNull);
+    expect(assets.findFile(r'assets\..\secret.txt'), isNull);
+    expect(assets.findFile('packages/test//etc/passwd'), isNull);
+    expect(assets.findFile('assets/escape_link/secret.txt'), isNull);
+    expect(assets.findFile('packages/test/assets/file_link.txt'), isNull);
+    expect(assets.findFile('assets/dangling_link.txt'), isNull);
+    expect(
+      assets.findFile('packages/test/assets/new_asset.png')?.path,
+      '${directory.path}/assets/new_asset.png',
+    );
+
+    final validSource = File('${outside.path}/valid.png')
+      ..writeAsBytesSync([1, 2, 3]);
+    final hiddenSource = File('${outside.path}/.hidden')
+      ..writeAsBytesSync([4, 5]);
+    expect(() => assets.importFile(hiddenSource), throwsFormatException);
+
+    final escapedParent = Directory('${directory.path}/assets/../..');
+    expect(
+      () => assets.importFile(validSource, shader: true, targetDirectory: escapedParent),
+      throwsFormatException,
+    );
+
+    manifest.writeAsStringSync('name: test\nflutter:\n  assets:\n    - /\n    - assets/\n');
+    expect(assets.getAssets(), isEmpty);
+
+    // Trailing slash on theme directory should not corrupt relative manifest paths.
+    final trailingAssets = StudioAssets(
+      directory: Directory('${directory.path}/'),
+      packageName: 'test',
+    );
+    expect(
+      trailingAssets.importFile(validSource),
+      'packages/test/assets/valid.png',
+    );
+  });
 }

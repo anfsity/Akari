@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
+import 'confined_path.dart';
 import 'studio_shader_compiler.dart';
 
 enum StudioAssetKind { image, svg, font, material, audio, shader, other }
@@ -67,6 +68,15 @@ class StudioAssets {
     }
   }
 
+  String get _rootDirectoryPath => trimTrailingSeparator(directory.path);
+
+  String _getRelativePath(String path) {
+    final base = _rootDirectoryPath == Platform.pathSeparator
+        ? Platform.pathSeparator
+        : '$_rootDirectoryPath${Platform.pathSeparator}';
+    return path.substring(base.length).replaceAll(Platform.pathSeparator, '/');
+  }
+
   String importFile(
     File source, {
     bool shader = false,
@@ -76,10 +86,8 @@ class StudioAssets {
       source.uri.pathSegments.last,
       parent: targetDirectory,
     );
-    final relative = target.path
-        .substring(directory.path.length + 1)
-        .replaceAll(Platform.pathSeparator, '/');
-    final manifest = File('${directory.path}/pubspec.yaml');
+    final relative = _getRelativePath(target.path);
+    final manifest = File('$_rootDirectoryPath/pubspec.yaml');
     final original = manifest.readAsStringSync();
     final updated = _getRegisteredManifest(original, relative, shader: shader);
     target.parent.createSync(recursive: true);
@@ -88,23 +96,43 @@ class StudioAssets {
   }
 
   File _getAvailableAssetFile(String name, {Directory? parent}) {
-    if (name.contains('..')) {
-      throw const FormatException('Asset names cannot contain "..".');
+    if (name.isEmpty ||
+        name.startsWith('.') ||
+        name.contains('/') ||
+        name.contains('\\') ||
+        name.contains('..') ||
+        name.contains('\u0000')) {
+      throw const FormatException(
+        'Asset names must be filenames without path separators or leading dots.',
+      );
     }
     final dot = name.lastIndexOf('.');
     final stem = dot > 0 ? name.substring(0, dot) : name;
     final extension = dot > 0 ? name.substring(dot) : '';
-    if (parent != null) {
+    final String assets;
+    if (parent == null) {
+      assets = '$_rootDirectoryPath/assets';
+    } else {
       final root = directory.resolveSymbolicLinksSync();
-      final target = parent.resolveSymbolicLinksSync();
-      if (target != root &&
-          !target.startsWith('$root${Platform.pathSeparator}')) {
+      if (!parent.existsSync()) {
         throw const FormatException(
           'Shader sources must stay inside the current theme.',
         );
       }
+      final target = parent.resolveSymbolicLinksSync();
+      if (!isCanonicalPathWithin(root, target)) {
+        throw const FormatException(
+          'Shader sources must stay inside the current theme.',
+        );
+      }
+      final base = root.endsWith(Platform.pathSeparator)
+          ? root
+          : '$root${Platform.pathSeparator}';
+      final relativeParent = target == root ? '' : target.substring(base.length);
+      assets = relativeParent.isEmpty
+          ? _rootDirectoryPath
+          : '$_rootDirectoryPath/$relativeParent';
     }
-    final assets = parent?.path ?? '${directory.path}/assets';
     var target = File('$assets/$name');
     var suffix = 2;
     while (FileSystemEntity.typeSync(target.path) !=
@@ -178,7 +206,7 @@ class StudioAssets {
     final files = <String>{};
     final directories = <String>{'assets/'};
     final root =
-        YamlEditor(File('${directory.path}/pubspec.yaml').readAsStringSync())
+        YamlEditor(File('$_rootDirectoryPath/pubspec.yaml').readAsStringSync())
                 .parseAt([])
                 .value
             as Map;
@@ -195,20 +223,24 @@ class StudioAssets {
         for (final font in (family as Map)['fonts'] as List)
           (font as Map)['asset'] as String,
     ];
+    final rootPath = directory.resolveSymbolicLinksSync();
     for (final path in declared) {
-      if (path.contains('..') || path.startsWith('/')) continue;
       if (path.endsWith('/')) {
-        directories.add(path);
+        final trimmed = path.replaceFirst(RegExp(r'/+$'), '');
+        if (trimmed.isNotEmpty && parseSafeRelativeSegments(trimmed) != null) {
+          directories.add(path);
+        }
       } else {
-        final file = File('${directory.path}/$path');
-        if (file.existsSync()) files.add(file.path);
+        final file = findConfinedFile(directory, path);
+        if (file != null && file.existsSync()) files.add(file.path);
       }
     }
     for (final path in directories) {
       final folder = Directory(
-        '${directory.path}/${path.replaceFirst(RegExp(r'/+$'), '')}',
+        '$_rootDirectoryPath/${path.replaceFirst(RegExp(r'/+$'), '')}',
       );
-      if (folder.existsSync()) {
+      if (folder.existsSync() &&
+          isCanonicalPathWithin(rootPath, folder.resolveSymbolicLinksSync())) {
         files.addAll(
           folder
               .listSync(recursive: true, followLinks: false)
@@ -217,21 +249,19 @@ class StudioAssets {
         );
       }
     }
-    return files.map((path) {
-      final relative = path
-          .substring(directory.path.length + 1)
-          .replaceAll(Platform.pathSeparator, '/');
-      return 'packages/$packageName/$relative';
-    }).toList()..sort();
+    return files
+        .map((path) => 'packages/$packageName/${_getRelativePath(path)}')
+        .toList()
+      ..sort();
   }
 
   File? findFile(String asset) {
     final prefix = 'packages/$packageName/';
     if (asset.startsWith(prefix)) {
-      return File('${directory.path}/${asset.substring(prefix.length)}');
+      return findConfinedFile(directory, asset.substring(prefix.length));
     }
     if (asset.startsWith('assets/')) {
-      return File('${directory.path}/$asset');
+      return findConfinedFile(directory, asset);
     }
     return null;
   }

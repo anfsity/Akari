@@ -111,9 +111,7 @@ class SceneEditor extends ChangeNotifier {
     // Undo and redo trust the revision invariant too. New authoring rules must
     // accept history before replacing this session's catalog and layout.
     for (final revision in [_revision, ..._undo, ..._redo]) {
-      componentCatalog.validateDocument(revision.document);
-      presetCatalog.validateDocument(revision.document);
-      layout?.validateDocument(revision.document);
+      _validateWith(revision.document, componentCatalog, presetCatalog, layout);
     }
     _componentCatalog = componentCatalog;
     _presetCatalog = presetCatalog;
@@ -449,6 +447,34 @@ class SceneEditor extends ChangeNotifier {
     }
     ids.add(id);
     return id;
+  }
+
+  static void _validateWith(
+    SceneDocument document,
+    ThemeComponentCatalog componentCatalog,
+    ThemePresetCatalog presetCatalog,
+    ThemeLayoutDefinition? layout,
+  ) {
+    componentCatalog.validateDocument(document);
+    presetCatalog.validateDocument(document);
+    layout?.validateDocument(document);
+  }
+
+  ({SceneDocument document, String encoded}) _validateDocument(
+    SceneDocument document,
+  ) {
+    final encoded = encodeSceneDocument(document);
+    final updated = decodeSceneDocument(encoded);
+    _validateWith(updated, _componentCatalog, _presetCatalog, _declaredLayout);
+    return (document: updated, encoded: encoded);
+  }
+
+  /// Validates a prospective scene canvas/background change against the schema,
+  /// catalogs, and declared layout before side effects like importing assets.
+  void validateScene({SceneCanvas? canvas, SceneBackground? background}) {
+    _validateDocument(
+      document.copyWith(canvas: canvas, background: background),
+    );
   }
 
   void updateScene({SceneCanvas? canvas, SceneBackground? background}) {
@@ -820,22 +846,18 @@ class SceneEditor extends ChangeNotifier {
   }) {
     // The codec is the same boundary used by code generation. Invalid edits
     // never replace the last working preview or create an undo entry.
-    final encoded = encodeSceneDocument(document);
+    final validated = _validateDocument(document);
     final hadPreview = _previewDocument != null;
-    if (encoded == _revision.encoded) {
+    if (validated.encoded == _revision.encoded) {
       _previewDocument = null;
       if (hadPreview) notifyListeners();
       return;
     }
-    final updated = decodeSceneDocument(encoded);
-    _componentCatalog.validateDocument(updated);
-    _presetCatalog.validateDocument(updated);
-    _declaredLayout?.validateDocument(updated);
     _undo.add(_revision);
     _redo.clear();
     _applyRevision((
-      document: updated,
-      encoded: encoded,
+      document: validated.document,
+      encoded: validated.encoded,
       selectedId: selectedId,
       selectedIds:
           selectedIds ??
@@ -934,9 +956,7 @@ class SceneEditor extends ChangeNotifier {
   void _loadFromDisk({bool initial = false}) {
     final source = file.readAsStringSync();
     final document = decodeSceneDocument(source);
-    _componentCatalog.validateDocument(document);
-    _presetCatalog.validateDocument(document);
-    _declaredLayout?.validateDocument(document);
+    _validateWith(document, _componentCatalog, _presetCatalog, _declaredLayout);
     _source = source;
     final revision = (
       document: document,

@@ -28,19 +28,7 @@ class StudioThemeProject {
     required SceneDocument document,
     required StudioAssets assets,
   }) async {
-    final references = {
-      if (document.background.asset != null) document.background.asset!,
-      if (document.background.shader case final shader?) ...[
-        shader.asset,
-        for (final texture in shader.textures) texture.asset,
-      ],
-      ...document.themeProperties.values,
-      for (final style in document.styleTokens.values)
-        if (style.fontAsset != null) style.fontAsset!,
-      for (final node in document.nodes) ...node.properties.values,
-      for (final node in document.nodes)
-        if (node.asset != null) node.asset!.path,
-    };
+    final references = getReferencedSceneAssets(document);
     final files = <String, File>{};
     for (final reference in references) {
       final file = assets.findFile(reference);
