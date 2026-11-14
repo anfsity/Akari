@@ -119,7 +119,10 @@ SceneDocument decodeSceneDocument(String source) {
         'themeProperties',
         fallback: const {},
       ).entries)
-        entry.key: _getStringValue(entry.value, 'themeProperties.${entry.key}'),
+        _getNonEmptyKey(entry.key, 'themeProperties'): _getStringValue(
+          entry.value,
+          'themeProperties.${entry.key}',
+        ),
     },
   );
 }
@@ -201,12 +204,8 @@ SceneBackground _decodeBackground(Map<String, dynamic> json) {
     'background.kind',
   );
   final asset = _findString(json, 'asset');
-  if (asset != null &&
-      (asset.contains('..') ||
-          (!asset.startsWith('assets/') &&
-              !asset.startsWith('packages/') &&
-              kind == SceneBackgroundKind.image))) {
-    throw FormatException('Invalid background asset path: $asset');
+  if (asset != null) {
+    _validateAssetPath(asset);
   }
   final scrimOpacity = _getDouble(
     json,
@@ -420,7 +419,10 @@ SceneNode _decodeNode(
         'properties',
         fallback: const {},
       ).entries)
-        entry.key: _getStringValue(entry.value, 'node.properties.${entry.key}'),
+        _getNonEmptyKey(entry.key, 'node.properties'): _getStringValue(
+          entry.value,
+          'node.properties.${entry.key}',
+        ),
     },
   );
 }
@@ -1059,6 +1061,13 @@ String? _findString(Map<String, dynamic> json, String key) {
     return null;
   }
   return _getStringValue(value, key);
+}
+
+String _getNonEmptyKey(String key, String field) {
+  if (key.isEmpty) {
+    throw FormatException('$field keys must be non-empty strings.');
+  }
+  return key;
 }
 
 String _getStringValue(Object? value, String field) {

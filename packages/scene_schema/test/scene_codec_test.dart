@@ -529,4 +529,38 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('rejects empty property keys and non-package background assets', () {
+    for (final raw in [
+      '''
+{
+  "id": "test",
+  "version": 1,
+  "canvas": {"fit": "cover"},
+  "background": {"kind": "video", "asset": "/etc/passwd"},
+  "nodes": [
+    {"id": "panel", "kind": "glassPanel", "rect": {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2}}
+  ]
+}
+''',
+      '''
+{
+  "id": "test",
+  "version": 1,
+  "canvas": {"fit": "cover"},
+  "background": {"kind": "solid"},
+  "nodes": [
+    {
+      "id": "panel",
+      "kind": "glassPanel",
+      "rect": {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2},
+      "properties": {"": "blank-key"}
+    }
+  ]
+}
+''',
+    ]) {
+      expect(() => decodeSceneDocument(raw), throwsFormatException);
+    }
+  });
 }

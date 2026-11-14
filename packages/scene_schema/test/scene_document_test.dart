@@ -43,4 +43,36 @@ void main() {
     expect(cleared.visibleWhen, isNull);
     expect(cleared.interactive, isFalse);
   });
+
+  test('value equality compares scene models deeply and background clears asset', () {
+    const base = SceneBackground(
+      kind: SceneBackgroundKind.image,
+      asset: 'assets/bg.png',
+      rendererId: 'terrace',
+      shader: SceneShader(
+        asset: 'assets/water.frag',
+        uniforms: [SceneShaderUniform(name: 'time', scale: 2)],
+        textures: [SceneShaderTexture(name: 'bg', asset: 'assets/bg.png')],
+      ),
+    );
+    expect(
+      base,
+      equals(
+        const SceneBackground(
+          kind: SceneBackgroundKind.image,
+          asset: 'assets/bg.png',
+          rendererId: 'terrace',
+          shader: SceneShader(
+            asset: 'assets/water.frag',
+            uniforms: [SceneShaderUniform(name: 'time', scale: 2)],
+            textures: [SceneShaderTexture(name: 'bg', asset: 'assets/bg.png')],
+          ),
+        ),
+      ),
+    );
+    final cleared = base.copyWith(asset: null, rendererId: null, shader: null);
+    expect(cleared.asset, isNull);
+    expect(cleared.rendererId, isNull);
+    expect(cleared.shader, isNull);
+  });
 }

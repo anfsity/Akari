@@ -5,10 +5,11 @@ String generateScene(String input) {
 }
 
 String generateSceneFromDocument(SceneDocument document) {
+  final commentId = document.id.replaceAll(RegExp(r'[\r\n]+'), ' ');
   // A getter creates a fresh document after hot reload. A cached top-level
   // final would keep the old scene even after regenerated code is loaded.
   return '''// GENERATED CODE - DO NOT MODIFY BY HAND
-// Generated from ${document.id}.scene.json.
+// Generated from $commentId.scene.json.
 import 'package:scene/scene.dart';
 
 SceneDocument get ${getSceneDocumentVariableName(document.id)} => SceneDocument(
@@ -166,5 +167,5 @@ String _encodeDartNullableString(String? value) {
 }
 
 String _encodeColorLiteral(int value) {
-  return '0x${value.toRadixString(16).padLeft(8, '0')}';
+  return '0x${value.toUnsigned(32).toRadixString(16).padLeft(8, '0')}';
 }

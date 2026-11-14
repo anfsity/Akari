@@ -41,6 +41,17 @@ class SceneAsset {
     fit: fit ?? this.fit,
     tint: identical(tint, _unset) ? this.tint : tint as int?,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneAsset &&
+      other.path == path &&
+      other.kind == kind &&
+      other.fit == fit &&
+      other.tint == tint;
+
+  @override
+  int get hashCode => Object.hash(path, kind, fit, tint);
 }
 
 class SceneGuide {
@@ -74,6 +85,28 @@ class SceneLayout {
   final SceneCrossAlignment crossAlignment;
   final bool clip;
   final bool wrap;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneLayout &&
+      other.direction == direction &&
+      other.padding == padding &&
+      other.gap == gap &&
+      other.mainAlignment == mainAlignment &&
+      other.crossAlignment == crossAlignment &&
+      other.clip == clip &&
+      other.wrap == wrap;
+
+  @override
+  int get hashCode => Object.hash(
+    direction,
+    padding,
+    gap,
+    mainAlignment,
+    crossAlignment,
+    clip,
+    wrap,
+  );
 }
 
 /// Fixed logical dimensions override proportional rectangle dimensions. In a
@@ -123,6 +156,32 @@ class SceneSizing {
         ? this.maxHeight
         : maxHeight as double?,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneSizing &&
+      other.width == width &&
+      other.height == height &&
+      other.flex == flex &&
+      other.widthMode == widthMode &&
+      other.heightMode == heightMode &&
+      other.minWidth == minWidth &&
+      other.minHeight == minHeight &&
+      other.maxWidth == maxWidth &&
+      other.maxHeight == maxHeight;
+
+  @override
+  int get hashCode => Object.hash(
+    width,
+    height,
+    flex,
+    widthMode,
+    heightMode,
+    minWidth,
+    minHeight,
+    maxWidth,
+    maxHeight,
+  );
 }
 
 /// The widest matching rule overrides base layout/sizing at logical viewport
@@ -132,6 +191,16 @@ class SceneBreakpoint {
   final double minWidth;
   final SceneLayout? layout;
   final SceneSizing? sizing;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneBreakpoint &&
+      other.minWidth == minWidth &&
+      other.layout == layout &&
+      other.sizing == sizing;
+
+  @override
+  int get hashCode => Object.hash(minWidth, layout, sizing);
 }
 
 SceneNode getSceneNodeForWidth(SceneNode node, double width) {
@@ -237,6 +306,48 @@ class SceneStyle {
         : lineHeight as double?,
     opacity: opacity ?? this.opacity,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneStyle &&
+      other.fill == fill &&
+      other.gradientEnd == gradientEnd &&
+      other.gradientAngle == gradientAngle &&
+      other.border == border &&
+      other.borderWidth == borderWidth &&
+      other.radius == radius &&
+      other.shadow == shadow &&
+      other.shadowBlur == shadowBlur &&
+      other.shadowY == shadowY &&
+      other.backgroundBlur == backgroundBlur &&
+      other.textColor == textColor &&
+      other.fontSize == fontSize &&
+      other.fontAsset == fontAsset &&
+      other.fontWeight == fontWeight &&
+      other.letterSpacing == letterSpacing &&
+      other.lineHeight == lineHeight &&
+      other.opacity == opacity;
+
+  @override
+  int get hashCode => Object.hash(
+    fill,
+    gradientEnd,
+    gradientAngle,
+    border,
+    borderWidth,
+    radius,
+    shadow,
+    shadowBlur,
+    shadowY,
+    backgroundBlur,
+    textColor,
+    fontSize,
+    fontAsset,
+    fontWeight,
+    letterSpacing,
+    lineHeight,
+    opacity,
+  );
 }
 
 /// Boolean questions about semantic greeter state used by [SceneCondition].
@@ -272,24 +383,52 @@ final class ScenePredicateCondition extends SceneCondition {
   const ScenePredicateCondition(this.predicate);
 
   final ScenePredicate predicate;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ScenePredicateCondition && other.predicate == predicate;
+
+  @override
+  int get hashCode => predicate.hashCode;
 }
 
 final class SceneAll extends SceneCondition {
   const SceneAll(this.conditions);
 
   final List<SceneCondition> conditions;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneAll && _listEquals(other.conditions, conditions);
+
+  @override
+  int get hashCode => Object.hash(SceneAll, Object.hashAll(conditions));
 }
 
 final class SceneAny extends SceneCondition {
   const SceneAny(this.conditions);
 
   final List<SceneCondition> conditions;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneAny && _listEquals(other.conditions, conditions);
+
+  @override
+  int get hashCode => Object.hash(SceneAny, Object.hashAll(conditions));
 }
 
 final class SceneNot extends SceneCondition {
   const SceneNot(this.condition);
 
   final SceneCondition condition;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneNot && other.condition == condition;
+
+  @override
+  int get hashCode => Object.hash(SceneNot, condition);
 }
 
 /// Evaluates [condition] against the predicates currently true for the scene.
@@ -336,6 +475,17 @@ class SceneStateTransition {
   final SceneCondition to;
   final SceneStateEffect effect;
   final SceneMotionTiming timing;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneStateTransition &&
+      other.from == from &&
+      other.to == to &&
+      other.effect == effect &&
+      other.timing == timing;
+
+  @override
+  int get hashCode => Object.hash(from, to, effect, timing);
 }
 
 /// State-entry responses and authored edges use one crossing evaluator.
@@ -369,6 +519,17 @@ class SceneCubicBezier {
   final double y1;
   final double x2;
   final double y2;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneCubicBezier &&
+      other.x1 == x1 &&
+      other.y1 == y1 &&
+      other.x2 == x2 &&
+      other.y2 == y2;
+
+  @override
+  int get hashCode => Object.hash(x1, y1, x2, y2);
 }
 
 class SceneMotionTiming {
@@ -377,6 +538,16 @@ class SceneMotionTiming {
   final int delayMs;
   final SceneCubicBezier? curve;
   bool get isDefault => durationMs == null && delayMs == 0 && curve == null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneMotionTiming &&
+      other.durationMs == durationMs &&
+      other.delayMs == delayMs &&
+      other.curve == curve;
+
+  @override
+  int get hashCode => Object.hash(durationMs, delayMs, curve);
 }
 
 enum SceneMotionProperty { opacity, translateX, translateY, scale, rotation }
@@ -394,12 +565,31 @@ class SceneKeyframe {
 
   /// Easing from this frame to the next frame.
   final SceneKeyframeCurve curve;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneKeyframe &&
+      other.timeMs == timeMs &&
+      other.value == value &&
+      other.curve == curve;
+
+  @override
+  int get hashCode => Object.hash(timeMs, value, curve);
 }
 
 class SceneMotionTrack {
   const SceneMotionTrack({required this.property, required this.keyframes});
   final SceneMotionProperty property;
   final List<SceneKeyframe> keyframes;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneMotionTrack &&
+      other.property == property &&
+      _listEquals(other.keyframes, keyframes);
+
+  @override
+  int get hashCode => Object.hash(property, Object.hashAll(keyframes));
 }
 
 enum SceneBackgroundKind { image, solid, video, custom }
@@ -435,6 +625,17 @@ class SceneRect {
       height: height ?? this.height,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneRect &&
+      other.x == x &&
+      other.y == y &&
+      other.width == width &&
+      other.height == height;
+
+  @override
+  int get hashCode => Object.hash(x, y, width, height);
 }
 
 /// Transform in node-local coordinates: translations use logical pixels,
@@ -502,6 +703,34 @@ class SceneTransform {
       perspective: perspective ?? this.perspective,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneTransform &&
+      other.translateX == translateX &&
+      other.translateY == translateY &&
+      other.scaleX == scaleX &&
+      other.scaleY == scaleY &&
+      other.rotationX == rotationX &&
+      other.rotationY == rotationY &&
+      other.rotationZ == rotationZ &&
+      other.pivotX == pivotX &&
+      other.pivotY == pivotY &&
+      other.perspective == perspective;
+
+  @override
+  int get hashCode => Object.hash(
+    translateX,
+    translateY,
+    scaleX,
+    scaleY,
+    rotationX,
+    rotationY,
+    rotationZ,
+    pivotX,
+    pivotY,
+    perspective,
+  );
 }
 
 class SceneCanvas {
@@ -530,6 +759,18 @@ class SceneCanvas {
       referenceHeight: referenceHeight ?? this.referenceHeight,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneCanvas &&
+      other.fit == fit &&
+      other.useSafeArea == useSafeArea &&
+      other.referenceWidth == referenceWidth &&
+      other.referenceHeight == referenceHeight;
+
+  @override
+  int get hashCode =>
+      Object.hash(fit, useSafeArea, referenceWidth, referenceHeight);
 }
 
 class SceneBackground {
@@ -563,25 +804,51 @@ class SceneBackground {
 
   SceneBackground copyWith({
     SceneBackgroundKind? kind,
-    String? asset,
+    Object? asset = _unset,
     int? color,
     double? scrimOpacity,
     double? blurSigma,
-    String? rendererId,
+    Object? rendererId = _unset,
     Map<String, double>? parameters,
     Object? shader = _unset,
   }) {
     return SceneBackground(
       kind: kind ?? this.kind,
-      asset: asset ?? this.asset,
+      asset: identical(asset, _unset) ? this.asset : asset as String?,
       color: color ?? this.color,
       scrimOpacity: scrimOpacity ?? this.scrimOpacity,
       blurSigma: blurSigma ?? this.blurSigma,
-      rendererId: rendererId ?? this.rendererId,
+      rendererId: identical(rendererId, _unset)
+          ? this.rendererId
+          : rendererId as String?,
       parameters: parameters ?? this.parameters,
       shader: identical(shader, _unset) ? this.shader : shader as SceneShader?,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneBackground &&
+      other.kind == kind &&
+      other.asset == asset &&
+      other.color == color &&
+      other.scrimOpacity == scrimOpacity &&
+      other.blurSigma == blurSigma &&
+      other.rendererId == rendererId &&
+      _mapEquals(other.parameters, parameters) &&
+      other.shader == shader;
+
+  @override
+  int get hashCode => Object.hash(
+    kind,
+    asset,
+    color,
+    scrimOpacity,
+    blurSigma,
+    rendererId,
+    _hashMap(parameters),
+    shader,
+  );
 }
 
 /// Authored layout and component identity, without executable business logic.
@@ -698,6 +965,58 @@ class SceneNode {
       properties: properties ?? this.properties,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneNode &&
+      other.id == id &&
+      other.componentId == componentId &&
+      other.rect == rect &&
+      other.parentId == parentId &&
+      other.layout == layout &&
+      other.sizing == sizing &&
+      _listEquals(other.breakpoints, breakpoints) &&
+      other.styleToken == styleToken &&
+      other.asset == asset &&
+      other.primitive == primitive &&
+      other.transform == transform &&
+      other.z == z &&
+      other.renderOrder == renderOrder &&
+      other.focusOrder == focusOrder &&
+      other.motion == motion &&
+      other.motionTiming == motionTiming &&
+      _listEquals(other.tracks, tracks) &&
+      _mapEquals(other.stateEffects, stateEffects) &&
+      _listEquals(other.transitions, transitions) &&
+      other.visibleWhen == visibleWhen &&
+      other.interactive == interactive &&
+      _mapEquals(other.properties, properties);
+
+  @override
+  int get hashCode => Object.hashAll([
+    id,
+    componentId,
+    rect,
+    parentId,
+    layout,
+    sizing,
+    Object.hashAll(breakpoints),
+    styleToken,
+    asset,
+    primitive,
+    transform,
+    z,
+    renderOrder,
+    focusOrder,
+    motion,
+    motionTiming,
+    Object.hashAll(tracks),
+    _hashMap(stateEffects),
+    Object.hashAll(transitions),
+    visibleWhen,
+    interactive,
+    _hashMap(properties),
+  ]);
 }
 
 class SceneDocument {
@@ -774,7 +1093,70 @@ class SceneDocument {
       guides: guides ?? this.guides,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneDocument &&
+      other.id == id &&
+      other.version == version &&
+      other.canvas == canvas &&
+      other.background == background &&
+      _listEquals(other.nodes, nodes) &&
+      _mapEquals(other.themeProperties, themeProperties) &&
+      _mapEquals(other.styleTokens, styleTokens) &&
+      _listEquals(other.guides, guides);
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    version,
+    canvas,
+    background,
+    Object.hashAll(nodes),
+    _hashMap(themeProperties),
+    _hashMap(styleTokens),
+    Object.hashAll(guides),
+  );
 }
+
+Set<String> getReferencedSceneAssets(SceneDocument document) => {
+  if (document.background.asset != null) document.background.asset!,
+  if (document.background.shader case final shader?) ...[
+    shader.asset,
+    for (final texture in shader.textures) texture.asset,
+  ],
+  ...document.themeProperties.values,
+  for (final style in document.styleTokens.values)
+    if (style.fontAsset != null) style.fontAsset!,
+  for (final node in document.nodes) ...[
+    ...node.properties.values,
+    if (node.asset != null) node.asset!.path,
+  ],
+};
+
+bool _listEquals<T>(List<T> a, List<T> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var index = 0; index < a.length; index++) {
+    if (a[index] != b[index]) return false;
+  }
+  return true;
+}
+
+bool _mapEquals<K, V>(Map<K, V> a, Map<K, V> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (final entry in a.entries) {
+    if (!b.containsKey(entry.key) || b[entry.key] != entry.value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+int _hashMap<K, V>(Map<K, V> map) => Object.hashAllUnordered([
+  for (final entry in map.entries) Object.hash(entry.key, entry.value),
+]);
 
 /// Sentinel for [SceneNode.copyWith] nullable fields that may be cleared.
 const Object _unset = Object();

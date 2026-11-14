@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:scene_codegen/scene_codegen.dart';
+import 'package:scene_schema/scene_schema.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -254,5 +255,28 @@ void main() {
 '''),
       throwsFormatException,
     );
+  });
+
+  test('sanitizes comment newlines and negative colors in generated source', () {
+    final generated = generateSceneFromDocument(
+      const SceneDocument(
+        id: 'line1\nvoid evil() {}',
+        version: currentSceneVersion,
+        canvas: SceneCanvas(),
+        background: SceneBackground(
+          kind: SceneBackgroundKind.solid,
+          color: -0x00112233,
+        ),
+        nodes: [
+          SceneNode(
+            id: 'panel',
+            componentId: 'glassPanel',
+            rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
+          ),
+        ],
+      ),
+    );
+    expect(generated, contains('// Generated from line1 void evil() {}.scene.json.'));
+    expect(generated, isNot(contains('0x-')));
   });
 }

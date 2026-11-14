@@ -179,4 +179,13 @@ void main() {
     _layout.validateDocument(other);
     expect(_layout.findMissingRequiredSlots(other), isEmpty);
   });
+
+  test('getSlots throws FormatException for unsupported layout presets', () {
+    expect(
+      () => _layout.getSlots(
+        _document.copyWith(themeProperties: const {'layout': 'missing'}),
+      ),
+      throwsFormatException,
+    );
+  });
 }

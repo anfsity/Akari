@@ -25,7 +25,13 @@ class ThemeLayoutDefinition {
   /// projected through the selected layout without changing authored nodes.
   List<ThemeLayoutSlot> getSlots(SceneDocument document) {
     if (presets.isEmpty) return slots;
-    final preset = presets[getPresetId(document)]!;
+    final presetId = getPresetId(document);
+    final preset = presets[presetId];
+    if (preset == null) {
+      throw FormatException(
+        'Layout "$label": unsupported preset "$presetId".',
+      );
+    }
     return [
       for (final slot in slots)
         if (preset.rects[slot.defaultNode.id] case final rect?)

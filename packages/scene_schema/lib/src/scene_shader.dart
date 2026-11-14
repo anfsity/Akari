@@ -32,12 +32,30 @@ class SceneShaderUniform {
     value: value ?? this.value,
     scale: scale ?? this.scale,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneShaderUniform &&
+      other.name == name &&
+      other.source == source &&
+      other.value == value &&
+      other.scale == scale;
+
+  @override
+  int get hashCode => Object.hash(name, source, value, scale);
 }
 
 class SceneShaderTexture {
   const SceneShaderTexture({required this.name, required this.asset});
   final String name;
   final String asset;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneShaderTexture && other.name == name && other.asset == asset;
+
+  @override
+  int get hashCode => Object.hash(name, asset);
 }
 
 class SceneShader {
@@ -58,4 +76,27 @@ class SceneShader {
     uniforms: uniforms ?? this.uniforms,
     textures: textures ?? this.textures,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      other is SceneShader &&
+      other.asset == asset &&
+      _shaderListEquals(other.uniforms, uniforms) &&
+      _shaderListEquals(other.textures, textures);
+
+  @override
+  int get hashCode => Object.hash(
+    asset,
+    Object.hashAll(uniforms),
+    Object.hashAll(textures),
+  );
+}
+
+bool _shaderListEquals<T>(List<T> a, List<T> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var index = 0; index < a.length; index++) {
+    if (a[index] != b[index]) return false;
+  }
+  return true;
 }
