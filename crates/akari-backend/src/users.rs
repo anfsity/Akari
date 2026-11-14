@@ -52,19 +52,50 @@ pub struct UserEntry {
     pub icon_path: String,
 }
 
-/// Reads login users from AccountsService without parsing NSS or passwd files.
-///
-/// The system-bus connection is initialized lazily and shared by cloned
-/// catalogs. Closed connections are discarded before the next query. User
-/// properties are fetched asynchronously by zbus.
+/// Lazily shared system D-Bus connection. Closed connections are discarded
+/// before the next query so long-lived callers do not keep leaking connections.
 #[derive(Clone, Debug, Default)]
-pub struct UserCatalog {
+pub(crate) struct SystemBus {
     connection: Arc<Mutex<Option<zbus::Connection>>>,
 }
 
+impl SystemBus {
+    pub(crate) async fn get_connection(&self) -> zbus::Result<zbus::Connection> {
+        // Serialize only connection initialization/replacement. The returned
+        // clone lets callers perform D-Bus I/O without holding this mutex.
+        let mut cached = self.connection.lock().await;
+        if let Some(connection) = cached.as_ref()
+            && !connection.is_closed()
+        {
+            return Ok(connection.clone());
+        }
+        cached.take();
+        let connection = zbus::Connection::system().await?;
+        *cached = Some(connection.clone());
+        Ok(connection)
+    }
+}
+
+/// Reads login users from AccountsService without parsing NSS or passwd files.
+///
+/// User properties are fetched once asynchronously without property caching.
+#[derive(Clone, Debug, Default)]
+pub struct UserCatalog {
+    system_bus: SystemBus,
+}
+
 impl UserCatalog {
+    #[cfg(not(feature = "mock-power"))]
+    pub(crate) fn system_bus(&self) -> &SystemBus {
+        &self.system_bus
+    }
+
     pub async fn list(&self) -> Result<Vec<UserEntry>, UserCatalogError> {
-        let connection = self.connect_system_bus().await?;
+        let connection = self
+            .system_bus
+            .get_connection()
+            .await
+            .map_err(UserCatalogError::Connect)?;
         let accounts = AccountsServiceProxy::new(&connection)
             .await
             .map_err(UserCatalogError::List)?;
@@ -89,23 +120,6 @@ impl UserCatalog {
         users.sort_by(|left, right| left.username.cmp(&right.username));
         Ok(users)
     }
-
-    async fn connect_system_bus(&self) -> Result<zbus::Connection, UserCatalogError> {
-        // Serialize only connection initialization/replacement. The returned
-        // clone lets user queries perform D-Bus I/O without holding this mutex.
-        let mut cached = self.connection.lock().await;
-        if let Some(connection) = cached.as_ref()
-            && !connection.is_closed()
-        {
-            return Ok(connection.clone());
-        }
-        cached.take();
-        let connection = zbus::Connection::system()
-            .await
-            .map_err(UserCatalogError::Connect)?;
-        *cached = Some(connection.clone());
-        Ok(connection)
-    }
 }
 
 async fn read_user(
@@ -120,7 +134,7 @@ async fn read_user(
     let proxy = AccountsServiceUserProxy::builder(connection)
         .path(path.as_ref())
         .map_err(map_err)?
-        .cache_properties(CacheProperties::Yes)
+        .cache_properties(CacheProperties::No)
         .build()
         .await
         .map_err(map_err)?;

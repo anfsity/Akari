@@ -201,9 +201,14 @@ impl GreeterService {
         }
         #[cfg(not(feature = "mock-power"))]
         {
-            let connection = zbus::Connection::system().await.map_err(|error| {
-                fdo::Error::Failed(format!("could not connect to system D-Bus: {error}"))
-            })?;
+            let connection = self
+                .users
+                .system_bus()
+                .get_connection()
+                .await
+                .map_err(|error| {
+                    fdo::Error::Failed(format!("could not connect to system D-Bus: {error}"))
+                })?;
             let proxy = zbus::Proxy::new(
                 &connection,
                 "org.freedesktop.login1",

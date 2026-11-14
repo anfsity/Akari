@@ -8,10 +8,10 @@
 use std::{
     env,
     ffi::OsString,
-    fs::{DirBuilder, File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::{self, Write},
     os::unix::{
-        fs::{DirBuilderExt, OpenOptionsExt},
+        fs::{OpenOptionsExt, PermissionsExt},
         process::CommandExt,
     },
     path::{Path, PathBuf},
@@ -71,10 +71,10 @@ pub fn start_session() -> io::Result<()> {
     // exists. Capture them here so a compositor exit cannot reveal them on VT.
     // Keep a separate startup log: native shell configuration may change the
     // state directory before the executor creates the desktop session log.
-    let mut log = create_session_log("startup")?;
+    let mut log = open_session_log_or_null("startup")?;
     let shell = env::var_os("SHELL")
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "PAM did not supply SHELL"))?;
-    writeln!(log, "event=native_shell_start shell={shell:?}")?;
+    let _ = writeln!(log, "event=native_shell_start shell={shell:?}");
     let error = Command::new(&shell)
         .args([
             "-l",
@@ -84,10 +84,10 @@ pub fn start_session() -> io::Result<()> {
         .stdout(Stdio::from(log.try_clone()?))
         .stderr(Stdio::from(log.try_clone()?))
         .exec();
-    writeln!(
+    let _ = writeln!(
         log,
         "event=native_shell_exec_failed shell={shell:?} error={error:?}"
-    )?;
+    );
     Err(error)
 }
 
@@ -101,7 +101,7 @@ pub fn exec_desktop() -> io::Result<()> {
             "desktop command is empty",
         ));
     }
-    let mut log = create_session_log("session")?;
+    let mut log = open_session_log_or_null("session")?;
     let mut command = Command::new(&invocation.command[0]);
     command.args(&invocation.command[1..]);
 
@@ -116,34 +116,36 @@ pub fn exec_desktop() -> io::Result<()> {
             command.env_remove(name);
         }
     }
-    writeln!(
+    let _ = writeln!(
         log,
         "event=user_session_initialized session={:?} source={:?} shell={:?} activation_owner=desktop",
         invocation.session_id,
         invocation.source,
         env::var_os("SHELL")
-    )?;
-    writeln!(
+    );
+    let _ = writeln!(
         log,
         "LANG={language:?} LC_ALL={:?} LC_CTYPE={:?}",
         env::var_os("LC_ALL"),
         env::var_os("LC_CTYPE")
-    )?;
+    );
     match Command::new("/usr/bin/locale")
         .arg("charmap")
         .env("LANG", &language)
         .output()
     {
         Ok(output) => {
-            writeln!(
+            let _ = writeln!(
                 log,
                 "event=locale_checked status={} charmap={:?} diagnostic={:?}",
                 output.status,
                 String::from_utf8_lossy(&output.stdout).trim(),
                 String::from_utf8_lossy(&output.stderr).trim()
-            )?;
+            );
         }
-        Err(error) => writeln!(log, "event=locale_check_failed error={error:?}")?,
+        Err(error) => {
+            let _ = writeln!(log, "event=locale_check_failed error={error:?}");
+        }
     }
     command
         .stdout(Stdio::from(log.try_clone()?))
@@ -163,16 +165,34 @@ pub fn exec_desktop() -> io::Result<()> {
         .stderr(log.try_clone()?)
         .status()
     {
-        Ok(status) => writeln!(log, "event=splash_finished status={status}")?,
-        Err(error) => writeln!(log, "event=splash_unavailable error={error:?}")?,
+        Ok(status) => {
+            let _ = writeln!(log, "event=splash_finished status={status}");
+        }
+        Err(error) => {
+            let _ = writeln!(log, "event=splash_unavailable error={error:?}");
+        }
     }
     let error = command.exec();
-    writeln!(
+    let _ = writeln!(
         log,
         "event=desktop_exec_failed executable={:?} error={error:?}",
         invocation.command[0]
-    )?;
+    );
     Err(error)
+}
+
+const MAX_RETAINED_LOGS_PER_STAGE: usize = 10;
+
+fn open_session_log_or_null(stage: &str) -> io::Result<File> {
+    if let Ok(log) = create_session_log(stage) {
+        return Ok(log);
+    }
+    // Unwritable state directories must not block login, while still keeping
+    // shell and renderer diagnostics off the VT.
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/null")
 }
 
 fn create_session_log(stage: &str) -> io::Result<File> {
@@ -183,11 +203,14 @@ fn create_session_log(stage: &str) -> io::Result<File> {
         })?)
         .join(".local/state"),
     };
-    let directory = state.join("akari/sessions");
-    DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(&directory)?;
+    let akari_dir = state.join("akari");
+    let directory = akari_dir.join("sessions");
+    // Only Akari's own state subdirectories get 0o700; ancestor directories like
+    // ~/.local keep normal permissions.
+    fs::create_dir_all(&directory)?;
+    fs::set_permissions(&akari_dir, fs::Permissions::from_mode(0o700))?;
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))?;
+    prune_old_session_logs(&directory, stage, MAX_RETAINED_LOGS_PER_STAGE - 1);
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(io::Error::other)?
@@ -198,4 +221,28 @@ fn create_session_log(stage: &str) -> io::Result<File> {
         .create_new(true)
         .mode(0o600)
         .open(&path)
+}
+
+fn prune_old_session_logs(directory: &Path, stage: &str, max_to_keep: usize) {
+    let prefix = format!("{stage}-");
+    let Ok(entries) = fs::read_dir(directory) else {
+        return;
+    };
+    let mut matching: Vec<(u128, PathBuf)> = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let path = entry.path();
+            let name = path.file_name()?.to_str()?;
+            let rest = name.strip_prefix(&prefix)?.strip_suffix(".log")?;
+            let timestamp = rest.split('-').next()?.parse::<u128>().ok()?;
+            Some((timestamp, path))
+        })
+        .collect();
+    if matching.len() <= max_to_keep {
+        return;
+    }
+    matching.sort_by(|left, right| right.0.cmp(&left.0).then_with(|| right.1.cmp(&left.1)));
+    for (_, path) in matching.into_iter().skip(max_to_keep) {
+        let _ = fs::remove_file(path);
+    }
 }

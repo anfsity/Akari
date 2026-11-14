@@ -407,3 +407,30 @@ fn native_shell_failures_stay_in_private_startup_logs() {
             .contains("native_shell_exec_failed")
     }));
 }
+
+#[test]
+fn unwritable_state_directory_does_not_abort_login_and_rotates_logs() {
+    let fixture = SessionFixture::create();
+    let locked_parent = fixture.root.join("locked");
+    fs::create_dir(&locked_parent).unwrap();
+    fs::set_permissions(&locked_parent, fs::Permissions::from_mode(0o500)).unwrap();
+    let unwritable = fixture
+        .get_command("/bin/sh", false, &[])
+        .env("XDG_STATE_HOME", locked_parent.join("state"))
+        .output()
+        .unwrap();
+    fs::set_permissions(&locked_parent, fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(unwritable.status.success());
+    assert!(unwritable.stdout.is_empty());
+    assert!(unwritable.stderr.is_empty());
+
+    let rotation = SessionFixture::create();
+    for _ in 0..14 {
+        let output = rotation
+            .get_command("/bin/sh", false, &[])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+    }
+    assert!(rotation.get_logs("state", "session-").len() <= 10);
+}
