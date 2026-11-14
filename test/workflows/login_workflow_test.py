@@ -206,18 +206,18 @@ class LoginWorkflowTest(unittest.TestCase):
                 patch('builtins.input', side_effect=['invalid', 'k']), \
                 patch.object(self.manager.platform, 'freedesktop_os_release', return_value={'ID': 'arch'}), \
                 patch.object(self.manager.subprocess, 'run', side_effect=install_package):
-            self.assertEqual(self.manager.select_keyrings('auto'), ['kwallet'])
+            self.assertEqual(self.manager.ensure_keyrings('auto'), ['kwallet'])
 
     def test_declined_and_unattended_installation_never_runs_package_manager(self):
         (self.modules / 'pam_gnome_keyring.so').unlink()
         with patch.object(self.manager.sys.stdin, 'isatty', return_value=True), \
                 patch('builtins.input', return_value=''):
-            self.assertEqual(self.manager.select_keyrings('auto'), [])
-            self.assertEqual(self.manager.select_keyrings('gnome'), [])
+            self.assertEqual(self.manager.ensure_keyrings('auto'), [])
+            self.assertEqual(self.manager.ensure_keyrings('gnome'), [])
         with patch.object(self.manager.sys.stdin, 'isatty', return_value=False):
-            self.assertEqual(self.manager.select_keyrings('auto'), [])
+            self.assertEqual(self.manager.ensure_keyrings('auto'), [])
             with self.assertRaisesRegex(ValueError, 'PAM module is missing'):
-                self.manager.select_keyrings('gnome')
+                self.manager.ensure_keyrings('gnome')
         self.assertEqual(self.calls, [])
         self.assertEqual(self.manager.PAM.read_text(), self.original_pam)
 
@@ -598,6 +598,27 @@ class LoginWorkflowTest(unittest.TestCase):
             self.manager.enable_login()
         self.assertFalse(self.manager.SNAPSHOT.exists())
         self.assertEqual(self.enabled, {'sddm.service'})
+
+    def test_broken_unmanaged_symlink_and_missing_pam_or_rollback_targets_fail_cleanly(self):
+        self.manager.UNIT.symlink_to(self.root / 'missing-unit')
+        with self.assertRaisesRegex(ValueError, 'unmanaged'):
+            self.install()
+        self.manager.UNIT.unlink()
+
+        self.assertEqual(self.manager.get_pam_modules('@include missing-common\nauth required pam_unix.so\n', 'auth', {self.manager.PAM}),
+                         {'pam_unix.so'})
+
+        self.manager.PAM.unlink()
+        with self.assertRaisesRegex(ValueError, 'Missing PAM configuration'):
+            self.manager.disable_gaze()
+        self.manager.PAM.write_text(self.original_pam)
+
+        self.install()
+        self.install()
+        (self.manager.INSTALLATION / 'previous').unlink()
+        (self.manager.INSTALLATION / 'previous').symlink_to(self.root / 'missing-release')
+        with self.assertRaisesRegex(ValueError, 'previous release target is missing'):
+            self.manager.rollback_installation()
 
 
 class RuntimeValidationTest(unittest.TestCase):

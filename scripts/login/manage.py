@@ -146,9 +146,6 @@ def ensure_keyrings(provider):
     return [target]
 
 
-select_keyrings = ensure_keyrings
-
-
 def get_pam_without_keyring(configuration):
     if KEYRING_START.strip() not in configuration and KEYRING_END.strip() not in configuration:
         return configuration
@@ -177,7 +174,7 @@ def get_pam_modules(configuration, phase, ancestors):
                 continue
             included = match[3]
         path = PAM.parent / included
-        if path in ancestors:
+        if path in ancestors or not path.is_file():
             continue
         modules.update(get_pam_modules(path.read_text(), phase, ancestors | {path}))
     return modules
@@ -294,6 +291,8 @@ def remove_gaze_helper():
 
 
 def disable_gaze():
+    if not PAM.is_file():
+        raise ValueError(f'Missing PAM configuration: {PAM}; install greetd first.')
     update_pam(get_gaze_pam_configuration(PAM.read_text(), enabled=False), 'greetd.pam.before-gaze')
     remove_gaze_helper()
     print('Gaze disabled for greetd. Other PAM rules and backups were retained.')
@@ -304,17 +303,32 @@ def run_systemctl(*arguments):
                           text=True, capture_output=True).stdout.strip()
 
 
+def write_bytes_atomic(path, data, mode=0o644):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=f'.{path.name}-', dir=path.parent)
+    try:
+        with os.fdopen(descriptor, 'wb') as stream:
+            os.fchmod(stream.fileno(), mode)
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
 def write_json(path, value):
-    temporary = path.with_name(f'.{path.name}-{os.getpid()}')
-    temporary.write_text(json.dumps(value, indent=2) + '\n')
-    temporary.chmod(0o644)
-    temporary.replace(path)
+    write_bytes_atomic(path, (json.dumps(value, indent=2) + '\n').encode())
 
 
 def update_link(path, target):
-    temporary = path.with_name(f'.{path.name}-{os.getpid()}')
-    temporary.symlink_to(target)
-    temporary.replace(path)
+    temporary_dir = Path(tempfile.mkdtemp(prefix=f'.{path.name}-', dir=path.parent))
+    try:
+        link = temporary_dir / path.name
+        link.symlink_to(target)
+        link.replace(path)
+    finally:
+        shutil.rmtree(temporary_dir, ignore_errors=True)
 
 
 def get_display_manager_target():
@@ -359,9 +373,9 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
         if not executable.is_file() or not os.access(executable, os.X_OK):
             raise ValueError(f'Missing built executable: {executable}')
     managed = (INSTALLATION / 'installation.json').is_file()
-    if not managed and any(path.exists() for path in [INSTALLATION, CONFIGURATION, UNIT]):
+    if not managed and any(path.exists() or path.is_symlink() for path in [INSTALLATION, CONFIGURATION, UNIT]):
         raise ValueError('Installation would replace existing unmanaged Akari files.')
-    providers = select_keyrings(keyring)
+    providers = ensure_keyrings(keyring)
     previous_pam = PAM.read_text()
     keyring_pam = get_keyring_pam_configuration(previous_pam, providers)
 
@@ -386,7 +400,11 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
     release.chmod(0o755)
     current = INSTALLATION / 'current'
     previous = os.readlink(current) if current.is_symlink() else None
-    previous_unit = UNIT.read_bytes() if UNIT.exists() else None
+    previous_link = INSTALLATION / 'previous'
+    previous_before = os.readlink(previous_link) if previous_link.is_symlink() else None
+    controller_path = INSTALLATION / 'manage.py'
+    previous_controller = controller_path.read_bytes() if controller_path.is_file() and not controller_path.is_symlink() else None
+    previous_unit = UNIT.read_bytes() if UNIT.is_file() and not UNIT.is_symlink() else None
     created_configs = []
     try:
         shutil.copytree(bundle, release / 'frontend')
@@ -409,11 +427,11 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
             path.chmod(0o755 if path.is_dir() or path.stat().st_mode & 0o111 else 0o644)
         for name in ['greetd.toml', 'sway.conf']:
             target = CONFIGURATION / name
-            if not target.exists():
+            if not target.exists() and not target.is_symlink():
                 shutil.copy2(source / 'system' / name, target)
                 target.chmod(0o644)
                 created_configs.append(target)
-        if layout is not None and not (CONFIGURATION / 'display-layout.json').exists():
+        if layout is not None and not (CONFIGURATION / 'display-layout.json').exists() and not (CONFIGURATION / 'display-layout.json').is_symlink():
             target = CONFIGURATION / 'display-layout.json'
             shutil.copy2(layout, target)
             target.chmod(0o644)
@@ -422,16 +440,21 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
         UNIT.chmod(0o644)
         run_systemctl('daemon-reload')
         update_pam(keyring_pam)
-        update_link(current, release)
-        controller = INSTALLATION / '.manage.py'
-        shutil.copy2(source / 'scripts/login/manage.py', controller)
-        controller.chmod(0o644)
-        controller.replace(INSTALLATION / 'manage.py')
+        write_bytes_atomic(controller_path, (source / 'scripts/login/manage.py').read_bytes())
         write_json(INSTALLATION / 'installation.json', {'schema_version': 1})
         if previous is not None:
-            update_link(INSTALLATION / 'previous', previous)
+            update_link(previous_link, previous)
+        update_link(current, release)
     except Exception:
         update_pam(previous_pam)
+        if previous_before is not None:
+            update_link(previous_link, previous_before)
+        else:
+            previous_link.unlink(missing_ok=True)
+        if previous_controller is not None:
+            write_bytes_atomic(controller_path, previous_controller)
+        elif managed:
+            controller_path.unlink(missing_ok=True)
         if previous is not None:
             update_link(current, previous)
         else:
@@ -530,8 +553,13 @@ def rollback_installation():
     if not previous.is_symlink():
         raise ValueError('No previous release is available.')
     current = INSTALLATION / 'current'
+    if not current.is_symlink():
+        raise ValueError('The current release symlink is missing.')
+    previous_target = os.readlink(previous)
+    if not (INSTALLATION / previous_target).is_dir():
+        raise ValueError('The previous release target is missing.')
     old_current = os.readlink(current)
-    update_link(current, os.readlink(previous))
+    update_link(current, previous_target)
     update_link(previous, old_current)
     print(f'Next greeter launch will use {current.resolve()}.')
 
@@ -676,7 +704,7 @@ def main():
             case 'install':
                 create_installation(arguments.source, arguments.bundle, arguments.backend, arguments.splash, arguments.layout, arguments.keyring)
             case 'configure-keyring':
-                providers = select_keyrings(arguments.keyring)
+                providers = ensure_keyrings(arguments.keyring)
                 update_pam(get_keyring_pam_configuration(PAM.read_text(), providers))
                 print(f'Configured greetd keyring PAM: {", ".join(providers) or "none"}')
             case 'enable-gaze':
