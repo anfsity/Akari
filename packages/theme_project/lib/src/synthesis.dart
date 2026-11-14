@@ -198,18 +198,47 @@ Set<String> _getSourceRoots(Map manifest) {
     'analysis_options.yaml',
   };
   final flutter = manifest['flutter'];
-  if (flutter is! Map) return roots;
+  if (flutter == null) return roots;
+  if (flutter is! Map) {
+    throw const FormatException('flutter manifest section must be a map.');
+  }
   final resources = <String>[
-    for (final asset in flutter['assets'] as List? ?? [])
+    for (final asset in _getList(flutter['assets'], 'flutter.assets'))
       if (asset is String)
         asset
       else if (asset is Map && asset['path'] is String)
-        asset['path'] as String,
-    for (final font in flutter['fonts'] as List? ?? [])
-      for (final item in (font as Map)['fonts'] as List? ?? [])
-        (item as Map)['asset'] as String,
-    ...?(flutter['shaders'] as List?)?.cast<String>(),
-    ...?(flutter['licenses'] as List?)?.cast<String>(),
+        asset['path'] as String
+      else
+        throw FormatException(
+          'Invalid flutter.assets entry in pubspec.yaml: $asset',
+        ),
+    for (final font in _getList(flutter['fonts'], 'flutter.fonts'))
+      if (font is! Map)
+        throw FormatException(
+          'Invalid flutter.fonts entry in pubspec.yaml: $font',
+        )
+      else
+        for (final item in _getList(font['fonts'], 'flutter.fonts[].fonts'))
+          if (item is Map && item['asset'] is String)
+            item['asset'] as String
+          else
+            throw FormatException(
+              'Invalid font asset entry in pubspec.yaml: $item',
+            ),
+    for (final shader in _getList(flutter['shaders'], 'flutter.shaders'))
+      if (shader is String)
+        shader
+      else
+        throw FormatException(
+          'Invalid flutter.shaders entry in pubspec.yaml: $shader',
+        ),
+    for (final license in _getList(flutter['licenses'], 'flutter.licenses'))
+      if (license is String)
+        license
+      else
+        throw FormatException(
+          'Invalid flutter.licenses entry in pubspec.yaml: $license',
+        ),
   ];
   for (final resource in resources) {
     final path = p.normalize(resource);
@@ -221,6 +250,12 @@ Set<String> _getSourceRoots(Map manifest) {
     roots.add(p.split(path).first);
   }
   return roots;
+}
+
+List<Object?> _getList(Object? value, String field) {
+  if (value == null) return const [];
+  if (value is List) return value;
+  throw FormatException('$field in pubspec.yaml must be a list.');
 }
 
 /// Owns source identity during traversal. External relative Dart directives
@@ -246,7 +281,7 @@ class _SourceCopier {
           !name.startsWith('LICENSE')) {
         continue;
       }
-      await _copyEntry(entry.path, p.join(staging.path, name), {});
+      await _copyEntry(entry.path, p.join(staging.path, name), {sourceRoot});
     }
   }
 
@@ -271,6 +306,12 @@ class _SourceCopier {
     final type = await FileSystemEntity.type(source, followLinks: true);
     if (type == FileSystemEntityType.directory) {
       final physical = await Directory(source).resolveSymbolicLinks();
+      if (!p.isWithin(sourceRoot, physical)) {
+        throw FileSystemException(
+          'Theme directory symlink escapes source package.',
+          source,
+        );
+      }
       if (ancestors.contains(physical)) {
         throw FileSystemException('Cyclic directory link in theme.', source);
       }
@@ -286,13 +327,20 @@ class _SourceCopier {
     if (type != FileSystemEntityType.file) {
       throw FileSystemException('Unreadable theme resource.', source);
     }
+    final physical = await File(source).resolveSymbolicLinks();
+    if (!p.isWithin(sourceRoot, physical)) {
+      throw FileSystemException(
+        'Theme file symlink escapes source package.',
+        source,
+      );
+    }
     await File(target).parent.create(recursive: true);
     if (!source.endsWith('.dart') && !source.endsWith('.scene.json')) {
-      await File(source).copy(target);
+      await File(physical).copy(target);
       return;
     }
     var content = _getRenamedPackageReferences(
-      await File(source).readAsString(),
+      await File(physical).readAsString(),
       sourceName,
       targetName,
     );
@@ -352,19 +400,7 @@ Future<Map<String, String>> _copyReferencedAssets(
   String packageName,
 ) async {
   final mappings = <String, String>{};
-  final references = {
-    if (validated.background.asset != null) validated.background.asset!,
-    if (validated.background.shader case final shader?) ...[
-      shader.asset,
-      for (final texture in shader.textures) texture.asset,
-    ],
-    ...validated.themeProperties.values,
-    for (final style in validated.styleTokens.values)
-      if (style.fontAsset != null) style.fontAsset!,
-    for (final node in validated.nodes) ...node.properties.values,
-    for (final node in validated.nodes)
-      if (node.asset != null) node.asset!.path,
-  };
+  final references = getReferencedSceneAssets(validated);
   for (final entry in assetFiles.entries) {
     if (!references.contains(entry.key)) continue;
     final physical = await entry.value.resolveSymbolicLinks();
@@ -432,34 +468,60 @@ String _getProjectManifest(
     ['akari'],
     {...?metadata as Map?, 'scene': 'lib/composition.scene.json'},
   );
-  if (assetReferences.isNotEmpty) {
-    final flutter = manifest['flutter'] as Map? ?? {};
-    final assets = List<Object?>.of(flutter['assets'] as List? ?? []);
-    for (final reference in assetReferences) {
-      final relative = reference.substring('packages/$packageName/'.length);
-      final parent = '${p.posix.dirname(relative)}/';
-      if (!assets.any(
-        (asset) =>
-            asset == relative ||
-            asset == parent ||
-            (asset is Map &&
-                (asset['path'] == relative || asset['path'] == parent)),
-      )) {
-        assets.add(relative);
+  if (assetReferences.isNotEmpty || shaderReferences.isNotEmpty) {
+    final existingFlutter = manifest['flutter'];
+    if (existingFlutter != null && existingFlutter is! Map) {
+      throw const FormatException('flutter manifest section must be a map.');
+    }
+    final flutter = Map<Object?, Object?>.of(
+      existingFlutter as Map? ?? const {},
+    );
+    if (assetReferences.isNotEmpty) {
+      final assets = List<Object?>.of(
+        _getList(flutter['assets'], 'flutter.assets'),
+      );
+      for (final reference in assetReferences) {
+        final relative = _getLocalPackageAssetPath(reference, packageName);
+        if (relative == null) continue;
+        final parent = '${p.posix.dirname(relative)}/';
+        if (!assets.any(
+          (asset) =>
+              asset == relative ||
+              asset == parent ||
+              (asset is Map &&
+                  (asset['path'] == relative || asset['path'] == parent)),
+        )) {
+          assets.add(relative);
+        }
       }
+      flutter['assets'] = assets;
     }
-    yaml.update(['flutter'], {...flutter, 'assets': assets});
-  }
-  if (shaderReferences.isNotEmpty) {
-    final flutter = yaml.parseAt(['flutter']).value as Map? ?? {};
-    final shaders = List<Object?>.of(flutter['shaders'] as List? ?? []);
-    for (final reference in shaderReferences) {
-      final relative = reference.substring('packages/$packageName/'.length);
-      if (!shaders.contains(relative)) shaders.add(relative);
+    if (shaderReferences.isNotEmpty) {
+      final shaders = List<Object?>.of(
+        _getList(flutter['shaders'], 'flutter.shaders'),
+      );
+      for (final reference in shaderReferences) {
+        final relative = _getLocalPackageAssetPath(reference, packageName);
+        if (relative != null && !shaders.contains(relative)) {
+          shaders.add(relative);
+        }
+      }
+      flutter['shaders'] = shaders;
     }
-    yaml.update(['flutter'], {...flutter, 'shaders': shaders});
+    yaml.update(['flutter'], flutter);
   }
   return yaml.toString();
+}
+
+String? _getLocalPackageAssetPath(String reference, String packageName) {
+  final prefix = 'packages/$packageName/';
+  if (reference.startsWith(prefix)) {
+    return reference.substring(prefix.length);
+  }
+  if (reference.startsWith('packages/')) {
+    return null;
+  }
+  return reference;
 }
 
 Future<void> _generateSceneSources(Directory staging) async {

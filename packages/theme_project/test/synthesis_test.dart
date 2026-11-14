@@ -585,4 +585,60 @@ void main() { stdout.write('\$local:\$native'); }
       }
     },
   );
+
+  test(
+    'rejects escaping symlinks, handles shader-only manifests without flutter section, and validates resource types',
+    () async {
+      final outsideSecret = File(p.join(root.path, 'secret.txt'));
+      await outsideSecret.writeAsString('host secret');
+      final linkFile = File(p.join(source.path, 'assets', 'escape.txt'));
+      await Link(linkFile.path).create(outsideSecret.path);
+      await expectLater(
+        createThemeProject(
+          source: source,
+          destination: target,
+          packageName: 'theme_copy',
+          document: _document,
+        ),
+        throwsA(isA<FileSystemException>()),
+      );
+      await Link(linkFile.path).delete();
+
+      final manifestFile = File(p.join(source.path, 'pubspec.yaml'));
+      final originalManifest = await manifestFile.readAsString();
+      await manifestFile.writeAsString(
+        '${originalManifest.split('\nflutter:').first}\n',
+      );
+      final localShaderResult = await createThemeProject(
+        source: source,
+        destination: target,
+        packageName: 'theme_shader_only',
+        document: _document.copyWith(
+          background: const SceneBackground(
+            kind: SceneBackgroundKind.custom,
+            shader: SceneShader(asset: 'assets/local.frag'),
+          ),
+        ),
+      );
+      final parsed = loadYaml(
+        await File(p.join(localShaderResult.directory.path, 'pubspec.yaml'))
+            .readAsString(),
+      ) as Map;
+      expect((parsed['flutter'] as Map)['shaders'], ['assets/local.frag']);
+
+      await manifestFile.writeAsString(
+        '${originalManifest.split('\nflutter:').first}\nflutter:\n  fonts:\n    - fonts: not-a-list\n',
+      );
+      final targetTwo = Directory(p.join(root.path, 'target_two'));
+      await expectLater(
+        createThemeProject(
+          source: source,
+          destination: targetTwo,
+          packageName: 'theme_bad_yaml',
+          document: _document,
+        ),
+        throwsFormatException,
+      );
+    },
+  );
 }
