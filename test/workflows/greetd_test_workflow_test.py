@@ -208,6 +208,40 @@ elif name == 'chmod':
             for log in [session / 'backend.log', session / 'sway.log']:
                 self.assertEqual(log.stat().st_mode & 0o777, 0o644)
 
+    def test_launch_routes_launcher_logs_to_lifecycle_and_not_sway(self):
+        self.assertEqual(self.run_script("start.sh").returncode, 0)
+        launcher = self.root / 'scripts/debug-dbus.sh'
+        launcher.write_text('#!/bin/sh\necho "debug-dbus stdout"\necho "debug-dbus stderr" >&2\nexec "$@"\n')
+        launcher.chmod(0o755)
+        result = self.run_script('launch.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        session = next((self.logs / 'current/greeter').iterdir())
+        self.assertEqual((session / 'sway.log').read_text(), 'test compositor output\n')
+        lifecycle = (session / 'lifecycle.log').read_text()
+        self.assertIn('debug-dbus stdout', lifecycle)
+        self.assertIn('debug-dbus stderr', lifecycle)
+
+    def test_start_rejects_symlink_log_root_and_restore_rejects_non_numeric_started_at(self):
+        real_logs = self.root / 'real-logs'
+        real_logs.mkdir()
+        link_logs = self.root / 'link-logs'
+        link_logs.symlink_to(real_logs)
+        rejected = subprocess.run(
+            ["bash", str(self.root / "start.sh"), "--log-dir", str(link_logs)],
+            env=self.environment, capture_output=True, text=True, timeout=10,
+        )
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertIn('symlink', rejected.stderr)
+
+        run_dir = self.root / 'run'
+        run_dir.mkdir()
+        (self.root / 'current-run').symlink_to(run_dir)
+        (run_dir / 'started-at').write_text('not-a-timestamp\n')
+        restored = self.run_script("restore.sh", "--service-stopped")
+        self.assertEqual(restored.returncode, 0, restored.stderr)
+        self.assertFalse((run_dir / 'journal.log').exists())
+        self.assertFalse((run_dir / 'restore.log').exists())
+
 
 class InstallerTest(unittest.TestCase):
     def setUp(self):
@@ -400,6 +434,16 @@ if name == 'dart':
                 self.assertIn(unit, result.stderr)
                 self.assertNotIn('"runuser"', (self.root / "calls").read_text())
                 self.assertFalse(self.installation.exists())
+
+    def test_installer_replaces_stale_frontend_files_and_prepares_state_dir(self):
+        stale = self.installation / "frontend/obsolete-file"
+        stale.parent.mkdir(parents=True)
+        stale.write_text("stale")
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(stale.exists())
+        self.assertEqual((self.installation / "state").stat().st_mode & 0o777, 0o755)
+        self.assertTrue((self.installation / "frontend/greeter").is_file())
 
 
 if __name__ == "__main__":

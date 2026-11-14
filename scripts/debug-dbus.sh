@@ -62,6 +62,8 @@ cleanup() {
   if [[ -n "$bus_pid" ]]; then
     kill "$bus_pid" >/dev/null 2>&1 || true
     wait "$bus_pid" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$bus_directory" ]]; then
     rm -rf -- "$bus_directory"
   fi
 }
@@ -102,6 +104,7 @@ if [[ "$inside_private_bus" -eq 0 ]]; then
   fi
 fi
 
+export RUST_LOG="${RUST_LOG:-backend=info,warn}"
 start_backend="${AKARI_START_BACKEND:-1}"
 if [[ "$start_backend" != 0 && "$start_backend" != 1 ]]; then
   printf 'AKARI_START_BACKEND must be 0 or 1, got: %s\n' "$start_backend" >&2
@@ -152,7 +155,6 @@ if [[ "$start_backend" -eq 1 ]]; then
   fi
 fi
 
-export RUST_LOG="${RUST_LOG:-backend=info,warn}"
 # Non-interactive shells may redirect a background job's stdin to /dev/null.
 # Preserve the caller's descriptor explicitly so reload and quit keys arrive.
 "$@" <&0 &

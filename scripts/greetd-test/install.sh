@@ -3,6 +3,10 @@ set -euo pipefail
 source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$source_dir/../.." && pwd)"
 test_root="${1:?Installation directory is required. Use akari greetd-test install.}"
+if [[ "$test_root" == *$'\n'* || "$test_root" == *$'\r'* ]]; then
+  echo 'Installation directory must not contain newlines.' >&2
+  exit 1
+fi
 theme_path="${2:-$repo_root/themes/default}"
 if [[ "$EUID" -ne 0 ]]; then
   echo 'Run this installer with sudo to build and install the test artifacts.' >&2
@@ -57,12 +61,36 @@ else
 fi
 backup="$test_root/backups/$(date +%Y%m%d-%H%M%S)-$$"
 install -d -m 0755 "$backup"
-for path in frontend backend akari-splash scripts start.sh restore.sh launch.sh greetd.toml sway.conf display-layout.json display-layout.py display_profile.py screenshot.py; do
-  if [[ -e "$test_root/$path" ]]; then
+managed_paths=(frontend backend akari-splash scripts start.sh restore.sh launch.sh greetd.toml sway.conf display-layout.json display-layout.py display_profile.py screenshot.py)
+for path in "${managed_paths[@]}"; do
+  if [[ -e "$test_root/$path" || -L "$test_root/$path" ]]; then
     cp -a "$test_root/$path" "$backup/"
   fi
 done
-cp -aL "$bundle/." "$test_root/frontend/"
+frontend_stage=''
+rollback_install() {
+  local status=$?
+  trap - EXIT
+  if [[ -n "$frontend_stage" && -d "$frontend_stage" ]]; then
+    rm -rf "$frontend_stage"
+  fi
+  if (( status != 0 )); then
+    for path in "${managed_paths[@]}"; do
+      rm -rf "$test_root/$path"
+      if [[ -e "$backup/$path" || -L "$backup/$path" ]]; then
+        cp -a "$backup/$path" "$test_root/$path"
+      fi
+    done
+  fi
+  exit "$status"
+}
+trap rollback_install EXIT
+frontend_stage="$(mktemp -d "$test_root/.frontend-stage.XXXXXXXX")"
+chmod 0755 "$frontend_stage"
+cp -aL "$bundle/." "$frontend_stage/"
+rm -rf "$test_root/frontend"
+mv "$frontend_stage" "$test_root/frontend"
+frontend_stage=''
 install -m 0755 "$backend" "$test_root/backend"
 install -m 0755 "$splash" "$test_root/akari-splash"
 install -m 0755 "$source_dir/start.sh" "$source_dir/restore.sh" "$source_dir/launch.sh" "$test_root/"
@@ -84,5 +112,10 @@ if [[ -n "$layout" ]]; then
 fi
 install -d -m 0755 "$test_root/scripts"
 install -m 0755 "$repo_root/scripts/debug-dbus.sh" "$repo_root/scripts/lib.sh" "$repo_root/system/splash.sh" "$test_root/scripts/"
+install -d -m 0755 "$test_root/state"
+if [[ "$EUID" -eq 0 ]]; then
+  chown greeter:greeter "$test_root/state"
+fi
+trap - EXIT
 echo "Installed test files; previous version: $backup"
 echo 'No display manager was started or stopped.'

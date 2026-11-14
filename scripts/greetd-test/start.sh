@@ -24,17 +24,29 @@ fi
 
 exec 9>/run/lock/akari-test.lock
 flock -n 9 || { echo 'Another test setup is running.' >&2; exit 1; }
-IFS=: read -r log_user _ log_uid _ _ _ _ < <(getent passwd "${SUDO_USER:-root}")
+IFS=: read -r _ _ log_uid _ _ _ _ < <(getent passwd "${SUDO_USER:-root}")
 log_root="${log_root:-/var/tmp/akari-greetd-test-$log_uid}"
-if [[ "$log_root" != /* ]]; then
-  echo '--log-dir must be an absolute path.' >&2
+if [[ "$log_root" != /* || "$log_root" == *$'\n'* || "$log_root" == *$'\r'* ]]; then
+  echo '--log-dir must be a single-line absolute path.' >&2
+  exit 1
+fi
+if [[ "$test_root" == *$'\n'* || "$test_root" == *$'\r'* ]]; then
+  echo 'Installation directory must not contain newlines.' >&2
+  exit 1
+fi
+if [[ -L "$log_root" ]]; then
+  echo 'Refusing symlink log root.' >&2
   exit 1
 fi
 umask 022
 run_dir="$log_root/$(date +%Y%m%d-%H%M%S)-$$"
-# Keep diagnostics outside the installation and readable without root or
-# membership in the caller's group, including tests started directly as root.
-install -d -o "$log_user" -g greeter -m 0755 "$log_root" "$run_dir"
+if [[ -L "$run_dir" ]]; then
+  echo 'Refusing pre-existing symlink run directory.' >&2
+  exit 1
+fi
+# Keep diagnostics outside the installation, owned by root to prevent symlink
+# replacement, and readable without root or membership in the caller's group.
+install -d -o root -g greeter -m 0755 "$log_root" "$run_dir"
 ln -sfn "$run_dir" "$log_root/latest"
 ln -sfn "$run_dir" "$test_root/latest-run-$log_uid"
 exec > >(tee -a "$run_dir/start.log") 2>&1
@@ -63,7 +75,9 @@ if [[ ! "$scale" =~ ^[0-9]+([.][0-9]+)?$ ]] || ! awk "BEGIN { exit !($scale > 0)
   exit 1
 fi
 install -d -o greeter -g greeter -m 0755 "$run_dir/greeter"
-printf 'output * scale %s\ninclude %s/sway.conf\n' "$scale" "$test_root" > "$run_dir/sway.conf"
+escaped_test_root="${test_root//\\/\\\\}"
+escaped_test_root="${escaped_test_root//\"/\\\"}"
+printf 'output * scale %s\ninclude "%s/sway.conf"\n' "$scale" "$escaped_test_root" > "$run_dir/sway.conf"
 python3 - "$run_dir" "$scale" "$log_root" <<'PY'
 import json
 from pathlib import Path
@@ -86,11 +100,16 @@ ln -sfn "$run_dir" "$test_root/current-run"
 # exit as well as on the deadline. Arm it before touching the display manager.
 systemd-run --unit=akari-restore --collect \
   --on-active=10m --timer-property=AccuracySec=1s "$test_root/restore.sh"
-trap 'status=$?; trap - EXIT; if (( status != 0 )); then "$test_root/restore.sh"; fi' EXIT
+trap 'status=$?; trap - EXIT; if (( status != 0 )); then AKARI_TEST_LOCK_PARENT=$$ "$test_root/restore.sh"; fi' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 systemctl is-active --quiet akari-restore.timer
 systemctl stop sddm.service
+if [[ "$test_root" =~ [[:space:]] ]]; then
+  exec_stop_post="\"$escaped_test_root/restore.sh\" --service-stopped"
+else
+  exec_stop_post="$test_root/restore.sh --service-stopped"
+fi
 systemd-run --unit=akari-test --collect \
   --property=Type=exec \
   --property=Conflicts=getty@tty1.service \
@@ -99,7 +118,7 @@ systemd-run --unit=akari-test --collect \
   --property=SendSIGHUP=yes \
   --property=KeyringMode=shared \
   --property=TimeoutStopSec=30s \
-  --property="ExecStopPost=$test_root/restore.sh --service-stopped" \
+  --property="ExecStopPost=$exec_stop_post" \
   /usr/bin/greetd --config "$test_root/greetd.toml"
 echo "Akari is on tty1; power actions call logind; output scale is $scale."
 echo "Recovery runs after service exit or in 10 minutes. Logs: $run_dir"

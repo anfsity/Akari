@@ -5,6 +5,11 @@ if [[ "$EUID" -ne 0 ]]; then
   printf 'Run with sudo: sudo %s/restore.sh\n' "$test_root" >&2
   exit 1
 fi
+# Parent start.sh already holds akari-test.lock during synchronous EXIT cleanup.
+if [[ "${AKARI_TEST_LOCK_PARENT:-}" != "$PPID" ]]; then
+  exec 9>/run/lock/akari-test.lock
+  flock 9
+fi
 if [[ "${1:-}" != --service-stopped ]]; then
   systemctl stop akari-test.service || true
 fi
@@ -15,11 +20,14 @@ systemctl is-active --quiet sddm.service
 systemctl stop akari-restore.timer || true
 umask 022
 run_dir="$(readlink -f "$test_root/current-run")"
-if [[ -f "$run_dir/started-at" ]]; then
-  journalctl -u akari-test.service -u sddm.service \
-    --since="@$(cat "$run_dir/started-at")" --no-pager -o short-iso-precise \
-    > "$run_dir/journal.log"
-  printf 'Restored SDDM at %s; service result: %s\n' \
-    "$(date --iso-8601=seconds)" "${SERVICE_RESULT:-manual}" >> "$run_dir/restore.log"
+if [[ -n "$run_dir" && ! -L "$run_dir" && -d "$run_dir" && -f "$run_dir/started-at" && ! -L "$run_dir/started-at" ]]; then
+  started_at="$(<"$run_dir/started-at")"
+  if [[ "$started_at" =~ ^[0-9]+$ ]] && [[ ! -L "$run_dir/journal.log" && ! -L "$run_dir/restore.log" ]]; then
+    journalctl -u akari-test.service -u sddm.service \
+      --since="@$started_at" --no-pager -o short-iso-precise \
+      > "$run_dir/journal.log"
+    printf 'Restored SDDM at %s; service result: %s\n' \
+      "$(date --iso-8601=seconds)" "${SERVICE_RESULT:-manual}" >> "$run_dir/restore.log"
+  fi
 fi
 printf 'SDDM restored. Test logs: %s\n' "$run_dir"

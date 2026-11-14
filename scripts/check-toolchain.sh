@@ -28,10 +28,12 @@ if [[ ! -f "$repo_root/crates/akari-backend/Cargo.toml" ]]; then
 fi
 
 check_command cargo
-check_command dbus-run-session
+check_command python3
 check_command dbus-daemon
 check_command busctl
 check_command setpriv
+check_command setsid
+check_command grim
 check_command clang
 check_command cmake
 check_command ninja

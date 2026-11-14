@@ -28,4 +28,4 @@ export XDG_SESSION_TYPE=wayland
 unset DISPLAY WAYLAND_DISPLAY WAYLAND_SOCKET SWAYSOCK WLR_BACKENDS WLR_WAYLAND_DISPLAY
 exec "$test_root/scripts/debug-dbus.sh" \
   /bin/bash "$test_root/scripts/splash.sh" \
-  /usr/bin/sway --config "$run_dir/sway.conf" > "$AKARI_LOG_DIR/sway.log" 2>&1
+  /bin/sh -c 'exec "$@" > "$AKARI_LOG_DIR/sway.log" 2>&1' _ /usr/bin/sway --config "$run_dir/sway.conf"
