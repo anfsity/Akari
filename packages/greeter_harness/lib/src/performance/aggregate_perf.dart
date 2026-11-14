@@ -29,9 +29,12 @@ Future<void> main(List<String> arguments) async {
 
   for (var cycle = 0; cycle < reports.length; cycle++) {
     final report = reports[cycle];
-    interactionSamples.addAll(
-      _readFrameSamples(report, 'frame_samples', 'interaction'),
+    final cycleInteractionSamples = _readFrameSamples(
+      report,
+      'frame_samples',
+      'interaction',
     );
+    interactionSamples.addAll(cycleInteractionSamples);
     final phases = report['phases'];
     if (phases is! Map<String, dynamic>) {
       throw const FormatException('A report is missing phase data.');
@@ -64,7 +67,7 @@ Future<void> main(List<String> arguments) async {
     }
 
     final interactionSummary = summarizeFrameSamples(
-      _readFrameSamples(report, 'frame_samples', 'interaction'),
+      cycleInteractionSamples,
       frameBudgetMs: frameBudget.toDouble(),
     )..remove('frame_samples');
     final sampleCount = interactionSummary['sample_count'] as int;
@@ -81,7 +84,10 @@ Future<void> main(List<String> arguments) async {
           sampleCount,
     });
 
-    observedFrameCount += readRequiredNumber(report, 'observed_frame_count').toInt();
+    final cycleObserved = readRequiredNumber(
+      report,
+      'observed_frame_count',
+    ).toInt();
     final match = report['phase_match'];
     if (match is! Map<String, dynamic>) {
       throw const FormatException('A report is missing frame match data.');
@@ -91,7 +97,19 @@ Future<void> main(List<String> arguments) async {
         'A report does not use exact frame-number matching.',
       );
     }
-    unmatchedFrameCount += readRequiredNumber(match, 'unmatched_frame_count').toInt();
+    final cycleUnmatched = readRequiredNumber(
+      match,
+      'unmatched_frame_count',
+    ).toInt();
+    if (cycleObserved < 0 ||
+        cycleUnmatched < 0 ||
+        cycleUnmatched > cycleObserved) {
+      throw FormatException(
+        'Cycle ${cycle + 1} has invalid frame match counts ($cycleUnmatched/$cycleObserved).',
+      );
+    }
+    observedFrameCount += cycleObserved;
+    unmatchedFrameCount += cycleUnmatched;
     final staticFrames = readRequiredNumber(
       report,
       'static_background_scheduled_frames',

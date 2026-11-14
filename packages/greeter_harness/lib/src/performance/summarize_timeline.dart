@@ -10,16 +10,10 @@ Future<void> main(List<String> arguments) async {
     throw const FormatException('Timeline must contain a traceEvents list.');
   }
 
-  final events = _readDartEvents(decoded['traceEvents'] as List);
+  final events = readDartTimelineEvents(decoded['traceEvents'] as List);
   final buildScopes = events.where((event) => event.name == 'BUILD').toList();
   if (buildScopes.isEmpty) {
     throw const FormatException('Timeline contains no Flutter BUILD events.');
-  }
-  final phaseScopes = events
-      .where((event) => event.name.startsWith('AKARI_PERF.'))
-      .toList();
-  if (phaseScopes.isEmpty) {
-    throw const FormatException('Timeline contains no Akari phase markers.');
   }
 
   final threadCounts = <int, int>{};
@@ -36,6 +30,12 @@ Future<void> main(List<String> arguments) async {
   final uiEvents = events
       .where((event) => event.threadId == uiThread.key)
       .toList();
+  final phaseScopes = uiEvents
+      .where((event) => event.name.startsWith('AKARI_PERF.'))
+      .toList();
+  if (phaseScopes.isEmpty) {
+    throw const FormatException('Timeline contains no Akari phase markers.');
+  }
 
   for (final phase in phaseScopes) {
     final phaseEvents = uiEvents
@@ -80,11 +80,11 @@ Future<void> main(List<String> arguments) async {
   }
 }
 
-void _writeRankedEvents(String title, List<_TimelineEvent> events) {
+void _writeRankedEvents(String title, List<TimelineEvent> events) {
   // Inclusive timings contain nested child work. Rank them for diagnosis, but
   // do not sum them as independent costs or compare them to the frame gate.
   stdout.writeln('$title (inclusive duration):');
-  final byName = <String, List<_TimelineEvent>>{};
+  final byName = <String, List<TimelineEvent>>{};
   for (final event in events) {
     byName.putIfAbsent(event.name, () => []).add(event);
   }
@@ -101,7 +101,7 @@ void _writeRankedEvents(String title, List<_TimelineEvent> events) {
   }
 }
 
-bool _isWithinAny(_TimelineEvent event, List<_TimelineEvent> scopes) {
+bool _isWithinAny(TimelineEvent event, List<TimelineEvent> scopes) {
   return scopes.any(
     (scope) =>
         event.startMicros >= scope.startMicros &&
@@ -109,12 +109,12 @@ bool _isWithinAny(_TimelineEvent event, List<_TimelineEvent> scopes) {
   );
 }
 
-List<_TimelineEvent> _readDartEvents(List traceEvents) {
+List<TimelineEvent> readDartTimelineEvents(List traceEvents) {
   // Traces may contain nested begin/end pairs or complete duration events.
   // Separate stacks by process/thread so scopes cannot close another thread's
   // event when names repeat during concurrent rendering work.
   final openEvents = <String, List<_OpenTimelineEvent>>{};
-  final completeEvents = <_TimelineEvent>[];
+  final completeEvents = <TimelineEvent>[];
 
   for (final value in traceEvents) {
     if (value is! Map<String, dynamic> || value['cat'] != 'Dart') {
@@ -124,12 +124,12 @@ List<_TimelineEvent> _readDartEvents(List traceEvents) {
     final phase = value['ph'];
     final timestamp = value['ts'];
     final threadId = value['tid'];
-    if (name is! String || timestamp is! num || threadId is! int) {
+    if (timestamp is! num || threadId is! int) {
       continue;
     }
 
     final thread = '${value['pid']}:$threadId';
-    if (phase == 'B') {
+    if (phase == 'B' && name is String) {
       openEvents
           .putIfAbsent(thread, () => [])
           .add(
@@ -137,10 +137,12 @@ List<_TimelineEvent> _readDartEvents(List traceEvents) {
           );
     } else if (phase == 'E') {
       final stack = openEvents[thread];
-      if (stack == null) {
+      if (stack == null || stack.isEmpty) {
         continue;
       }
-      final matchingIndex = stack.lastIndexWhere((event) => event.name == name);
+      final matchingIndex = name is String
+          ? stack.lastIndexWhere((event) => event.name == name)
+          : stack.length - 1;
       if (matchingIndex < 0) {
         continue;
       }
@@ -148,8 +150,8 @@ List<_TimelineEvent> _readDartEvents(List traceEvents) {
       final durationMicros = timestamp.toInt() - start.timestampMicros;
       if (durationMicros > 0) {
         completeEvents.add(
-          _TimelineEvent(
-            name: name,
+          TimelineEvent(
+            name: start.name,
             threadId: threadId,
             startMicros: start.timestampMicros,
             endMicros: timestamp.toInt(),
@@ -157,11 +159,11 @@ List<_TimelineEvent> _readDartEvents(List traceEvents) {
           ),
         );
       }
-    } else if (phase == 'X' && value['dur'] is num) {
+    } else if (phase == 'X' && name is String && value['dur'] is num) {
       final durationMs = (value['dur'] as num) / 1000;
       if (durationMs > 0) {
         completeEvents.add(
-          _TimelineEvent(
+          TimelineEvent(
             name: name,
             threadId: threadId,
             startMicros: timestamp.toInt(),
@@ -176,10 +178,10 @@ List<_TimelineEvent> _readDartEvents(List traceEvents) {
   return completeEvents;
 }
 
-double _percentile(List<_TimelineEvent> events, double percentile) =>
+double _percentile(List<TimelineEvent> events, double percentile) =>
     calculatePercentile(events.map((e) => e.durationMs).toList(), percentile);
 
-double _maximum(List<_TimelineEvent> events) =>
+double _maximum(List<TimelineEvent> events) =>
     calculateMaximum(events.map((e) => e.durationMs));
 
 String _parseArguments(List<String> arguments) {
@@ -196,8 +198,8 @@ class _OpenTimelineEvent {
   final int timestampMicros;
 }
 
-class _TimelineEvent {
-  const _TimelineEvent({
+class TimelineEvent {
+  const TimelineEvent({
     required this.name,
     required this.threadId,
     required this.startMicros,

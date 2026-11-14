@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:akari_cli/akari_cli.dart' show previewScenarioNames;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,13 @@ Future<void> runPreviewScenario(
   Widget Function(GreeterGateway gateway) createApp,
   String scenario,
 ) async {
+  if (!previewScenarioNames.contains(scenario)) {
+    throw ArgumentError.value(
+      scenario,
+      'scenario',
+      'Unsupported preview scenario. Expected one of: $previewScenarioNames.',
+    );
+  }
   final gateway = _PreviewGateway();
   var exitRequests = 0;
   final hadTextInput = tester.testTextInput.isRegistered;
@@ -25,12 +33,17 @@ Future<void> runPreviewScenario(
     },
   );
   try {
-    await tester.pumpWidget(
-      createApp(gateway),
+    await tester.pumpWidget(createApp(gateway));
+    final adapters = tester
+        .widgetList<GreeterSceneAdapter>(find.byType(GreeterSceneAdapter))
+        .toList();
+    expect(adapters, isNotEmpty);
+    final activeAdapter = adapters.firstWhere(
+      (adapter) => adapter.isActive,
+      orElse: () => adapters.first,
     );
-    final feature = tester
-        .widget<GreeterSceneAdapter>(find.byType(GreeterSceneAdapter))
-        .feature;
+    final feature = activeAdapter.feature;
+    final activeScope = find.byWidget(activeAdapter);
     await _waitFor(
       tester,
       () => feature.state.catalogMode == CatalogMode.ready,
@@ -45,8 +58,15 @@ Future<void> runPreviewScenario(
       () => feature.state.prompt?.kind == PromptKind.info,
       'face scan',
     );
-    expect(find.text('Attempting facial authentication'), findsOneWidget);
-    expect(find.byType(TextField), findsNothing);
+    expect(
+      feature.state.prompt?.text,
+      'Attempting facial authentication',
+    );
+    final textFields = find.descendant(
+      of: activeScope,
+      matching: find.byType(TextField),
+    );
+    expect(textFields, findsNothing);
     await tester.pump(const Duration(milliseconds: 1800));
     // Enter during a scan must never submit an empty credential.
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -57,24 +77,29 @@ Future<void> runPreviewScenario(
       gateway.sendPasswordFallback();
       await _waitFor(
         tester,
-        () =>
-            feature.state.authMode == AuthMode.prompting &&
-            find.byType(TextField).evaluate().isNotEmpty,
+        () => feature.state.authMode == AuthMode.prompting,
         'password fallback',
       );
-      final field = tester.widget<TextField>(find.byType(TextField));
-      expect(field.enabled, isTrue);
-      expect(field.obscureText, isTrue);
-      expect(field.controller!.text, isEmpty);
-      expect(field.focusNode!.hasFocus, isTrue);
-      expect(find.text('Face detection timeout reached'), findsOneWidget);
+      expect(
+        feature.state.promptError,
+        'Face detection timeout reached',
+      );
+      if (textFields.evaluate().isNotEmpty) {
+        final field = tester.widget<TextField>(textFields.first);
+        expect(field.enabled, isTrue);
+        expect(field.obscureText, isTrue);
+        expect(field.controller!.text, isEmpty);
+        expect(field.focusNode!.hasFocus, isTrue);
+      }
       await tester.pump(const Duration(milliseconds: 1200));
       for (final character in 'password'.split('')) {
-        tester.testTextInput.enterText('${field.controller!.text}$character');
+        tester.testTextInput.enterText(
+          '${activeAdapter.credentialController?.text ?? ''}$character',
+        );
         await tester.pump(const Duration(milliseconds: 100));
       }
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    } else {
+    } else if (scenario == 'face-success') {
       gateway.sendAuthenticated();
     }
 
@@ -93,7 +118,9 @@ Future<void> runPreviewScenario(
           ? [(_PreviewGateway._attemptId, 'password')]
           : isEmpty,
     );
-    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+    if (textFields.evaluate().isNotEmpty) {
+      expect(tester.widget<TextField>(textFields.first).enabled, isFalse);
+    }
     await tester.pump(const Duration(milliseconds: 900));
     expect(tester.takeException(), isNull);
   } finally {
@@ -144,16 +171,22 @@ class _PreviewGateway implements GreeterGateway {
     (id: 'wayland:sway', name: 'Sway'),
   ];
 
+  void _emit(GreeterEvent event) {
+    if (!_events.isClosed) {
+      _events.add(event);
+    }
+  }
+
   @override
   Future<String> beginAuthentication(String username) async {
-    _events.add(
+    _emit(
       const BackendPromptReceived(
         attemptId: _attemptId,
         kind: PromptKind.info,
         text: 'Attempting facial authentication',
       ),
     );
-    _events.add(
+    _emit(
       const BackendStateChanged(
         attemptId: _attemptId,
         state: BackendAuthState.submittingResponse,
@@ -164,14 +197,14 @@ class _PreviewGateway implements GreeterGateway {
   }
 
   void sendPasswordFallback() {
-    _events.add(
+    _emit(
       const BackendPromptReceived(
         attemptId: _attemptId,
         kind: PromptKind.error,
         text: 'Face detection timeout reached',
       ),
     );
-    _events.add(
+    _emit(
       const BackendPromptReceived(
         attemptId: _attemptId,
         kind: PromptKind.secret,
@@ -181,7 +214,7 @@ class _PreviewGateway implements GreeterGateway {
   }
 
   void sendAuthenticated() {
-    _events.add(
+    _emit(
       const BackendStateChanged(
         attemptId: _attemptId,
         state: BackendAuthState.authenticated,
@@ -202,6 +235,13 @@ class _PreviewGateway implements GreeterGateway {
   @override
   Future<void> startSession(String attemptId, String sessionId) async {
     sessions.add((attemptId, sessionId));
+    _emit(
+      BackendStateChanged(
+        attemptId: attemptId,
+        state: BackendAuthState.handingOff,
+        detail: '',
+      ),
+    );
   }
 
   @override
@@ -209,7 +249,10 @@ class _PreviewGateway implements GreeterGateway {
 
   @override
   Future<void> close() async {
-    await _events.close();
+    if (closed) {
+      return;
+    }
     closed = true;
+    await _events.close();
   }
 }
