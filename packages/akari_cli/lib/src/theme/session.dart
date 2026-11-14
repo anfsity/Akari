@@ -83,7 +83,7 @@ class ThemeSession {
         _watchDirectory(Directory('${project.path}/lib'), sceneTheme: project);
         _watchDirectory(Directory('${project.path}/assets'));
       }
-      _watchDirectory(Directory('${repoRoot.path}/lib'));
+      _watchDirectory(Directory('${repoRoot.path}/apps/greeter/lib'));
       for (final package in Directory(
         '${repoRoot.path}/packages',
       ).listSync().whereType<Directory>()) {
@@ -231,10 +231,10 @@ class ThemeSession {
       _process.kill();
     } else {
       try {
-        await _sendRequest('app.stop', {'appId': _appId}).timeout(
-          const Duration(seconds: 2),
-          onTimeout: () => {'error': 'timed out'},
-        );
+        await _sendRequest(
+          'app.stop',
+          {'appId': _appId},
+        ).timeout(const Duration(seconds: 2));
       } catch (_) {
         _process.kill();
       }

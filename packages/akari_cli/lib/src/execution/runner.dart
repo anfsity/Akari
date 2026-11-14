@@ -7,19 +7,29 @@ import 'report.dart';
 Future<RunResult> runSteps(List<RunStep> steps, RunReport report) async {
   final startedAt = DateTime.now().toUtc();
   final stopwatch = Stopwatch()..start();
+  final stepIds = {for (final step in steps) step.id};
   final results = <String, Future<StepResult?>>{};
+  var aborted = false;
   // Construct futures in plan order, then wait for the whole graph. Awaiting
   // each step here would accidentally serialize independent build branches.
   for (var index = 0; index < steps.length; index++) {
     final step = steps[index];
     final dependencies =
         step.dependencies ?? (index == 0 ? <String>[] : [steps[index - 1].id]);
+    for (final id in dependencies) {
+      if (!stepIds.contains(id) || !results.containsKey(id)) {
+        throw StateError(
+          'Step "${step.id}" depends on unknown or later step "$id".',
+        );
+      }
+    }
     final prerequisites = [for (final id in dependencies) results[id]!];
     results[step.id] = () async {
       final completed = await Future.wait(prerequisites);
-      if (completed.any(
-        (result) => result == null || result.status == 'failed',
-      )) {
+      if (aborted ||
+          completed.any(
+            (result) => result == null || result.status == 'failed',
+          )) {
         return null;
       }
       await report.recordEvent('step_started', {
@@ -39,6 +49,9 @@ Future<RunResult> runSteps(List<RunStep> steps, RunReport report) async {
         format: report.format,
         redactor: report.redactor,
       );
+      if (result.status == 'failed') {
+        aborted = true;
+      }
       await report.recordEvent('step_finished', {
         'step_id': step.id,
         'status': result.status,

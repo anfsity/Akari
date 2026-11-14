@@ -27,9 +27,10 @@ Future<void> updateBuildLinks(
     'splash_link': splash,
   };
   final paths = getBuildLinkPaths(theme);
-  if (paths['bundle_link'] == paths['backend_link']) {
-    throw const FormatException(
-      'Theme name backend conflicts with the backend link.',
+  if (paths['bundle_link'] == paths['backend_link'] ||
+      paths['bundle_link'] == paths['splash_link']) {
+    throw FormatException(
+      'Theme name ${theme.packageName.substring('theme_'.length)} conflicts with a shared build link.',
     );
   }
   final output = Directory('${repoRoot.path}/build/out');

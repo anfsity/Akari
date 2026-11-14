@@ -19,12 +19,14 @@ class SecretRedactor {
     'passwd',
     'passphrase',
     'token',
+    'secret',
+    r'(?:client|app|webhook)[_-]?secret',
     r'access[_-]?token',
     r'refresh[_-]?token',
     r'api[_-]?key',
     'credential',
     'authorization',
-    r'pam[_-]?(?:secret|password|response)',
+    r'pam[_-]?(?:secret|password|response|answer)',
   ];
   static final _credentialName = '(?:${_credentialNames.join('|')})';
   static const _quotedOrBareValue = r"""(?:"[^"]*"|'[^']*'|[^\s,;]+)""";
@@ -68,7 +70,7 @@ class SecretRedactor {
     for (final environment in environments) {
       for (final entry in environment.entries) {
         if (_sensitiveEnvironmentName.hasMatch(entry.key) &&
-            entry.value.isNotEmpty) {
+            entry.value.length >= 4) {
           secretValues.add(entry.value);
         }
       }

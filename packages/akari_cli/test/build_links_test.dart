@@ -173,5 +173,17 @@ void main() {
       ),
       throwsFormatException,
     );
+    await expectLater(
+      updateBuildLinks(
+        repo,
+        ThemePackage(
+          packageName: 'theme_akari-splash',
+          builderName: 'buildSplashTheme',
+          directory: theme.directory,
+        ),
+        BuildMode.release,
+      ),
+      throwsFormatException,
+    );
   });
 }

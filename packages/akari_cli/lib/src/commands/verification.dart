@@ -15,6 +15,9 @@ RunPlan createVerificationPlan(
   List<ThemePackage> themes, {
   required bool selectedThemeOnly,
 }) {
+  final sceneSteps = [
+    for (final theme in themes) 'scenes.generate_${theme.packageName}',
+  ];
   return RunPlan(
     command: 'verify',
     themes: themes,
@@ -22,21 +25,25 @@ RunPlan createVerificationPlan(
       RunStep(
         id: 'toolchain.check',
         command: ['bash', 'scripts/check-toolchain.sh'],
+        dependencies: const [],
       ),
       RunStep(
         id: 'rust.format',
         command: ['cargo', 'fmt', '--all', '--', '--check'],
         workingDirectory: 'crates',
+        dependencies: const [],
       ),
       RunStep(
         id: 'rust.check',
         command: ['cargo', 'check', '--locked', '--workspace'],
         workingDirectory: 'crates',
+        dependencies: const ['rust.format'],
       ),
       RunStep(
         id: 'backend.test',
         command: ['cargo', 'test', '--locked', '--', '--test-threads=1'],
         workingDirectory: 'crates/akari-backend',
+        dependencies: const ['rust.check'],
       ),
       RunStep(
         id: 'backend.test_mock',
@@ -50,23 +57,31 @@ RunPlan createVerificationPlan(
           '--test-threads=1',
         ],
         workingDirectory: 'crates/akari-backend',
+        dependencies: const ['rust.check'],
       ),
       RunStep(
         id: 'splash.test',
         command: ['cargo', 'test', '--locked'],
         workingDirectory: 'crates/akari-splash',
+        dependencies: const ['rust.check'],
       ),
       for (final theme in themes)
         RunStep(
           id: '${theme.packageName}.pub_get',
           command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
           workingDirectory: theme.directory.path,
+          dependencies: const [],
         ),
-      ...createSceneGenerationSteps(repoRoot, themes),
+      ...createSceneGenerationSteps(
+        repoRoot,
+        themes,
+        dependenciesFor: (theme) => ['${theme.packageName}.pub_get'],
+      ),
       RunStep(
         id: 'greeter.pub_get',
         command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
         workingDirectory: 'apps/greeter',
+        dependencies: const [],
       ),
       RunStep(
         id: 'flutter.analyze',
@@ -79,11 +94,13 @@ RunPlan createVerificationPlan(
           if (!selectedThemeOnly) 'lib/main.dart',
         ],
         workingDirectory: 'apps/greeter',
+        dependencies: ['greeter.pub_get', ...sceneSteps],
       ),
       RunStep(
         id: 'flutter.test',
         command: [...getFlutterCommand(repoRoot), 'test'],
         workingDirectory: 'apps/greeter',
+        dependencies: ['greeter.pub_get', ...sceneSteps],
       ),
       for (final packageName in [
         'scene_schema',
@@ -104,11 +121,13 @@ RunPlan createVerificationPlan(
           id: '$packageName.pub_get',
           command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
           workingDirectory: 'packages/$packageName',
+          dependencies: const [],
         ),
         ..._getFlutterPackageVerificationSteps(
           repoRoot,
           Directory(getJoinedPath(repoRoot.path, 'packages/$packageName')),
           packageName,
+          dependencies: ['$packageName.pub_get'],
         ),
       ],
       for (final theme in themes)
@@ -116,6 +135,7 @@ RunPlan createVerificationPlan(
           repoRoot,
           theme.directory,
           theme.packageName,
+          dependencies: ['scenes.generate_${theme.packageName}'],
         ),
       createBackendBuildStep(BackendMode.mock, BuildMode.debug, null),
       RunStep(
@@ -128,6 +148,7 @@ RunPlan createVerificationPlan(
           'test/dbus_gateway_smoke.dart',
         ],
         workingDirectory: 'apps/greeter',
+        dependencies: ['backend.build', 'greeter.pub_get', ...sceneSteps],
         environment: {
           'AKARI_BACKEND_BIN': getAbsolutePath(
             repoRoot,
@@ -143,8 +164,9 @@ RunPlan createVerificationPlan(
 List<RunStep> _getFlutterPackageVerificationSteps(
   Directory repoRoot,
   Directory directory,
-  String packageName,
-) {
+  String packageName, {
+  required List<String> dependencies,
+}) {
   final testDirectory = Directory(getJoinedPath(directory.path, 'test'));
   final hasTests =
       testDirectory.existsSync() &&
@@ -159,12 +181,14 @@ List<RunStep> _getFlutterPackageVerificationSteps(
       id: '$packageName.analyze',
       command: [...flutter, 'analyze'],
       workingDirectory: directory.path,
+      dependencies: dependencies,
     ),
     if (hasTests)
       RunStep(
         id: '$packageName.test',
         command: [...flutter, 'test'],
         workingDirectory: directory.path,
+        dependencies: dependencies,
       ),
   ];
 }
@@ -176,14 +200,15 @@ List<RunStep> _getDartPackageVerificationSteps(
   final dart = getDartCommand(repoRoot);
   return [
     for (final operation in [
-      ('pub_get', ['pub', 'get']),
-      ('analyze', ['analyze']),
-      ('test', ['test']),
+      ('pub_get', ['pub', 'get'], const <String>[]),
+      ('analyze', ['analyze'], ['$packageName.pub_get']),
+      ('test', ['test'], ['$packageName.pub_get']),
     ])
       RunStep(
         id: '$packageName.${operation.$1}',
         command: [...dart, ...operation.$2],
         workingDirectory: 'packages/$packageName',
+        dependencies: operation.$3,
       ),
   ];
 }

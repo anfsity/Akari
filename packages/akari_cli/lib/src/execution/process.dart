@@ -124,7 +124,7 @@ Future<void> _copyOutput(
   // Redact whole lines: a pipe chunk can split a secret across boundaries.
   // Chunk-local replacement would leak fragments into both logs and mirrors.
   var pending = '';
-  await for (final chunk in input.transform(utf8.decoder)) {
+  await for (final chunk in input.transform(const Utf8Decoder(allowMalformed: true))) {
     pending += chunk;
     var lineEnd = pending.indexOf('\n');
     while (lineEnd >= 0) {

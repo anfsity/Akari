@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,6 +7,7 @@ import 'package:test/test.dart';
 import 'package:akari_cli/src/commands/development.dart';
 import 'package:akari_cli/src/commands/plan.dart';
 import 'package:akari_cli/src/execution/model.dart';
+import 'package:akari_cli/src/theme/display_profile.dart';
 
 void main() {
   late Directory root;
@@ -128,6 +130,76 @@ void main() {
       );
       expect(event['event'], 'run_finished');
       expect(event['status'], 'failed');
+    },
+  );
+
+  test(
+    'failed branch aborts pending sibling branches and display completion preserves exit code',
+    () async {
+      final ranSibling = File('${root.path}/sibling-ran');
+      final blocker = Completer<void>();
+      final code = await runPlan(
+        RunPlan(
+          command: 'custom',
+          steps: [
+            RunStep(
+              id: 'failing.root',
+              command: const ['false'],
+              dependencies: const [],
+              action: () {
+                blocker.complete();
+                throw StateError('boom');
+              },
+            ),
+            RunStep(
+              id: 'sibling.gate',
+              command: const ['true'],
+              dependencies: const [],
+              action: () => blocker.future,
+            ),
+            RunStep(
+              id: 'sibling.child',
+              command: const ['true'],
+              dependencies: const ['sibling.gate'],
+              action: () => ranSibling.writeAsString('ran'),
+            ),
+          ],
+          getCompletion: (result) => getDisplayCompletion(
+            File('${root.path}/missing-display.json'),
+            result,
+          ),
+        ),
+        repoRoot: root,
+        runDirectory: 'abort',
+        format: RunOutputFormat.json,
+      );
+      expect(code, 1);
+      expect(ranSibling.existsSync(), isFalse);
+      final completion = await getDisplayCompletion(
+        File('${root.path}/missing-display.json'),
+        RunResult(
+          steps: [
+            StepResult(
+              id: 'theme.sway',
+              command: const ['sway'],
+              workingDirectory: '.',
+              status: 'failed',
+              exitCode: 42,
+              startedAt: DateTime.now(),
+              finishedAt: DateTime.now(),
+              durationMs: 1,
+              stdoutLog: '',
+              stderrLog: '',
+              error: 'failed',
+              inProcess: false,
+            ),
+          ],
+          startedAt: DateTime.now(),
+          finishedAt: DateTime.now(),
+          durationMs: 1,
+        ),
+      );
+      expect(completion.failureExitCode, 42);
     },
   );
 }

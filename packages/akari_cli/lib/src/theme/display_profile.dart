@@ -46,11 +46,13 @@ class DisplayProfileFailure implements Exception {
 }
 
 Future<RunCompletion> getDisplayCompletion(File file, RunResult result) async {
+  final failureExitCode = result.getFirstFailureExitCode();
   if (!await file.exists()) {
     return RunCompletion(
       error: result.isPassed
           ? 'Sway session did not publish its display report.'
           : null,
+      failureExitCode: failureExitCode,
     );
   }
   try {
@@ -61,9 +63,13 @@ Future<RunCompletion> getDisplayCompletion(File file, RunResult result) async {
       error: display['matched'] == true
           ? null
           : '${display['error'] ?? 'Sway outputs did not match the requested profile.'}',
+      failureExitCode: failureExitCode,
     );
   } catch (error) {
-    return RunCompletion(error: 'Could not read Sway display report: $error');
+    return RunCompletion(
+      error: 'Could not read Sway display report: $error',
+      failureExitCode: failureExitCode,
+    );
   }
 }
 

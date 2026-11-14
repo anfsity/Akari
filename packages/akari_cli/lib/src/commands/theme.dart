@@ -54,6 +54,7 @@ RunPlan createBuildPlan(
           '--dart-define=AKARI_BACKEND=real',
         ],
         workingDirectory: host,
+        dependencies: const ['theme.host.pub_get'],
         environment: {if (jobs != null) 'AKARI_BUILD_JOBS': '$jobs'},
       ),
       if (platform == 'linux')
@@ -229,6 +230,7 @@ RunPlan createPreviewPlan(
           '--dart-define=AKARI_PREVIEW_RESULT=${getAbsolutePath(repoRoot, resultPath)}',
         ],
         workingDirectory: host,
+        dependencies: const ['theme.host.pub_get'],
         environment: {
           'AKARI_DISPLAY_MODE': 'single',
           'AKARI_WINDOW_MODE': 'windowed',
@@ -348,7 +350,15 @@ List<RunStep> _createHostPreparationSteps(
         workingDirectory: project.directory.path,
         dependencies: const [],
       ),
-    ...createSceneGenerationSteps(repoRoot, projects),
+    ...createSceneGenerationSteps(
+      repoRoot,
+      projects,
+      dependenciesFor: (project) => [
+        project.packageName == theme.packageName
+            ? 'theme.pub_get'
+            : '${project.packageName}.pub_get',
+      ],
+    ),
     RunStep(
       id: 'theme.host.generate',
       command: [
@@ -360,6 +370,9 @@ List<RunStep> _createHostPreparationSteps(
           '--studio'
         else if (kind == ThemeHostKind.preview)
           '--preview',
+      ],
+      dependencies: [
+        for (final project in projects) 'scenes.generate_${project.packageName}',
       ],
       action: () => createThemeHost(
         repoRoot: repoRoot,
@@ -373,6 +386,7 @@ List<RunStep> _createHostPreparationSteps(
       id: 'theme.host.pub_get',
       command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
       workingDirectory: host,
+      dependencies: const ['theme.host.generate'],
     ),
   ];
 }

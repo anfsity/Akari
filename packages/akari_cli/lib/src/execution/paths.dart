@@ -34,7 +34,7 @@ Directory findUserHomeDirectory({
 /// can use the invocation directory or an explicit AKARI_REPO_ROOT.
 Directory findRepositoryRoot() {
   final configured = Platform.environment['AKARI_REPO_ROOT'];
-  final starts = configured == null
+  final starts = configured == null || configured.isEmpty
       ? [File.fromUri(Platform.script).parent.absolute, Directory.current]
       : [Directory(configured).absolute];
   for (var directory in starts) {

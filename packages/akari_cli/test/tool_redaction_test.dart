@@ -41,4 +41,15 @@ void main() {
       {'TOKENIZER': 'visible', 'API_KEY': '[REDACTED]'},
     );
   });
+
+  test('redacts client/pam answer syntax while skipping tiny env values', () {
+    final redactor = SecretRedactor.fromEnvironments([
+      {'SECRET': 'x'},
+    ]);
+    expect(
+      redactor.redact('client_secret=longsecret pam_answer=xyz ok x'),
+      'client_secret=[REDACTED] pam_answer=[REDACTED] ok x',
+    );
+    expect(redactor.redactEnvironment({'SECRET': 'x'}), {'SECRET': '[REDACTED]'});
+  });
 }
