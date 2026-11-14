@@ -102,6 +102,13 @@ class DemoGreeterGateway implements GreeterGateway {
       StreamController<GreeterEvent>.broadcast();
 
   String? _attemptId;
+  bool _closed = false;
+
+  void _emit(GreeterEvent event) {
+    if (!_closed && !_events.isClosed) {
+      _events.add(event);
+    }
+  }
 
   @override
   Stream<GreeterEvent> get events => _events.stream;
@@ -136,7 +143,7 @@ class DemoGreeterGateway implements GreeterGateway {
   Future<String> beginAuthentication(String username) async {
     final attemptId = 'demo-attempt-$username';
     _attemptId = attemptId;
-    _events.add(
+    _emit(
       BackendStateChanged(
         attemptId: attemptId,
         state: BackendAuthState.creatingSession,
@@ -144,15 +151,15 @@ class DemoGreeterGateway implements GreeterGateway {
       ),
     );
     scheduleMicrotask(() {
-      if (_attemptId == attemptId) {
-        _events.add(
+      if (!_closed && _attemptId == attemptId) {
+        _emit(
           BackendPromptReceived(
             attemptId: attemptId,
             kind: PromptKind.secret,
             text: 'Password',
           ),
         );
-        _events.add(
+        _emit(
           BackendStateChanged(
             attemptId: attemptId,
             state: BackendAuthState.waitingForInput,
@@ -167,7 +174,7 @@ class DemoGreeterGateway implements GreeterGateway {
   @override
   Future<void> respond(String attemptId, String response) async {
     if (_attemptId == attemptId) {
-      _events.add(
+      _emit(
         BackendStateChanged(
           attemptId: attemptId,
           state: BackendAuthState.authenticated,
@@ -181,7 +188,7 @@ class DemoGreeterGateway implements GreeterGateway {
   Future<void> cancel(String attemptId) async {
     if (_attemptId == attemptId) {
       _attemptId = null;
-      _events.add(
+      _emit(
         BackendStateChanged(
           attemptId: attemptId,
           state: BackendAuthState.idle,
@@ -194,7 +201,7 @@ class DemoGreeterGateway implements GreeterGateway {
   @override
   Future<void> startSession(String attemptId, String sessionId) async {
     if (_attemptId == attemptId) {
-      _events.add(
+      _emit(
         BackendStateChanged(
           attemptId: attemptId,
           state: BackendAuthState.handingOff,
@@ -208,5 +215,11 @@ class DemoGreeterGateway implements GreeterGateway {
   Future<void> requestPowerAction(PowerAction action) async {}
 
   @override
-  Future<void> close() => _events.close();
+  Future<void> close() async {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
+    await _events.close();
+  }
 }

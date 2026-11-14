@@ -1090,6 +1090,123 @@ void main() {
       isA<RetrySessionCatalogCommand>(),
     );
   });
+
+  test(
+    'cancelling while beginAuthentication is pending cancels the orphaned attempt',
+    () async {
+      final beginCompleter = Completer<void>();
+      final gateway = _FakeGreeterGateway()
+        ..beginAuthenticationFuture = beginCompleter.future;
+      final feature = GreeterFeature(gateway: gateway);
+      addTearDown(feature.dispose);
+      await feature.initialize();
+      await _flushEvents();
+      await feature.dispatch(const WakeGreeterCommand());
+      await _selectDefaultSession(feature);
+
+      final selectFuture = feature.dispatch(
+        SelectUserCommand(gateway.users.first),
+      );
+      await _flushEvents();
+      expect(gateway.beginAuthenticationCalls, 1);
+
+      await feature.dispatch(const CancelAuthenticationCommand());
+      expect(feature.state.authMode, AuthMode.userSelection);
+      expect(feature.state.selectedUser, isNull);
+
+      beginCompleter.complete();
+      await selectFuture;
+      await _flushEvents();
+
+      expect(gateway.cancelledAttemptId, 'attempt-1');
+      expect(feature.state.authMode, AuthMode.userSelection);
+      expect(feature.state.selectedUser, isNull);
+    },
+  );
+
+  test(
+    'sleep during beginAuthentication suppresses FocusCredentialEffect while dormant',
+    () async {
+      final beginCompleter = Completer<void>();
+      final gateway = _FakeGreeterGateway()
+        ..beginAuthenticationFuture = beginCompleter.future;
+      final feature = GreeterFeature(gateway: gateway);
+      addTearDown(feature.dispose);
+      final effects = <FeatureEffect>[];
+      final subscription = feature.effects.listen(effects.add);
+      addTearDown(subscription.cancel);
+
+      await feature.initialize();
+      await _flushEvents();
+      await feature.dispatch(const WakeGreeterCommand());
+      await _selectDefaultSession(feature);
+
+      final selectFuture = feature.dispatch(
+        SelectUserCommand(gateway.users.first),
+      );
+      await _flushEvents();
+      await feature.dispatch(const SleepGreeterCommand());
+
+      beginCompleter.complete();
+      await selectFuture;
+      await _flushEvents();
+
+      expect(feature.state.dormant, isTrue);
+      expect(feature.state.authMode, AuthMode.prompting);
+      expect(effects.whereType<FocusCredentialEffect>(), isEmpty);
+    },
+  );
+
+  test(
+    'non-transport cancel error resets to user selection instead of unavailable',
+    () async {
+      final gateway = _FakeGreeterGateway();
+      final feature = await _createPromptedFeature(gateway);
+      addTearDown(feature.dispose);
+      gateway.cancellationFuture = Future.error(
+        const GreeterGatewayException(
+          'stale or unknown attempt id',
+          kind: GreeterErrorKind.authentication,
+        ),
+      );
+
+      await feature.dispatch(SelectUserCommand(gateway.users.last));
+      await _flushEvents();
+
+      expect(feature.state.serviceMode, ServiceMode.ready);
+      expect(feature.state.selectedUser?.id, 'bob');
+      expect(feature.state.authMode, AuthMode.prompting);
+    },
+  );
+
+  test(
+    'ignores stale power action error after service reconnect',
+    () async {
+      final powerCompleter = Completer<void>();
+      final gateway = _FakeGreeterGateway()
+        ..powerActionFuture = powerCompleter.future;
+      final feature = GreeterFeature(gateway: gateway);
+      addTearDown(feature.dispose);
+      await feature.initialize();
+      await _flushEvents();
+
+      final powerFuture = feature.dispatch(
+        const RequestPowerActionCommand(PowerAction.reboot),
+      );
+      expect(feature.state.powerMode, PowerMode.executing);
+
+      gateway.emit(const BackendDisconnected());
+      await _flushEvents();
+      await feature.dispatch(const ReconnectServiceCommand());
+      await _flushEvents();
+
+      powerCompleter.completeError(const GreeterGatewayException('late fail'));
+      await powerFuture;
+
+      expect(feature.state.powerMode, PowerMode.executing);
+      expect(feature.state.powerError, isNull);
+    },
+  );
 }
 
 Future<GreeterFeature> _createPromptedFeature(

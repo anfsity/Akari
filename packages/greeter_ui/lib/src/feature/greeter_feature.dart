@@ -71,6 +71,7 @@ class GreeterFeature {
   bool _sessionStartInFlight = false;
   bool _disposed = false;
   int _serviceGeneration = 0;
+  int _authGeneration = 0;
   int _sessionLoadGeneration = 0;
 
   GreeterState get state => _state;
@@ -235,6 +236,7 @@ class GreeterFeature {
     // Method replies may outlive a disconnect or reconnect. Invalidate their
     // continuations as well as signals so they cannot revive the old service.
     _serviceGeneration++;
+    _authGeneration++;
     _sessionLoadGeneration++;
     _attemptId = null;
     _beginInFlight = false;
@@ -329,11 +331,18 @@ class GreeterFeature {
     _beginInFlight = true;
     _eventsDuringBegin.clear();
     final generation = _serviceGeneration;
+    final authGeneration = ++_authGeneration;
     try {
       // Signals can precede the reply that supplies the attempt ID. Replay
       // them only after binding that ID, preserving order and stale filtering.
       final attemptId = await gateway.beginAuthentication(user.id);
       if (generation != _serviceGeneration) {
+        return;
+      }
+      if (authGeneration != _authGeneration) {
+        _eventsDuringBegin.clear();
+        _beginInFlight = false;
+        unawaited(_cancelOrphanedAttempt(attemptId));
         return;
       }
       _attemptId = attemptId;
@@ -344,7 +353,7 @@ class GreeterFeature {
         _handleEvent(event);
       }
     } on Object catch (error) {
-      if (generation != _serviceGeneration) {
+      if (generation != _serviceGeneration || authGeneration != _authGeneration) {
         return;
       }
       _eventsDuringBegin.clear();
@@ -356,6 +365,14 @@ class GreeterFeature {
           recovery: GreeterRecovery.retryAuthentication,
         ),
       );
+    }
+  }
+
+  Future<void> _cancelOrphanedAttempt(String attemptId) async {
+    try {
+      await gateway.cancel(attemptId);
+    } on Object {
+      // Best-effort cleanup when a pending start was cancelled before reply.
     }
   }
 
@@ -396,8 +413,11 @@ class GreeterFeature {
   }
 
   Future<void> _cancelAuthentication() async {
+    _authGeneration++;
     final attemptId = _attemptId;
     if (attemptId == null) {
+      _beginInFlight = false;
+      _eventsDuringBegin.clear();
       _resetToUserSelection(clearSelectedUser: true);
       return;
     }
@@ -419,6 +439,13 @@ class GreeterFeature {
       await gateway.cancel(attemptId);
     } on Object catch (error) {
       if (generation != _serviceGeneration) {
+        return;
+      }
+      // If the attempt already ended on the backend (stale/unknown attempt id),
+      // treat the non-transport error as cancelled instead of breaking service.
+      if (error is GreeterGatewayException &&
+          error.kind != GreeterErrorKind.transport) {
+        _resetToUserSelection(clearSelectedUser: true);
         return;
       }
       _updateState(
@@ -504,14 +531,18 @@ class GreeterFeature {
     if (_state.powerMode == PowerMode.executing) {
       return;
     }
+    final generation = _serviceGeneration;
     _updateState(
       _state.copyWith(powerMode: PowerMode.executing, powerError: null),
     );
     try {
       await gateway.requestPowerAction(action);
+      if (generation != _serviceGeneration) {
+        return;
+      }
       _updateState(_state.copyWith(powerMode: PowerMode.succeeded));
     } on Object catch (error) {
-      if (_disposed) {
+      if (generation != _serviceGeneration) {
         return;
       }
       final powerError = _getGreeterError(
@@ -598,7 +629,9 @@ class GreeterFeature {
             authError: null,
           ),
         );
-        _effects.add(const FocusCredentialEffect());
+        if (!_state.dormant) {
+          _effects.add(const FocusCredentialEffect());
+        }
       case PromptKind.error:
         _updateState(_state.copyWith(promptError: text));
       case PromptKind.info:
