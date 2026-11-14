@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_studio/src/authoring/scene_editor.dart';
+import 'package:theme_studio/src/preview/studio_preview_host.dart';
+import 'package:theme_studio/src/timeline/studio_state_graph.dart';
 import 'package:theme_studio/src/timeline/studio_timeline.dart';
 import 'package:theme_studio/src/timeline/studio_timeline_tracks.dart';
 
@@ -158,4 +160,68 @@ void main() {
       expect(editor.canUndo, isFalse);
     },
   );
+
+  testWidgets('cancelling a keyframe drag restores state without committing', (
+    tester,
+  ) async {
+    await pumpTimeline(tester, 700);
+    elapsed.value = const Duration(milliseconds: 500);
+    await tester.pumpAndSettle();
+    final marker = find.byKey(const ValueKey('keyframe-plain-0-1'));
+    final start = tester.getCenter(marker);
+    final gesture = await tester.startGesture(start);
+    await gesture.moveTo(Offset(tester.getCenter(playhead).dx, start.dy));
+    await tester.pump();
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+
+    expect(editor.selectedNode.tracks.single.keyframes[1].timeMs, 250);
+    expect(editor.canUndo, isFalse);
+  });
+
+  testWidgets('timeline handles zero duration and empty selection safely', (
+    tester,
+  ) async {
+    editor.selectNodes({});
+    await tester.pumpWidget(
+      ShadcnApp(
+        home: Scaffold(
+          child: SizedBox(
+            width: 700,
+            child: Column(
+              children: [
+                StudioTimeline(
+                  editor: editor,
+                  duration: Duration.zero,
+                  fallbackDuration: Duration.zero,
+                  elapsed: Duration.zero,
+                  transition: StudioTransition.entrance,
+                  onTimeChanged: (value) => elapsed.value = value,
+                  onTransitionChanged: (_) {},
+                ),
+                StudioStateGraph(
+                  editor: editor,
+                  dormant: false,
+                  scenario: StudioPreviewScenario.password,
+                  onSelect: (_, _) {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('No selection · visual transitions'), findsOneWidget);
+    final addTrack = tester.widget<OutlineButton>(
+      find.byKey(const ValueKey('timeline-add-track')),
+    );
+    expect(addTrack.onPressed, isNull);
+    final addTransition = tester.widget<OutlineButton>(
+      find.byKey(const ValueKey('graph-add-transition')),
+    );
+    expect(addTransition.onPressed, isNull);
+  });
 }

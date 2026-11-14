@@ -243,7 +243,7 @@ class _AssetListState extends State<_AssetList> {
             ? _selected
             : _getPaths().firstOrNull);
     _tint = null;
-    _scroll.jumpTo(0);
+    if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
   List<String> _getPaths() => widget.paths
@@ -842,7 +842,8 @@ class _LayerRowState extends State<_LayerRow> {
                       ),
                     ],
                     if (widget.node.visibleWhen != null ||
-                        widget.node.stateEffects.isNotEmpty) ...[
+                        widget.node.stateEffects.isNotEmpty ||
+                        widget.node.transitions.isNotEmpty) ...[
                       const Gap(4),
                       Icon(
                         LucideIcons.gitBranch,

@@ -8,10 +8,12 @@ import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:theme_project/theme_project.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import '../inspector/code_inspector.dart';
 import '../inspector/node_inspector.dart';
+import '../inspector/studio_form.dart';
 import '../authoring/scene_editor.dart';
 import '../canvas/studio_canvas.dart';
 import '../inspector/studio_effects_inspector.dart';
@@ -20,6 +22,7 @@ import 'studio_status_bar.dart';
 import 'studio_toolbar.dart';
 import '../authoring/studio_create_theme.dart';
 import 'studio_workspace.dart';
+import '../resources/confined_path.dart';
 import '../resources/studio_assets.dart';
 import 'studio_preferences.dart';
 import 'studio_settings.dart';
@@ -60,9 +63,45 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   bool _effects = false;
   bool _confirmReload = false;
   int _seedRevision = 0;
+  int _assetActionRevision = 0;
+  final Map<String, List<String>> _createdScenesByProject = {};
   String? _lastBackgroundAsset;
   Map<String, String> _lastThemeProperties = const {};
   ui.Color? _themeSeed;
+
+  static String _getCanonicalDirectoryPath(String path) {
+    final directory = Directory(path);
+    return directory.existsSync() ? directory.resolveSymbolicLinksSync() : path;
+  }
+
+  List<String> _getProjectScenePaths(StudioThemeProject project) {
+    final result = <String>[];
+    final seenCanonical = <String>{};
+    void addPath(String path) {
+      final file = File(path);
+      final canonical = file.existsSync()
+          ? file.resolveSymbolicLinksSync()
+          : path;
+      if (seenCanonical.add(canonical)) result.add(path);
+    }
+
+    for (final path in project.scenePaths) {
+      addPath(path);
+    }
+    if (File('${project.directory}/pubspec.yaml').existsSync()) {
+      for (final file in findThemeSceneFiles(Directory(project.directory))) {
+        addPath(file.path);
+      }
+    }
+    final created =
+        _createdScenesByProject[_getCanonicalDirectoryPath(project.directory)];
+    if (created != null) {
+      for (final path in created) {
+        addPath(path);
+      }
+    }
+    return result;
+  }
 
   @override
   void initState() {
@@ -77,10 +116,9 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     );
     _assets = _compiledAssets;
     _updateTheme(_project.themeBuilder());
-    _scenePaths = [..._project.scenePaths];
+    _scenePaths = _getProjectScenePaths(_project);
     _path = _scenePaths.first;
     _openScene(_path);
-    unawaited(_loadSeed());
     unawaited(_loadPreferences());
   }
 
@@ -136,6 +174,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       componentCatalog: theme.componentCatalog,
       presetCatalog: theme.presetCatalog,
       layout: theme.layout,
+      minHitTarget: theme.bundle.tokens.minHitTarget,
     );
     _theme = theme.copyWith(
       bundle: theme.bundle.copyWith(
@@ -244,7 +283,12 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       _assetPaths = assetPaths;
       _path = path;
       _updateTheme(session.theme);
-      if (!_scenePaths.contains(path)) _scenePaths.add(path);
+      _scenePaths = _getProjectScenePaths(_project);
+      if (assets.directory.path ==
+              _getCanonicalDirectoryPath(_project.directory) &&
+          !_scenePaths.contains(path)) {
+        _scenePaths.add(path);
+      }
       _error = null;
       _confirmReload = false;
       unawaited(_loadSeed());
@@ -284,9 +328,13 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       _compiledAssets = assets;
       _assets = assets;
       _assetPaths = assetPaths;
-      _scenePaths = [...project.scenePaths];
+      _scenePaths = _getProjectScenePaths(project);
       _path = session.editor.file.path;
-      if (!_scenePaths.contains(_path)) _scenePaths.add(_path);
+      if (assets.directory.path ==
+              _getCanonicalDirectoryPath(project.directory) &&
+          !_scenePaths.contains(_path)) {
+        _scenePaths.add(_path);
+      }
       _updateTheme(session.theme);
       _error = null;
       _confirmReload = false;
@@ -367,7 +415,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     }
     for (final project in _projects) {
       if (!identical(project, _project) &&
-          project.directory == assets?.directory.path) {
+          _getCanonicalDirectoryPath(project.directory) ==
+              assets?.directory.path) {
         await _switchTheme(project, context, scenePath: path);
         return;
       }
@@ -412,68 +461,84 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     }
   }
 
-  Future<void> _applyBackground(String asset) async {
+  Future<void> _runAssetAction(
+    Future<void> Function(SceneEditor editor, bool Function() isCurrent) action, {
+    required String errorPrefix,
+    bool requiresSelection = false,
+  }) async {
     final editor = _editor;
-    if (editor == null || !editor.tryApplyDraft()) return;
+    if (editor == null ||
+        (requiresSelection && editor.selectedIds.isEmpty) ||
+        !editor.tryApplyDraft()) {
+      return;
+    }
+    final revision = ++_assetActionRevision;
+    bool isCurrent() =>
+        mounted &&
+        revision == _assetActionRevision &&
+        identical(editor, _editor);
     try {
-      final file = _assets.findFile(asset);
-      if (file == null) {
-        throw FormatException('Asset "$asset" is not a local theme file.');
-      }
-      final bytes = await file.readAsBytes();
-      final codec = await ui.instantiateImageCodec(bytes);
-      codec.dispose();
-      if (!mounted || !identical(editor, _editor)) return;
-      editor.updateScene(
-        background: editor.document.background.copyWith(
-          kind: SceneBackgroundKind.image,
-          asset: asset,
-        ),
-      );
+      await action(editor, isCurrent);
+      if (!isCurrent()) return;
       setState(() => _error = null);
     } on Object catch (error) {
-      if (mounted) setState(() => _error = 'Cannot use image: $error');
+      if (mounted && revision == _assetActionRevision) {
+        setState(() => _error = '$errorPrefix: $error');
+      }
     }
   }
 
-  Future<void> _applyFont(String asset) async {
-    final editor = _editor;
-    if (editor == null || !editor.tryApplyDraft()) return;
-    try {
+  Future<void> _applyBackground(String asset) => _runAssetAction((
+    editor,
+    isCurrent,
+  ) async {
+    final file = _assets.findFile(asset);
+    if (file == null) {
+      throw FormatException('Asset "$asset" is not a local theme file.');
+    }
+    final bytes = await file.readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    codec.dispose();
+    if (!isCurrent()) return;
+    editor.updateScene(
+      background: editor.document.background.copyWith(
+        kind: SceneBackgroundKind.image,
+        asset: asset,
+      ),
+    );
+  }, errorPrefix: 'Cannot use image');
+
+  Future<void> _applyFont(String asset) => _runAssetAction(
+    (editor, isCurrent) async {
       await _assets.loadFontPreview(asset);
-      if (!mounted || !identical(editor, _editor)) return;
+      if (!isCurrent() || editor.selectedIds.isEmpty) return;
       final style =
           editor.document.styleTokens[editor.selectedNode.styleToken] ??
           const SceneStyle();
       editor.updateSelectionStyle(style.copyWith(fontAsset: asset));
-      setState(() => _error = null);
-    } on Object catch (error) {
-      if (mounted) setState(() => _error = 'Cannot apply font: $error');
-    }
-  }
+    },
+    errorPrefix: 'Cannot apply font',
+    requiresSelection: true,
+  );
 
-  Future<void> _placeAsset(SceneAsset asset) async {
-    final editor = _editor;
-    if (editor == null || !editor.tryApplyDraft()) return;
-    try {
-      if (asset.kind == SceneAssetKind.svg) {
-        final source = await _assets.loadTextAsset(asset.path);
-        final picture = await vg.loadPicture(SvgStringLoader(source), null);
-        picture.picture.dispose();
-      } else {
-        final bytes = await _assets.loadBytes(asset.path);
-        final codec = await ui.instantiateImageCodec(
-          bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
-        );
-        codec.dispose();
-      }
-      if (!mounted || !identical(editor, _editor)) return;
-      editor.createAssetNode(asset);
-      setState(() => _error = null);
-    } on Object catch (error) {
-      if (mounted) setState(() => _error = 'Cannot place asset: $error');
+  Future<void> _placeAsset(SceneAsset asset) => _runAssetAction((
+    editor,
+    isCurrent,
+  ) async {
+    if (asset.kind == SceneAssetKind.svg) {
+      final source = await _assets.loadTextAsset(asset.path);
+      final picture = await vg.loadPicture(SvgStringLoader(source), null);
+      picture.picture.dispose();
+    } else {
+      final bytes = await _assets.loadBytes(asset.path);
+      final codec = await ui.instantiateImageCodec(
+        bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
+      );
+      codec.dispose();
     }
-  }
+    if (!isCurrent()) return;
+    editor.createAssetNode(asset);
+  }, errorPrefix: 'Cannot place asset');
 
   void _save() {
     final editor = _editor;
@@ -514,7 +579,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                     key: const ValueKey('new-scene-name'),
                     controller: name,
                   ),
-                  if (error != null) Text(error!).small(),
+                  if (error != null) StudioFormError(error!),
                 ],
               ),
             ),
@@ -539,26 +604,28 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                     return;
                   }
                   try {
-                    file.parent.createSync(recursive: true);
-                    file.writeAsStringSync(
-                      encodeSceneDocument(
-                        SceneDocument(
-                          id: id,
-                          version: currentSceneVersion,
-                          canvas: _editor!.document.canvas,
-                          background: const SceneBackground(
-                            kind: SceneBackgroundKind.solid,
-                          ),
-                          nodes: const [
-                            SceneNode(
-                              id: 'artboard',
-                              componentId: 'frame',
-                              layout: SceneLayout(),
-                              rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
-                            ),
-                          ],
+                    final source = encodeSceneDocument(
+                      SceneDocument(
+                        id: id,
+                        version: currentSceneVersion,
+                        canvas: _editor?.document.canvas ?? const SceneCanvas(),
+                        background: const SceneBackground(
+                          kind: SceneBackgroundKind.solid,
                         ),
+                        nodes: const [
+                          SceneNode(
+                            id: 'artboard',
+                            componentId: 'frame',
+                            layout: SceneLayout(),
+                            rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+                          ),
+                        ],
                       ),
+                    );
+                    writeFileAtomically(
+                      file,
+                      '$source\n',
+                      tempName: '$id.scene.json',
                     );
                     Navigator.of(context).pop(file.path);
                   } on FileSystemException catch (failure) {
@@ -571,7 +638,17 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
           ),
         ),
       ).future;
-      if (mounted && path != null) setState(() => _openScene(path));
+      if (mounted && path != null) {
+        final projectKey = _getCanonicalDirectoryPath(_project.directory);
+        if (_assets.directory.path == projectKey) {
+          final created = _createdScenesByProject.putIfAbsent(
+            projectKey,
+            () => [],
+          );
+          if (!created.contains(path)) created.add(path);
+        }
+        setState(() => _openScene(path));
+      }
     } finally {
       name.dispose();
     }
@@ -623,7 +700,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       onOpenSettings: () => _openSettings(context),
       input: _preferences.input,
       onCanvasKeyEvent: (event) =>
-          _canvasKey.currentState!.handleKeyEvent(event),
+          _canvasKey.currentState?.handleKeyEvent(event) ??
+          KeyEventResult.ignored,
       toolbar: StudioToolbar(
         themeId: _theme.id,
         readOnly: _inspect,

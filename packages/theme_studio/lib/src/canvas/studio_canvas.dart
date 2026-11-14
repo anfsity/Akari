@@ -104,9 +104,11 @@ class StudioCanvasState extends State<StudioCanvas> {
 
   double _getEffectiveZoom() {
     if (_zoom != null) return _zoom!;
-    final viewport =
-        _viewportKey.currentContext!.findRenderObject()! as RenderBox;
-    final canvas = widget.editor!.document.canvas;
+    final viewport = _viewportKey.currentContext?.findRenderObject();
+    final canvas = widget.editor?.document.canvas;
+    if (viewport is! RenderBox || !viewport.hasSize || canvas == null) {
+      return 1;
+    }
     return calculateFitZoom(
       viewportSize: viewport.size,
       referenceSize: Size(
@@ -550,6 +552,7 @@ class StudioCanvasState extends State<StudioCanvas> {
                             !widget.readOnly &&
                             !_previewing &&
                             _elapsed == null &&
+                            session.selectedIds.isNotEmpty &&
                             (session.selectedIds.length > 1 ||
                                 session.selectedNode.layout != null)) ...[
                           const Divider(),
@@ -695,7 +698,6 @@ class StudioCanvasState extends State<StudioCanvas> {
                                                   (node) => node.id == id,
                                                 );
                                           },
-                                          onCommitDrag: session.updateNode,
                                           onDragNodeChanged: session
                                               .inspector
                                               .updatePreviewNode,

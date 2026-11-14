@@ -30,8 +30,10 @@ class StudioStateGraph extends StatelessWidget {
         child: Text(label),
       );
   Future<void> _editTransition(BuildContext context, int? index) async {
-    if (!editor.tryApplyDraft()) return;
+    if (editor.selectedIds.isEmpty || !editor.tryApplyDraft()) return;
     final node = editor.selectedNode;
+    if (index != null && index >= node.transitions.length) return;
+    final targetId = node.id;
     final result = await showOverlay<SceneStateTransition>(
       context,
       const DialogConfiguration(),
@@ -40,18 +42,26 @@ class StudioStateGraph extends StatelessWidget {
       ),
     ).future;
     if (result == null || !context.mounted) return;
-    final rules = [...node.transitions];
+    final current = editor.document.nodes
+        .where((entry) => entry.id == targetId)
+        .firstOrNull;
+    if (current == null) return;
+    final rules = [...current.transitions];
     if (index == null) {
       rules.add(result);
-    } else {
+    } else if (index < rules.length) {
       rules[index] = result;
+    } else {
+      return;
     }
-    editor.updateNode(node.copyWith(transitions: rules));
+    editor.updateNode(current.copyWith(transitions: rules));
   }
 
   @override
   Widget build(BuildContext context) {
-    final node = editor.selectedNode;
+    final hasSelection = editor.selectedIds.isNotEmpty;
+    final node = hasSelection ? editor.selectedNode : null;
+    final transitions = node?.transitions ?? const <SceneStateTransition>[];
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -81,27 +91,35 @@ class StudioStateGraph extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text('${node.id} · visual transitions')
-                    .small()
-                    .semiBold(),
+                child: Text(
+                  node == null
+                      ? 'No selection · visual transitions'
+                      : '${node.id} · visual transitions',
+                ).small().semiBold(),
               ),
               OutlineButton(
                 key: const ValueKey('graph-add-transition'),
-                onPressed: () => _editTransition(context, null),
+                onPressed: node == null
+                    ? null
+                    : () => _editTransition(context, null),
                 child: const Text('Add transition').small(),
               ),
             ],
           ),
           const Gap(6),
           SizedBox(
-            height: node.transitions.isEmpty ? 42 : 120,
-            child: node.transitions.isEmpty
+            height: transitions.isEmpty ? 42 : 120,
+            child: node == null
+                ? const Text(
+                    'Select a node to inspect or add visual transition rules.',
+                  ).small().muted()
+                : transitions.isEmpty
                 ? const Text(
                     'Add an edge to animate a layer when its source and target conditions match.',
                   ).small().muted()
                 : ListView(
                     children: [
-                      for (var i = 0; i < node.transitions.length; i++)
+                      for (var i = 0; i < transitions.length; i++)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 6),
                           child: Row(
@@ -115,7 +133,7 @@ class StudioStateGraph extends StatelessWidget {
                                       Expanded(
                                         child: Text(
                                           getSceneConditionLabel(
-                                            node.transitions[i].from,
+                                            transitions[i].from,
                                           ),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
@@ -133,26 +151,35 @@ class StudioStateGraph extends StatelessWidget {
                                       Expanded(
                                         child: Text(
                                           getSceneConditionLabel(
-                                            node.transitions[i].to,
+                                            transitions[i].to,
                                           ),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                         ).small(),
                                       ),
                                       const Gap(8),
-                                      Text(node.transitions[i].effect.name)
-                                          .small(),
+                                      Text(transitions[i].effect.name).small(),
                                     ],
                                   ),
                                 ),
                               ),
                               GhostButton(
-                                onPressed: () => editor.updateNode(
-                                  node.copyWith(
-                                    transitions: [...node.transitions]
-                                      ..removeAt(i),
-                                  ),
-                                ),
+                                onPressed: () {
+                                  if (!editor.tryApplyDraft()) return;
+                                  final current = editor.document.nodes
+                                      .where((entry) => entry.id == node.id)
+                                      .firstOrNull;
+                                  if (current == null ||
+                                      i >= current.transitions.length) {
+                                    return;
+                                  }
+                                  editor.updateNode(
+                                    current.copyWith(
+                                      transitions: [...current.transitions]
+                                        ..removeAt(i),
+                                    ),
+                                  );
+                                },
                                 child: const Icon(LucideIcons.x, size: 14),
                               ),
                             ],
@@ -275,7 +302,7 @@ class _TransitionDialogState extends State<_TransitionDialog> {
               ),
               if (_error != null) ...[
                 const Gap(8),
-                Text(_error!).small(),
+                StudioFormError(_error!),
               ],
             ],
           ),

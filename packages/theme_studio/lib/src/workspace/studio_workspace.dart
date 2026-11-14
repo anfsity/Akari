@@ -83,7 +83,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
     super.initState();
     _sidebar.addListener(_scheduleSave);
     _inspector.addListener(_scheduleSave);
-    unawaited(_restoreLayout());
+    unawaited(_loadLayout());
   }
 
   StudioDock _getDock(String title) =>
@@ -117,29 +117,33 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
     inspectorBounds: _inspectorBounds,
   );
 
-  Future<void> _restoreLayout() async {
+  Future<void> _loadLayout() async {
     final revision = _layoutRevision;
     try {
       final layout = await StudioWorkspaceLayout.load();
       if (!mounted || revision != _layoutRevision) return;
       _restoring = true;
-      setState(() {
-        _sidebarDock = layout.sidebarDock;
-        _inspectorDock = layout.inspectorDock;
-        _sidebarVisible = layout.sidebarVisible;
-        _inspectorVisible = layout.inspectorVisible;
-        _sidebar.size = layout.leftWidth;
-        _inspector.size = layout.rightWidth;
-        _sidebarBounds = layout.sidebarBounds;
-        _inspectorBounds = layout.inspectorBounds;
-        _mode = layout.mode;
-        _updatePanels();
-      });
-      _restoring = false;
+      try {
+        setState(() {
+          _sidebarDock = layout.sidebarDock;
+          _inspectorDock = layout.inspectorDock;
+          _sidebarVisible = layout.sidebarVisible;
+          _inspectorVisible = layout.inspectorVisible;
+          _sidebar.size = layout.leftWidth;
+          _inspector.size = layout.rightWidth;
+          _sidebarBounds = layout.sidebarBounds;
+          _inspectorBounds = layout.inspectorBounds;
+          _mode = layout.mode;
+          _updatePanels();
+        });
+      } finally {
+        _restoring = false;
+      }
     } on Object {
       if (mounted) {
         setState(
-          () => _workspaceError = 'Saved workspace could not be restored. Choose a workspace preset to reset it.',
+          () => _workspaceError =
+              'Saved workspace could not be restored. Choose a workspace preset to reset it.',
         );
       }
     }
@@ -194,8 +198,11 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
     FocusManager.instance.primaryFocus?.unfocus();
     _presenting = !_presenting;
     _restoring = true;
-    _updatePanels();
-    _restoring = false;
+    try {
+      _updatePanels();
+    } finally {
+      _restoring = false;
+    }
   });
 
   void _setDock(String title, StudioDock dock) {
@@ -237,11 +244,20 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
   void dispose() {
     if (_saveTimer?.isActive ?? false) {
       _saveTimer!.cancel();
-      unawaited(_saveLayout());
+      final layout = _getLayout();
+      unawaited(layout.save().catchError((Object _) {}));
     }
     _sidebar.dispose();
     _inspector.dispose();
     super.dispose();
+  }
+
+  double _getDockExtent(
+    AbsoluteResizablePaneController controller,
+    StudioDock side,
+  ) {
+    if (!controller.collapsed) return controller.value;
+    return _presenting || _getRailPanels(side).isEmpty ? 0 : 32;
   }
 
   Widget _button(
@@ -448,8 +464,8 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                     child: SizedBox(
                       width: math.max(
                         384 +
-                            (_sidebar.collapsed ? 32 : _sidebar.value) +
-                            (_inspector.collapsed ? 32 : _inspector.value),
+                            _getDockExtent(_sidebar, StudioDock.left) +
+                            _getDockExtent(_inspector, StudioDock.right),
                         constraints.maxWidth,
                       ),
                       height: math.max(420, constraints.maxHeight),
@@ -501,12 +517,10 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                           minSize: 216,
                                           maxSize: 360,
                                           collapsedSize: _sidebar.collapsed
-                                              ? (_presenting ||
-                                                        _getPanels(
-                                                          StudioDock.left,
-                                                        ).isEmpty
-                                                    ? 0
-                                                    : 32)
+                                              ? _getDockExtent(
+                                                  _sidebar,
+                                                  StudioDock.left,
+                                                )
                                               : null,
                                           child: _buildDockGroup(
                                             _sidebar,
@@ -524,12 +538,10 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                           minSize: 260,
                                           maxSize: 420,
                                           collapsedSize: _inspector.collapsed
-                                              ? (_presenting ||
-                                                        _getPanels(
-                                                          StudioDock.right,
-                                                        ).isEmpty
-                                                    ? 0
-                                                    : 32)
+                                              ? _getDockExtent(
+                                                  _inspector,
+                                                  StudioDock.right,
+                                                )
                                               : null,
                                           child: _buildDockGroup(
                                             _inspector,
@@ -584,7 +596,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                 child: widget.statusBar,
                               ),
                               if (_workspaceError != null)
-                                Text(_workspaceError!).small(),
+                                StudioFormError(_workspaceError!),
                             ],
                           ),
                           if (_presenting)

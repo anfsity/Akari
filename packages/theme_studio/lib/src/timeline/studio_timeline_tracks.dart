@@ -64,7 +64,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
 
   void _addTrack() {
     final editor = widget.editor;
-    if (!editor.tryApplyDraft()) return;
+    if (editor.selectedIds.isEmpty || !editor.tryApplyDraft()) return;
     final node = editor.selectedNode;
     if (node.tracks.any((track) => track.property == _property)) return;
     final start = switch (_property) {
@@ -95,7 +95,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
 
   void _addKeyframe() {
     final editor = widget.editor;
-    if (!editor.tryApplyDraft()) return;
+    if (editor.selectedIds.isEmpty || !editor.tryApplyDraft()) return;
     final node = editor.selectedNode;
     final index = node.tracks.indexWhere(
       (track) => track.property == _property,
@@ -124,33 +124,54 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
   }
 
   Future<void> _editFrame(
-    SceneNode node,
-    int trackIndex,
+    String nodeId,
+    SceneMotionProperty property,
     int frameIndex,
   ) async {
-    final track = node.tracks[trackIndex];
+    final editor = widget.editor;
+    if (!editor.tryApplyDraft()) return;
+    final current = editor.document.nodes
+        .where((entry) => entry.id == nodeId)
+        .firstOrNull;
+    if (current == null) return;
+    final currentTrackIndex = current.tracks.indexWhere(
+      (track) => track.property == property,
+    );
+    if (currentTrackIndex < 0) return;
+    final currentTrack = current.tracks[currentTrackIndex];
+    if (frameIndex >= currentTrack.keyframes.length) return;
     final result = await showOverlay<({SceneKeyframe? frame})>(
       context,
       const DialogConfiguration(),
-      builder: (_) => _KeyframeDialog(track: track, index: frameIndex),
+      builder: (_) => _KeyframeDialog(track: currentTrack, index: frameIndex),
     ).future;
     if (!mounted || result == null) return;
-    final frames = [...track.keyframes];
+    final latest = editor.document.nodes
+        .where((entry) => entry.id == nodeId)
+        .firstOrNull;
+    if (latest == null) return;
+    final latestTrackIndex = latest.tracks.indexWhere(
+      (track) => track.property == property,
+    );
+    if (latestTrackIndex < 0) return;
+    final latestTrack = latest.tracks[latestTrackIndex];
+    if (frameIndex >= latestTrack.keyframes.length) return;
+    final frames = [...latestTrack.keyframes];
     if (result.frame case final frame?) {
       frames[frameIndex] = frame;
     } else {
       frames.removeAt(frameIndex);
     }
-    final tracks = [...node.tracks];
+    final tracks = [...latest.tracks];
     if (frames.isEmpty) {
-      tracks.removeAt(trackIndex);
+      tracks.removeAt(latestTrackIndex);
     } else {
-      tracks[trackIndex] = SceneMotionTrack(
-        property: track.property,
+      tracks[latestTrackIndex] = SceneMotionTrack(
+        property: latestTrack.property,
         keyframes: frames,
       );
     }
-    widget.editor.updateNode(node.copyWith(tracks: tracks));
+    editor.updateNode(latest.copyWith(tracks: tracks));
   }
 
   Widget _row(
@@ -190,8 +211,10 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
   @override
   Widget build(BuildContext context) {
     final editor = widget.editor;
-    final node = editor.selectedNode;
-    final hasTrack = node.tracks.any((track) => track.property == _property);
+    final hasSelection = editor.selectedIds.isNotEmpty;
+    final node = hasSelection ? editor.selectedNode : null;
+    final hasTrack =
+        node != null && node.tracks.any((track) => track.property == _property);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     // Match Slider's internal inset, with room for endpoint keyframe targets.
@@ -217,7 +240,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
             OutlineButton(
               key: const ValueKey('timeline-add-track'),
               density: ButtonDensity.dense,
-              onPressed: hasTrack ? null : _addTrack,
+              onPressed: !hasSelection || hasTrack ? null : _addTrack,
               child: const Text('Add track').small(),
             ),
             OutlineButton(
@@ -229,13 +252,19 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
             if (hasTrack)
               GhostButton(
                 density: ButtonDensity.dense,
-                onPressed: () => editor.updateNode(
-                  node.copyWith(
-                    tracks: node.tracks
-                        .where((track) => track.property != _property)
-                        .toList(),
-                  ),
-                ),
+                onPressed: () {
+                  if (editor.selectedIds.isEmpty || !editor.tryApplyDraft()) {
+                    return;
+                  }
+                  final current = editor.selectedNode;
+                  editor.updateNode(
+                    current.copyWith(
+                      tracks: current.tracks
+                          .where((track) => track.property != _property)
+                          .toList(),
+                    ),
+                  );
+                },
                 child: const Text('Remove track').small(),
               ),
           ],
@@ -332,10 +361,12 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                                       ),
                                       top: 4,
                                       bottom: 4,
-                                      child: GestureDetector(
-                                        key: ValueKey(
-                                          'timeline-block-${item.id}',
-                                        ),
+                                      child: Listener(
+                                        onPointerCancel: (_) => _cancel(),
+                                        child: GestureDetector(
+                                          key: ValueKey(
+                                            'timeline-block-${item.id}',
+                                          ),
                                         behavior: HitTestBehavior.opaque,
                                         onTap: () => editor.selectNode(item.id),
                                         dragStartBehavior:
@@ -454,26 +485,28 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                                           ),
                                         );
                                       },
-                                      onHorizontalDragEnd: (_) => _commit(),
-                                      onHorizontalDragCancel: _cancel,
-                                      child: const SizedBox(
-                                        width: 12,
-                                        child: Center(
-                                          child: Icon(
-                                            LucideIcons.gripVertical,
-                                            size: 12,
+                                            onHorizontalDragEnd: (_) =>
+                                                _commit(),
+                                            onHorizontalDragCancel: _cancel,
+                                            child: const SizedBox(
+                                              width: 12,
+                                              child: Center(
+                                                child: Icon(
+                                                  LucideIcons.gripVertical,
+                                                  size: 12,
+                                                ),
+                                              ),
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          onSelect: () => editor.selectNode(item.id),
                         ),
-                        onSelect: () => editor.selectNode(item.id),
-                      ),
                       for (
                         var trackIndex = 0;
                         trackIndex < item.tracks.length;
@@ -512,19 +545,24 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                                       width -
                                       studioTimelineTrackPadding,
                                   top: 2,
-                                  child: GestureDetector(
-                                    key: ValueKey(
-                                      'keyframe-${item.id}-$trackIndex-$frameIndex',
-                                    ),
-                                    onTap: () {
-                                      editor.selectNode(item.id);
-                                      setState(
-                                        () => _property =
-                                            item.tracks[trackIndex].property,
-                                      );
-                                    },
-                                    onDoubleTap: () =>
-                                        _editFrame(item, trackIndex, frameIndex),
+                                  child: Listener(
+                                    onPointerCancel: (_) => _cancel(),
+                                    child: GestureDetector(
+                                      key: ValueKey(
+                                        'keyframe-${item.id}-$trackIndex-$frameIndex',
+                                      ),
+                                      onTap: () {
+                                        editor.selectNode(item.id);
+                                        setState(
+                                          () => _property =
+                                              item.tracks[trackIndex].property,
+                                        );
+                                      },
+                                      onDoubleTap: () => _editFrame(
+                                        item.id,
+                                        item.tracks[trackIndex].property,
+                                        frameIndex,
+                                      ),
                                     dragStartBehavior: DragStartBehavior.down,
                                     onHorizontalDragStart: (details) =>
                                         _start(item, details, width),
@@ -565,18 +603,19 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                                         ),
                                       );
                                     },
-                                    onHorizontalDragEnd: (_) => _commit(),
-                                    onHorizontalDragCancel: _cancel,
-                                    child: Tooltip(
-                                      tooltip: (_) => const Text(
-                                        'Drag time · Double-click to edit',
-                                      ),
-                                      child: const SizedBox(
-                                        width: 2 * studioTimelineTrackPadding,
-                                        height: 24,
-                                        child: Icon(
-                                          LucideIcons.diamond,
-                                          size: 13,
+                                      onHorizontalDragEnd: (_) => _commit(),
+                                      onHorizontalDragCancel: _cancel,
+                                      child: Tooltip(
+                                        tooltip: (_) => const Text(
+                                          'Drag time · Double-click to edit',
+                                        ),
+                                        child: const SizedBox(
+                                          width: 2 * studioTimelineTrackPadding,
+                                          height: 24,
+                                          child: Icon(
+                                            LucideIcons.diamond,
+                                            size: 13,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -712,7 +751,7 @@ class _KeyframeDialogState extends State<_KeyframeDialog> {
             values: SceneKeyframeCurve.values,
             onChanged: (value) => setState(() => _curve = value),
           ),
-          if (_error != null) Text(_error!).small(),
+          if (_error != null) StudioFormError(_error!),
         ],
       ),
     ),

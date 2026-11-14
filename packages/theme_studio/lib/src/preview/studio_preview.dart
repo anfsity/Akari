@@ -46,7 +46,6 @@ class StudioPreview extends StatefulWidget {
     required this.dormant,
     required this.onSelect,
     required this.onStartDrag,
-    required this.onCommitDrag,
     required this.onDragNodeChanged,
     required this.preferences,
     required this.tool,
@@ -92,7 +91,7 @@ class StudioPreview extends StatefulWidget {
   final ValueChanged<List<SceneNode>>? onCommitNodes;
   final void Function(SceneNode, Offset)? onPlaceNode;
   final void Function(StudioComponent, Offset)? onCreateComponent;
-  final void Function(String, String)? onUpdateText;
+  final bool Function(String, String)? onUpdateText;
   final bool snapToGuides;
   final Duration? playbackElapsed;
   final StudioTransition transition;
@@ -117,7 +116,6 @@ class StudioPreview extends StatefulWidget {
   final ValueChanged<double>? onZoom;
   final ValueChanged<String> onSelect;
   final SceneNode? Function(String id) onStartDrag;
-  final ValueChanged<SceneNode> onCommitDrag;
   final ValueChanged<SceneNode> onDragNodeChanged;
 
   @override
@@ -152,7 +150,11 @@ class _StudioPreviewState extends State<StudioPreview>
               document.canvas.referenceWidth.toDouble(),
               document.canvas.referenceHeight.toDouble(),
             ),
+        safeArea: document.canvas.useSafeArea
+            ? MediaQuery.paddingOf(context)
+            : EdgeInsets.zero,
         minHitTarget: widget.theme.bundle.tokens.minHitTarget,
+        fontFamilies: sceneFontFamilies.value,
       );
 
   _NodeDrag _createDrag(
@@ -271,10 +273,10 @@ class _StudioPreviewState extends State<StudioPreview>
         updated,
         for (final other in _otherDrags) calculate(other),
       ];
-      final ids = nodes.map((node) => node.id).toSet();
-      for (final node in widget.document.layerOrder) {
-        if (ids.contains(node.parentId)) ids.add(node.id);
-      }
+      final ids = getDescendantIds(
+        widget.document,
+        nodes.map((node) => node.id),
+      );
       final candidates = {for (final node in nodes) node.id: node};
       final geometry = _getGeometry(
         widget.document.copyWith(
@@ -325,6 +327,14 @@ class _StudioPreviewState extends State<StudioPreview>
     if (changed) widget.onDragNodeChanged(updated);
   }
 
+  void _clearDragState() {
+    _drag = null;
+    _otherDrags.clear();
+    _verticalGuides = [];
+    _horizontalGuides = [];
+    _measurements = [];
+  }
+
   void _stopDrag({required bool commit}) {
     final drag = _drag;
     if (drag == null) return;
@@ -333,19 +343,9 @@ class _StudioPreviewState extends State<StudioPreview>
       drag.preview,
       for (final other in _otherDrags) other.preview,
     ];
-    setState(() {
-      _drag = null;
-      _otherDrags.clear();
-      _verticalGuides = [];
-      _horizontalGuides = [];
-      _measurements = [];
-    });
+    setState(_clearDragState);
     if (commit) {
-      if (widget.onCommitNodes case final onCommit?) {
-        onCommit(nodes);
-      } else {
-        widget.onCommitDrag(drag.preview);
-      }
+      widget.onCommitNodes?.call(nodes);
     }
   }
 
@@ -424,6 +424,14 @@ class _StudioPreviewState extends State<StudioPreview>
     if (!identical(oldWidget.theme, widget.theme) ||
         _hasCanvasChanged(oldWidget.document.canvas, widget.document.canvas)) {
       _updateComponents();
+    }
+    if (widget.readOnly || widget.interactive) {
+      _editingText = null;
+      _clearDragState();
+    } else if (_editingText case final editing?) {
+      if (!widget.document.nodes.any((node) => node.id == editing.id)) {
+        _editingText = null;
+      }
     }
   }
 
@@ -515,7 +523,7 @@ class _StudioPreviewState extends State<StudioPreview>
   void _commitText() {
     final node = _editingText;
     if (node == null) return;
-    widget.onUpdateText?.call(node.id, _text.text);
+    if (widget.onUpdateText?.call(node.id, _text.text) == false) return;
     setState(() => _editingText = null);
   }
 
@@ -799,9 +807,10 @@ class _StudioPreviewState extends State<StudioPreview>
                       ),
                     ),
                   if (_editingText case final node?)
-                    Positioned.fromRect(
-                      rect: geometry[node.id]!.bounds,
-                      child: Localizations.override(
+                    if (geometry[node.id] case final nodeGeometry?)
+                      Positioned.fromRect(
+                        rect: nodeGeometry.bounds,
+                        child: Localizations.override(
                         context: context,
                         delegates: const [
                           DefaultMaterialLocalizations.delegate,
@@ -847,15 +856,17 @@ class _StudioPreviewState extends State<StudioPreview>
     );
   }
 
+  void _selectOnTap(String nodeId) {
+    if (!_selectedIds.contains(nodeId) ||
+        HardwareKeyboard.instance.isShiftPressed) {
+      widget.onSelect(nodeId);
+    }
+  }
+
   Widget _buildSelectableNode(SceneNode node, Widget child) => _PreviewNode(
     nodeId: node.id,
     interactive: widget.interactive,
-    onSelect: () {
-      if (!_selectedIds.contains(node.id) ||
-          HardwareKeyboard.instance.isShiftPressed) {
-        widget.onSelect(node.id);
-      }
-    },
+    onSelect: () => _selectOnTap(node.id),
     onDoubleTap: () => _startTextEditing(node),
     onStartDrag: widget.readOnly || widget.interactive
         ? null
@@ -869,17 +880,21 @@ class _StudioPreviewState extends State<StudioPreview>
   Widget _buildInteractiveFrame(SceneNode node, Widget child) =>
       widget.interactive
       ? child
-      : GestureDetector(
-          key: ValueKey('preview-${node.id}'),
+      : Listener(
           behavior: HitTestBehavior.translucent,
-          onTap: () => widget.onSelect(node.id),
-          onPanStart: widget.readOnly
-              ? null
-              : (details) => _startDrag(node.id, details),
-          onPanUpdate: widget.readOnly ? null : _updateDrag,
-          onPanEnd: widget.readOnly ? null : (_) => _stopDrag(commit: true),
-          onPanCancel: () => _stopDrag(commit: false),
-          child: child,
+          onPointerCancel: (_) => _stopDrag(commit: false),
+          child: GestureDetector(
+            key: ValueKey('preview-${node.id}'),
+            behavior: HitTestBehavior.translucent,
+            onTap: () => _selectOnTap(node.id),
+            onPanStart: widget.readOnly
+                ? null
+                : (details) => _startDrag(node.id, details),
+            onPanUpdate: widget.readOnly ? null : _updateDrag,
+            onPanEnd: widget.readOnly ? null : (_) => _stopDrag(commit: true),
+            onPanCancel: () => _stopDrag(commit: false),
+            child: child,
+          ),
         );
 }
 

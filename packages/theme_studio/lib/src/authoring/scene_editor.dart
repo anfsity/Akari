@@ -7,6 +7,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import '../inspector/node_inspector_controller.dart';
 import '../canvas/node_geometry.dart';
+import '../resources/confined_path.dart';
 import 'studio_components.dart';
 
 // Store canonical JSON with history so status queries and undo/redo do not
@@ -924,16 +925,7 @@ class SceneEditor extends ChangeNotifier {
     }
     final encoded = _revision.encoded;
     final source = '$encoded\n';
-    // A failed write must leave the authored file intact. A sibling temporary
-    // file keeps the final rename on the same filesystem.
-    final temporaryDirectory = file.parent.createTempSync('.akari-studio-');
-    try {
-      final temporary = File('${temporaryDirectory.path}/scene.json');
-      temporary.writeAsStringSync(source, flush: true);
-      temporary.renameSync(file.path);
-    } finally {
-      temporaryDirectory.deleteSync(recursive: true);
-    }
+    writeFileAtomically(file, source, tempName: 'scene.json');
     _source = source;
     _savedDocument = encoded;
     notifyListeners();

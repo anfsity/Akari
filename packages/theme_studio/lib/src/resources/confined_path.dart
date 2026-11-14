@@ -62,3 +62,22 @@ File? findConfinedFile(Directory root, String relative) {
   }
   return File('$displayPrefix${segments.join('/')}');
 }
+
+/// Writes [contents] to [target] via a sibling temporary directory rename so
+/// failed writes never leave a partially written target file.
+void writeFileAtomically(
+  File target,
+  String contents, {
+  String tempPrefix = '.akari-studio-',
+  String tempName = 'file',
+}) {
+  target.parent.createSync(recursive: true);
+  final temporaryDirectory = target.parent.createTempSync(tempPrefix);
+  try {
+    final temporary = File('${temporaryDirectory.path}/$tempName');
+    temporary.writeAsStringSync(contents, flush: true);
+    temporary.renameSync(target.path);
+  } finally {
+    temporaryDirectory.deleteSync(recursive: true);
+  }
+}

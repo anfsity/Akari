@@ -93,15 +93,19 @@ class _StudioTimelineState extends State<StudioTimeline>
             );
           }
         });
+  double _getProgress() {
+    final total = widget.duration.inMicroseconds;
+    if (total <= 0) return 0;
+    return (widget.elapsed.inMicroseconds / total).clamp(0.0, 1.0);
+  }
+
   @override
   void didUpdateWidget(StudioTimeline old) {
     super.didUpdateWidget(old);
     _player.duration = widget.duration;
     if (!_player.isAnimating) {
       _synchronizing = true;
-      _player.value =
-          (widget.elapsed.inMicroseconds / widget.duration.inMicroseconds)
-              .clamp(0, 1);
+      _player.value = _getProgress();
       _synchronizing = false;
     }
   }
@@ -190,11 +194,7 @@ class _StudioTimelineState extends State<StudioTimeline>
                 ),
                 child: Slider(
                   key: const ValueKey('timeline-scrubber'),
-                  value: SliderValue.single(
-                    (widget.elapsed.inMicroseconds /
-                            widget.duration.inMicroseconds)
-                        .clamp(0, 1),
-                  ),
+                  value: SliderValue.single(_getProgress()),
                   onChanged: (value) {
                     _player.stop();
                     widget.onTimeChanged(

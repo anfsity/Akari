@@ -106,7 +106,6 @@ class StudioComparison extends StatelessWidget {
                           tool: StudioCanvasTool.move,
                           onSelect: (_) {},
                           onStartDrag: (_) => null,
-                          onCommitDrag: (_) {},
                           onDragNodeChanged: (_) {},
                         ),
                       ),
