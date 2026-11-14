@@ -170,7 +170,7 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
         compiled.source != _source.text) {
       return;
     }
-    if (!widget.editor.applyDraft()) return;
+    if (!widget.editor.tryApplyDraft()) return;
     setState(() => _busy = true);
     Directory? staging;
     try {

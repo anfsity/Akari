@@ -18,6 +18,15 @@ double calculateFitZoom({
 
 enum NodeAlignment { left, center, right, top, middle, bottom }
 
+/// Returns [rootIds] plus every descendant node id beneath them in [document].
+Set<String> getDescendantIds(SceneDocument document, Iterable<String> rootIds) {
+  final ids = rootIds.toSet();
+  for (final node in document.layerOrder) {
+    if (ids.contains(node.parentId)) ids.add(node.id);
+  }
+  return ids;
+}
+
 SceneRect getRelativeRect(SceneRect rect, SceneRect parent) {
   final x = ((rect.x - parent.x) / parent.width).clamp(0.0, 1.0);
   final y = ((rect.y - parent.y) / parent.height).clamp(0.0, 1.0);

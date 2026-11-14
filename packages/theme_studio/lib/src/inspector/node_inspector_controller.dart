@@ -33,17 +33,17 @@ class NodeInspectorController extends ChangeNotifier {
   StudioLayoutUnit get layoutUnit => _layoutUnit;
   TextEditingController getField(String label) => _fields[label]!;
 
-  void _markDraftChanged() {
-    if (_updatingFields || _hasDraft) return;
+  void _markDraftChanged({bool forceNotify = false}) {
+    if (_updatingFields) return;
+    final hadDraft = _hasDraft;
     _hasDraft = true;
-    notifyListeners();
+    if (!hadDraft || forceNotify) notifyListeners();
   }
 
   void updateMotion(SceneMotionPreset motion) {
     if (motion == _motion) return;
     _motion = motion;
-    _hasDraft = true;
-    notifyListeners();
+    _markDraftChanged(forceNotify: true);
   }
 
   void resetScale() {

@@ -36,7 +36,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
   double _origin = 0;
   double _millisecondsPerPixel = 1;
   void _start(SceneNode node, DragStartDetails details, double width) {
-    if (!widget.editor.applyDraft()) return;
+    if (!widget.editor.tryApplyDraft()) return;
     _source = node;
     _origin = details.globalPosition.dx;
     _millisecondsPerPixel = widget.duration.inMilliseconds / width;
@@ -64,7 +64,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
 
   void _addTrack() {
     final editor = widget.editor;
-    if (!editor.applyDraft()) return;
+    if (!editor.tryApplyDraft()) return;
     final node = editor.selectedNode;
     if (node.tracks.any((track) => track.property == _property)) return;
     final start = switch (_property) {
@@ -95,7 +95,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
 
   void _addKeyframe() {
     final editor = widget.editor;
-    if (!editor.applyDraft()) return;
+    if (!editor.tryApplyDraft()) return;
     final node = editor.selectedNode;
     final index = node.tracks.indexWhere(
       (track) => track.property == _property,

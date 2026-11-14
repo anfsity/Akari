@@ -107,7 +107,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   void _openSettings(BuildContext context) {
     final editor = _editor;
-    if (editor == null || !editor.applyDraft()) return;
+    if (editor == null || !editor.tryApplyDraft()) return;
     showOverlay<void>(
       context,
       const DialogConfiguration(),
@@ -296,7 +296,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   void _openCreateTheme(BuildContext context) {
     final editor = _editor;
-    if (editor == null || !editor.applyDraft()) return;
+    if (editor == null || !editor.tryApplyDraft()) return;
     final source = _project;
     final document = editor.document;
     final assets = _assets;
@@ -324,7 +324,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   Future<bool> _confirmSwitch(BuildContext context) async {
     final editor = _editor;
     if (editor == null) return true;
-    if (!editor.applyDraft()) return false;
+    if (!editor.tryApplyDraft()) return false;
     if (!editor.isDirty) return true;
     final save = await showOverlay<bool>(
       context,
@@ -414,7 +414,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   Future<void> _applyBackground(String asset) async {
     final editor = _editor;
-    if (editor == null || !editor.applyDraft()) return;
+    if (editor == null || !editor.tryApplyDraft()) return;
     try {
       final file = _assets.findFile(asset);
       if (file == null) {
@@ -438,7 +438,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   Future<void> _applyFont(String asset) async {
     final editor = _editor;
-    if (editor == null || !editor.applyDraft()) return;
+    if (editor == null || !editor.tryApplyDraft()) return;
     try {
       await _assets.loadFontPreview(asset);
       if (!mounted || !identical(editor, _editor)) return;
@@ -454,7 +454,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   Future<void> _placeAsset(SceneAsset asset) async {
     final editor = _editor;
-    if (editor == null || !editor.applyDraft()) return;
+    if (editor == null || !editor.tryApplyDraft()) return;
     try {
       if (asset.kind == SceneAssetKind.svg) {
         final source = await _assets.loadTextAsset(asset.path);
@@ -703,7 +703,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                       vertical: 8,
                     ),
                     onChanged: (index) {
-                      if (!editor.applyDraft()) return;
+                      if (!editor.tryApplyDraft()) return;
                       setState(() {
                         _inspect = index == 2;
                         _effects = index == 1;
@@ -740,7 +740,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                           editor: editor,
                           controller: editor.inspector,
                           componentCatalog: editor.componentCatalog,
-                          onApply: editor.applyDraft,
+                          onApply: editor.tryApplyDraft,
                         ),
                 ),
               ],

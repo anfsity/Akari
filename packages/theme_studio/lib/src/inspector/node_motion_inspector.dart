@@ -14,6 +14,8 @@ class NodeMotionInspector extends StatefulWidget {
 
 class _NodeMotionInspectorState extends State<NodeMotionInspector> {
   final _fields = <String, TextEditingController>{};
+  String? _syncedNodeId;
+  SceneMotionTiming? _syncedTiming;
   @override
   void initState() {
     super.initState();
@@ -23,11 +25,17 @@ class _NodeMotionInspectorState extends State<NodeMotionInspector> {
   @override
   void didUpdateWidget(NodeMotionInspector old) {
     super.didUpdateWidget(old);
-    _updateFields();
+    final node = widget.editor.selectedNode;
+    if (node.id != _syncedNodeId || node.motionTiming != _syncedTiming) {
+      _updateFields();
+    }
   }
 
   void _updateFields() {
-    final timing = widget.editor.selectedNode.motionTiming;
+    final node = widget.editor.selectedNode;
+    final timing = node.motionTiming;
+    _syncedNodeId = node.id;
+    _syncedTiming = timing;
     final curve = timing.curve ?? const SceneCubicBezier(.2, 0, .2, 1);
     for (final entry in {
       'Duration ms': timing.durationMs?.toString() ?? '',
@@ -43,7 +51,7 @@ class _NodeMotionInspectorState extends State<NodeMotionInspector> {
   }
 
   void _apply({bool? customCurve}) {
-    if (!widget.editor.applyDraft()) return;
+    if (!widget.editor.tryApplyDraft()) return;
     try {
       double number(String label) =>
           getFiniteNumberInput(label, _fields[label]!.text);

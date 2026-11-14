@@ -30,7 +30,7 @@ class StudioStateGraph extends StatelessWidget {
         child: Text(label),
       );
   Future<void> _editTransition(BuildContext context, int? index) async {
-    if (!editor.applyDraft()) return;
+    if (!editor.tryApplyDraft()) return;
     final node = editor.selectedNode;
     final result = await showOverlay<SceneStateTransition>(
       context,

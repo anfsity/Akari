@@ -27,12 +27,14 @@ class _CodeInspectorState extends State<CodeInspector> {
     listenable: widget.editor,
     builder: (context, _) {
       final document = widget.editor.document;
-      final node = widget.editor.selectedNode;
-      final source = switch ((_format, _wholeScene)) {
+      final hasSelection = widget.editor.selectedIds.isNotEmpty;
+      final node = hasSelection ? widget.editor.selectedNode : null;
+      final String? source = switch ((_format, _wholeScene)) {
         (_CodeFormat.json, true) => widget.editor.encodedDocument,
-        (_CodeFormat.json, false) => encodeSceneNode(node),
+        (_CodeFormat.json, false) => node == null ? null : encodeSceneNode(node),
         (_CodeFormat.dart, true) => generateSceneFromDocument(document),
-        (_CodeFormat.dart, false) => generateSceneNode(node).trim(),
+        (_CodeFormat.dart, false) =>
+          node == null ? null : generateSceneNode(node).trim(),
       };
       final canvas = document.canvas;
       return Column(
@@ -45,14 +47,16 @@ class _CodeInspectorState extends State<CodeInspector> {
               spacing: 2,
               children: [
                 Text(
-                  node.id,
+                  node?.id ?? 'No selection',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ).small().semiBold(),
                 Text(
-                  '${node.componentId} · '
-                  '${(node.rect.width * canvas.referenceWidth).toStringAsFixed(1)} × '
-                  '${(node.rect.height * canvas.referenceHeight).toStringAsFixed(1)} px',
+                  node == null
+                      ? 'Whole scene'
+                      : '${node.componentId} · '
+                            '${(node.rect.width * canvas.referenceWidth).toStringAsFixed(1)} × '
+                            '${(node.rect.height * canvas.referenceHeight).toStringAsFixed(1)} px',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ).xSmall().muted(),
@@ -113,25 +117,28 @@ class _CodeInspectorState extends State<CodeInspector> {
           ),
           const Divider(),
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) => SingleChildScrollView(
-                padding: const EdgeInsets.all(12),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minWidth: constraints.maxWidth - 24,
-                    ),
-                    child: SelectableText(
-                      source,
-                      key: const ValueKey('inspect-code-source'),
-                      style: Theme.of(context).typography.mono
-                          .copyWith(fontSize: 12),
+            child: source == null
+                ? const Center(child: Text('Select a layer or switch to Scene.'))
+                : LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
+                      padding: const EdgeInsets.all(12),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minWidth: constraints.maxWidth - 24,
+                          ),
+                          child: SelectableText(
+                            source,
+                            key: const ValueKey('inspect-code-source'),
+                            style: Theme.of(context).typography.mono.copyWith(
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ),
           ),
           const Divider(),
           Padding(
@@ -140,7 +147,9 @@ class _CodeInspectorState extends State<CodeInspector> {
               constraints: const BoxConstraints(minHeight: 34),
               child: OutlineButton(
                 density: ButtonDensity.dense,
-                onPressed: () => Clipboard.setData(ClipboardData(text: source)),
+                onPressed: source == null
+                    ? null
+                    : () => Clipboard.setData(ClipboardData(text: source)),
                 child: const Text('Copy code').small(),
               ),
             ),

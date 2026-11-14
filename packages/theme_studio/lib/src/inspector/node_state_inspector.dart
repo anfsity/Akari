@@ -17,9 +17,15 @@ class _NodeStateInspectorState extends State<NodeStateInspector> {
   ScenePredicate _trigger = ScenePredicate.isAuthError;
   SceneStateEffect _effect = SceneStateEffect.shake;
 
-  void _updateNode(SceneNode Function(SceneNode) update) {
-    if (!widget.editor.applyDraft()) return;
-    widget.editor.updateNode(update(widget.editor.selectedNode));
+  void _updateNode(SceneNode Function(SceneNode) update, {String? nodeId}) {
+    if (!widget.editor.tryApplyDraft()) return;
+    final target = nodeId == null
+        ? widget.editor.selectedNode
+        : widget.editor.document.nodes
+              .where((node) => node.id == nodeId)
+              .firstOrNull;
+    if (target == null) return;
+    widget.editor.updateNode(update(target));
   }
 
   @override
@@ -64,11 +70,13 @@ class _NodeStateInspectorState extends State<NodeStateInspector> {
           key: const ValueKey('edit-visibility-condition'),
           density: ButtonDensity.dense,
           onPressed: () async {
-            if (!widget.editor.applyDraft()) return;
+            if (!widget.editor.tryApplyDraft()) return;
+            final targetId = node.id;
             final result = await editStudioCondition(context, condition);
             if (!mounted || result == null) return;
             _updateNode(
-              (node) => node.copyWith(visibleWhen: result.condition),
+              (target) => target.copyWith(visibleWhen: result.condition),
+              nodeId: targetId,
             );
           },
           child: const Text('Edit compound condition').small(),

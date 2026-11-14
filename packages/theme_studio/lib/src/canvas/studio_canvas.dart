@@ -118,7 +118,7 @@ class StudioCanvasState extends State<StudioCanvas> {
 
   void _toggleTimeline() {
     final session = widget.editor;
-    if (session == null || !session.applyDraft()) return;
+    if (session == null || !session.tryApplyDraft()) return;
     setState(() {
       _elapsed = _elapsed == null ? Duration.zero : null;
       _previewing = false;
@@ -128,7 +128,7 @@ class StudioCanvasState extends State<StudioCanvas> {
 
   void _toggleGraph() {
     final session = widget.editor;
-    if (session == null || !session.applyDraft()) return;
+    if (session == null || !session.tryApplyDraft()) return;
     setState(() {
       _showStateGraph = !_showStateGraph;
       _elapsed = null;
@@ -138,7 +138,7 @@ class StudioCanvasState extends State<StudioCanvas> {
 
   void _togglePreview() {
     final session = widget.editor;
-    if (session == null || (!_previewing && !session.applyDraft())) return;
+    if (session == null || (!_previewing && !session.tryApplyDraft())) return;
     setState(() {
       _elapsed = null;
       _showStateGraph = false;
@@ -148,7 +148,7 @@ class StudioCanvasState extends State<StudioCanvas> {
 
   void _toggleComparison() {
     final session = widget.editor;
-    if (session == null || !session.applyDraft()) return;
+    if (session == null || !session.tryApplyDraft()) return;
     setState(() {
       _comparing = !_comparing;
       _previewing = false;
@@ -639,7 +639,7 @@ class StudioCanvasState extends State<StudioCanvas> {
                                           onUpdateText: session.updateNodeText,
                                           snapToGuides: _snapToGuides,
                                           showRulers: _showRulers,
-                                          onPrepareGuide: session.applyDraft,
+                                          onPrepareGuide: session.tryApplyDraft,
                                           onCreateGuide: session.createGuide,
                                           onUpdateGuide: session.updateGuide,
                                           onDeleteGuide: session.deleteGuide,
@@ -687,7 +687,7 @@ class StudioCanvasState extends State<StudioCanvas> {
                                                 )) {
                                               return null;
                                             }
-                                            if (!session.applyDraft()) {
+                                            if (!session.tryApplyDraft()) {
                                               return null;
                                             }
                                             return session.document.nodes
@@ -778,7 +778,9 @@ class StudioCanvasState extends State<StudioCanvas> {
                                           formatValue: (preset) =>
                                               '${preset.width} × ${preset.height}',
                                           onChanged: (preset) {
-                                            if (!session.applyDraft()) return;
+                                            if (!session.tryApplyDraft()) {
+                                              return;
+                                            }
                                             session.updateScene(
                                               canvas: session.document.canvas
                                                   .copyWith(

@@ -65,6 +65,7 @@ class StudioThemeProject {
       componentCatalog: declarations.componentCatalog,
       presetCatalog: declarations.presetCatalog,
       layout: declarations.layout,
+      minHitTarget: declarations.bundle.tokens.minHitTarget,
     );
     try {
       return (editor: editor, theme: themeBuilder(document: editor.document));

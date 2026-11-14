@@ -207,7 +207,7 @@ void main() {
     editor.updateAuthoring(componentCatalog: _catalog, layout: _layout);
     editor.updateLayoutSlot('caption', isPresent: true);
     editor.inspector.updateProperty('text', 'Edited');
-    editor.applyDraft();
+    editor.tryApplyDraft();
     final original = editor.encodedDocument;
     editor.updateLayoutPreset('right');
     expect(editor.document.themeProperties, {'layout': 'right'});
@@ -257,7 +257,7 @@ void main() {
       editor.redo();
       editor.inspector.updateProperty('text', 'Edited caption');
       editor.inspector.getField('X').text = '576';
-      editor.applyDraft();
+      editor.tryApplyDraft();
       editor.selectNode('panel');
       editor.updateLayoutSlot('caption', isPresent: false);
       expect(editor.selectedId, 'panel');
@@ -378,10 +378,10 @@ void main() {
   test('theme choices validate drafts before preview, history and saving', () {
     editor.updateAuthoring(componentCatalog: _catalog, layout: null);
     editor.inspector.updateProperty('variant', 'wide');
-    expect(editor.applyDraft(), isTrue);
+    expect(editor.tryApplyDraft(), isTrue);
     final valid = editor.document;
     editor.inspector.updateProperty('variant', 'unsupported');
-    expect(editor.applyDraft(), isFalse);
+    expect(editor.tryApplyDraft(), isFalse);
     expect(editor.save(), isFalse);
     expect(editor.document, same(valid));
     expect(
@@ -394,7 +394,7 @@ void main() {
     );
 
     editor.inspector.updateProperty('variant', 'compact');
-    expect(editor.applyDraft(), isTrue);
+    expect(editor.tryApplyDraft(), isTrue);
     editor.undo();
     expect(editor.selectedNode.properties['variant'], 'wide');
     editor.undo();
@@ -431,7 +431,7 @@ void main() {
   test('catalog replacement preserves valid undo and redo history', () {
     editor.updateAuthoring(componentCatalog: _catalog, layout: null);
     editor.inspector.updateProperty('variant', 'wide');
-    editor.applyDraft();
+    editor.tryApplyDraft();
     const compactOnly = ThemeComponentCatalog(
       components: {
         'panel': ThemeComponentDefinition(
@@ -536,7 +536,7 @@ void main() {
 
   test('equivalent drafts clear without creating history', () {
     editor.inspector.getField('X').text = '192.00';
-    expect(editor.applyDraft(), isTrue);
+    expect(editor.tryApplyDraft(), isTrue);
     expect(editor.inspector.hasDraft, isFalse);
     expect(editor.canUndo, isFalse);
     expect(editor.isDirty, isFalse);
@@ -552,7 +552,7 @@ void main() {
     expect(editor.inspector.getField('Rotate Z').text, '20');
     expect(editor.canUndo, isFalse);
     expect(editor.inspector.hasDraft, isTrue);
-    expect(editor.applyDraft(), isTrue);
+    expect(editor.tryApplyDraft(), isTrue);
     expect(editor.selectedNode.rect.x, 0.2);
     expect(editor.selectedNode.transform.rotationZ, 20);
     editor.undo();
@@ -574,10 +574,10 @@ void main() {
       editor.inspector.updateLayoutUnit(StudioLayoutUnit.percent);
       editor.inspector.updateLayoutUnit(StudioLayoutUnit.pixels);
       expect(editor.inspector.hasDraft, isFalse);
-      expect(editor.applyDraft(), isTrue);
+      expect(editor.tryApplyDraft(), isTrue);
       expect(encodeSceneDocument(editor.document), original);
       editor.inspector.getField('Depth').text = '1';
-      editor.applyDraft();
+      editor.tryApplyDraft();
       expect(editor.selectedNode.rect.x, 0.123456789);
       editor.updateScene(canvas: const SceneCanvas(referenceWidth: 1000));
       expect(editor.inspector.getField('Width').text, '500');
@@ -596,17 +596,17 @@ void main() {
     () {
       for (final value in ['NaN', 'Infinity', 'not a number']) {
         editor.inspector.getField('X').text = value;
-        expect(editor.applyDraft(), isFalse);
+        expect(editor.tryApplyDraft(), isFalse);
         expect(editor.inspector.error, 'X must be a finite number.');
       }
       editor.inspector.getField('X').text = '192';
       editor.inspector.getField('Depth').text = '1.5';
-      expect(editor.applyDraft(), isFalse);
+      expect(editor.tryApplyDraft(), isFalse);
       expect(editor.inspector.error, 'Depth must be an integer.');
       editor.inspector.getField('Depth').text = '0';
       for (final value in ['[]', '{"variant":42}', '{"variant":""}']) {
         editor.inspector.getField('Properties').text = value;
-        expect(editor.applyDraft(), isFalse);
+        expect(editor.tryApplyDraft(), isFalse);
         expect(editor.inspector.error, contains('non-empty strings'));
       }
       expect(editor.isDirty, isFalse);

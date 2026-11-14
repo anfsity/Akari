@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
@@ -16,6 +17,10 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
   final _fields = <String, TextEditingController>{};
   int _editing = -1;
   String? _nodeId;
+  int? _syncedEditing;
+  SceneSizing? _syncedSizing;
+  SceneLayout? _syncedLayout;
+  List<SceneBreakpoint> _syncedBreakpoints = const [];
   SceneBreakpoint? get _rule =>
       _editing < 0 ? null : widget.editor.selectedNode.breakpoints[_editing];
   SceneSizing get _sizing => _rule?.sizing ?? widget.editor.selectedNode.sizing;
@@ -30,7 +35,16 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
   @override
   void didUpdateWidget(NodeLayoutInspector oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _updateFields();
+    final node = widget.editor.selectedNode;
+    // Preserve typed invalid/draft text across unrelated controller rebuilds
+    // (such as showError notifications or sibling inspector field edits).
+    if (node.id != _nodeId ||
+        _editing != _syncedEditing ||
+        node.sizing != _syncedSizing ||
+        node.layout != _syncedLayout ||
+        !listEquals(node.breakpoints, _syncedBreakpoints)) {
+      _updateFields();
+    }
   }
 
   void _updateFields() {
@@ -39,6 +53,10 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
       _editing = -1;
     }
     _nodeId = node.id;
+    _syncedEditing = _editing;
+    _syncedSizing = node.sizing;
+    _syncedLayout = node.layout;
+    _syncedBreakpoints = List.of(node.breakpoints);
     final sizing = _sizing;
     for (final entry in <String, String>{
       'Fixed width': sizing.width?.toString() ?? '',
@@ -67,7 +85,7 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
     bool? wrap,
   }) {
     final editor = widget.editor;
-    if (!editor.applyDraft()) return;
+    if (!editor.tryApplyDraft()) return;
     final node = editor.selectedNode;
     final layout = _layout;
     try {
@@ -116,7 +134,7 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
 
   void _addBreakpoint() {
     final editor = widget.editor;
-    if (!editor.applyDraft()) return;
+    if (!editor.tryApplyDraft()) return;
     final node = editor.selectedNode;
     var width = 640.0;
     while (node.breakpoints.any((rule) => rule.minWidth == width)) {
@@ -230,14 +248,20 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
                           key: const ValueKey('layout-remove-breakpoint'),
                           density: ButtonDensity.icon,
                           onPressed: () {
-                            final rules = [...node.breakpoints]
+                            final editor = widget.editor;
+                            if (!editor.tryApplyDraft()) return;
+                            final current = editor.selectedNode;
+                            final rules = [...current.breakpoints]
                               ..removeAt(_editing);
-                            setState(() {
-                              _editing = -1;
-                            });
-                            widget.editor.updateNode(
-                              node.copyWith(breakpoints: rules),
+                            editor.updateNode(
+                              current.copyWith(breakpoints: rules),
                             );
+                            if (mounted) {
+                              setState(() {
+                                _editing = -1;
+                                _updateFields();
+                              });
+                            }
                           },
                           child: const Icon(LucideIcons.minus, size: 16),
                         ),

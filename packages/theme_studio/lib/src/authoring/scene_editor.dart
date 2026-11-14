@@ -26,7 +26,11 @@ class SceneEditor extends ChangeNotifier {
     this._componentCatalog = const ThemeComponentCatalog(),
     this._presetCatalog = const ThemePresetCatalog(),
     ThemeLayoutDefinition? layout,
-  }) : _declaredLayout = layout {
+    this._minHitTarget = 44,
+    this._safeArea = EdgeInsets.zero,
+    Map<String, String> fontFamilies = const {},
+  }) : _declaredLayout = layout,
+       _fontFamilies = Map.unmodifiable(fontFamilies) {
     _loadFromDisk(initial: true);
     inspector = NodeInspectorController(selectedNode, getInspectorCanvas());
   }
@@ -35,6 +39,9 @@ class SceneEditor extends ChangeNotifier {
   ThemeComponentCatalog _componentCatalog;
   ThemePresetCatalog _presetCatalog;
   ThemeLayoutDefinition? _declaredLayout;
+  double _minHitTarget;
+  EdgeInsets _safeArea;
+  Map<String, String> _fontFamilies;
   late final NodeInspectorController inspector;
   late String _source;
   late String _savedDocument;
@@ -102,10 +109,21 @@ class SceneEditor extends ChangeNotifier {
     required ThemeComponentCatalog componentCatalog,
     required ThemeLayoutDefinition? layout,
     ThemePresetCatalog presetCatalog = const ThemePresetCatalog(),
+    double? minHitTarget,
+    EdgeInsets? safeArea,
+    Map<String, String>? fontFamilies,
   }) {
+    final nextMinHitTarget = minHitTarget ?? _minHitTarget;
+    final nextSafeArea = safeArea ?? _safeArea;
+    final nextFontFamilies = fontFamilies == null
+        ? _fontFamilies
+        : Map<String, String>.unmodifiable(fontFamilies);
     if (identical(componentCatalog, _componentCatalog) &&
         identical(presetCatalog, _presetCatalog) &&
-        identical(layout, _declaredLayout)) {
+        identical(layout, _declaredLayout) &&
+        nextMinHitTarget == _minHitTarget &&
+        nextSafeArea == _safeArea &&
+        mapEquals(nextFontFamilies, _fontFamilies)) {
       return;
     }
     // Undo and redo trust the revision invariant too. New authoring rules must
@@ -116,11 +134,14 @@ class SceneEditor extends ChangeNotifier {
     _componentCatalog = componentCatalog;
     _presetCatalog = presetCatalog;
     _declaredLayout = layout;
+    _minHitTarget = nextMinHitTarget;
+    _safeArea = nextSafeArea;
+    _fontFamilies = nextFontFamilies;
     notifyListeners();
   }
 
   void updateThemeProperty(String name, String value) {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     if (!_presetCatalog.properties.any((property) => property.name == name)) {
       throw ArgumentError.value(name, 'name', 'Undeclared theme preset');
     }
@@ -134,10 +155,7 @@ class SceneEditor extends ChangeNotifier {
 
   String? getDeletionBlockReason(String nodeId) {
     if (document.nodes.length == 1) return 'A scene needs at least one node.';
-    final ids = {nodeId};
-    for (final node in document.layerOrder) {
-      if (ids.contains(node.parentId)) ids.add(node.id);
-    }
+    final ids = getDescendantIds(document, [nodeId]);
     if (ids.length == document.nodes.length) {
       return 'A scene needs at least one node.';
     }
@@ -151,7 +169,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void updateLayoutSlot(String nodeId, {required bool isPresent}) {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     final slot = layout?.findSlot(nodeId, document: document);
     if (slot == null) throw ArgumentError.value(nodeId, 'nodeId');
     if (document.nodes.any((node) => node.id == nodeId) == isPresent) return;
@@ -166,7 +184,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void updateLayoutPreset(String presetId) {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     final layout = this.layout;
     if (layout == null) throw StateError('This scene has no layout.');
     _updateDocument(
@@ -176,7 +194,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void addRequiredLayoutSlots() {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     final missing = missingRequiredSlots;
     if (missing.isEmpty) return;
     _updateDocument(
@@ -190,7 +208,10 @@ class SceneEditor extends ChangeNotifier {
     );
   }
 
-  bool applyDraft() {
+  /// Validates and commits any pending inspector draft into scene history,
+  /// surfacing validation errors in [inspector] and returning whether the caller
+  /// may proceed cleanly.
+  bool tryApplyDraft() {
     if (!inspector.hasDraft) return true;
     try {
       updateNode(inspector.getUpdatedNode());
@@ -209,7 +230,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   bool selectNodes(Set<String> ids, {String? primaryId}) {
-    if (!applyDraft()) return false;
+    if (!tryApplyDraft()) return false;
     if (!document.nodes.map((node) => node.id).toSet().containsAll(ids)) {
       throw ArgumentError.value(ids, 'ids');
     }
@@ -268,21 +289,42 @@ class SceneEditor extends ChangeNotifier {
     }).toList();
   }
 
+  Size get _referenceSize => Size(
+    document.canvas.referenceWidth.toDouble(),
+    document.canvas.referenceHeight.toDouble(),
+  );
+
+  Map<String, SceneNodeGeometry> _calculateReferenceGeometry() =>
+      calculateSceneLayout(
+        document: document,
+        size: _referenceSize,
+        safeArea: _safeArea,
+        fontFamilies: _fontFamilies,
+        minHitTarget: _minHitTarget,
+      );
+
+  Size _getContainerContentSize(Size containerSize, SceneLayout layout) {
+    final padding = layout.padding * 2;
+    return Size(
+      math.max(1, containerSize.width - padding),
+      math.max(1, containerSize.height - padding),
+    );
+  }
+
+  Set<String> _getReservedIds() => {
+    for (final node in document.nodes) node.id,
+    for (final slot in layout?.slots ?? const <ThemeLayoutSlot>[])
+      slot.defaultNode.id,
+  };
+
   List<SceneNode> getSelectionSubtree() {
-    final ids = {...selectedIds};
-    for (final node in document.layerOrder) {
-      if (ids.contains(node.parentId)) ids.add(node.id);
-    }
+    final ids = getDescendantIds(document, selectedIds);
     return document.nodes.where((node) => ids.contains(node.id)).toList();
   }
 
   void moveSelection(Offset delta) {
-    if (!applyDraft()) return;
-    final size = Size(
-      document.canvas.referenceWidth.toDouble(),
-      document.canvas.referenceHeight.toDouble(),
-    );
-    final geometry = calculateSceneLayout(document: document, size: size);
+    if (!tryApplyDraft()) return;
+    final geometry = _calculateReferenceGeometry();
     updateNodes([
       for (final node in getSelectionRoots())
         if (getParentLayout(node).direction == SceneLayoutDirection.absolute)
@@ -300,27 +342,20 @@ class SceneEditor extends ChangeNotifier {
     SceneNode node,
     Map<String, SceneNodeGeometry> geometry,
   ) {
-    if (node.parentId == null) {
-      return Size(
-        document.canvas.referenceWidth.toDouble(),
-        document.canvas.referenceHeight.toDouble(),
-      );
-    }
-    final size = geometry[node.parentId]!.rect.size;
-    final padding = getParentLayout(node).padding * 2;
-    return Size(
-      math.max(1, size.width - padding),
-      math.max(1, size.height - padding),
+    if (node.parentId == null) return _referenceSize;
+    return _getContainerContentSize(
+      geometry[node.parentId]!.rect.size,
+      getParentLayout(node),
     );
   }
 
   void alignSelection(NodeAlignment alignment) {
-    if (!applyDraft() || !canArrange) return;
+    if (!tryApplyDraft() || !canArrange) return;
     updateNodes(calculateAlignedNodes(getSelectionLayoutNodes(), alignment));
   }
 
   void distributeSelection({required bool horizontal}) {
-    if (!applyDraft() || !canArrange || selectedNodes.length < 3) return;
+    if (!tryApplyDraft() || !canArrange || selectedNodes.length < 3) return;
     updateNodes(
       calculateDistributedNodes(
         getSelectionLayoutNodes(),
@@ -330,7 +365,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void staggerSelection(int intervalMs) {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     var index = 0;
     updateNodes([
       for (final node in document.paintOrder)
@@ -346,7 +381,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void groupSelection() {
-    if (!applyDraft() || !canGroup) return;
+    if (!tryApplyDraft() || !canGroup) return;
     final nodes = getSelectionLayoutNodes();
     final byId = {for (final node in nodes) node.id: node};
     final left = nodes.map((node) => node.rect.x).reduce(math.min);
@@ -357,10 +392,7 @@ class SceneEditor extends ChangeNotifier {
     final bottom = nodes
         .map((node) => node.rect.y + node.rect.height)
         .reduce(math.max);
-    final id = _allocateId(
-      'frame',
-      document.nodes.map((node) => node.id).toSet(),
-    );
+    final id = _allocateId('frame', _getReservedIds());
     final frame = SceneNode(
       id: id,
       componentId: 'frame',
@@ -394,20 +426,14 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void ungroupSelection() {
-    if (!applyDraft() || !canUngroup) return;
+    if (!tryApplyDraft() || !canUngroup) return;
     final frame = selectedNode;
     final children = document.getChildren(frame.id);
     if (children.isEmpty) {
       deleteSelectedNode();
       return;
     }
-    final geometry = calculateSceneLayout(
-      document: document,
-      size: Size(
-        document.canvas.referenceWidth.toDouble(),
-        document.canvas.referenceHeight.toDouble(),
-      ),
-    );
+    final geometry = _calculateReferenceGeometry();
     final frameRect = geometry[frame.id]!.rect;
     final parentSize = getParentContentSize(frame, geometry);
     final padding = getParentLayout(frame).padding;
@@ -478,7 +504,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void updateScene({SceneCanvas? canvas, SceneBackground? background}) {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     _updateDocument(
       document.copyWith(canvas: canvas, background: background),
       selectedId: selectedId,
@@ -486,7 +512,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void placeNode(SceneNode template, Offset position) {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     final existing = document.nodes
         .where((node) => node.id == template.id)
         .firstOrNull;
@@ -509,14 +535,15 @@ class SceneEditor extends ChangeNotifier {
     );
   }
 
-  void updateNodeText(String id, String text) {
-    if (!applyDraft()) return;
+  bool updateNodeText(String id, String text) {
+    if (!tryApplyDraft()) return false;
     final node = document.nodes.firstWhere((node) => node.id == id);
     if (text.isEmpty) {
       inspector.showError('Text must not be empty.');
-      return;
+      return false;
     }
     updateNode(node.copyWith(properties: {...node.properties, 'text': text}));
+    return true;
   }
 
   void createComponent(
@@ -524,13 +551,9 @@ class SceneEditor extends ChangeNotifier {
     Offset position = const Offset(.3, .3),
   }) {
     final primitive = component.primitive;
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     final base = primitive?.name ?? 'frame';
-    final id = _allocateId(base, {
-      for (final node in document.nodes) node.id,
-      for (final slot in layout?.slots ?? const <ThemeLayoutSlot>[])
-        slot.defaultNode.id,
-    });
+    final id = _allocateId(base, _getReservedIds());
     final token = _allocateId('$id-style', document.styleTokens.keys.toSet());
     final node = SceneNode(
       id: id,
@@ -564,14 +587,13 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void createAssetNode(SceneAsset asset) {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     final name = asset.path.split('/').last;
     final dot = name.lastIndexOf('.');
-    final id = _allocateId(dot > 0 ? name.substring(0, dot) : name, {
-      for (final node in document.nodes) node.id,
-      for (final slot in layout?.slots ?? const <ThemeLayoutSlot>[])
-        slot.defaultNode.id,
-    });
+    final id = _allocateId(
+      dot > 0 ? name.substring(0, dot) : name,
+      _getReservedIds(),
+    );
     final node = SceneNode(
       id: id,
       componentId: 'sceneAsset',
@@ -599,7 +621,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void moveLayer(String id, {required String? parentId, String? beforeId}) {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     final reason = getLayerMoveBlockReason(id, parentId);
     if (reason != null) {
       inspector.showError(reason);
@@ -607,31 +629,13 @@ class SceneEditor extends ChangeNotifier {
     }
     var node = document.nodes.firstWhere((node) => node.id == id);
     if (node.parentId != parentId) {
-      final geometry = calculateSceneLayout(
-        document: document,
-        size: Size(
-          document.canvas.referenceWidth.toDouble(),
-          document.canvas.referenceHeight.toDouble(),
-        ),
-      );
+      final geometry = _calculateReferenceGeometry();
       final parent = parentId == null
           ? null
           : document.nodes.firstWhere((node) => node.id == parentId);
       final content = parent == null
-          ? Size(
-              document.canvas.referenceWidth.toDouble(),
-              document.canvas.referenceHeight.toDouble(),
-            )
-          : Size(
-              math.max(
-                1,
-                geometry[parent.id]!.rect.width - parent.layout!.padding * 2,
-              ),
-              math.max(
-                1,
-                geometry[parent.id]!.rect.height - parent.layout!.padding * 2,
-              ),
-            );
+          ? _referenceSize
+          : _getContainerContentSize(geometry[parent.id]!.rect.size, parent.layout!);
       final oldParent = node.parentId == null
           ? Matrix4.identity()
           : geometry[node.parentId]!.worldTransform;
@@ -685,7 +689,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void updateSelectionStyle(SceneStyle style) {
-    if (!applyDraft() || selectedIds.isEmpty) return;
+    if (!tryApplyDraft() || selectedIds.isEmpty) return;
     final token =
         selectedNode.styleToken ??
         _allocateId('$selectedId-style', document.styleTokens.keys.toSet());
@@ -745,7 +749,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void createGuide(SceneGuide guide) {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     _updateDocument(
       document.copyWith(guides: [...document.guides, guide]),
       selectedId: selectedId,
@@ -753,31 +757,31 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void updateGuide(int index, SceneGuide guide) {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     final guides = [...document.guides];
     guides[index] = guide;
     _updateDocument(document.copyWith(guides: guides), selectedId: selectedId);
   }
 
   void deleteGuide(int index) {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     final guides = [...document.guides]..removeAt(index);
     _updateDocument(document.copyWith(guides: guides), selectedId: selectedId);
   }
 
   void updateSelectionStyleToken(String? token) {
-    if (!applyDraft() || selectedIds.isEmpty) return;
+    if (!tryApplyDraft() || selectedIds.isEmpty) return;
     updateNodes([
       for (final node in selectedNodes) node.copyWith(styleToken: token),
     ]);
   }
 
   void duplicateSelectedNode() {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     if (!canDuplicateNode) {
       throw StateError('Layout slots can only be added once.');
     }
-    final ids = document.nodes.map((entry) => entry.id).toSet();
+    final ids = _getReservedIds();
     final subtree = getSelectionSubtree();
     final copies = {
       for (final node in subtree) node.id: _allocateId('${node.id}-copy', ids),
@@ -801,7 +805,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void deleteSelectedNode() {
-    if (!applyDraft()) return;
+    if (!tryApplyDraft()) return;
     final reason = deletionBlockReason;
     if (reason != null) throw StateError(reason);
     final ids = getSelectionSubtree().map((node) => node.id).toSet();
@@ -820,10 +824,7 @@ class SceneEditor extends ChangeNotifier {
   void _removeNode(String nodeId) {
     final reason = getDeletionBlockReason(nodeId);
     if (reason != null) throw StateError(reason);
-    final ids = {nodeId};
-    for (final node in document.layerOrder) {
-      if (ids.contains(node.parentId)) ids.add(node.id);
-    }
+    final ids = getDescendantIds(document, [nodeId]);
     final index = document.nodes.indexWhere((node) => node.id == nodeId);
     final nodes = document.nodes
         .where((node) => !ids.contains(node.id))
@@ -873,13 +874,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   SceneCanvas getInspectorCanvas() {
-    final geometry = calculateSceneLayout(
-      document: document,
-      size: Size(
-        document.canvas.referenceWidth.toDouble(),
-        document.canvas.referenceHeight.toDouble(),
-      ),
-    );
+    final geometry = _calculateReferenceGeometry();
     final size = getParentContentSize(selectedNode, geometry);
     return document.canvas.copyWith(
       referenceWidth: size.width.round(),
@@ -888,13 +883,7 @@ class SceneEditor extends ChangeNotifier {
   }
 
   List<SceneNode> getSelectionLayoutNodes() {
-    final geometry = calculateSceneLayout(
-      document: document,
-      size: Size(
-        document.canvas.referenceWidth.toDouble(),
-        document.canvas.referenceHeight.toDouble(),
-      ),
-    );
+    final geometry = _calculateReferenceGeometry();
     final result = <SceneNode>[];
     for (final node in selectedNodes) {
       final rect = geometry[node.id]!.rect;
@@ -915,19 +904,19 @@ class SceneEditor extends ChangeNotifier {
   }
 
   void undo() {
-    if (!applyDraft() || !canUndo) return;
+    if (!tryApplyDraft() || !canUndo) return;
     _redo.add(_revision);
     _applyRevision(_undo.removeLast());
   }
 
   void redo() {
-    if (!applyDraft() || !canRedo) return;
+    if (!tryApplyDraft() || !canRedo) return;
     _undo.add(_revision);
     _applyRevision(_redo.removeLast());
   }
 
   bool save() {
-    if (!applyDraft()) return false;
+    if (!tryApplyDraft()) return false;
     if (file.readAsStringSync() != _source) {
       throw const FileSystemException(
         'The scene changed on disk. Reload it before saving.',

@@ -8,7 +8,7 @@ class NodeAssetInspector extends StatelessWidget {
   const NodeAssetInspector({required this.editor, super.key});
   final SceneEditor editor;
   void _updateAsset(SceneAsset Function(SceneAsset) update) {
-    if (!editor.applyDraft()) return;
+    if (!editor.tryApplyDraft()) return;
     editor.updateNode(
       editor.selectedNode.copyWith(asset: update(editor.selectedNode.asset!)),
     );
