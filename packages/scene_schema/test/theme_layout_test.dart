@@ -188,4 +188,45 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('reserved IDs reject layout, asset, or primitive slot overrides', () {
+    expect(
+      () => _layout.validateDocument(
+        _document.copyWith(
+          nodes: [
+            _credential.copyWith(layout: const SceneLayout()),
+            _caption,
+          ],
+        ),
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => _layout.validateDocument(
+        _document.copyWith(
+          nodes: [
+            _credential.copyWith(primitive: ScenePrimitive.text),
+            _caption,
+          ],
+        ),
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => _layout.validateDocument(
+        _document.copyWith(
+          nodes: [
+            _credential.copyWith(
+              asset: const SceneAsset(
+                kind: SceneAssetKind.image,
+                path: 'assets/bg.png',
+              ),
+            ),
+            _caption,
+          ],
+        ),
+      ),
+      throwsFormatException,
+    );
+  });
 }

@@ -63,10 +63,20 @@ class ThemeLayoutDefinition {
     }
     for (final node in document.nodes) {
       final slot = findSlot(node.id);
-      if (slot != null && node.componentId != slot.defaultNode.componentId) {
+      if (slot == null) continue;
+      final expected = slot.defaultNode;
+      if (node.componentId != expected.componentId) {
         throw FormatException(
           'Layout "$label": slot "${node.id}" requires component '
-          '"${slot.defaultNode.componentId}".',
+          '"${expected.componentId}".',
+        );
+      }
+      if ((node.layout == null) != (expected.layout == null) ||
+          (node.asset == null) != (expected.asset == null) ||
+          node.primitive != expected.primitive) {
+        throw FormatException(
+          'Layout "$label": slot "${node.id}" must preserve its component '
+          'kind without overriding layout, asset, or primitive.',
         );
       }
     }
