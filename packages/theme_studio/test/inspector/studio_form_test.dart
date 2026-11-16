@@ -247,7 +247,7 @@ void main() {
     tester,
   ) async {
     const section = ValueKey('section');
-    Future<Size> getSize(double scale) async {
+    Future<Size> pumpScaledDisclosure(double scale) async {
       await tester.pumpWidget(
         ShadcnApp(
           theme: AdaptiveScaling(scale).scale(const ThemeData()),
@@ -269,8 +269,8 @@ void main() {
       return tester.getSize(find.byKey(section));
     }
 
-    final normal = await getSize(1);
-    final enlarged = await getSize(1.5);
+    final normal = await pumpScaledDisclosure(1);
+    final enlarged = await pumpScaledDisclosure(1.5);
     expect(enlarged.height / normal.height, closeTo(1.5, .03));
     expect(tester.takeException(), isNull);
   });

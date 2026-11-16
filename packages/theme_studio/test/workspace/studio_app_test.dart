@@ -1670,6 +1670,7 @@ void main() {
       final scroll = tester.widget<ListView>(list).controller!;
       final offset = scroll.offset;
       await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
+      await tester.pump();
       await tester.tap(find.text('Apply to preview'));
       await tester.pumpAndSettle();
       expect(scroll.offset, offset);
@@ -1903,6 +1904,7 @@ void main() {
         {'palette': 'nord'},
       );
       await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
+      await tester.pump();
       await tester.tap(find.text('Apply to preview'));
       await tester.pumpAndSettle();
       final reload = tester.binding.reassembleApplication();
@@ -1938,6 +1940,7 @@ void main() {
         .widget<StudioPreview>(find.byType(StudioPreview))
         .theme;
     await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
+    await tester.pump();
     await tester.tap(find.text('Apply to preview'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
@@ -2336,6 +2339,7 @@ void main() {
       expect(find.byKey(const ValueKey('property-private')), findsNothing);
       final text = find.byKey(const ValueKey('property-text'));
       await tester.enterText(text, 'My desktop');
+      await tester.pump();
       await tester.tap(find.text('Apply to preview'));
       await tester.pumpAndSettle();
       final choice = find.byKey(const ValueKey('property-variant'));
