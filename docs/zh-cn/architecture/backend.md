@@ -15,7 +15,8 @@ Rust 后端（`crates/akari-backend/`）是一个二进制应用 crate，对外�
 | `service.rs` | `io.akari.Greeter1` D-Bus 接口暴露、认证 Actor 监控与 `systemd-logind` 电源调用 |
 | `auth/handle.rs` | D-Bus 命令句柄与认证 Actor 任务的生命周期管理 |
 | `auth/actor.rs` | 单一串行命令队列、命令接收与调用结果回复 |
-| `auth/attempt.rs` | 活动认证资源、传输操作、清理及状态/提示信号顺序 |
+| `auth/attempt.rs` | 活动认证资源、状态快照/控制句柄发布、取消及信号顺序 |
+| `auth/flow.rs` | 串行化的认证与桌面会话启动协议流程 |
 | `auth/caller_watch.rs` | 监听调用方断连并取消认证，使用弱发送端避免延长队列生命周期 |
 | `greetd/protocol.rs` | 协议消息与共享传输错误定义 |
 | `greetd/transport.rs` | 真实 Unix Socket、受限协议帧及凭据缓冲区清零 |

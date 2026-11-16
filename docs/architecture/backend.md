@@ -15,7 +15,8 @@ The `crates/Cargo.toml` workspace shares one `Cargo.lock` and Rust edition with 
 | `service.rs` | `io.akari.Greeter1` D-Bus interface, authentication actor supervision, and `systemd-logind` power calls |
 | `auth/handle.rs` | D-Bus-facing command handles and supervision of the actor task |
 | `auth/actor.rs` | Single command queue, serialized acceptance, and operation replies |
-| `auth/attempt.rs` | Attempt resources, transport operations, cleanup, and ordered state/prompt signals |
+| `auth/attempt.rs` | Attempt resources, snapshot/control publishing, cancellation, and signal ordering |
+| `auth/flow.rs` | Serialized authentication and session-start protocol flows |
 | `auth/caller_watch.rs` | Caller disconnect observation and cancellation without retaining the actor queue |
 | `greetd/protocol.rs` | Protocol messages and shared transport errors |
 | `greetd/transport.rs` | Real Unix socket transport, bounded framing, and zeroized credential buffers |
