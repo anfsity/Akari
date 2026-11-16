@@ -158,7 +158,12 @@ impl ApplicationHandler for Preview {
             event_loop.exit();
             return;
         }
-        match plan_frame_wait(self.window.is_some(), self.pending_redraw, now, self.next_frame) {
+        match plan_frame_wait(
+            self.window.is_some(),
+            self.pending_redraw,
+            now,
+            self.next_frame,
+        ) {
             FrameWaitPlan::Wait => event_loop.set_control_flow(ControlFlow::Wait),
             FrameWaitPlan::RequestRedrawAndWait => {
                 if let Some(window) = self.window.as_ref() {
@@ -204,7 +209,10 @@ mod tests {
     fn frame_wait_avoids_busy_spinning_without_window_or_with_pending_redraw() {
         let now = Instant::now();
         let past = now - Duration::from_millis(5);
-        assert_eq!(plan_frame_wait(false, false, now, past), FrameWaitPlan::Wait);
+        assert_eq!(
+            plan_frame_wait(false, false, now, past),
+            FrameWaitPlan::Wait
+        );
         assert_eq!(plan_frame_wait(true, true, now, past), FrameWaitPlan::Wait);
         assert_eq!(
             plan_frame_wait(true, false, now, past),

@@ -234,12 +234,7 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
     let mut timing = Presentation::new(options.duration);
     loop {
         dispatch_seat(&mut session.seat, 0, &stop)?;
-        if !should_continue_presentation(
-            session.activation.get(),
-            &stop,
-            &timing,
-            Instant::now(),
-        ) {
+        if !should_continue_presentation(session.activation.get(), &stop, &timing, Instant::now()) {
             break;
         }
         let mut display = session.display.borrow_mut();
@@ -247,12 +242,7 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
             card.present(&mut timing, &mut options.snapshot)?;
         }
         drop(display);
-        if !should_continue_presentation(
-            session.activation.get(),
-            &stop,
-            &timing,
-            Instant::now(),
-        ) {
+        if !should_continue_presentation(session.activation.get(), &stop, &timing, Instant::now()) {
             break;
         }
         // Dispatch instead of sleeping so VT revocation is acknowledged promptly.
