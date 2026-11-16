@@ -704,6 +704,9 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
           KeyEventResult.ignored,
       toolbar: StudioToolbar(
         themeId: _theme.id,
+        scenePath: _path,
+        scenePaths: _scenePaths,
+        onSwitchScene: (path) => _switchScene(path, context),
         readOnly: _inspect,
         editor: editor,
         preferencesReady: _preferencesReady,

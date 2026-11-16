@@ -280,19 +280,10 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
     List<String> visible,
     StudioDock side,
   ) {
-    final collapse = _button(
-      active == 'Sidebar' ? 'toggle-sidebar' : 'toggle-inspector',
-      'Collapse panel',
-      side == StudioDock.left
-          ? LucideIcons.chevronLeft
-          : LucideIcons.chevronRight,
-      () => _togglePanel(active),
-    );
     return SizedBox(
       height: 42,
       child: Row(
         children: [
-          if (side == StudioDock.left) collapse,
           Expanded(
             child: visible.length > 1
                 ? Padding(
@@ -332,10 +323,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                     behavior: HitTestBehavior.opaque,
                     onDoubleTap: () => _togglePanel(active),
                     child: Padding(
-                      padding: EdgeInsets.only(
-                        left: side == StudioDock.left ? 4 : 12,
-                        right: 8,
-                      ),
+                      padding: const EdgeInsets.only(left: 12, right: 8),
                       child: Text(_getPanelLabel(active)).small().semiBold(),
                     ),
                   ),
@@ -346,7 +334,15 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
             LucideIcons.externalLink,
             () => _setDock(active, StudioDock.floating),
           ),
-          if (side == StudioDock.right) collapse,
+          if (active == 'Inspector')
+            _button(
+              'toggle-inspector',
+              'Collapse panel',
+              side == StudioDock.left
+                  ? LucideIcons.panelLeft
+                  : LucideIcons.panelRight,
+              () => _togglePanel(active),
+            ),
         ],
       ),
     );
@@ -402,11 +398,11 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
               children: [
                 for (final title in _getRailPanels(side))
                   _button(
-                    title == 'Sidebar' ? 'toggle-sidebar' : 'toggle-inspector',
+                    title == 'Sidebar' ? 'reopen-sidebar' : 'toggle-inspector',
                     'Show ${_getPanelLabel(title).toLowerCase()} panel',
                     side == StudioDock.left
-                        ? LucideIcons.chevronRight
-                        : LucideIcons.chevronLeft,
+                        ? LucideIcons.panelLeft
+                        : LucideIcons.panelRight,
                     () => _togglePanel(title),
                   ),
               ],
@@ -479,15 +475,22 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                 maintainState: true,
                                 child: Row(
                                   children: [
+                                    const Gap(8),
+                                    _button(
+                                      'toggle-sidebar',
+                                      'Toggle project panel',
+                                      LucideIcons.panelLeft,
+                                      () => _togglePanel('Sidebar'),
+                                    ),
                                     Expanded(child: widget.toolbar),
                                     SizedBox(
-                                      width: 168,
+                                      width: 132,
                                       child: StudioEnumSelect(
                                         key: const ValueKey('workspace-preset'),
                                         value: _mode,
                                         values: StudioWorkspaceMode.values,
                                         formatValue: (value) =>
-                                            '${value.name[0].toUpperCase()}${value.name.substring(1)} layout',
+                                            '${value.name[0].toUpperCase()}${value.name.substring(1)}',
                                         onChanged: _applyPreset,
                                       ),
                                     ),
