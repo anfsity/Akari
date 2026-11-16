@@ -358,13 +358,58 @@ class StudioDisclosureSection extends StatefulWidget {
       _StudioDisclosureSectionState();
 }
 
-class _StudioDisclosureSectionState extends State<StudioDisclosureSection> {
+class _StudioDisclosureSectionState extends State<StudioDisclosureSection>
+    with SingleTickerProviderStateMixin {
   late bool _expanded = widget.initiallyExpanded;
+  late final _controller =
+      AnimationController(
+        vsync: this,
+        duration: kDefaultDuration,
+        value: _expanded ? 1 : 0,
+      )..addStatusListener((status) {
+        if (status == AnimationStatus.dismissed) setState(() {});
+      });
+  late final _progress = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOut,
+    reverseCurve: Curves.easeIn,
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = _expanded ? 1 : 0;
+    }
+  }
+
+  void _toggleExpanded() {
+    setState(() => _expanded = !_expanded);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = _expanded ? 1 : 0;
+      return;
+    }
+    if (_expanded) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final gap = theme.density.baseGap * theme.scaling;
+    final inset = theme.density.baseContainerPadding * theme.scaling * .75;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Semantics(
@@ -372,31 +417,53 @@ class _StudioDisclosureSectionState extends State<StudioDisclosureSection> {
           child: GhostButton(
             key: widget.triggerKey,
             density: ButtonDensity.compact,
-            onPressed: () => setState(() => _expanded = !_expanded),
-            child: SizedBox(
-              height: 40,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(widget.title).small().semiBold()),
-                    Icon(
-                      _expanded
-                          ? LucideIcons.chevronDown
-                          : LucideIcons.chevronRight,
-                      size: 14,
-                      color: colors.mutedForeground,
+            onPressed: _toggleExpanded,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: inset,
+                vertical: gap * .75,
+              ),
+              child: Row(
+                children: [
+                  Expanded(child: Text(widget.title).small().medium()),
+                  RotationTransition(
+                    turns: _progress.drive(Tween(begin: 0.0, end: .25)),
+                    child: Icon(
+                      LucideIcons.chevronRight,
+                      size: theme.typography.small.fontSize,
+                      color: theme.colorScheme.mutedForeground,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
-        if (_expanded)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
-            child: widget.child,
+        // Transition widgets animate around a stable body without rebuilding its
+        // editors each frame. Unmount closed sections once the transition ends.
+        if (_expanded || !_controller.isDismissed)
+          SizeTransition(
+            sizeFactor: _progress,
+            axisAlignment: -1,
+            fixedCrossAxisSizeFactor: 1,
+            child: IgnorePointer(
+              ignoring: !_expanded,
+              child: ExcludeFocus(
+                excluding: !_expanded,
+                child: ExcludeSemantics(
+                  excluding: !_expanded,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      inset,
+                      gap * .25,
+                      inset,
+                      inset,
+                    ),
+                    child: widget.child,
+                  ),
+                ),
+              ),
+            ),
           ),
       ],
     );
