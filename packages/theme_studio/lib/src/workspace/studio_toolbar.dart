@@ -76,15 +76,17 @@ class StudioToolbar extends StatelessWidget {
     tooltip: (_) => Text(label),
     child: Semantics(
       label: label,
-      child: OutlineButton(
-        key: ValueKey(key),
-        density: ButtonDensity.icon,
-        theme: OutlineButtonTheme(
+      child: ComponentTheme<OutlineButtonTheme>(
+        data: OutlineButtonTheme(
           decoration: (context, states, value) =>
-              (value as BoxDecoration).copyWith(border: const Border()),
+              ButtonVariance.ghost.decoration(context, states),
         ),
-        onPressed: onPressed,
-        child: Icon(icon, size: 16),
+        child: OutlineButton(
+          key: ValueKey(key),
+          density: ButtonDensity.icon,
+          onPressed: onPressed,
+          child: Icon(icon, size: 16),
+        ),
       ),
     ),
   );
@@ -194,12 +196,9 @@ class StudioToolbar extends StatelessWidget {
             Tooltip(
               tooltip: (_) =>
                   Text(hasDraft || isDirty ? 'Unsaved changes' : 'Saved'),
-              child: Semantics(
-                label: hasDraft || isDirty ? 'Unsaved changes' : 'Saved',
-                child: Text(hasDraft || isDirty ? 'Unsaved changes' : 'Saved')
-                    .xSmall()
-                    .muted(),
-              ),
+              child: Text(hasDraft || isDirty ? 'Unsaved changes' : 'Saved')
+                  .xSmall()
+                  .muted(),
             ),
             const Gap(10),
             PrimaryButton(

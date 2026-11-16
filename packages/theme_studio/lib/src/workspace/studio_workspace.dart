@@ -484,13 +484,13 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                     ),
                                     Expanded(child: widget.toolbar),
                                     SizedBox(
-                                      width: 132,
+                                      width: 148,
                                       child: StudioEnumSelect(
                                         key: const ValueKey('workspace-preset'),
                                         value: _mode,
                                         values: StudioWorkspaceMode.values,
                                         formatValue: (value) =>
-                                            '${value.name[0].toUpperCase()}${value.name.substring(1)}',
+                                            '${value.name[0].toUpperCase()}${value.name.substring(1)} layout',
                                         onChanged: _applyPreset,
                                       ),
                                     ),

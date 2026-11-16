@@ -269,13 +269,14 @@ class StudioCanvasState extends State<StudioCanvas> {
     required VoidCallback? onPressed,
     IconData? icon,
     String? text,
-    bool active = false,
+    bool? active,
   }) {
     final colors = Theme.of(context).colorScheme;
+    final isActive = active ?? false;
     return Tooltip(
       tooltip: (_) => Text(label),
       child: Semantics(
-        label: label,
+        label: icon == null ? null : label,
         toggled: active,
         child: Button(
           key: ValueKey(key),
@@ -290,7 +291,7 @@ class StudioCanvasState extends State<StudioCanvas> {
               ).copyWith(
                 decoration: (context, states, value) =>
                     (value as BoxDecoration).copyWith(
-                      color: active
+                      color: isActive
                           ? colors.primary.withValues(alpha: .08)
                           : null,
                     ),
@@ -298,7 +299,7 @@ class StudioCanvasState extends State<StudioCanvas> {
           onPressed: onPressed,
           child: icon == null
               ? Text(text ?? label).small()
-              : Icon(icon, size: 16, color: active ? colors.primary : null),
+              : Icon(icon, size: 16, color: isActive ? colors.primary : null),
         ),
       ),
     );
@@ -442,7 +443,7 @@ class StudioCanvasState extends State<StudioCanvas> {
                   const SizedBox(height: 20, child: VerticalDivider()),
                 if (session != null)
                   SizedBox(
-                    width: compact ? 128 : 148,
+                    width: 148,
                     child: StudioSelect<StudioCanvasPreset>(
                       theme: SelectTheme(
                         padding: const EdgeInsets.symmetric(
