@@ -9,7 +9,7 @@
   },
   "background": {
     "kind": "image",
-    "asset": "packages/theme_default/assets/(71187447)Hello world.png",
+    "asset": "packages/theme_default/assets/terrace-backdrop.png",
     "color": "#081b2b",
     "scrimOpacity": 0.08,
     "blurSigma": 0.0

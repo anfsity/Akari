@@ -46,7 +46,7 @@ void main() {
     await _mountGreeter(
       tester,
       gateway: _SingleUserGateway(
-        iconPath: File('assets/(71187447)Hello world.png').absolute.path,
+        iconPath: File('assets/terrace-backdrop.png').absolute.path,
       ),
     );
     await tester.runAsync(() async {
