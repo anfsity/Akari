@@ -27,6 +27,7 @@ fvm dart run packages/akari_cli/bin/akari.dart run studio --theme /path/to/theme
 
 ## Workspace & panels
 
+- **Document header**: The project/scene breadcrumb opens the scene menu, including **New scene** and **Create theme**. The panel icon at the top left toggles the project panel; undo, redo, settings, save, and workspace controls stay on the right.
 - **Workspace modes**: Switch between **Design**, **Motion** (opens motion inspector tabs and the timeline), and **Focus** (hides side panels).
 - **Collapsible & floating panels**: Toggle the left sidebar (`Ctrl+B`), right inspector (`Ctrl+Shift+B`), or fullscreen presentation mode (`Ctrl+Shift+P`, `Escape` to exit). Double-click a panel header to collapse it, click its float button to detach it into a movable/resizable window, or drag/dock panels onto either edge to form tab groups.
 - **Persistent layout**: Dock positions, panel widths, floating bounds, and workspace mode are saved as user preferences without polluting scene undo history.
@@ -34,7 +35,7 @@ fvm dart run packages/akari_cli/bin/akari.dart run studio --theme /path/to/theme
 
 ## Editing workflow
 
-1. **Choose a theme and scene**: Select a compiled theme in **Theme** and a scene in **Scenes**, click **New scene** to create a fresh artboard in the current theme, or click **Load JSON** to open any `*.scene.json` file from disk.
+1. **Choose a theme and scene**: Select a compiled theme in the project panel's **Theme** selector and a scene in **Scenes** or the header's scene menu. Choose **New scene** from the header menu to create a fresh artboard in the current theme, or click **Load JSON** to open any `*.scene.json` file from disk.
 2. **Assemble & select layers**: Use **Compose** to toggle layout slots, apply presets, or drag basic primitives onto the canvas. Use **Layers** to inspect the front-to-back hierarchy (including hidden nodes) and **Assets** to browse or import package resources.
 3. **Customize in the inspector**: Edit component properties, visual style tokens, geometry, frame auto-layout, and motion settings in the right-hand inspector.
 4. **Apply & preview**: Choices and sliders preview immediately (committing a single undo step on release); text and numeric fields apply on `Enter`, blur, or **Apply to preview**. The apply button appears when there is a pending draft or validation error; otherwise the inspector shows **Synced**. Invalid drafts display an inline error while keeping the last valid scene on canvas.
@@ -109,7 +110,8 @@ Transform translations (`translateX`, `translateY`) remain in logical pixels as 
 
 ## Canvas tools, rulers & shortcuts
 
-- **Rulers & reference guides**: Toggle rulers from the bottom bar. Drag from the top or left ruler to create vertical/horizontal guides, drag guides to reposition, or double-click to remove them.
+- **Floating canvas controls**: The bottom capsule groups the current tool, hand tool, smart guides, resolution, responsive/comparison preview, and zoom. Narrow canvases use compact icons and wrap the controls. Its **Canvas tools** (`…`) menu contains the transform tools, aspect-ratio lock, and rulers.
+- **Rulers & reference guides**: Toggle **Rulers & guides** in the capsule's **Canvas tools** menu. Drag from the top or left ruler to create vertical/horizontal guides, drag guides to reposition, or double-click to remove them.
 - **Smart guides & grid snapping**: Moving or resizing layers snaps edges and centers to visible layers, canvas bounds, and reference guides (6-pixel screen tolerance) while labeling nearest gaps. Toggle smart guides with the magnet button, hold `Alt` to bypass snapping temporarily, or configure grid snapping in **Settings → Grid & snapping**.
 
 | Tool | Shortcut | Behavior |
