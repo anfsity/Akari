@@ -50,6 +50,11 @@ These rules apply to all changes in this repository.
 
 - Do not add comments merely to narrate the diff, restate the method signature, or explain what the code already clearly expresses.
 
+## Testing
+
+- Use regression tests to verify observable behavior and prevent known issues from recurring. Do not add unit tests.
+- Do not add test code unless regression coverage is explicitly requested. Run relevant existing regression checks and verify UI changes in the rendered interface.
+
 ## Commits
 
 - Keep commits atomic and split changes at the finest reasonable granularity.
