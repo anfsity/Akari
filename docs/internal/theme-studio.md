@@ -30,13 +30,14 @@ fvm dart run packages/akari_cli/bin/akari.dart run studio --theme /path/to/theme
 - **Workspace modes**: Switch between **Design**, **Motion** (opens motion inspector tabs and the timeline), and **Focus** (hides side panels).
 - **Collapsible & floating panels**: Toggle the left sidebar (`Ctrl+B`), right inspector (`Ctrl+Shift+B`), or fullscreen presentation mode (`Ctrl+Shift+P`, `Escape` to exit). Double-click a panel header to collapse it, click its float button to detach it into a movable/resizable window, or drag/dock panels onto either edge to form tab groups.
 - **Persistent layout**: Dock positions, panel widths, floating bounds, and workspace mode are saved as user preferences without polluting scene undo history.
+- **Panel density & motion**: Compose lists and inspector disclosure controls follow the editor theme's spacing density and scaling. Selection and disclosure transitions are brief and local to the panel; system reduced-motion settings skip these transitions.
 
 ## Editing workflow
 
 1. **Choose a theme and scene**: Select a compiled theme in **Theme** and a scene in **Scenes**, click **New scene** to create a fresh artboard in the current theme, or click **Load JSON** to open any `*.scene.json` file from disk.
 2. **Assemble & select layers**: Use **Compose** to toggle layout slots, apply presets, or drag basic primitives onto the canvas. Use **Layers** to inspect the front-to-back hierarchy (including hidden nodes) and **Assets** to browse or import package resources.
 3. **Customize in the inspector**: Edit component properties, visual style tokens, geometry, frame auto-layout, and motion settings in the right-hand inspector.
-4. **Apply & preview**: Choices and sliders preview immediately (committing a single undo step on release); text and numeric fields apply on `Enter`, blur, or **Apply to preview**. Invalid drafts display an inline error while keeping the last valid scene on canvas.
+4. **Apply & preview**: Choices and sliders preview immediately (committing a single undo step on release); text and numeric fields apply on `Enter`, blur, or **Apply to preview**. The apply button appears when there is a pending draft or validation error; otherwise the inspector shows **Synced**. Invalid drafts display an inline error while keeping the last valid scene on canvas.
 5. **Undo or save**: Use **Undo** / **Redo** (`Ctrl+Z` / `Ctrl+Shift+Z`) to step through history and **Save scene** (`Ctrl+S`) to write changes atomically to the scene JSON.
 
 ### Component properties & visual styles

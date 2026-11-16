@@ -65,19 +65,19 @@ class _InspectorHeader extends StatelessWidget {
   final ThemeComponentDefinition? definition;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    child: Column(
+  Widget build(BuildContext context) => DensityContainerPadding(
+    padding: const EdgeInsetsDensity.symmetric(horizontal: .75, vertical: .625),
+    child: DensityColumn(
       crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 2,
+      spacing: .25,
       children: [
         Text(
-          node.id,
+          definition?.label ?? node.componentId,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ).small().semiBold(),
         Text(
-          definition?.label ?? node.componentId,
+          node.id,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ).muted().xSmall(),
@@ -105,8 +105,8 @@ class _InspectorForm extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
+        DensityContainerPadding(
+          padding: const EdgeInsetsDensity.all(.75),
           child: switch (editor) {
             final session? when controller.node.asset != null =>
               NodeAssetInspector(editor: session),
@@ -118,8 +118,8 @@ class _InspectorForm extends StatelessWidget {
           },
         ),
         const Divider(),
-        Padding(
-          padding: const EdgeInsets.all(12),
+        DensityContainerPadding(
+          padding: const EdgeInsetsDensity.all(.75),
           child: _buildLayoutSection(),
         ),
         const Divider(),
@@ -139,9 +139,9 @@ class _InspectorForm extends StatelessWidget {
         ],
         StudioDisclosureSection(
           title: 'Advanced layout',
-          child: Column(
+          child: DensityColumn(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 12,
+            spacing: 1.5,
             children: [
               _buildLayeringSection(),
               const Divider(),
@@ -445,20 +445,25 @@ class _InspectorActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = hasDraft || error != null;
+    final theme = Theme.of(context);
+    final gap = theme.density.baseGap * theme.scaling;
     return Padding(
       key: const ValueKey('inspector-actions'),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: theme.density.baseContainerPadding * theme.scaling * .75,
+        vertical: gap * .5,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 6,
+        spacing: gap * .75,
         children: [
           if (error case final message?)
             ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 64),
+              constraints: BoxConstraints(maxHeight: gap * 8),
               child: SingleChildScrollView(child: StudioFormError(message)),
             ),
           ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 34),
+            constraints: BoxConstraints(minHeight: gap * 4),
             child: Row(
               children: [
                 Expanded(
@@ -472,15 +477,12 @@ class _InspectorActions extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ).xSmall().muted(),
                 ),
-                Button(
-                  style: active
-                      ? const ButtonStyle.primary(density: ButtonDensity.dense)
-                      : const ButtonStyle.ghost(density: ButtonDensity.dense),
-                  onPressed: onApply,
-                  child: active
-                      ? const Text('Apply to preview').xSmall()
-                      : const Text('Apply to preview').xSmall().muted(),
-                ),
+                if (active)
+                  PrimaryButton(
+                    density: ButtonDensity.dense,
+                    onPressed: onApply,
+                    child: const Text('Apply to preview').xSmall(),
+                  ),
               ],
             ),
           ),

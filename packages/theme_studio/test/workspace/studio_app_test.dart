@@ -1970,8 +1970,12 @@ void main() {
   ) async {
     await openStudio(tester);
     final preview = tester.widget<StudioPreview>(find.byType(StudioPreview));
+    expect(find.text('Synced'), findsOneWidget);
+    expect(find.text('Apply to preview'), findsNothing);
     await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
     await tester.pump();
+    expect(find.text('Pending draft'), findsOneWidget);
+    expect(find.text('Apply to preview').hitTestable(), findsOneWidget);
     expect(find.text('Unsaved changes'), findsOneWidget);
     expect(
       tester.widget<StudioPreview>(find.byType(StudioPreview)),
@@ -1979,6 +1983,8 @@ void main() {
     );
     await tester.tap(find.text('Apply to preview'));
     await tester.pumpAndSettle();
+    expect(find.text('Synced'), findsOneWidget);
+    expect(find.text('Apply to preview'), findsNothing);
     expect(
       tester
           .widget<StudioPreview>(find.byType(StudioPreview))
