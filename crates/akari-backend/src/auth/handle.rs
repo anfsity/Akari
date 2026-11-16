@@ -138,8 +138,8 @@ impl AuthActorHandle {
     ) -> fdo::Result<()> {
         let allow_after_cleanup = self.interrupt_current(Some(&attempt_id), &caller);
         self.send_with(|reply| AuthCommand::Cancel {
-            expected_attempt: Some(attempt_id),
-            expected_caller: Some(caller),
+            attempt_id,
+            caller,
             allow_after_cleanup,
             emitter: Some(emitter),
             reply,
@@ -279,8 +279,8 @@ pub(super) enum AuthCommand {
         reply: oneshot::Sender<fdo::Result<()>>,
     },
     Cancel {
-        expected_attempt: Option<String>,
-        expected_caller: Option<String>,
+        attempt_id: String,
+        caller: String,
         allow_after_cleanup: bool,
         emitter: Option<SignalEmitter<'static>>,
         reply: oneshot::Sender<fdo::Result<()>>,
@@ -333,13 +333,11 @@ impl AuthCommand {
         match self {
             Self::Begin { caller, .. }
             | Self::Respond { caller, .. }
+            | Self::Cancel { caller, .. }
             | Self::BeginSessionResolution { caller, .. }
             | Self::ReportSessionUnavailable { caller, .. }
             | Self::FailSessionResolution { caller, .. }
             | Self::StartSession { caller, .. } => Some(caller),
-            Self::Cancel {
-                expected_caller, ..
-            } => expected_caller.as_deref(),
             #[cfg(test)]
             Self::Panic => None,
         }
@@ -348,13 +346,11 @@ impl AuthCommand {
     pub(super) fn get_attempt_id(&self) -> Option<&str> {
         match self {
             Self::Respond { attempt_id, .. }
+            | Self::Cancel { attempt_id, .. }
             | Self::BeginSessionResolution { attempt_id, .. }
             | Self::ReportSessionUnavailable { attempt_id, .. }
             | Self::FailSessionResolution { attempt_id, .. }
             | Self::StartSession { attempt_id, .. } => Some(attempt_id),
-            Self::Cancel {
-                expected_attempt, ..
-            } => expected_attempt.as_deref(),
             Self::Begin { .. } => None,
             #[cfg(test)]
             Self::Panic => None,

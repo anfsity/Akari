@@ -9,6 +9,7 @@
 mod actor;
 mod attempt;
 mod caller_watch;
+mod flow;
 mod handle;
 
 pub(crate) use attempt::sanitize_detail;

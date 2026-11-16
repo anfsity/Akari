@@ -74,8 +74,8 @@ async fn cancel_for_caller_disconnect(
         return;
     };
     let _ = send_command(&commands, |reply| AuthCommand::Cancel {
-        expected_attempt: Some(attempt_id),
-        expected_caller: Some(caller),
+        attempt_id,
+        caller,
         allow_after_cleanup: false,
         emitter: None,
         reply,

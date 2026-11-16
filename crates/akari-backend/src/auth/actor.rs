@@ -7,10 +7,11 @@ use zbus::fdo;
 
 use super::{
     attempt::{
-        ActorState, AttemptControl, AuthSnapshot, begin_session_resolution, cancel_current,
-        create_attempt, fail_session_resolution, finish_cancellation, handle_respond,
+        ActorState, AttemptControl, AuthSnapshot, CancelScope, cancel_current, finish_cancellation,
+    },
+    flow::{
+        begin_session_resolution, create_attempt, fail_session_resolution, handle_respond,
         handle_start_session, report_session_unavailable, run_authentication,
-        validate_owned_attempt,
     },
     handle::{AuthCommand, BeginSequenceMap},
 };
@@ -82,7 +83,7 @@ pub(super) async fn run_actor(
                     emitter,
                     reply,
                 } => {
-                    let attempt_id = match create_attempt(
+                    let (attempt_id, cancellation) = match create_attempt(
                         &mut actor,
                         caller.clone(),
                         username.clone(),
@@ -91,7 +92,7 @@ pub(super) async fn run_actor(
                     )
                     .await
                     {
-                        Ok(attempt_id) => attempt_id,
+                        Ok(created) => created,
                         Err(error) => {
                             let _ = consume_begin_sequence(&latest_begin, &caller, sequence);
                             send_reply(reply, Err(error));
@@ -104,11 +105,17 @@ pub(super) async fn run_actor(
                     // then reported through the attempt's state signals.
                     send_reply(reply, Ok(attempt_id.clone()));
                     if superseded {
-                        let _ =
-                            finish_cancellation(&mut actor, &attempt_id, Some(&emitter)).await;
+                        let _ = finish_cancellation(&mut actor, &attempt_id, Some(&emitter)).await;
                         return;
                     }
-                    let _ = run_authentication(&mut actor, &attempt_id, &username, emitter).await;
+                    let _ = run_authentication(
+                        &mut actor,
+                        &attempt_id,
+                        &username,
+                        emitter,
+                        &cancellation,
+                    )
+                    .await;
                 }
                 AuthCommand::Respond {
                     caller,
@@ -117,25 +124,24 @@ pub(super) async fn run_actor(
                     emitter,
                     reply,
                 } => {
-                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                        send_reply(reply, Err(error));
-                        return;
-                    }
-                    let result = handle_respond(&mut actor, &attempt_id, response, emitter).await;
+                    let result =
+                        handle_respond(&mut actor, &attempt_id, &caller, response, emitter).await;
                     send_reply(reply, result);
                 }
                 AuthCommand::Cancel {
-                    expected_attempt,
-                    expected_caller,
+                    attempt_id,
+                    caller,
                     allow_after_cleanup,
                     emitter,
                     reply,
                 } => {
                     let result = cancel_current(
                         &mut actor,
-                        expected_attempt.as_deref(),
-                        expected_caller.as_deref(),
-                        allow_after_cleanup,
+                        CancelScope::Caller {
+                            attempt_id: &attempt_id,
+                            caller: &caller,
+                            allow_after_cleanup,
+                        },
                         emitter,
                     )
                     .await;
@@ -147,11 +153,8 @@ pub(super) async fn run_actor(
                     emitter,
                     reply,
                 } => {
-                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                        send_reply(reply, Err(error));
-                        return;
-                    }
-                    let result = begin_session_resolution(&mut actor, &attempt_id, &emitter).await;
+                    let result =
+                        begin_session_resolution(&mut actor, &attempt_id, &caller, &emitter).await;
                     send_reply(reply, result);
                 }
                 AuthCommand::ReportSessionUnavailable {
@@ -161,12 +164,14 @@ pub(super) async fn run_actor(
                     emitter,
                     reply,
                 } => {
-                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                        send_reply(reply, Err(error));
-                        return;
-                    }
-                    let result =
-                        report_session_unavailable(&mut actor, &attempt_id, detail, &emitter).await;
+                    let result = report_session_unavailable(
+                        &mut actor,
+                        &attempt_id,
+                        &caller,
+                        detail,
+                        &emitter,
+                    )
+                    .await;
                     send_reply(reply, result);
                 }
                 AuthCommand::FailSessionResolution {
@@ -176,12 +181,9 @@ pub(super) async fn run_actor(
                     emitter,
                     reply,
                 } => {
-                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                        send_reply(reply, Err(error));
-                        return;
-                    }
                     let result =
-                        fail_session_resolution(&mut actor, &attempt_id, detail, &emitter).await;
+                        fail_session_resolution(&mut actor, &attempt_id, &caller, detail, &emitter)
+                            .await;
                     send_reply(reply, result);
                 }
                 AuthCommand::StartSession {
@@ -191,12 +193,9 @@ pub(super) async fn run_actor(
                     emitter,
                     reply,
                 } => {
-                    if let Err(error) = validate_owned_attempt(&actor, &attempt_id, &caller) {
-                        send_reply(reply, Err(error));
-                        return;
-                    }
                     let result =
-                        handle_start_session(&mut actor, &attempt_id, session, emitter).await;
+                        handle_start_session(&mut actor, &attempt_id, &caller, session, emitter)
+                            .await;
                     send_reply(reply, result);
                 }
             }
@@ -205,7 +204,7 @@ pub(super) async fn run_actor(
         .await;
     }
 
-    let _ = cancel_current(&mut actor, None, None, false, None).await;
+    let _ = cancel_current(&mut actor, CancelScope::Internal, None).await;
 }
 
 #[cfg(test)]
