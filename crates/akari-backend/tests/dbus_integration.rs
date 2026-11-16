@@ -475,6 +475,58 @@ async fn auth_error_without_user_input_does_not_retry() {
 }
 
 #[tokio::test]
+async fn begin_authentication_recovers_after_failed_state() {
+    let _guard = lock_test_bus().await;
+    let directory = temp_dir("retry-after-failed");
+    let socket = directory.join("greetd.sock");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let server = spawn_server(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        assert_eq!(read_request(&mut stream).await["type"], "create_session");
+        write_response(
+            &mut stream,
+            serde_json::json!({
+                "type": "error",
+                "error_type": "auth_error",
+                "description": "authentication failed"
+            }),
+        )
+        .await;
+        assert_eq!(read_request(&mut stream).await["type"], "cancel_session");
+        write_response(&mut stream, serde_json::json!({"type": "success"})).await;
+
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let create = read_request(&mut stream).await;
+        assert_eq!(create["type"], "create_session");
+        assert_eq!(create["username"], "bob");
+        send_secret_prompt(&mut stream).await;
+        let response = read_request(&mut stream).await;
+        assert_eq!(response["response"], "password");
+        write_response(&mut stream, serde_json::json!({"type": "success"})).await;
+    });
+    let _backend = start_backend(&socket);
+    let connection = connect_backend().await;
+    let proxy = create_proxy(&connection).await;
+
+    let first: String = proxy
+        .call("BeginAuthentication", &("alice",))
+        .await
+        .unwrap();
+    wait_for_state(&proxy, "Failed").await;
+
+    let second: String = proxy.call("BeginAuthentication", &("bob",)).await.unwrap();
+    assert_ne!(first, second);
+    wait_for_state(&proxy, "WaitingForInput").await;
+    proxy
+        .call::<_, _, ()>("Respond", &(second, "password"))
+        .await
+        .unwrap();
+    let state: (String, String) = proxy.call("GetState", &()).await.unwrap();
+    assert_eq!(state.0, "Authenticated");
+    server.finish().await;
+}
+
+#[tokio::test]
 async fn wrong_password_prompts_again() {
     let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
@@ -1330,7 +1382,10 @@ async fn failed_previous_cancel_does_not_block_replacement_and_prompts_are_sanit
     let proxy = create_proxy(&connection).await;
     let mut prompts = proxy.receive_signal("Prompt").await.unwrap();
 
-    let first: String = proxy.call("BeginAuthentication", &("alice",)).await.unwrap();
+    let first: String = proxy
+        .call("BeginAuthentication", &("alice",))
+        .await
+        .unwrap();
     let _ = prompts.next().await.unwrap();
     wait_for_state(&proxy, "WaitingForInput").await;
 
