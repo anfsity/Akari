@@ -444,7 +444,7 @@ class _StudioDisclosureSectionState extends State<StudioDisclosureSection>
         if (_expanded || !_controller.isDismissed)
           SizeTransition(
             sizeFactor: _progress,
-            axisAlignment: -1,
+            alignment: Alignment.topCenter,
             fixedCrossAxisSizeFactor: 1,
             child: IgnorePointer(
               ignoring: !_expanded,
