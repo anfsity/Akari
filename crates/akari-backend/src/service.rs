@@ -143,9 +143,8 @@ impl GreeterService {
         let session = match tokio::task::spawn_blocking(move || sessions.find(&lookup_id)).await {
             Ok(Ok(Some(session))) => session,
             Ok(Ok(None)) => {
-                let detail = crate::auth::sanitize_detail(&format!(
-                    "session {session_id} is unavailable"
-                ));
+                let detail =
+                    crate::auth::sanitize_detail(&format!("session {session_id} is unavailable"));
                 self.auth
                     .report_session_unavailable(caller, attempt_id, detail.clone(), emitter)
                     .await?;

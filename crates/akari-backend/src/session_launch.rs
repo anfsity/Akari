@@ -189,10 +189,7 @@ fn open_session_log_or_null(stage: &str) -> io::Result<File> {
     }
     // Unwritable state directories must not block login, while still keeping
     // shell and renderer diagnostics off the VT.
-    OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open("/dev/null")
+    OpenOptions::new().read(true).write(true).open("/dev/null")
 }
 
 fn create_session_log(stage: &str) -> io::Result<File> {
