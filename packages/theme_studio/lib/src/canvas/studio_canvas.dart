@@ -256,6 +256,319 @@ class StudioCanvasState extends State<StudioCanvas> {
     return KeyEventResult.handled;
   }
 
+  IconData _getToolIcon(StudioCanvasTool tool) => switch (tool) {
+    StudioCanvasTool.move => LucideIcons.mousePointer2,
+    StudioCanvasTool.scale => LucideIcons.scaling,
+    StudioCanvasTool.rotate => LucideIcons.rotateCw,
+    StudioCanvasTool.rotate3d => LucideIcons.rotate3d,
+  };
+
+  Widget _buildDockButton({
+    required String key,
+    required String label,
+    required VoidCallback? onPressed,
+    IconData? icon,
+    String? text,
+    bool active = false,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return Tooltip(
+      tooltip: (_) => Text(label),
+      child: Semantics(
+        label: label,
+        toggled: active,
+        child: Button(
+          key: ValueKey(key),
+          style:
+              ButtonStyle.ghost(
+                density: icon == null
+                    ? ButtonDensity.dense
+                    : ButtonDensity.icon,
+                shape: icon == null
+                    ? ButtonShape.rectangle
+                    : ButtonShape.circle,
+              ).copyWith(
+                decoration: (context, states, value) =>
+                    (value as BoxDecoration).copyWith(
+                      color: active
+                          ? colors.primary.withValues(alpha: .08)
+                          : null,
+                    ),
+              ),
+          onPressed: onPressed,
+          child: icon == null
+              ? Text(text ?? label).small()
+              : Icon(icon, size: 16, color: active ? colors.primary : null),
+        ),
+      ),
+    );
+  }
+
+  void _openToolMenu(BuildContext context, {required bool canEdit}) {
+    showDropdown<void>(
+      context: context,
+      alignment: Alignment.bottomLeft,
+      anchorAlignment: Alignment.topLeft,
+      builder: (_) => DropdownMenu(
+        children: [
+          const MenuLabel(child: Text('Transform')),
+          for (final tool in StudioCanvasTool.values)
+            MenuButton(
+              key: ValueKey('tool-menu-${tool.name}'),
+              leading: Icon(_getToolIcon(tool), size: 16),
+              trailing: Text(
+                widget.preferences.input.getBinding(tool.command)?.getLabel() ??
+                    'Unbound',
+              ).xSmall().muted(),
+              enabled: canEdit,
+              onPressed: (_) => _selectTool(tool),
+              child: Text(tool.label),
+            ),
+          const MenuDivider(),
+          MenuButton(
+            key: const ValueKey('lock-aspect-ratio'),
+            leading: Icon(
+              _lockAspectRatio ? LucideIcons.lock : LucideIcons.lockOpen,
+              size: 16,
+            ),
+            trailing: _lockAspectRatio
+                ? const Icon(LucideIcons.check, size: 14)
+                : null,
+            enabled: canEdit,
+            onPressed: (_) =>
+                setState(() => _lockAspectRatio = !_lockAspectRatio),
+            child: const Text('Lock aspect ratio'),
+          ),
+          MenuButton(
+            key: const ValueKey('canvas-rulers'),
+            leading: const Icon(LucideIcons.ruler, size: 16),
+            trailing: _showRulers
+                ? const Icon(LucideIcons.check, size: 14)
+                : null,
+            onPressed: (_) => setState(() => _showRulers = !_showRulers),
+            child: const Text('Rulers & guides'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCanvasDock(SceneEditor? session) {
+    final colors = Theme.of(context).colorScheme;
+    final canEdit =
+        session != null &&
+        !widget.readOnly &&
+        !_previewing &&
+        _elapsed == null &&
+        !_comparing &&
+        _responsiveSize == null;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 720;
+        final responsiveLabel = _responsiveSize == null
+            ? 'Responsive'
+            : 'Authored size';
+        final comparisonLabel = _comparing ? 'Single' : 'Compare';
+        return Center(
+          child: Container(
+            key: const ValueKey('canvas-dock'),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colors.background,
+              border: Border.all(color: colors.border.withValues(alpha: .7)),
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x12000000),
+                  blurRadius: 24,
+                  offset: Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Color(0x08000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildDockButton(
+                      key: 'tool-${_tool.name}',
+                      label:
+                          '${_tool.label} · ${widget.preferences.input.getBinding(_tool.command)?.getLabel() ?? 'Unbound'}',
+                      icon: _getToolIcon(_tool),
+                      active: !_handTool && canEdit,
+                      onPressed: canEdit ? () => _selectTool(_tool) : null,
+                    ),
+                    _buildDockButton(
+                      key: 'canvas-hand',
+                      label:
+                          'Hand · ${widget.preferences.input.getBinding(StudioCommand.hand)?.getLabel() ?? 'Unbound'}',
+                      icon: LucideIcons.hand,
+                      active: _handTool,
+                      onPressed: session == null
+                          ? null
+                          : () => setState(() => _handTool = !_handTool),
+                    ),
+                    _buildDockButton(
+                      key: 'smart-guides',
+                      label: 'Smart guides · Alt to bypass',
+                      icon: LucideIcons.magnet,
+                      active: _snapToGuides,
+                      onPressed: canEdit
+                          ? () => setState(() => _snapToGuides = !_snapToGuides)
+                          : null,
+                    ),
+                    Builder(
+                      builder: (context) => _buildDockButton(
+                        key: 'canvas-tool-menu',
+                        label: 'Canvas tools',
+                        icon: LucideIcons.ellipsis,
+                        onPressed: session == null
+                            ? null
+                            : () => _openToolMenu(context, canEdit: canEdit),
+                      ),
+                    ),
+                  ],
+                ),
+                if (!compact)
+                  const SizedBox(height: 20, child: VerticalDivider()),
+                if (session != null)
+                  SizedBox(
+                    width: compact ? 128 : 148,
+                    child: StudioSelect<StudioCanvasPreset>(
+                      theme: SelectTheme(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                        decoration: (context, states, value) =>
+                            (value as BoxDecoration).copyWith(
+                              border: const Border(),
+                              color: Colors.transparent,
+                            ),
+                      ),
+                      key: const ValueKey('quick-resolution'),
+                      enabled: !widget.readOnly,
+                      value: StudioCanvasPreset.values
+                          .where(
+                            (preset) =>
+                                preset.width ==
+                                    session.document.canvas.referenceWidth &&
+                                preset.height ==
+                                    session.document.canvas.referenceHeight,
+                          )
+                          .firstOrNull,
+                      values: StudioCanvasPreset.values,
+                      placeholder: Text(
+                        '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}',
+                      ).small(),
+                      formatValue: (preset) =>
+                          '${preset.width} × ${preset.height}',
+                      onChanged: (preset) {
+                        if (!session.tryApplyDraft()) return;
+                        session.updateScene(
+                          canvas: session.document.canvas.copyWith(
+                            referenceWidth: preset.width,
+                            referenceHeight: preset.height,
+                          ),
+                        );
+                        _fitView();
+                      },
+                    ),
+                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildDockButton(
+                      key: 'canvas-responsive',
+                      label: responsiveLabel,
+                      icon: compact ? LucideIcons.monitor : null,
+                      active: _responsiveSize != null,
+                      onPressed: session == null
+                          ? null
+                          : () => setState(() {
+                              _responsiveSize = _responsiveSize == null
+                                  ? Size(
+                                      session.document.canvas.referenceWidth
+                                          .toDouble(),
+                                      session.document.canvas.referenceHeight
+                                          .toDouble(),
+                                    )
+                                  : null;
+                            }),
+                    ),
+                    _buildDockButton(
+                      key: 'canvas-compare',
+                      label: comparisonLabel,
+                      icon: compact ? LucideIcons.columns2 : null,
+                      active: _comparing,
+                      onPressed: session == null ? null : _toggleComparison,
+                    ),
+                  ],
+                ),
+                if (!compact)
+                  const SizedBox(height: 20, child: VerticalDivider()),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildDockButton(
+                      key: 'zoom-out',
+                      label: 'Zoom out',
+                      icon: LucideIcons.minus,
+                      onPressed: session == null
+                          ? null
+                          : () => setState(
+                              () => _zoom = clampStudioZoom(
+                                _getEffectiveZoom() / 1.25,
+                              ),
+                            ),
+                    ),
+                    _buildDockButton(
+                      key: 'zoom-fit',
+                      label: 'Fit canvas',
+                      text: _zoom == null
+                          ? 'Fit'
+                          : '${(_zoom! * 100).round()}%',
+                      onPressed: session == null ? null : _fitView,
+                    ),
+                    _buildDockButton(
+                      key: 'zoom-in',
+                      label: 'Zoom in',
+                      icon: LucideIcons.plus,
+                      onPressed: session == null
+                          ? null
+                          : () => setState(
+                              () => _zoom = clampStudioZoom(
+                                _getEffectiveZoom() * 1.25,
+                              ),
+                            ),
+                    ),
+                    _buildDockButton(
+                      key: 'zoom-actual-size',
+                      label: 'Actual size · 100%',
+                      text: '100%',
+                      onPressed: session == null
+                          ? null
+                          : () => setState(() => _zoom = 1),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final presenting =
@@ -276,131 +589,6 @@ class StudioCanvasState extends State<StudioCanvas> {
           listenable: Listenable.merge([widget.editor]),
           builder: (context, _) {
             final session = widget.editor;
-            final toolControls = <Widget>[
-              if (!widget.readOnly && !_previewing && _elapsed == null)
-                for (final tool in StudioCanvasTool.values)
-                  Tooltip(
-                    tooltip: (_) => Text(
-                      '${tool.label} · ${widget.preferences.input.getBinding(tool.command)?.getLabel() ?? 'Unbound'}',
-                    ),
-                    child: Button(
-                      key: ValueKey('tool-${tool.name}'),
-                      style: !_handTool && tool == _tool
-                          ? const ButtonStyle.primaryIcon()
-                          : const ButtonStyle.outlineIcon(),
-                      onPressed: () => _selectTool(tool),
-                      child: Semantics(
-                        label: tool.label,
-                        child: Icon(switch (tool) {
-                          StudioCanvasTool.move => LucideIcons.mousePointer2,
-                          StudioCanvasTool.scale => LucideIcons.scaling,
-                          StudioCanvasTool.rotate => LucideIcons.rotateCw,
-                          StudioCanvasTool.rotate3d => LucideIcons.rotate3d,
-                        }, size: 16),
-                      ),
-                    ),
-                  ),
-              Tooltip(
-                tooltip: (_) => Text(
-                  'Hand · ${widget.preferences.input.getBinding(StudioCommand.hand)?.getLabel() ?? 'Unbound'} · Hold ${widget.preferences.input.getBinding(StudioCommand.temporaryPan)?.getLabel() ?? 'Unbound'} to pan',
-                ),
-                child: Button(
-                  key: const ValueKey('canvas-hand'),
-                  style: _handTool
-                      ? const ButtonStyle.primaryIcon()
-                      : const ButtonStyle.outlineIcon(),
-                  onPressed: () => setState(() => _handTool = !_handTool),
-                  child: Semantics(
-                    label: 'Hand',
-                    child: const Icon(LucideIcons.hand, size: 16),
-                  ),
-                ),
-              ),
-              if (!widget.readOnly && !_previewing && _elapsed == null)
-                Tooltip(
-                  tooltip: (_) => const Text('Smart guides · Alt to bypass'),
-                  child: Button(
-                    key: const ValueKey('smart-guides'),
-                    style: _snapToGuides
-                        ? const ButtonStyle.primaryIcon()
-                        : const ButtonStyle.outlineIcon(),
-                    onPressed: () =>
-                        setState(() => _snapToGuides = !_snapToGuides),
-                    child: const Icon(LucideIcons.magnet, size: 16),
-                  ),
-                ),
-              if (!widget.readOnly && !_previewing && _elapsed == null)
-                Tooltip(
-                  tooltip: (_) =>
-                      const Text('Lock aspect ratio · Shift while resizing'),
-                  child: Button(
-                    key: const ValueKey('lock-aspect-ratio'),
-                    style: _lockAspectRatio
-                        ? const ButtonStyle.primaryIcon()
-                        : const ButtonStyle.outlineIcon(),
-                    onPressed: () =>
-                        setState(() => _lockAspectRatio = !_lockAspectRatio),
-                    child: Semantics(
-                      label: 'Lock aspect ratio',
-                      toggled: _lockAspectRatio,
-                      child: Icon(
-                        _lockAspectRatio
-                            ? LucideIcons.lock
-                            : LucideIcons.lockOpen,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                ),
-            ];
-            final zoomControls = <Widget>[
-              OutlineButton(
-                key: const ValueKey('zoom-out'),
-                density: ButtonDensity.icon,
-                onPressed: session == null
-                    ? null
-                    : () => setState(
-                        () =>
-                            _zoom = clampStudioZoom(_getEffectiveZoom() / 1.25),
-                      ),
-                child: const Icon(LucideIcons.minus, size: 16),
-              ),
-              OutlineButton(
-                key: const ValueKey('zoom-fit'),
-                onPressed: _fitView,
-                child: SizedBox(
-                  width: 44,
-                  child: Text(
-                    _zoom == null ? 'Fit' : '${(_zoom! * 100).round()}%',
-                    textAlign: TextAlign.center,
-                  ).small(),
-                ),
-              ),
-              OutlineButton(
-                key: const ValueKey('zoom-in'),
-                density: ButtonDensity.icon,
-                onPressed: session == null
-                    ? null
-                    : () => setState(
-                        () =>
-                            _zoom = clampStudioZoom(_getEffectiveZoom() * 1.25),
-                      ),
-                child: const Icon(LucideIcons.plus, size: 16),
-              ),
-              SizedBox(
-                width: 72,
-                child: OutlineButton(
-                  key: const ValueKey('zoom-actual-size'),
-                  onPressed: session == null
-                      ? null
-                      : () => setState(() => _zoom = 1),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: const Text('100%').small(),
-                  ),
-                ),
-              ),
-            ];
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -431,7 +619,7 @@ class StudioCanvasState extends State<StudioCanvas> {
                                   children: [
                                     SizedBox(
                                       width: 128,
-                                      child: OutlineButton(
+                                      child: GhostButton(
                                         onPressed: _elapsed == null
                                             ? widget.onToggleDormant
                                             : null,
@@ -480,7 +668,7 @@ class StudioCanvasState extends State<StudioCanvas> {
                                       child: Button(
                                         key: const ValueKey('canvas-timeline'),
                                         style: _elapsed == null
-                                            ? const ButtonStyle.outlineIcon()
+                                            ? const ButtonStyle.ghostIcon()
                                             : const ButtonStyle.primaryIcon(),
                                         onPressed: session == null
                                             ? null
@@ -500,7 +688,7 @@ class StudioCanvasState extends State<StudioCanvas> {
                                         ),
                                         style: _showStateGraph
                                             ? const ButtonStyle.primaryIcon()
-                                            : const ButtonStyle.outlineIcon(),
+                                            : const ButtonStyle.ghostIcon(),
                                         onPressed: session == null
                                             ? null
                                             : _toggleGraph,
@@ -524,7 +712,7 @@ class StudioCanvasState extends State<StudioCanvas> {
                                         key: const ValueKey('canvas-preview'),
                                         style: _previewing
                                             ? const ButtonStyle.primaryIcon()
-                                            : const ButtonStyle.outlineIcon(),
+                                            : const ButtonStyle.ghostIcon(),
                                         onPressed: session == null
                                             ? null
                                             : _togglePreview,
@@ -563,41 +751,25 @@ class StudioCanvasState extends State<StudioCanvas> {
                     ),
                   ),
                 Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (!presenting && !_comparing)
-                        Container(
-                          key: const ValueKey('canvas-tool-rail'),
-                          width: 44,
-                          decoration: BoxDecoration(
-                            color: colors.background,
-                            border: Border(
-                              right: BorderSide(color: colors.border),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (!presenting)
+                          IgnorePointer(
+                            child: CustomPaint(
+                              painter: _StudioStageGrid(colors.border),
                             ),
                           ),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              children: [
-                                const Gap(8),
-                                for (final control in toolControls)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 3,
-                                    ),
-                                    child: control,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      Expanded(
-                        child: Padding(
+                        Padding(
+                          key: const ValueKey('canvas-viewport-area'),
                           padding: presenting
                               ? EdgeInsets.zero
-                              : const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
+                              : EdgeInsets.fromLTRB(
+                                  20,
+                                  20,
+                                  20,
+                                  constraints.maxWidth < 720 ? 136 : 88,
                                 ),
                           child: session == null
                               ? const Center(
@@ -721,152 +893,26 @@ class StudioCanvasState extends State<StudioCanvas> {
                                   ),
                                 ),
                         ),
-                      ),
-                    ],
+                        if (!presenting)
+                          Positioned(
+                            left: 12,
+                            right: 12,
+                            bottom: 16,
+                            child: _buildCanvasDock(session),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-                if (!presenting)
+                if (!presenting &&
+                    (_responsiveSize != null ||
+                        _showStateGraph ||
+                        _elapsed != null))
                   ColoredBox(
                     color: colors.background,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Divider(),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(minHeight: 42),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              alignment: WrapAlignment.spaceBetween,
-                              children: [
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    if (session != null)
-                                      SizedBox(
-                                        width: 170,
-                                        child: StudioSelect<StudioCanvasPreset>(
-                                          key: const ValueKey(
-                                            'quick-resolution',
-                                          ),
-                                          enabled: !widget.readOnly,
-                                          value: StudioCanvasPreset.values
-                                              .where(
-                                                (preset) =>
-                                                    preset.width ==
-                                                        session
-                                                            .document
-                                                            .canvas
-                                                            .referenceWidth &&
-                                                    preset.height ==
-                                                        session
-                                                            .document
-                                                            .canvas
-                                                            .referenceHeight,
-                                              )
-                                              .firstOrNull,
-                                          values: StudioCanvasPreset.values,
-                                          placeholder: Text(
-                                            '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}',
-                                          ).small(),
-                                          formatValue: (preset) =>
-                                              '${preset.width} × ${preset.height}',
-                                          onChanged: (preset) {
-                                            if (!session.tryApplyDraft()) {
-                                              return;
-                                            }
-                                            session.updateScene(
-                                              canvas: session.document.canvas
-                                                  .copyWith(
-                                                    referenceWidth:
-                                                        preset.width,
-                                                    referenceHeight:
-                                                        preset.height,
-                                                  ),
-                                            );
-                                            _fitView();
-                                          },
-                                        ),
-                                      ),
-                                    Button(
-                                      key: const ValueKey('canvas-responsive'),
-                                      style: _responsiveSize == null
-                                          ? const ButtonStyle.outline()
-                                          : const ButtonStyle.primary(),
-                                      onPressed: session == null
-                                          ? null
-                                          : () => setState(() {
-                                              _responsiveSize =
-                                                  _responsiveSize == null
-                                                  ? Size(
-                                                      session
-                                                          .document
-                                                          .canvas
-                                                          .referenceWidth
-                                                          .toDouble(),
-                                                      session
-                                                          .document
-                                                          .canvas
-                                                          .referenceHeight
-                                                          .toDouble(),
-                                                    )
-                                                  : null;
-                                            }),
-                                      child: Text(
-                                        _responsiveSize == null
-                                            ? 'Responsive'
-                                            : 'Authored size',
-                                      ).small(),
-                                    ),
-                                    Button(
-                                      key: const ValueKey('canvas-compare'),
-                                      style: _comparing
-                                          ? const ButtonStyle.primary()
-                                          : const ButtonStyle.outline(),
-                                      onPressed: session == null
-                                          ? null
-                                          : _toggleComparison,
-                                      child: Text(
-                                        _comparing ? 'Single' : 'Compare',
-                                      ).small(),
-                                    ),
-                                    Tooltip(
-                                      tooltip: (_) => const Text(
-                                        'Rulers · Drag from a ruler to create a guide',
-                                      ),
-                                      child: Button(
-                                        key: const ValueKey('canvas-rulers'),
-                                        style: _showRulers
-                                            ? const ButtonStyle.primaryIcon()
-                                            : const ButtonStyle.outlineIcon(),
-                                        onPressed: () => setState(
-                                          () => _showRulers = !_showRulers,
-                                        ),
-                                        child: const Icon(
-                                          LucideIcons.ruler,
-                                          size: 16,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Wrap(
-                                  spacing: 4,
-                                  runSpacing: 4,
-                                  children: zoomControls,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
                         if (_responsiveSize != null) ...[
                           const Divider(),
                           Padding(
@@ -991,4 +1037,24 @@ class StudioCanvasState extends State<StudioCanvas> {
     }
     return duration;
   }
+}
+
+class _StudioStageGrid extends CustomPainter {
+  const _StudioStageGrid(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    for (var x = 12.0; x < size.width; x += 24) {
+      for (var y = 12.0; y < size.height; y += 24) {
+        canvas.drawCircle(Offset(x, y), 1, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StudioStageGrid oldDelegate) =>
+      oldDelegate.color != color;
 }

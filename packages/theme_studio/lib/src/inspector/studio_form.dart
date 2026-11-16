@@ -510,6 +510,7 @@ class StudioSelect<T> extends StatefulWidget {
     this.label,
     this.placeholder,
     this.enabled = true,
+    this.theme,
     super.key,
   });
 
@@ -520,6 +521,7 @@ class StudioSelect<T> extends StatefulWidget {
   final String? label;
   final Widget? placeholder;
   final bool enabled;
+  final SelectTheme? theme;
 
   @override
   State<StudioSelect<T>> createState() => _StudioSelectState<T>();
@@ -532,7 +534,9 @@ class _StudioSelectState<T> extends State<StudioSelect<T>> {
   Widget build(BuildContext context) => OverlayAnchor(
     anchor: _anchor,
     child: Select<T>(
-      theme: const SelectTheme(adaptiveOverlay: false),
+      theme: (widget.theme ?? const SelectTheme()).copyWith(
+        adaptiveOverlay: () => false,
+      ),
       overlayConfiguration: PopoverConfiguration(
         anchor: LinkedAnchor(_anchor),
         alignment: Alignment.topCenter,
