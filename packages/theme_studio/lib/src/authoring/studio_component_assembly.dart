@@ -19,6 +19,9 @@ class StudioComponentAssembly extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: editor,
     builder: (context, _) {
+      final theme = Theme.of(context);
+      final gap = theme.density.baseGap * theme.scaling;
+      final inset = theme.density.baseContainerPadding * theme.scaling * .75;
       final layout = editor.layout;
       final ids = editor.document.nodes.map((node) => node.id).toSet();
       final slots =
@@ -29,27 +32,26 @@ class StudioComponentAssembly extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(inset),
               child: StudioFormSection(
                 title: 'Component library',
-                headerSpacing: 8,
+                headerSpacing: gap,
                 children: [
                   LayoutBuilder(
                     builder: (context, constraints) => Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
+                      spacing: gap * .75,
+                      runSpacing: gap * .75,
                       children: [
                         for (final component in StudioComponent.values)
                           SizedBox(
-                            width: (constraints.maxWidth - 6) / 2,
-                            height: 32,
+                            width: (constraints.maxWidth - gap * .75) / 2,
                             child: Draggable<StudioComponent>(
                               data: component,
                               affinity: Axis.horizontal,
                               dragAnchorStrategy: pointerDragAnchorStrategy,
                               maxSimultaneousDrags: readOnly ? 0 : 1,
                               feedback: Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: EdgeInsets.all(inset),
                                 color: Theme.of(context).colorScheme.background,
                                 child: Text(component.label),
                               ),
@@ -64,8 +66,11 @@ class StudioComponentAssembly extends StatelessWidget {
                                     : () => editor.createComponent(component),
                                 child: Row(
                                   children: [
-                                    Icon(component.icon, size: 14),
-                                    const Gap(6),
+                                    Icon(
+                                      component.icon,
+                                      size: theme.typography.small.fontSize,
+                                    ),
+                                    Gap(gap * .75),
                                     Expanded(
                                       child: Text(
                                         component.label,
@@ -87,10 +92,10 @@ class StudioComponentAssembly extends StatelessWidget {
             if (layout != null && layout.presets.length > 1) ...[
               const Divider(),
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(inset),
                 child: StudioFormSection(
                   title: layout.label,
-                  spacing: 10,
+                  spacing: gap,
                   children: [
                     StudioLabeledField(
                       label: 'Layout preset',
@@ -110,10 +115,10 @@ class StudioComponentAssembly extends StatelessWidget {
             if (editor.presetCatalog.properties.isNotEmpty) ...[
               const Divider(),
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(inset),
                 child: StudioFormSection(
                   title: 'Theme presets',
-                  spacing: 10,
+                  spacing: gap,
                   children: [
                     for (final property in editor.presetCatalog.properties)
                       StudioLabeledField(
@@ -139,10 +144,10 @@ class StudioComponentAssembly extends StatelessWidget {
             if (layout != null) ...[
               const Divider(),
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(inset),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: 12,
+                  spacing: gap * 1.5,
                   children: [
                     if (layout.presets.length <= 1)
                       Text(layout.label).small().semiBold(),
@@ -159,8 +164,8 @@ class StudioComponentAssembly extends StatelessWidget {
                       if (group.isNotEmpty)
                         StudioFormSection(
                           title: label,
-                          headerSpacing: 8,
-                          spacing: 6,
+                          headerSpacing: gap,
+                          spacing: gap * .25,
                           children: [
                             for (final slot in group)
                               _AssemblySlot(
@@ -203,24 +208,31 @@ class _AssemblySlot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selected = isPresent && editor.selectedId == slot.defaultNode.id;
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final gap = theme.density.baseGap * theme.scaling;
     final canToggle =
         !readOnly &&
         (!isPresent ||
             editor.getDeletionBlockReason(slot.defaultNode.id) == null);
-    final row = Container(
-      padding: const EdgeInsets.fromLTRB(4, 2, 8, 2),
+    final row = AnimatedContainer(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : kDefaultDuration,
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(right: gap),
       decoration: BoxDecoration(
-        color: selected ? colors.secondary : null,
-        border: Border.all(color: selected ? colors.primary : colors.border),
-        borderRadius: BorderRadius.circular(6),
+        color: selected
+            ? colors.secondary
+            : colors.secondary.withValues(alpha: 0),
+        borderRadius: theme.borderRadiusMd,
       ),
       child: Row(
         children: [
           Expanded(
             child: GhostButton(
               key: ValueKey('select-slot-${slot.defaultNode.id}'),
-              density: ButtonDensity.compact,
+              density: ButtonDensity.dense,
               alignment: Alignment.centerLeft,
               onPressed: isPresent
                   ? () => editor.selectNode(slot.defaultNode.id)
@@ -232,15 +244,15 @@ class _AssemblySlot extends StatelessWidget {
               ).small(),
             ),
           ),
-          const Gap(6),
+          Gap(gap * .75),
           if (slot.isRequired)
             if (isPresent)
               Semantics(
                 label: '${slot.label}: required, included',
                 child: Icon(
-                  LucideIcons.check,
+                  LucideIcons.lockKeyhole,
                   key: ValueKey('slot-${slot.defaultNode.id}'),
-                  size: 15,
+                  size: theme.typography.small.fontSize,
                   color: colors.mutedForeground,
                 ),
               )
@@ -259,14 +271,16 @@ class _AssemblySlot extends StatelessWidget {
           else
             Semantics(
               label: 'Include ${slot.label}',
-              child: Switch(
+              child: Checkbox(
                 key: ValueKey('slot-${slot.defaultNode.id}'),
-                value: isPresent,
+                state: isPresent
+                    ? CheckboxState.checked
+                    : CheckboxState.unchecked,
                 enabled: canToggle,
                 onChanged: canToggle
                     ? (value) => editor.updateLayoutSlot(
                         slot.defaultNode.id,
-                        isPresent: value,
+                        isPresent: value == CheckboxState.checked,
                       )
                     : null,
               ),
@@ -280,15 +294,17 @@ class _AssemblySlot extends StatelessWidget {
       affinity: Axis.horizontal,
       dragAnchorStrategy: pointerDragAnchorStrategy,
       feedback: Container(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(
+          theme.density.baseContainerPadding * theme.scaling * .75,
+        ),
         decoration: BoxDecoration(
           color: colors.background,
           border: Border.all(color: colors.primary),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: theme.borderRadiusMd,
         ),
         child: Text(
           slot.label,
-          style: TextStyle(color: colors.foreground, fontSize: 14),
+          style: theme.typography.small.copyWith(color: colors.foreground),
         ),
       ),
       childWhenDragging: Opacity(opacity: .4, child: row),

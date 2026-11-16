@@ -48,7 +48,7 @@ fvm dart run packages/akari_cli/bin/akari.dart run studio --theme /path/to/theme
 ### 布局插槽装配与主题预设
 
 - **基础组件库（图元与容器）**：通过 **Compose → Component library** 可重复添加通用 **Text**（`T`）、**Rectangle**（`U`）、**Circle** 与 **Frame**（`F`）图层，或水平拖拽至画布指定位置。双击画布上的文本图层即可原位编辑文字（`Enter` 提交，`Escape` 取消）。
-- **声明式布局插槽**：对于声明了 [`ThemeLayoutDefinition`](../reference/theme-package.md#声明布局插槽) 的场景，**Compose** 面板提供可选组件开关与 **Required controls** 清单：
+- **声明式布局插槽**：对于声明了 [`ThemeLayoutDefinition`](../reference/theme-package.md#声明布局插槽) 的场景，**Compose** 面板提供可选组件复选框与 **Required controls** 清单，必需组件以锁图标标记：
   - 开启或关闭可选组件会按预设位置插入或移除节点（移除后可通过 **Undo** 恢复此前的自定义修改）。
   - 必需控件受删除保护；若打开的场景缺失必需插槽，侧栏顶部会提示 **Add required**，支持一键补齐全部缺失控件。
 - **布局预设（Layout preset）**：在 **Compose → Layout preset** 中切换不同布局骨架（如默认主题的 `Terrace split` 分屏与 `Centered column` 居中列），在重排插槽几何位置的同时保留组件属性、已关闭的可选组件与自定义图层。

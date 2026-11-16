@@ -48,7 +48,7 @@ fvm dart run packages/akari_cli/bin/akari.dart run studio --theme /path/to/theme
 ### Layout assembly & theme presets
 
 - **Component library (primitives & frames)**: Under **Compose → Component library**, add reusable **Text** (`T`), **Rectangle** (`U`), **Circle**, and **Frame** (`F`) layers, or drag them horizontally onto the canvas. Double-click any text layer on the canvas to edit its text inline (`Enter` commits, `Escape` cancels).
-- **Declared layout slots**: For scenes with a [`ThemeLayoutDefinition`](../reference/theme-package.md#declaring-layout-slots), **Compose** lists optional slots as toggles and required controls under **Required controls**:
+- **Declared layout slots**: For scenes with a [`ThemeLayoutDefinition`](../reference/theme-package.md#declaring-layout-slots), **Compose** lists optional slots as checkboxes and required controls with lock icons under **Required controls**:
   - Toggling an optional slot inserts or removes its preset node (use **Undo** to recover custom edits after removal).
   - Required slots cannot be deleted. If an opened scene is missing required slots, a banner offers **Add required** to restore all missing controls in a single undo step.
 - **Layout presets**: **Compose → Layout preset** switches between declared arrangements (such as `Terrace split` and `Centered column` in the default theme), updating slot positions while preserving customized properties, optional slot omissions, and custom layers.
