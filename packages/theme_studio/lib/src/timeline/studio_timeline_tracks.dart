@@ -284,67 +284,36 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                                   ),
                                 ],
                               ),
-                              for (
-                                var trackIndex = 0;
-                                trackIndex < item.tracks.length;
-                                trackIndex++
-                              )
-                                _TimelineRow(
-                                  label:
-                                      '  ${item.tracks[trackIndex].property.name}',
-                                  selected: false,
+                              for (final (trackIndex, track)
+                                  in item.tracks.indexed)
+                                _PropertyTrackRow(
+                                  nodeId: item.id,
+                                  delayMs: item.motionTiming.delayMs,
+                                  trackIndex: trackIndex,
+                                  track: track,
+                                  totalMs: total,
+                                  width: width,
                                   trackInset: trackInset,
                                   laneColor: colors.muted.withValues(
                                     alpha: .18,
                                   ),
-                                  onSelect: () => _selectTrack(
+                                  onSelect: () =>
+                                      _selectTrack(item.id, track.property),
+                                  onEditFrame: (frameIndex) => _editFrame(
                                     item.id,
-                                    item.tracks[trackIndex].property,
+                                    track.property,
+                                    frameIndex,
                                   ),
-                                  overlays: [
-                                    for (
-                                      var frameIndex = 0;
-                                      frameIndex <
-                                          item
-                                              .tracks[trackIndex]
-                                              .keyframes
-                                              .length;
-                                      frameIndex++
-                                    )
-                                      _KeyframeMarker(
-                                        nodeId: item.id,
-                                        trackIndex: trackIndex,
-                                        frameIndex: frameIndex,
-                                        timeMs:
-                                            item.motionTiming.delayMs +
-                                            item
-                                                .tracks[trackIndex]
-                                                .keyframes[frameIndex]
-                                                .timeMs,
-                                        totalMs: total,
-                                        width: width,
-                                        trackInset: trackInset,
-                                        onTap: () => _selectTrack(
-                                          item.id,
-                                          item.tracks[trackIndex].property,
-                                        ),
-                                        onDoubleTap: () => _editFrame(
-                                          item.id,
-                                          item.tracks[trackIndex].property,
-                                          frameIndex,
-                                        ),
-                                        onStartDrag: (details) =>
-                                            _start(item, details, width),
-                                        onUpdateDrag: (details) =>
-                                            _dragKeyframe(
-                                              details,
-                                              trackIndex,
-                                              frameIndex,
-                                            ),
-                                        onEndDrag: _commit,
-                                        onCancelDrag: _cancel,
+                                  onStartDrag: (details) =>
+                                      _start(item, details, width),
+                                  onDragKeyframe: (details, frameIndex) =>
+                                      _dragKeyframe(
+                                        details,
+                                        trackIndex,
+                                        frameIndex,
                                       ),
-                                  ],
+                                  onEndDrag: _commit,
+                                  onCancelDrag: _cancel,
                                 ),
                             ],
                           ],
@@ -734,6 +703,67 @@ class _LayerDurationBlock extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PropertyTrackRow extends StatelessWidget {
+  const _PropertyTrackRow({
+    required this.nodeId,
+    required this.delayMs,
+    required this.trackIndex,
+    required this.track,
+    required this.totalMs,
+    required this.width,
+    required this.trackInset,
+    required this.laneColor,
+    required this.onSelect,
+    required this.onEditFrame,
+    required this.onStartDrag,
+    required this.onDragKeyframe,
+    required this.onEndDrag,
+    required this.onCancelDrag,
+  });
+
+  final String nodeId;
+  final int delayMs;
+  final int trackIndex;
+  final SceneMotionTrack track;
+  final int totalMs;
+  final double width;
+  final double trackInset;
+  final Color laneColor;
+  final VoidCallback onSelect;
+  final ValueChanged<int> onEditFrame;
+  final GestureDragStartCallback onStartDrag;
+  final void Function(DragUpdateDetails details, int frameIndex) onDragKeyframe;
+  final VoidCallback onEndDrag;
+  final VoidCallback onCancelDrag;
+
+  @override
+  Widget build(BuildContext context) => _TimelineRow(
+    label: '  ${track.property.name}',
+    selected: false,
+    trackInset: trackInset,
+    laneColor: laneColor,
+    onSelect: onSelect,
+    overlays: [
+      for (final (frameIndex, frame) in track.keyframes.indexed)
+        _KeyframeMarker(
+          nodeId: nodeId,
+          trackIndex: trackIndex,
+          frameIndex: frameIndex,
+          timeMs: delayMs + frame.timeMs,
+          totalMs: totalMs,
+          width: width,
+          trackInset: trackInset,
+          onTap: onSelect,
+          onDoubleTap: () => onEditFrame(frameIndex),
+          onStartDrag: onStartDrag,
+          onUpdateDrag: (details) => onDragKeyframe(details, frameIndex),
+          onEndDrag: onEndDrag,
+          onCancelDrag: onCancelDrag,
+        ),
+    ],
+  );
 }
 
 class _KeyframeMarker extends StatelessWidget {
