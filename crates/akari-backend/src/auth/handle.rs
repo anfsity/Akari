@@ -66,8 +66,8 @@ impl AuthActorHandle {
                 "authentication actor is unavailable".to_owned(),
             ));
         }
-        let snapshot = self.snapshot.borrow().clone();
-        Ok((snapshot.state, snapshot.detail))
+        let snapshot = self.snapshot.borrow();
+        Ok((snapshot.state.clone(), snapshot.detail.clone()))
     }
 
     /// Cancels the current attempt when it still matches `expected_attempt`.
@@ -94,21 +94,31 @@ impl AuthActorHandle {
         username: String,
         emitter: SignalEmitter<'static>,
     ) -> fdo::Result<String> {
-        let sequence = {
-            let mut sequences = self.latest_begin.lock().expect("begin sequence mutex");
-            let next = sequences.get(&caller).copied().unwrap_or(0) + 1;
-            sequences.insert(caller.clone(), next);
-            next
-        };
+        // Interrupt an owned in-flight exchange before waiting on channel
+        // capacity, then assign the sequence number and enqueue atomically so
+        // FIFO arrival matches sequence order and dropped futures never leak.
         self.interrupt_current(None, &caller);
-        self.send_with(|reply| AuthCommand::Begin {
-            caller,
-            username,
-            sequence,
-            emitter,
-            reply,
-        })
-        .await
+        let permit =
+            self.commands.reserve().await.map_err(|_| {
+                fdo::Error::Failed("authentication actor is unavailable".to_owned())
+            })?;
+        let (reply, receiver) = oneshot::channel();
+        {
+            let mut sequences = self.latest_begin.lock().expect("begin sequence mutex");
+            let sequence = sequences.get(&caller).copied().unwrap_or(0) + 1;
+            sequences.insert(caller.clone(), sequence);
+            self.interrupt_current(None, &caller);
+            permit.send(AuthCommand::Begin {
+                caller,
+                username,
+                sequence,
+                emitter,
+                reply,
+            });
+        }
+        receiver
+            .await
+            .map_err(|_| fdo::Error::Failed("authentication actor stopped".to_owned()))?
     }
 
     /// Submits a UI response to the actor for the active prompt.
