@@ -2,7 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import '../authoring/scene_editor.dart';
-import 'studio_form.dart';
+import '../ui/studio_form.dart';
 
 class NodeAssetInspector extends StatelessWidget {
   const NodeAssetInspector({required this.editor, super.key});

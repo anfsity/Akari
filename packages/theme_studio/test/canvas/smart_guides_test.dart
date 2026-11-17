@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:theme_studio/src/canvas/smart_guides.dart';
+import 'package:theme_studio/src/preview/smart_guides.dart';
 
 void main() {
   test(

@@ -17,15 +17,15 @@ import 'package:theme_studio/src/preview/studio_preview.dart';
 import 'package:theme_studio/src/preview/studio_preview_host.dart';
 import 'package:theme_studio/src/inspector/node_inspector.dart';
 import 'package:theme_studio/src/canvas/studio_canvas.dart';
-import 'package:theme_studio/src/workspace/studio_theme.dart';
+import 'package:theme_studio/src/model/studio_theme.dart';
 import 'package:theme_studio/src/timeline/studio_timeline.dart';
-import 'package:theme_studio/src/canvas/studio_canvas_presets.dart';
-import 'package:theme_studio/src/inspector/studio_form.dart';
+import 'package:theme_studio/src/model/studio_canvas_presets.dart';
+import 'package:theme_studio/src/ui/studio_form.dart';
 import 'package:theme_studio/src/resources/studio_assets.dart';
-import 'package:theme_studio/src/workspace/studio_input.dart';
-import 'package:theme_studio/src/workspace/studio_preferences.dart';
+import 'package:theme_studio/src/model/studio_input.dart';
+import 'package:theme_studio/src/model/studio_preferences.dart';
 import 'package:theme_studio/src/authoring/studio_components.dart';
-import 'package:theme_studio/src/workspace/studio_workspace_layout.dart';
+import 'package:theme_studio/src/model/studio_workspace_layout.dart';
 
 const _document = SceneDocument(
   id: 'test',
@@ -705,6 +705,8 @@ void main() {
   testWidgets('blank scenes and reusable primitives author independently of layout slots', (tester) async {
     await openStudio(tester);
     final original = file.readAsStringSync();
+    await tester.tap(find.byKey(const ValueKey('studio-scene-menu')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('new-scene')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('new-scene-name')), 'free-canvas');
@@ -860,6 +862,8 @@ void main() {
   testWidgets('rulers create move delete and save guides as atomic edits', (tester) async {
     await openStudio(tester);
     final editor = tester.widget<StudioCanvas>(find.byType(StudioCanvas)).editor!;
+    await tester.tap(find.byKey(const ValueKey('canvas-tool-menu')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('canvas-rulers'))); await tester.pumpAndSettle();
     final ruler = find.byKey(const ValueKey('ruler-vertical'));
     final canvas = tester.getRect(find.byType(SceneRuntime));
@@ -1151,6 +1155,8 @@ void main() {
         find.byKey(const ValueKey('property-text')),
         'My synthesized desktop',
       );
+      await tester.tap(find.byKey(const ValueKey('studio-scene-menu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('create-theme')));
       await tester.pumpAndSettle();
       await tester.enterText(
@@ -1202,6 +1208,8 @@ void main() {
       File('${existing.path}/marker').writeAsStringSync('untouched');
       await openStudio(tester, packageName: 'theme_source');
       tester.view.physicalSize = const Size(600, 480);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('studio-scene-menu')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('create-theme')));
       await tester.pumpAndSettle();
@@ -1384,6 +1392,8 @@ void main() {
         encodeSceneDocument(_document.copyWith(id: 'preset')),
       );
       picker.selected = _PickedFile(presetFile);
+      await tester.tap(find.byKey(const ValueKey('studio-scene-menu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Load JSON'));
       await tester.pumpAndSettle();
       expect(
@@ -1514,8 +1524,7 @@ void main() {
         );
         expect(toolbar.height, lessThanOrEqualTo(56));
         for (final action in [
-          'new-scene',
-          'create-theme',
+          'studio-scene-menu',
           'toolbar-settings',
           'toolbar-undo',
           'toolbar-redo',
@@ -1621,8 +1630,8 @@ void main() {
       expect(toolbar.height, lessThan(150));
       for (final name in [
         'tool-move',
-        'tool-scale',
         'canvas-hand',
+        'canvas-tool-menu',
         'zoom-fit',
       ]) {
         final rect = tester.getRect(find.byKey(ValueKey(name)));
@@ -2265,6 +2274,8 @@ void main() {
           encodeSceneDocument(_document.copyWith(id: 'other')),
         );
       picker.selected = _PickedFile(other);
+      await tester.tap(find.byKey(const ValueKey('studio-scene-menu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Load JSON'));
       await tester.pumpAndSettle();
       final editor = tester
@@ -2664,6 +2675,8 @@ void main() {
         isNull,
       );
       file.writeAsStringSync(encodeSceneDocument(_document));
+      await tester.tap(find.byKey(const ValueKey('studio-scene-menu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Reload from disk'));
       await tester.pumpAndSettle();
       expect(find.byType(StudioPreview), findsOneWidget);
@@ -3353,6 +3366,8 @@ void main() {
       final invalid = File('${scene.parent.path}/invalid.json')
         ..writeAsStringSync('invalid');
       picker.selected = _PickedFile(invalid);
+      await tester.tap(find.byKey(const ValueKey('studio-scene-menu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Load JSON'));
       await tester.pumpAndSettle();
       expect(find.textContaining('FormatException'), findsOneWidget);
@@ -3361,6 +3376,8 @@ void main() {
       expect(find.text('wallpaper.png'), findsWidgets);
       expect(find.text('local.png'), findsNothing);
       picker.selected = _PickedFile(scene);
+      await tester.tap(find.byKey(const ValueKey('studio-scene-menu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Load JSON'));
       await tester.pumpAndSettle();
       expect(find.text('local.png'), findsWidgets);
@@ -3419,7 +3436,9 @@ void main() {
         SceneBackgroundKind.solid,
       );
 
-      await tester.tap(find.text('test.scene.json'));
+      await tester.tap(find.byKey(const ValueKey('studio-scene-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('test.scene.json').last);
       await tester.pumpAndSettle();
       expect(find.text('local.png'), findsNothing);
       expect(find.text('wallpaper.png'), findsWidgets);
@@ -3443,14 +3462,19 @@ void main() {
     'load JSON handles cancellation, invalid files and unsaved edits',
     (tester) async {
       await openStudio(tester);
-      await tester.tap(find.text('Load JSON'));
-      await tester.pumpAndSettle();
+      Future<void> tapLoadJson() async {
+        await tester.tap(find.byKey(const ValueKey('studio-scene-menu')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Load JSON'));
+        await tester.pumpAndSettle();
+      }
+
+      await tapLoadJson();
       expect(find.text('Saved'), findsOneWidget);
       final imported = File('${directory.path}/imported.json')
         ..writeAsStringSync('invalid');
       picker.selected = _PickedFile(imported);
-      await tester.tap(find.text('Load JSON'));
-      await tester.pumpAndSettle();
+      await tapLoadJson();
       expect(find.textContaining('FormatException'), findsOneWidget);
       expect(
         tester.widget<StudioPreview>(find.byType(StudioPreview)).document.id,
@@ -3460,20 +3484,21 @@ void main() {
         encodeSceneDocument(_document.copyWith(id: 'imported')),
       );
       await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
-      await tester.tap(find.text('Load JSON'));
-      await tester.pumpAndSettle();
+      await tapLoadJson();
       expect(find.text('Unsaved scene changes'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Load JSON'));
-      await tester.pumpAndSettle();
+      await tapLoadJson();
       expect(
         tester.widget<StudioPreview>(find.byType(StudioPreview)).document.id,
         'imported',
       );
-      expect(find.text('imported.json'), findsOneWidget);
+      expect(
+        find.text('test / imported.json', findRichText: true),
+        findsOneWidget,
+      );
       await tester.enterText(find.byKey(const ValueKey('field-X')), '384');
       await tester.tap(find.text('Save scene'));
       await tester.pumpAndSettle();
@@ -3725,6 +3750,8 @@ void main() {
       expect(tester.getRect(scene), originalRect);
       await tester.tap(find.byKey(const ValueKey('canvas-hand')));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('canvas-tool-menu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('zoom-actual-size')));
       await tester.pumpAndSettle();
       expect(tester.getRect(scene).width, closeTo(1280, 1e-6));
@@ -3897,6 +3924,8 @@ void main() {
     'aspect lock and Shift preserve ratio, hidden selections have no handles',
     (tester) async {
       await openStudio(tester);
+      await tester.tap(find.byKey(const ValueKey('canvas-tool-menu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('lock-aspect-ratio')));
       await tester.pumpAndSettle();
       await tester.drag(
@@ -3911,6 +3940,8 @@ void main() {
           .first;
       expect(node.rect.width / node.rect.height, closeTo(0.75, 1e-8));
       await tester.tap(find.byKey(const ValueKey('toolbar-undo')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('canvas-tool-menu')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('lock-aspect-ratio')));
       await tester.pumpAndSettle();
@@ -3997,7 +4028,9 @@ void main() {
       tester,
     ) async {
       await openStudio(tester);
-      await tester.tap(find.byKey(ValueKey('tool-${tool.name}')));
+      await tester.tap(find.byKey(const ValueKey('canvas-tool-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('tool-menu-${tool.name}')));
       await tester.pumpAndSettle();
       final inspector = tester
           .widget<NodeInspector>(find.byType(NodeInspector))
@@ -4145,7 +4178,9 @@ void main() {
     );
     file.writeAsStringSync(encodeSceneDocument(document));
     await openStudio(tester);
-    await tester.tap(find.byKey(const ValueKey('tool-scale')));
+    await tester.tap(find.byKey(const ValueKey('canvas-tool-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tool-menu-scale')));
     await tester.pumpAndSettle();
     await tester.drag(
       find.byKey(const ValueKey('preview-panel')),
@@ -4481,6 +4516,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('layer-label')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('field-X')), '256');
+    await tester.tap(find.byKey(const ValueKey('studio-scene-menu')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Reload from disk'));
     await tester.pumpAndSettle();
     expect(find.text('Discard edits and reload?'), findsOneWidget);

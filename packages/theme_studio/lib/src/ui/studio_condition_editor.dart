@@ -1,8 +1,8 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
+import '../model/studio_scenario.dart';
 import 'studio_form.dart';
-import '../timeline/studio_state_labels.dart';
 
 String getSceneConditionLabel(SceneCondition condition) => switch (condition) {
   ScenePredicateCondition(:final predicate) => getScenePredicateLabel(

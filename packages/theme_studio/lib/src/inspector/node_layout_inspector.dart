@@ -2,8 +2,8 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import '../authoring/scene_editor.dart';
-import '../workspace/studio_tooltip.dart';
-import 'studio_form.dart';
+import '../ui/studio_form.dart';
+import '../ui/studio_tooltip.dart';
 
 class NodeLayoutInspector extends StatelessWidget {
   const NodeLayoutInspector({required this.editor, super.key});

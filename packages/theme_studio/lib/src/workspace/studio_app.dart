@@ -11,23 +11,23 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_project/theme_project.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
+import '../authoring/scene_editor.dart';
+import '../authoring/studio_create_theme.dart';
+import '../authoring/studio_theme_project.dart';
+import '../canvas/studio_canvas.dart';
 import '../inspector/code_inspector.dart';
 import '../inspector/node_inspector.dart';
-import '../inspector/studio_form.dart';
-import '../authoring/scene_editor.dart';
-import '../canvas/studio_canvas.dart';
 import '../inspector/studio_effects_inspector.dart';
-import 'studio_sidebar.dart';
-import 'studio_status_bar.dart';
-import 'studio_toolbar.dart';
-import '../authoring/studio_create_theme.dart';
-import 'studio_workspace.dart';
+import '../model/studio_preferences.dart';
 import '../resources/confined_path.dart';
 import '../resources/studio_assets.dart';
-import 'studio_preferences.dart';
+import '../ui/studio_form.dart';
 import 'studio_settings.dart';
-import '../authoring/studio_theme_project.dart';
+import 'studio_sidebar.dart';
+import 'studio_status_bar.dart';
 import 'studio_theme_selector.dart';
+import 'studio_toolbar.dart';
+import 'studio_workspace.dart';
 
 class ThemeStudioApp extends StatefulWidget {
   const ThemeStudioApp({
@@ -687,9 +687,6 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
           _canvasKey.currentState?.handleKeyEvent(event) ??
           KeyEventResult.ignored,
       toolbar: StudioToolbar(
-        projects: _projects,
-        selectedProject: _project,
-        onSwitchTheme: (project) => unawaited(_switchTheme(project, context)),
         themeId: _theme.id,
         scenePath: _path,
         scenePaths: _scenePaths,

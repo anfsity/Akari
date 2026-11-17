@@ -1,5 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
-import 'studio_tooltip.dart';
+import '../ui/studio_tooltip.dart';
 
 class StudioStatusBar extends StatelessWidget {
   const StudioStatusBar({

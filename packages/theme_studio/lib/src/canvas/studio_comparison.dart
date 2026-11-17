@@ -1,11 +1,11 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
-import 'studio_canvas_presets.dart';
-import '../workspace/studio_preferences.dart';
+import '../model/studio_canvas_presets.dart';
+import '../model/studio_preferences.dart';
+import '../model/studio_scenario.dart';
+import '../model/studio_theme.dart';
 import '../preview/studio_preview.dart';
-import '../preview/studio_preview_host.dart';
-import '../workspace/studio_theme.dart';
 
 /// Each board has its own simulated input host. Only output size varies; the
 /// authored reference canvas stays identical to production in every board.

@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_studio/src/authoring/scene_editor.dart';
-import 'package:theme_studio/src/canvas/node_geometry.dart';
+import 'package:theme_studio/src/model/node_geometry.dart';
 import 'package:theme_studio/src/inspector/code_inspector.dart';
 import 'package:theme_studio/src/inspector/node_inspector.dart';
 import 'package:theme_studio/src/inspector/node_layout_inspector.dart';

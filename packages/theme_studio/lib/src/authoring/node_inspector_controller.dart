@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:scene/scene.dart';
 
-import 'studio_form_values.dart';
+import '../ui/studio_form_values.dart';
 
 enum StudioLayoutUnit { pixels, percent }
 

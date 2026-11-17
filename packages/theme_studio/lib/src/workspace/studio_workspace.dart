@@ -5,32 +5,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
-import 'studio_input.dart';
+import '../model/studio_input.dart';
+import '../model/studio_workspace_layout.dart';
+import '../ui/studio_form.dart';
+import '../ui/studio_tooltip.dart';
 import 'studio_toolbar.dart';
-import '../inspector/studio_form.dart';
-import 'studio_workspace_layout.dart';
-import 'studio_tooltip.dart';
+
+export '../model/studio_workspace_layout.dart' show StudioWorkspaceScope;
 
 String _getPanelLabel(String title) =>
     title == 'Sidebar' ? 'Project' : 'Properties';
-
-class StudioWorkspaceScope extends InheritedWidget {
-  const StudioWorkspaceScope({
-    required this.presenting,
-    required super.child,
-    this.mode = StudioWorkspaceMode.design,
-    this.workspaceControls,
-    super.key,
-  });
-  final bool presenting;
-  final StudioWorkspaceMode mode;
-  final Widget? workspaceControls;
-  @override
-  bool updateShouldNotify(StudioWorkspaceScope old) =>
-      old.presenting != presenting ||
-      old.mode != mode ||
-      old.workspaceControls != workspaceControls;
-}
 
 /// Dock regions own widths; global keys carry panel state between regions and
 /// floating windows. Hiding and switching tabs leave their contents mounted.

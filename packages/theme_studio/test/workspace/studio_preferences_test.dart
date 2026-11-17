@@ -3,9 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'dart:convert';
 
 import 'package:shadcn_flutter/shadcn_flutter.dart' show ThemeMode;
-import 'package:theme_studio/src/workspace/studio_theme.dart';
+import 'package:theme_studio/src/model/studio_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:theme_studio/src/workspace/studio_preferences.dart';
+import 'package:theme_studio/src/model/studio_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

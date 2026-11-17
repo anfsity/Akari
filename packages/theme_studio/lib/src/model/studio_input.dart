@@ -176,6 +176,27 @@ enum StudioCommand {
   final StudioKeyBinding defaultBinding;
 }
 
+enum StudioCanvasTool {
+  move('Move', 'Drag to move', StudioCommand.move),
+  scale(
+    'Scale',
+    'Drag horizontally / vertically to scale X / Y',
+    StudioCommand.scale,
+  ),
+  rotate('Rotate', 'Drag horizontally to rotate Z', StudioCommand.rotate),
+  rotate3d(
+    '3D rotate',
+    'Drag horizontally / vertically to rotate Y / X',
+    StudioCommand.rotate3d,
+  );
+
+  const StudioCanvasTool(this.label, this.hint, this.command);
+
+  final String label;
+  final String hint;
+  final StudioCommand command;
+}
+
 class StudioKeyBinding {
   const StudioKeyBinding(
     this.key, {

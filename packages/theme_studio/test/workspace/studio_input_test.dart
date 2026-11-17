@@ -2,8 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:theme_studio/src/workspace/studio_input.dart';
-import 'package:theme_studio/src/workspace/studio_preferences.dart';
+import 'package:theme_studio/src/model/studio_input.dart';
+import 'package:theme_studio/src/model/studio_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

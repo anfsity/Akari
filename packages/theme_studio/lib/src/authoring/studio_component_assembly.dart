@@ -1,8 +1,8 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
+import '../ui/studio_form.dart';
 import 'scene_editor.dart';
-import '../inspector/studio_form.dart';
 import 'studio_components.dart';
 
 class StudioComponentAssembly extends StatelessWidget {

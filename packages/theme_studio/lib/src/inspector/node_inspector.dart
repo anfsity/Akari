@@ -1,14 +1,14 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
-import 'node_inspector_controller.dart';
-import 'studio_form.dart';
+import '../authoring/node_inspector_controller.dart';
 import '../authoring/scene_editor.dart';
+import '../ui/studio_form.dart';
+import 'node_asset_inspector.dart';
 import 'node_layout_inspector.dart';
-import 'node_style_inspector.dart';
 import 'node_motion_inspector.dart';
 import 'node_state_inspector.dart';
-import 'node_asset_inspector.dart';
+import 'node_style_inspector.dart';
 
 class NodeInspector extends StatelessWidget {
   const NodeInspector({

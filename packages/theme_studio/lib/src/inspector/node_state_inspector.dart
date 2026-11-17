@@ -2,9 +2,9 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import '../authoring/scene_editor.dart';
-import 'studio_form.dart';
-import 'studio_condition_editor.dart';
-import '../timeline/studio_state_labels.dart';
+import '../model/studio_scenario.dart';
+import '../ui/studio_condition_editor.dart';
+import '../ui/studio_form.dart';
 
 class NodeStateInspector extends StatefulWidget {
   const NodeStateInspector({required this.editor, super.key});

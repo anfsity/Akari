@@ -3,13 +3,13 @@ import 'dart:math' as math;
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
-import 'studio_preferences.dart';
-import 'studio_input.dart';
+import '../model/studio_canvas_presets.dart';
+import '../model/studio_input.dart';
+import '../model/studio_preferences.dart';
+import '../model/studio_theme.dart';
+import '../ui/studio_form.dart';
+import '../ui/studio_form_values.dart';
 import 'studio_input_settings.dart';
-import '../inspector/studio_form.dart';
-import '../inspector/studio_form_values.dart';
-import 'studio_theme.dart';
-import '../canvas/studio_canvas_presets.dart';
 
 class StudioSettings extends StatefulWidget {
   const StudioSettings({

@@ -3,8 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
-import 'node_geometry.dart';
-import '../workspace/studio_input.dart';
+import '../model/node_geometry.dart';
+import '../model/studio_input.dart';
 
 /// Owns the editor camera independently of scene geometry. Zooming keeps the
 /// point under the pointer stationary; wheel panning and the hand tool never

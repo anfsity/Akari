@@ -2,8 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
-import '../inspector/studio_form.dart';
-import 'studio_input.dart';
+import '../model/studio_input.dart';
+import '../ui/studio_form.dart';
 
 class StudioInputSettings extends StatefulWidget {
   const StudioInputSettings({

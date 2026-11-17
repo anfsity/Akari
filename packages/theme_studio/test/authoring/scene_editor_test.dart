@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_studio/src/authoring/scene_editor.dart';
-import 'package:theme_studio/src/inspector/node_inspector_controller.dart';
+import 'package:theme_studio/src/authoring/node_inspector_controller.dart';
 
 enum _PanelVariant { compact, wide }
 

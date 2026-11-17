@@ -1,11 +1,29 @@
 import 'dart:convert';
-import 'dart:ui';
 
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum StudioDock { left, right, floating }
 
 enum StudioWorkspaceMode { design, motion, focus }
+
+class StudioWorkspaceScope extends InheritedWidget {
+  const StudioWorkspaceScope({
+    required this.presenting,
+    required super.child,
+    this.mode = StudioWorkspaceMode.design,
+    this.workspaceControls,
+    super.key,
+  });
+  final bool presenting;
+  final StudioWorkspaceMode mode;
+  final Widget? workspaceControls;
+  @override
+  bool updateShouldNotify(StudioWorkspaceScope old) =>
+      old.presenting != presenting ||
+      old.mode != mode ||
+      old.workspaceControls != workspaceControls;
+}
 
 /// Workspace geometry is a user preference, independent of scene history.
 class StudioWorkspaceLayout {

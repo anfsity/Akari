@@ -6,7 +6,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_studio/src/authoring/scene_editor.dart';
 import 'package:theme_studio/src/preview/studio_preview.dart';
-import 'package:theme_studio/src/workspace/studio_preferences.dart';
+import 'package:theme_studio/src/model/studio_preferences.dart';
 import 'package:theme_studio/src/workspace/studio_sidebar.dart';
 
 class _TestComponents implements GreeterThemeComponents {

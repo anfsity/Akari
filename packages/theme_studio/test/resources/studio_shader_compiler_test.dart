@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 import 'package:theme_studio/src/resources/studio_shader_compiler.dart';
-import 'package:theme_studio/src/resources/studio_shader_playground.dart';
+import 'package:theme_studio/src/inspector/studio_shader_playground.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -1,7 +1,7 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
-import '../inspector/studio_form.dart';
 import '../authoring/studio_theme_project.dart';
+import '../ui/studio_form.dart';
 
 class StudioThemeSelector extends StatelessWidget {
   const StudioThemeSelector({

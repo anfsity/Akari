@@ -1,61 +1,12 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
-import '../inspector/studio_form.dart';
 import '../authoring/scene_editor.dart';
+import '../model/studio_scenario.dart';
+import '../ui/studio_form.dart';
+import '../ui/studio_tooltip.dart';
 import 'studio_timeline_tracks.dart';
-import '../preview/studio_preview_host.dart';
-import '../workspace/studio_tooltip.dart';
 
-enum StudioTransition {
-  entrance(
-    'Entrance',
-    false,
-    false,
-    StudioPreviewScenario.password,
-    StudioPreviewScenario.password,
-  ),
-  wake(
-    'Dormant → Login',
-    true,
-    false,
-    StudioPreviewScenario.password,
-    StudioPreviewScenario.password,
-  ),
-  sleep(
-    'Login → Dormant',
-    false,
-    true,
-    StudioPreviewScenario.password,
-    StudioPreviewScenario.password,
-  ),
-  success(
-    'Submit → Success',
-    false,
-    false,
-    StudioPreviewScenario.submitting,
-    StudioPreviewScenario.success,
-  ),
-  error(
-    'Submit → Error',
-    false,
-    false,
-    StudioPreviewScenario.submitting,
-    StudioPreviewScenario.error,
-  );
-
-  const StudioTransition(
-    this.label,
-    this.fromDormant,
-    this.toDormant,
-    this.fromScenario,
-    this.toScenario,
-  );
-  final String label;
-  final bool fromDormant;
-  final bool toDormant;
-  final StudioPreviewScenario fromScenario;
-  final StudioPreviewScenario toScenario;
-}
+export '../model/studio_scenario.dart' show StudioTransition;
 
 class StudioTimeline extends StatefulWidget {
   const StudioTimeline({

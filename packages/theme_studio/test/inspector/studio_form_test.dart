@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
-import 'package:theme_studio/src/inspector/studio_form.dart';
+import 'package:theme_studio/src/ui/studio_form.dart';
 
 Future<void> _pumpSliderField(WidgetTester tester, List<double> commits) async {
   var value = 12.34;

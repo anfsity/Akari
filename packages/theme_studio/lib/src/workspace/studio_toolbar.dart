@@ -1,16 +1,11 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../authoring/scene_editor.dart';
-import '../authoring/studio_theme_project.dart';
-import '../inspector/studio_form.dart';
-import 'studio_workspace.dart';
-import 'studio_tooltip.dart';
+import '../model/studio_workspace_layout.dart';
+import '../ui/studio_tooltip.dart';
 
 class StudioToolbar extends StatelessWidget {
   const StudioToolbar({
-    required this.projects,
-    required this.selectedProject,
-    required this.onSwitchTheme,
     required this.themeId,
     required this.scenePath,
     required this.scenePaths,
@@ -30,9 +25,6 @@ class StudioToolbar extends StatelessWidget {
 
   final bool readOnly;
   final bool loadingFile;
-  final List<StudioThemeProject> projects;
-  final StudioThemeProject selectedProject;
-  final ValueChanged<StudioThemeProject> onSwitchTheme;
   final String themeId;
   final String scenePath;
   final List<String> scenePaths;
@@ -89,28 +81,6 @@ class StudioToolbar extends StatelessWidget {
                       style: theme.typography.mono.copyWith(fontSize: 12),
                     ),
                   ),
-                ),
-                const Gap(12),
-                Row(
-                  children: [
-                    const Text('Current theme').small().muted(),
-                    const Gap(12),
-                    Expanded(
-                      child: StudioSelect<StudioThemeProject>(
-                        key: const ValueKey('toolbar-theme-select'),
-                        value: selectedProject,
-                        values: projects,
-                        formatValue: (project) => project.packageName,
-                        regionGroupId: groupId,
-                        onChanged: (project) {
-                          if (!identical(project, selectedProject)) {
-                            closeOverlay<void>(popoverContext);
-                            onSwitchTheme(project);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
                 ),
                 const Gap(12),
                 const Text('Scenes').xSmall().muted(),
@@ -363,8 +333,8 @@ class StudioToolbar extends StatelessWidget {
                 const Gap(12),
                 const SizedBox(height: 18, child: VerticalDivider()),
                 const Gap(8),
-                // Undo clears an uncommitted inspector draft before it consumes
-                // a scene history entry.
+                // Undo commits any pending inspector draft into redoable
+                // history first, then reverts one revision step.
                 _buildAction(
                   key: 'toolbar-undo',
                   label: 'Undo',

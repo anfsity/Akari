@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:theme_studio/src/workspace/studio_workspace_layout.dart';
+import 'package:theme_studio/src/model/studio_workspace_layout.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

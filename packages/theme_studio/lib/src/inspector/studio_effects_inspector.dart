@@ -2,9 +2,9 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import '../authoring/scene_editor.dart';
-import 'studio_form.dart';
 import '../resources/studio_assets.dart';
-import '../resources/studio_shader_playground.dart';
+import '../ui/studio_form.dart';
+import 'studio_shader_playground.dart';
 
 class StudioEffectsInspector extends StatefulWidget {
   const StudioEffectsInspector({

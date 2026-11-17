@@ -1,8 +1,8 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
-import 'node_geometry.dart';
 import '../authoring/scene_editor.dart';
-import '../workspace/studio_tooltip.dart';
+import '../model/node_geometry.dart';
+import '../ui/studio_tooltip.dart';
 
 class NodeArrangementToolbar extends StatelessWidget {
   const NodeArrangementToolbar({required this.editor, super.key});

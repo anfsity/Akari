@@ -1,6 +1,21 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
-import '../workspace/studio_tooltip.dart';
+import 'studio_tooltip.dart';
+
+AbstractButtonStyle getStudioSelectableRowStyle(
+  ColorScheme colors, {
+  required bool selected,
+  ButtonDensity density = ButtonDensity.normal,
+}) {
+  return ButtonStyle.ghost(density: density).copyWith(
+    decoration: (context, states, value) => (value as BoxDecoration).copyWith(
+      color: selected ? colors.primary.withValues(alpha: 0.08) : null,
+      border: selected
+          ? Border.all(color: colors.primary.withValues(alpha: 0.25))
+          : null,
+    ),
+  );
+}
 
 /// Keeps preview updates separate from one final edit. shadcn can omit its
 /// onChangeEnd after a controlled value catches up, so pointer release owns

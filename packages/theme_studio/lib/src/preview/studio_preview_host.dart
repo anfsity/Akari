@@ -1,21 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
-enum StudioPreviewScenario {
-  password('Password'),
-  username('Username'),
-  submitting('Signing in'),
-  success('Entering desktop'),
-  rejectedPassword('Wrong password'),
-  error('Authentication error'),
-  userSelection('Choose account'),
-  sessionSelection('Choose session'),
-  starting('Connecting'),
-  unavailable('Service unavailable');
-
-  const StudioPreviewScenario(this.label);
-  final String label;
-}
+import '../model/studio_scenario.dart';
+export '../model/studio_scenario.dart' show StudioPreviewScenario;
 
 /// Owns the simulated greeter inputs for one preview session. Theme components
 /// borrow these resources, exactly as they borrow the production host's inputs.

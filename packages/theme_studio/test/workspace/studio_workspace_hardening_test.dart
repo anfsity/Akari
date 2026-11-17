@@ -6,7 +6,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:theme_studio/src/resources/confined_path.dart';
 import 'package:theme_studio/src/workspace/studio_workspace.dart';
-import 'package:theme_studio/src/workspace/studio_workspace_layout.dart';
+import 'package:theme_studio/src/model/studio_workspace_layout.dart';
 
 void main() {
   testWidgets(

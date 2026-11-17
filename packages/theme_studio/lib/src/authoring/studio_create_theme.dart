@@ -5,7 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_project/theme_project.dart';
 
-import '../inspector/studio_form.dart';
+import '../ui/studio_form.dart';
 
 /// Owns only dialog drafts. The workspace owns synthesis and the new project;
 /// dismissal is blocked while that command is publishing its result.

@@ -5,9 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
-import '../inspector/node_inspector_controller.dart';
-import '../canvas/node_geometry.dart';
+import '../model/node_geometry.dart';
 import '../resources/confined_path.dart';
+import 'node_inspector_controller.dart';
 import 'studio_components.dart';
 
 // Store canonical JSON with history so status queries and undo/redo do not
