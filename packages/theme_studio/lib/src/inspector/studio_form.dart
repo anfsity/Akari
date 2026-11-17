@@ -412,29 +412,35 @@ class _StudioDisclosureSectionState extends State<StudioDisclosureSection>
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Semantics(
-          expanded: _expanded,
-          child: GhostButton(
-            key: widget.triggerKey,
-            density: ButtonDensity.compact,
-            onPressed: _toggleExpanded,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: inset,
-                vertical: gap * .75,
-              ),
-              child: Row(
-                children: [
-                  Expanded(child: Text(widget.title).small().medium()),
-                  RotationTransition(
-                    turns: _progress.drive(Tween(begin: 0.0, end: .25)),
-                    child: Icon(
-                      LucideIcons.chevronRight,
-                      size: theme.typography.small.fontSize,
-                      color: theme.colorScheme.mutedForeground,
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: inset * .5,
+            vertical: gap * .125,
+          ),
+          child: Semantics(
+            expanded: _expanded,
+            child: GhostButton(
+              key: widget.triggerKey,
+              density: ButtonDensity.compact,
+              onPressed: _toggleExpanded,
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: inset * .5,
+                  vertical: gap * .625,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(widget.title).small().medium()),
+                    RotationTransition(
+                      turns: _progress.drive(Tween(begin: 0.0, end: .25)),
+                      child: Icon(
+                        LucideIcons.chevronRight,
+                        size: theme.typography.small.fontSize,
+                        color: theme.colorScheme.mutedForeground,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -454,12 +460,21 @@ class _StudioDisclosureSectionState extends State<StudioDisclosureSection>
                   excluding: !_expanded,
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
-                      inset,
-                      gap * .25,
-                      inset,
-                      inset,
+                      inset * .5,
+                      gap * .125,
+                      inset * .5,
+                      gap * .75,
                     ),
-                    child: widget.child,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.muted.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(theme.radiusMd),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(inset * .625),
+                        child: widget.child,
+                      ),
+                    ),
                   ),
                 ),
               ),

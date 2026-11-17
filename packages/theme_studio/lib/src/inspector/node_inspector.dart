@@ -125,17 +125,14 @@ class _InspectorForm extends StatelessWidget {
         const Divider(),
         if (editor case final session?) ...[
           NodeLayoutInspector(editor: session),
-          const Divider(),
           StudioDisclosureSection(
             title: 'Visual style',
             child: NodeStyleInspector(editor: session),
           ),
-          const Divider(),
           StudioDisclosureSection(
             title: 'State rules',
             child: NodeStateInspector(editor: session),
           ),
-          const Divider(),
         ],
         StudioDisclosureSection(
           title: 'Advanced layout',
@@ -144,19 +141,16 @@ class _InspectorForm extends StatelessWidget {
             spacing: 1.5,
             children: [
               _buildLayeringSection(),
-              const Divider(),
               _buildTransformSection(),
-              const Divider(),
               _buildMotionSection(),
             ],
           ),
         ),
-        const Divider(),
         StudioDisclosureSection(
           title: 'Advanced properties',
           child: _buildField('Properties', maxLines: 6),
         ),
-        const Divider(),
+        const Gap(6),
       ],
     ),
   );
