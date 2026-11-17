@@ -129,7 +129,9 @@ class _CodeInspectorState extends State<CodeInspector> {
         (_CodeFormat.dart, false) =>
           node == null ? null : generateSceneNode(node).trim(),
       };
-      final canvas = document.canvas;
+      final nodeSize = node == null
+          ? null
+          : widget.editor.getNodePixelSize(node);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -155,8 +157,8 @@ class _CodeInspectorState extends State<CodeInspector> {
                             node == null
                                 ? 'Whole scene'
                                 : '${node.componentId} · '
-                                      '${(node.rect.width * canvas.referenceWidth).toStringAsFixed(1)} × '
-                                      '${(node.rect.height * canvas.referenceHeight).toStringAsFixed(1)} px',
+                                      '${nodeSize!.width.toStringAsFixed(1)} × '
+                                      '${nodeSize.height.toStringAsFixed(1)} px',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ).xSmall().muted(),

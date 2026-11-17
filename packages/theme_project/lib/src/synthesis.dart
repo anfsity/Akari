@@ -128,6 +128,9 @@ Future<SynthesizedTheme> createThemeProject({
     );
     await File(p.join(staging.path, 'lib', 'composition.scene.json'))
         .writeAsString('${encodeSceneDocument(composed)}\n');
+    final shaderAssets = composed.background.shader == null
+        ? const <String>{}
+        : {composed.background.shader!.asset};
     await File(p.join(staging.path, 'pubspec.yaml')).writeAsString(
       _getProjectManifest(
         manifestText,
@@ -135,10 +138,8 @@ Future<SynthesizedTheme> createThemeProject({
         sourceRoot,
         target,
         packageName,
-        mappings.values,
-        composed.background.shader == null
-            ? const []
-            : [composed.background.shader!.asset],
+        mappings.values.where((asset) => !shaderAssets.contains(asset)),
+        shaderAssets,
       ),
     );
     final sceneGetter = getSceneDocumentVariableName(composed.id);

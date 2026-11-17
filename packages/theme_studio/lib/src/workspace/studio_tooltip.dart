@@ -26,6 +26,7 @@ class _StudioTooltipState extends State<StudioTooltip> {
   Timer? _hoverTimer;
 
   void _startHover() {
+    _hoverTimer?.cancel();
     if (!widget.enabled) return;
     _hoverTimer = Timer(const Duration(milliseconds: 500), _showTooltip);
   }
@@ -36,6 +37,7 @@ class _StudioTooltipState extends State<StudioTooltip> {
   }
 
   void _showTooltip() {
+    if (!mounted || !widget.enabled) return;
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     _controller.show<void>(
       context,

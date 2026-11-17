@@ -20,12 +20,14 @@ class StudioTimelineTracks extends StatefulWidget {
     required this.duration,
     required this.elapsed,
     required this.fallbackDuration,
+    this.readOnly = false,
     super.key,
   });
   final SceneEditor editor;
   final Duration duration;
   final Duration elapsed;
   final Duration fallbackDuration;
+  final bool readOnly;
   @override
   State<StudioTimelineTracks> createState() => _StudioTimelineTracksState();
 }
@@ -36,8 +38,34 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
   SceneNode? _candidate;
   double _origin = 0;
   double _millisecondsPerPixel = 1;
+
+  @override
+  void didUpdateWidget(StudioTimelineTracks oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if ((oldWidget.editor != widget.editor || widget.readOnly) &&
+        (_source != null || _candidate != null)) {
+      final previous = oldWidget.editor;
+      _source = _candidate = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!previous.isDisposed) previous.cancelPreview();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_source != null || _candidate != null) {
+      final editor = widget.editor;
+      _source = _candidate = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!editor.isDisposed) editor.cancelPreview();
+      });
+    }
+    super.dispose();
+  }
+
   void _start(SceneNode node, DragStartDetails details, double width) {
-    if (!widget.editor.tryApplyDraft()) return;
+    if (widget.readOnly || !widget.editor.tryApplyDraft()) return;
     _source = node;
     _origin = details.globalPosition.dx;
     _millisecondsPerPixel = widget.duration.inMilliseconds / width;
@@ -65,7 +93,11 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
 
   void _addTrack() {
     final editor = widget.editor;
-    if (editor.selectedIds.isEmpty || !editor.tryApplyDraft()) return;
+    if (widget.readOnly ||
+        editor.selectedIds.isEmpty ||
+        !editor.tryApplyDraft()) {
+      return;
+    }
     final node = editor.selectedNode;
     if (node.tracks.any((track) => track.property == _property)) return;
     final start = switch (_property) {
@@ -96,7 +128,11 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
 
   void _addKeyframe() {
     final editor = widget.editor;
-    if (editor.selectedIds.isEmpty || !editor.tryApplyDraft()) return;
+    if (widget.readOnly ||
+        editor.selectedIds.isEmpty ||
+        !editor.tryApplyDraft()) {
+      return;
+    }
     final node = editor.selectedNode;
     final index = node.tracks.indexWhere(
       (track) => track.property == _property,
@@ -104,7 +140,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
     if (index < 0) return;
     final track = node.tracks[index];
     final time = (widget.elapsed.inMilliseconds - node.motionTiming.delayMs)
-        .clamp(0, 60000);
+        .clamp(0, maxSceneMotionTimeMs);
     if (track.keyframes.any((frame) => frame.timeMs == time)) return;
     final frames = [
       ...track.keyframes,
@@ -130,7 +166,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
     int frameIndex,
   ) async {
     final editor = widget.editor;
-    if (!editor.tryApplyDraft()) return;
+    if (widget.readOnly || !editor.tryApplyDraft()) return;
     final initial = _findTrackTarget(
       editor.document,
       nodeId,
@@ -165,7 +201,11 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
 
   void _removeTrack() {
     final editor = widget.editor;
-    if (editor.selectedIds.isEmpty || !editor.tryApplyDraft()) return;
+    if (widget.readOnly ||
+        editor.selectedIds.isEmpty ||
+        !editor.tryApplyDraft()) {
+      return;
+    }
     final current = editor.selectedNode;
     editor.updateNode(
       current.copyWith(
@@ -223,6 +263,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
         const Gap(6),
         _TrackToolbar(
           property: _property,
+          readOnly: widget.readOnly,
           hasSelection: hasSelection,
           hasTrack: hasTrack,
           onPropertyChanged: (value) => setState(() => _property = value),
@@ -280,7 +321,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                                         _start(item, details, width),
                                     onDragDelay: _dragDelay,
                                     onDragDuration: _dragDuration,
-                                    onEndDrag: _commit,
+                                    onStopDrag: _commit,
                                     onCancelDrag: _cancel,
                                   ),
                                 ],
@@ -313,7 +354,7 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
                                         trackIndex,
                                         frameIndex,
                                       ),
-                                  onEndDrag: _commit,
+                                  onStopDrag: _commit,
                                   onCancelDrag: _cancel,
                                 ),
                             ],
@@ -342,7 +383,10 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
 
 SceneNode _shiftNodeDelay(SceneNode source, int deltaMs) => source.copyWith(
   motionTiming: SceneMotionTiming(
-    delayMs: (source.motionTiming.delayMs + deltaMs).clamp(0, 60000),
+    delayMs: (source.motionTiming.delayMs + deltaMs).clamp(
+      0,
+      maxSceneMotionTimeMs,
+    ),
     durationMs: source.motionTiming.durationMs,
     curve: source.motionTiming.curve,
   ),
@@ -360,7 +404,7 @@ SceneNode _resizeNodeDuration(
     1,
     (value, track) => math.max(value, track.keyframes.length - 1),
   );
-  final duration = (span + deltaMs).clamp(minimum, 60000);
+  final duration = (span + deltaMs).clamp(minimum, maxSceneMotionTimeMs);
   return source.copyWith(
     tracks: [
       for (final track in source.tracks)
@@ -408,7 +452,7 @@ SceneNode _retimeKeyframe(
   final frame = track.keyframes[frameIndex];
   final min = frameIndex == 0 ? 0 : track.keyframes[frameIndex - 1].timeMs + 1;
   final max = frameIndex == track.keyframes.length - 1
-      ? 60000
+      ? maxSceneMotionTimeMs
       : track.keyframes[frameIndex + 1].timeMs - 1;
   final frames = [...track.keyframes]
     ..[frameIndex] = SceneKeyframe(
@@ -471,6 +515,7 @@ SceneNode _replaceOrRemoveKeyframe(
 class _TrackToolbar extends StatelessWidget {
   const _TrackToolbar({
     required this.property,
+    required this.readOnly,
     required this.hasSelection,
     required this.hasTrack,
     required this.onPropertyChanged,
@@ -480,6 +525,7 @@ class _TrackToolbar extends StatelessWidget {
   });
 
   final SceneMotionProperty property;
+  final bool readOnly;
   final bool hasSelection;
   final bool hasTrack;
   final ValueChanged<SceneMotionProperty> onPropertyChanged;
@@ -504,19 +550,19 @@ class _TrackToolbar extends StatelessWidget {
       OutlineButton(
         key: const ValueKey('timeline-add-track'),
         density: ButtonDensity.dense,
-        onPressed: !hasSelection || hasTrack ? null : onAddTrack,
+        onPressed: readOnly || !hasSelection || hasTrack ? null : onAddTrack,
         child: const Text('Add track').small(),
       ),
       OutlineButton(
         key: const ValueKey('timeline-add-keyframe'),
         density: ButtonDensity.dense,
-        onPressed: hasTrack ? onAddKeyframe : null,
+        onPressed: !readOnly && hasTrack ? onAddKeyframe : null,
         child: const Text('+ Keyframe').small(),
       ),
       if (hasTrack)
         GhostButton(
           density: ButtonDensity.dense,
-          onPressed: onRemoveTrack,
+          onPressed: readOnly ? null : onRemoveTrack,
           child: const Text('Remove track').small(),
         ),
     ],
@@ -638,7 +684,7 @@ class _LayerDurationBlock extends StatelessWidget {
     required this.onStartDrag,
     required this.onDragDelay,
     required this.onDragDuration,
-    required this.onEndDrag,
+    required this.onStopDrag,
     required this.onCancelDrag,
   });
 
@@ -652,7 +698,7 @@ class _LayerDurationBlock extends StatelessWidget {
   final GestureDragStartCallback onStartDrag;
   final GestureDragUpdateCallback onDragDelay;
   final GestureDragUpdateCallback onDragDuration;
-  final VoidCallback onEndDrag;
+  final VoidCallback onStopDrag;
   final VoidCallback onCancelDrag;
 
   @override
@@ -674,7 +720,7 @@ class _LayerDurationBlock extends StatelessWidget {
           dragStartBehavior: DragStartBehavior.down,
           onHorizontalDragStart: onStartDrag,
           onHorizontalDragUpdate: onDragDelay,
-          onHorizontalDragEnd: (_) => onEndDrag(),
+          onHorizontalDragEnd: (_) => onStopDrag(),
           onHorizontalDragCancel: onCancelDrag,
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -689,7 +735,7 @@ class _LayerDurationBlock extends StatelessWidget {
                 dragStartBehavior: DragStartBehavior.down,
                 onHorizontalDragStart: onStartDrag,
                 onHorizontalDragUpdate: onDragDuration,
-                onHorizontalDragEnd: (_) => onEndDrag(),
+                onHorizontalDragEnd: (_) => onStopDrag(),
                 onHorizontalDragCancel: onCancelDrag,
                 child: const SizedBox(
                   width: 12,
@@ -720,7 +766,7 @@ class _PropertyTrackRow extends StatelessWidget {
     required this.onEditFrame,
     required this.onStartDrag,
     required this.onDragKeyframe,
-    required this.onEndDrag,
+    required this.onStopDrag,
     required this.onCancelDrag,
   });
 
@@ -736,7 +782,7 @@ class _PropertyTrackRow extends StatelessWidget {
   final ValueChanged<int> onEditFrame;
   final GestureDragStartCallback onStartDrag;
   final void Function(DragUpdateDetails details, int frameIndex) onDragKeyframe;
-  final VoidCallback onEndDrag;
+  final VoidCallback onStopDrag;
   final VoidCallback onCancelDrag;
 
   @override
@@ -760,7 +806,7 @@ class _PropertyTrackRow extends StatelessWidget {
           onDoubleTap: () => onEditFrame(frameIndex),
           onStartDrag: onStartDrag,
           onUpdateDrag: (details) => onDragKeyframe(details, frameIndex),
-          onEndDrag: onEndDrag,
+          onStopDrag: onStopDrag,
           onCancelDrag: onCancelDrag,
         ),
     ],
@@ -780,7 +826,7 @@ class _KeyframeMarker extends StatelessWidget {
     required this.onDoubleTap,
     required this.onStartDrag,
     required this.onUpdateDrag,
-    required this.onEndDrag,
+    required this.onStopDrag,
     required this.onCancelDrag,
   });
 
@@ -795,7 +841,7 @@ class _KeyframeMarker extends StatelessWidget {
   final VoidCallback onDoubleTap;
   final GestureDragStartCallback onStartDrag;
   final GestureDragUpdateCallback onUpdateDrag;
-  final VoidCallback onEndDrag;
+  final VoidCallback onStopDrag;
   final VoidCallback onCancelDrag;
 
   @override
@@ -811,7 +857,7 @@ class _KeyframeMarker extends StatelessWidget {
         dragStartBehavior: DragStartBehavior.down,
         onHorizontalDragStart: onStartDrag,
         onHorizontalDragUpdate: onUpdateDrag,
-        onHorizontalDragEnd: (_) => onEndDrag(),
+        onHorizontalDragEnd: (_) => onStopDrag(),
         onHorizontalDragCancel: onCancelDrag,
         child: StudioTooltip(
           tooltip: (_) => const Text('Drag time · Double-click to edit'),
@@ -884,17 +930,15 @@ class _KeyframeDialogState extends State<_KeyframeDialog> {
       final value = getFiniteNumberInput('Value', _value.text);
       final frames = widget.track.keyframes;
       if (time < 0 ||
-          time > 60000 ||
+          time > maxSceneMotionTimeMs ||
           (widget.index > 0 && time <= frames[widget.index - 1].timeMs) ||
           (widget.index < frames.length - 1 &&
               time >= frames[widget.index + 1].timeMs)) {
         throw const FormatException(
-          'Time must stay between adjacent keyframes (0..60000 ms).',
+          'Time must stay between adjacent keyframes (0..$maxSceneMotionTimeMs ms).',
         );
       }
-      if (value.abs() > 100000 ||
-          (widget.track.property == SceneMotionProperty.opacity &&
-              (value < 0 || value > 1))) {
+      if (clampSceneKeyframeValue(widget.track.property, value) != value) {
         throw const FormatException(
           'Opacity must be 0..1; other values must be within ±100000.',
         );

@@ -13,15 +13,19 @@ class StudioStateGraph extends StatelessWidget {
     required this.dormant,
     required this.scenario,
     required this.onSelect,
+    this.readOnly = false,
     super.key,
   });
   final SceneEditor editor;
   final bool dormant;
   final StudioPreviewScenario scenario;
   final void Function(bool, StudioPreviewScenario) onSelect;
+  final bool readOnly;
 
   Future<void> _editTransition(BuildContext context, int? index) async {
-    if (editor.selectedIds.isEmpty || !editor.tryApplyDraft()) return;
+    if (readOnly || editor.selectedIds.isEmpty || !editor.tryApplyDraft()) {
+      return;
+    }
     final node = editor.selectedNode;
     if (index != null && index >= node.transitions.length) return;
     final targetId = node.id;
@@ -49,7 +53,7 @@ class StudioStateGraph extends StatelessWidget {
   }
 
   void _removeTransition(String nodeId, int index) {
-    if (!editor.tryApplyDraft()) return;
+    if (readOnly || !editor.tryApplyDraft()) return;
     final current = editor.document.nodes
         .where((entry) => entry.id == nodeId)
         .firstOrNull;
@@ -90,7 +94,7 @@ class StudioStateGraph extends StatelessWidget {
               ),
               OutlineButton(
                 key: const ValueKey('graph-add-transition'),
-                onPressed: node == null
+                onPressed: readOnly || node == null
                     ? null
                     : () => _editTransition(context, null),
                 child: const Text('Add transition').small(),
@@ -114,8 +118,12 @@ class StudioStateGraph extends StatelessWidget {
                         _TransitionEdgeRow(
                           index: i,
                           transition: transitions[i],
-                          onEdit: () => _editTransition(context, i),
-                          onRemove: () => _removeTransition(node.id, i),
+                          onEdit: readOnly
+                              ? null
+                              : () => _editTransition(context, i),
+                          onRemove: readOnly
+                              ? null
+                              : () => _removeTransition(node.id, i),
                         ),
                     ],
                   ),
@@ -181,8 +189,8 @@ class _TransitionEdgeRow extends StatelessWidget {
 
   final int index;
   final SceneStateTransition transition;
-  final VoidCallback onEdit;
-  final VoidCallback onRemove;
+  final VoidCallback? onEdit;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) => Padding(

@@ -66,6 +66,7 @@ class StudioTimeline extends StatefulWidget {
     required this.transition,
     required this.onTimeChanged,
     required this.onTransitionChanged,
+    this.readOnly = false,
     super.key,
   });
   final SceneEditor editor;
@@ -75,6 +76,7 @@ class StudioTimeline extends StatefulWidget {
   final StudioTransition transition;
   final ValueChanged<Duration> onTimeChanged;
   final ValueChanged<StudioTransition> onTransitionChanged;
+  final bool readOnly;
   @override
   State<StudioTimeline> createState() => _StudioTimelineState();
 }
@@ -216,6 +218,7 @@ class _StudioTimelineState extends State<StudioTimeline>
           duration: widget.duration,
           elapsed: widget.elapsed,
           fallbackDuration: widget.fallbackDuration,
+          readOnly: widget.readOnly,
         ),
       ],
     ),

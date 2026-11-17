@@ -50,7 +50,9 @@ class SceneEditor extends ChangeNotifier {
   final _undo = <_SceneRevision>[];
   final _redo = <_SceneRevision>[];
   SceneDocument? _previewDocument;
+  bool _disposed = false;
 
+  bool get isDisposed => _disposed;
   SceneDocument get document => _revision.document;
   SceneDocument get previewDocument => _previewDocument ?? document;
   String get encodedDocument => _revision.encoded;
@@ -885,6 +887,15 @@ class SceneEditor extends ChangeNotifier {
     );
   }
 
+  Size getNodePixelSize(SceneNode node) {
+    final geometry = _calculateReferenceGeometry()[node.id];
+    if (geometry != null) return geometry.rect.size;
+    return Size(
+      node.rect.width * document.canvas.referenceWidth,
+      node.rect.height * document.canvas.referenceHeight,
+    );
+  }
+
   List<SceneNode> getSelectionLayoutNodes() {
     final geometry = _calculateReferenceGeometry();
     final result = <SceneNode>[];
@@ -966,6 +977,7 @@ class SceneEditor extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     inspector.dispose();
     super.dispose();
   }

@@ -69,12 +69,35 @@ class StudioCanvasState extends State<StudioCanvas> {
   StudioPreviewScenario _scenario = StudioPreviewScenario.password;
   double? _zoom;
   int _resetView = 0;
+  EdgeInsets _lastSafeArea = EdgeInsets.zero;
   final _viewportKey = GlobalKey();
   final _focus = FocusNode(debugLabel: 'Studio canvas');
+
+  void _syncEditorSafeArea(EdgeInsets padding) {
+    final session = widget.editor;
+    if (session == null) return;
+    final effective = session.document.canvas.useSafeArea
+        ? padding
+        : EdgeInsets.zero;
+    if (effective == _lastSafeArea) return;
+    _lastSafeArea = effective;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || session.isDisposed || session != widget.editor) return;
+      session.updateAuthoring(
+        componentCatalog: widget.theme.componentCatalog,
+        presetCatalog: widget.theme.presetCatalog,
+        layout: widget.theme.layout,
+        minHitTarget: widget.theme.bundle.tokens.minHitTarget,
+        safeArea: effective,
+        fontFamilies: sceneFontFamilies.value,
+      );
+    });
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _syncEditorSafeArea(MediaQuery.paddingOf(context));
     final mode =
         context
             .dependOnInheritedWidgetOfExactType<StudioWorkspaceScope>()
@@ -86,6 +109,23 @@ class StudioCanvasState extends State<StudioCanvas> {
       _previewing = false;
       _comparing = false;
       _showStateGraph = false;
+    }
+  }
+
+  @override
+  void didUpdateWidget(StudioCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.editor != widget.editor) {
+      _lastSafeArea = EdgeInsets.zero;
+      _syncEditorSafeArea(MediaQuery.paddingOf(context));
+      if (_elapsed != null) _elapsed = Duration.zero;
+      if (_responsiveSize != null && widget.editor != null) {
+        final canvas = widget.editor!.document.canvas;
+        _responsiveSize = Size(
+          canvas.referenceWidth.toDouble(),
+          canvas.referenceHeight.toDouble(),
+        );
+      }
     }
   }
 
@@ -214,7 +254,7 @@ class StudioCanvasState extends State<StudioCanvas> {
       case StudioCommand.guides:
         setState(() => _snapToGuides = !_snapToGuides);
       default:
-        if (_isEditingBlocked) {
+        if (!_canEditCanvas) {
           return KeyEventResult.ignored;
         }
         switch (command) {
@@ -427,6 +467,7 @@ class StudioCanvasState extends State<StudioCanvas> {
               child: !presenting && hasBottomDrawer
                   ? _CanvasBottomDrawer(
                       session: session,
+                      readOnly: widget.readOnly,
                       responsiveSize: _responsiveSize,
                       showStateGraph: _showStateGraph,
                       elapsed: _elapsed,
@@ -1219,6 +1260,7 @@ class _DockButton extends StatelessWidget {
 class _CanvasBottomDrawer extends StatelessWidget {
   const _CanvasBottomDrawer({
     required this.session,
+    required this.readOnly,
     required this.responsiveSize,
     required this.showStateGraph,
     required this.elapsed,
@@ -1233,6 +1275,7 @@ class _CanvasBottomDrawer extends StatelessWidget {
   });
 
   final SceneEditor? session;
+  final bool readOnly;
   final Size? responsiveSize;
   final bool showStateGraph;
   final Duration? elapsed;
@@ -1268,6 +1311,7 @@ class _CanvasBottomDrawer extends StatelessWidget {
                     const Divider(),
                     StudioStateGraph(
                       editor: activeSession,
+                      readOnly: readOnly,
                       dormant: dormant,
                       scenario: scenario,
                       onSelect: onSelectState,
@@ -1277,6 +1321,7 @@ class _CanvasBottomDrawer extends StatelessWidget {
                     const Divider(),
                     StudioTimeline(
                       editor: activeSession,
+                      readOnly: readOnly,
                       fallbackDuration: fallbackDuration,
                       duration: _getTimelineDuration(
                         activeSession,

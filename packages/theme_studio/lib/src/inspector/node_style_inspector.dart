@@ -13,6 +13,8 @@ class NodeStyleInspector extends StatefulWidget {
 
 class _NodeStyleInspectorState extends State<NodeStyleInspector> {
   late SceneStyle _draft;
+  bool _hasStylePreview = false;
+
   @override
   void initState() {
     super.initState();
@@ -22,7 +24,26 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
   @override
   void didUpdateWidget(NodeStyleInspector old) {
     super.didUpdateWidget(old);
+    if (old.editor != widget.editor && _hasStylePreview) {
+      final previous = old.editor;
+      _hasStylePreview = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!previous.isDisposed) previous.cancelPreview();
+      });
+    }
     _updateDraft();
+  }
+
+  @override
+  void dispose() {
+    if (_hasStylePreview) {
+      final editor = widget.editor;
+      _hasStylePreview = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!editor.isDisposed) editor.cancelPreview();
+      });
+    }
+    super.dispose();
   }
 
   void _updateDraft() {
@@ -35,10 +56,12 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
   }
 
   void _commit(SceneStyle style) {
+    _hasStylePreview = false;
     widget.editor.updateSelectionStyle(style);
   }
 
   void _preview(SceneStyle style) {
+    _hasStylePreview = true;
     setState(() => _draft = style);
     widget.editor.previewSelectionStyle(style);
   }
@@ -76,6 +99,7 @@ class _NodeStyleInspectorState extends State<NodeStyleInspector> {
     minimum: minimum,
     decimals: maximum <= 3 ? 2 : 1,
     onCancel: () {
+      _hasStylePreview = false;
       widget.editor.cancelPreview();
       setState(_updateDraft);
     },

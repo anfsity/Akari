@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -237,11 +238,18 @@ class _AssetListState extends State<_AssetList> {
       _selected = path;
       _tint = null;
     });
-    _scroll.animateTo(
-      0,
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOut,
-    );
+    if (!_scroll.hasClients) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scroll.jumpTo(0);
+    } else {
+      unawaited(
+        _scroll.animateTo(
+          0,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+        ),
+      );
+    }
   }
 
   @override

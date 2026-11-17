@@ -106,6 +106,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   @override
   void initState() {
     super.initState();
+    sceneFontFamilies.addListener(_onSceneFontsChanged);
     _projects = [...widget.projects];
     _project = _projects.firstWhere(
       (project) => project.packageName == widget.initialThemePackageName,
@@ -117,9 +118,24 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     _assets = _compiledAssets;
     _updateTheme(_project.themeBuilder());
     _scenePaths = _getProjectScenePaths(_project);
-    _path = _scenePaths.first;
-    _openScene(_path);
+    _path = _scenePaths.firstOrNull ?? '${_project.directory}/lib/default.scene.json';
+    if (_scenePaths.isNotEmpty) {
+      _openScene(_path);
+    } else {
+      _error = 'No scene files found in ${_project.packageName}.';
+    }
     unawaited(_loadPreferences());
+  }
+
+  void _onSceneFontsChanged() {
+    if (!mounted) return;
+    _editor?.updateAuthoring(
+      componentCatalog: _theme.componentCatalog,
+      presetCatalog: _theme.presetCatalog,
+      layout: _theme.layout,
+      minHitTarget: _theme.bundle.tokens.minHitTarget,
+      fontFamilies: sceneFontFamilies.value,
+    );
   }
 
   Future<void> _loadPreferences() async {
@@ -175,6 +191,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       presetCatalog: theme.presetCatalog,
       layout: theme.layout,
       minHitTarget: theme.bundle.tokens.minHitTarget,
+      fontFamilies: sceneFontFamilies.value,
     );
     _theme = theme.copyWith(
       bundle: theme.bundle.copyWith(
@@ -268,6 +285,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   @override
   void dispose() {
+    sceneFontFamilies.removeListener(_onSceneFontsChanged);
     _editor?.removeListener(_onEditorChanged);
     _editor?.dispose();
     super.dispose();
@@ -318,9 +336,12 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       packageName: project.packageName,
     );
     final assetPaths = assets.getAssets();
-    final session = project.createSceneSession(
-      scenePath ?? project.scenePaths.first,
-    );
+    final candidatePaths = _getProjectScenePaths(project);
+    final targetPath = scenePath ?? candidatePaths.firstOrNull;
+    if (targetPath == null) {
+      throw FormatException('No scene files found in ${project.packageName}.');
+    }
+    final session = project.createSceneSession(targetPath);
     setState(() {
       if (!_projects.contains(project)) _projects.add(project);
       _setEditor(session.editor);
@@ -361,6 +382,14 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
             destination: destination,
             document: document,
             assets: assets,
+            additionalAssets: [
+              for (final sibling in _projects)
+                if (sibling.packageName != assets.packageName)
+                  StudioAssets(
+                    directory: Directory(sibling.directory),
+                    packageName: sibling.packageName,
+                  ),
+            ],
           );
           if (!mounted) return;
           _openProject(project);
@@ -587,6 +616,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       }
       try {
         editor.reload();
+        _assetPaths = _assets.getAssets();
         _error = null;
         _confirmReload = false;
       } on Object catch (error) {

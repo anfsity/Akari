@@ -27,12 +27,19 @@ class StudioThemeProject {
     required String destination,
     required SceneDocument document,
     required StudioAssets assets,
+    Iterable<StudioAssets> additionalAssets = const [],
   }) async {
+    final assetSources = [assets, ...additionalAssets];
     final references = getReferencedSceneAssets(document);
     final files = <String, File>{};
     for (final reference in references) {
-      final file = assets.findFile(reference);
-      if (file != null && await file.exists()) files[reference] = file;
+      for (final candidate in assetSources) {
+        final file = candidate.findFile(reference);
+        if (file != null && await file.exists()) {
+          files[reference] = file;
+          break;
+        }
+      }
     }
     final result = await createThemeProject(
       source: Directory(directory),
@@ -66,6 +73,7 @@ class StudioThemeProject {
       presetCatalog: declarations.presetCatalog,
       layout: declarations.layout,
       minHitTarget: declarations.bundle.tokens.minHitTarget,
+      fontFamilies: sceneFontFamilies.value,
     );
     try {
       return (editor: editor, theme: themeBuilder(document: editor.document));
