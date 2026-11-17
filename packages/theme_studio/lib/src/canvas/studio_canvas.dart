@@ -418,28 +418,37 @@ class StudioCanvasState extends State<StudioCanvas> {
                       ),
               ),
             ),
-            if (!presenting && hasBottomDrawer)
-              _CanvasBottomDrawer(
-                session: session,
-                responsiveSize: _responsiveSize,
-                showStateGraph: _showStateGraph,
-                elapsed: _elapsed,
-                dormant: widget.dormant,
-                scenario: _scenario,
-                transition: _transition,
-                fallbackDuration: widget.theme.bundle.tokens.mediumMotion,
-                onResponsiveChanged: (size) =>
-                    setState(() => _responsiveSize = size),
-                onSelectState: (dormant, scenario) {
-                  if (dormant != widget.dormant) widget.onToggleDormant();
-                  setState(() => _scenario = scenario);
-                },
-                onTimeChanged: (elapsed) => setState(() => _elapsed = elapsed),
-                onTransitionChanged: (transition) => setState(() {
-                  _transition = transition;
-                  _elapsed = Duration.zero;
-                }),
-              ),
+            AnimatedSize(
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.bottomCenter,
+              child: !presenting && hasBottomDrawer
+                  ? _CanvasBottomDrawer(
+                      session: session,
+                      responsiveSize: _responsiveSize,
+                      showStateGraph: _showStateGraph,
+                      elapsed: _elapsed,
+                      dormant: widget.dormant,
+                      scenario: _scenario,
+                      transition: _transition,
+                      fallbackDuration: widget.theme.bundle.tokens.mediumMotion,
+                      onResponsiveChanged: (size) =>
+                          setState(() => _responsiveSize = size),
+                      onSelectState: (dormant, scenario) {
+                        if (dormant != widget.dormant) widget.onToggleDormant();
+                        setState(() => _scenario = scenario);
+                      },
+                      onTimeChanged: (elapsed) =>
+                          setState(() => _elapsed = elapsed),
+                      onTransitionChanged: (transition) => setState(() {
+                        _transition = transition;
+                        _elapsed = Duration.zero;
+                      }),
+                    )
+                  : const SizedBox.shrink(),
+            ),
           ],
         ),
       ),
@@ -1102,8 +1111,9 @@ class _CanvasDock extends StatelessWidget {
                                       ),
                                 onPressed: hasSession
                                     ? () {
-                                        if (comparing != isCompare)
+                                        if (comparing != isCompare) {
                                           onToggleComparison();
+                                        }
                                       }
                                     : null,
                                 child: Icon(icon, size: 15),
