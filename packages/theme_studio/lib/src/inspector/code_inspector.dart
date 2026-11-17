@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:scene/scene.dart';
 import 'package:scene_codegen/scene_codegen.dart';
@@ -21,6 +23,24 @@ class CodeInspector extends StatefulWidget {
 class _CodeInspectorState extends State<CodeInspector> {
   _CodeFormat _format = _CodeFormat.json;
   bool _wholeScene = false;
+  String? _copiedSource;
+  Timer? _copyTimer;
+
+  Future<void> _copyCode(String source) async {
+    await Clipboard.setData(ClipboardData(text: source));
+    if (!mounted) return;
+    _copyTimer?.cancel();
+    setState(() => _copiedSource = source);
+    _copyTimer = Timer(const Duration(milliseconds: 1500), () {
+      setState(() => _copiedSource = null);
+    });
+  }
+
+  @override
+  void dispose() {
+    _copyTimer?.cancel();
+    super.dispose();
+  }
 
   Widget _buildSegmentedControl<T>({
     required BuildContext context,
@@ -46,33 +66,31 @@ class _CodeInspectorState extends State<CodeInspector> {
                 child: Semantics(
                   button: true,
                   selected: value == option,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onChanged(option),
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 120),
-                        curve: Curves.easeOut,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 4,
-                        ),
-                        alignment: Alignment.center,
-                        decoration: value == option
-                            ? BoxDecoration(
-                                color: colors.background,
-                                borderRadius: BorderRadius.circular(
-                                  (theme.radiusMd - 2).clamp(
-                                    0,
-                                    double.infinity,
+                  child: Button(
+                    style:
+                        const ButtonStyle.ghost(density: ButtonDensity.compact)
+                            .copyWith(
+                              decoration: (context, states, decoration) =>
+                                  (decoration as BoxDecoration).copyWith(
+                                    color: value == option
+                                        ? colors.background
+                                        : decoration.color,
+                                    border: value == option
+                                        ? Border.all(
+                                            color: colors.border.withValues(
+                                              alpha: .6,
+                                            ),
+                                          )
+                                        : null,
                                   ),
-                                ),
-                                border: Border.all(
-                                  color: colors.border.withValues(alpha: 0.6),
-                                ),
-                              )
-                            : null,
+                            ),
+                    onPressed: () => onChanged(option),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
+                      child: Center(
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: value == option
@@ -105,7 +123,8 @@ class _CodeInspectorState extends State<CodeInspector> {
       final node = hasSelection ? widget.editor.selectedNode : null;
       final String? source = switch ((_format, _wholeScene)) {
         (_CodeFormat.json, true) => widget.editor.encodedDocument,
-        (_CodeFormat.json, false) => node == null ? null : encodeSceneNode(node),
+        (_CodeFormat.json, false) =>
+          node == null ? null : encodeSceneNode(node),
         (_CodeFormat.dart, true) => generateSceneFromDocument(document),
         (_CodeFormat.dart, false) =>
           node == null ? null : generateSceneNode(node).trim(),
@@ -145,14 +164,36 @@ class _CodeInspectorState extends State<CodeInspector> {
                       ),
                     ),
                     const Gap(8),
-                    OutlineButton(
-                      density: ButtonDensity.compact,
-                      leading: const Icon(LucideIcons.copy, size: 13),
+                    GhostButton(
+                      key: const ValueKey('inspect-copy-code'),
+                      density: ButtonDensity.dense,
+                      leading: Icon(
+                        source != null && _copiedSource == source
+                            ? LucideIcons.check
+                            : LucideIcons.copy,
+                        size: 14,
+                      ),
                       onPressed: source == null
                           ? null
-                          : () =>
-                                Clipboard.setData(ClipboardData(text: source)),
-                      child: const Text('Copy code').xSmall(),
+                          : () => _copyCode(source),
+                      child: SizedBox(
+                        width: 80,
+                        child: AnimatedSwitcher(
+                          duration: MediaQuery.disableAnimationsOf(context)
+                              ? Duration.zero
+                              : const Duration(milliseconds: 120),
+                          child: Text(
+                            source != null && _copiedSource == source
+                                ? 'Copied'
+                                : 'Copy code',
+                            maxLines: 1,
+                            softWrap: false,
+                            key: ValueKey(
+                              source != null && _copiedSource == source,
+                            ),
+                          ).small(),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -190,7 +231,9 @@ class _CodeInspectorState extends State<CodeInspector> {
           const Divider(),
           Expanded(
             child: source == null
-                ? const Center(child: Text('Select a layer or switch to Scene.'))
+                ? const Center(
+                    child: Text('Select a layer or switch to Scene.'),
+                  )
                 : LayoutBuilder(
                     builder: (context, constraints) => SingleChildScrollView(
                       padding: const EdgeInsets.all(12),
@@ -203,9 +246,8 @@ class _CodeInspectorState extends State<CodeInspector> {
                           child: SelectableText(
                             source,
                             key: const ValueKey('inspect-code-source'),
-                            style: Theme.of(context).typography.mono.copyWith(
-                              fontSize: 12,
-                            ),
+                            style: Theme.of(context).typography.mono
+                                .copyWith(fontSize: 12),
                           ),
                         ),
                       ),
