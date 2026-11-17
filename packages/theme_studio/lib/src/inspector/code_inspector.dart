@@ -120,24 +120,40 @@ class _CodeInspectorState extends State<CodeInspector> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               spacing: 10,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: 2,
+                Row(
                   children: [
-                    Text(
-                      node?.id ?? 'No selection',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ).small().semiBold(),
-                    Text(
-                      node == null
-                          ? 'Whole scene'
-                          : '${node.componentId} · '
-                                '${(node.rect.width * canvas.referenceWidth).toStringAsFixed(1)} × '
-                                '${(node.rect.height * canvas.referenceHeight).toStringAsFixed(1)} px',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ).xSmall().muted(),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        spacing: 2,
+                        children: [
+                          Text(
+                            node?.id ?? 'No selection',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ).small().semiBold(),
+                          Text(
+                            node == null
+                                ? 'Whole scene'
+                                : '${node.componentId} · '
+                                      '${(node.rect.width * canvas.referenceWidth).toStringAsFixed(1)} × '
+                                      '${(node.rect.height * canvas.referenceHeight).toStringAsFixed(1)} px',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ).xSmall().muted(),
+                        ],
+                      ),
+                    ),
+                    const Gap(8),
+                    OutlineButton(
+                      density: ButtonDensity.compact,
+                      leading: const Icon(LucideIcons.copy, size: 13),
+                      onPressed: source == null
+                          ? null
+                          : () =>
+                                Clipboard.setData(ClipboardData(text: source)),
+                      child: const Text('Copy code').xSmall(),
+                    ),
                   ],
                 ),
                 Row(
@@ -195,20 +211,6 @@ class _CodeInspectorState extends State<CodeInspector> {
                       ),
                     ),
                   ),
-          ),
-          const Divider(),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 34),
-              child: OutlineButton(
-                density: ButtonDensity.dense,
-                onPressed: source == null
-                    ? null
-                    : () => Clipboard.setData(ClipboardData(text: source)),
-                child: const Text('Copy code').small(),
-              ),
-            ),
           ),
         ],
       );
