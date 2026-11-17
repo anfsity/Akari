@@ -345,6 +345,7 @@ class StudioDisclosureSection extends StatefulWidget {
     required this.child,
     this.triggerKey,
     this.initiallyExpanded = false,
+    this.showTopDividerWhenExpanded = false,
     super.key,
   });
 
@@ -352,6 +353,7 @@ class StudioDisclosureSection extends StatefulWidget {
   final Widget child;
   final Key? triggerKey;
   final bool initiallyExpanded;
+  final bool showTopDividerWhenExpanded;
 
   @override
   State<StudioDisclosureSection> createState() =>
@@ -412,35 +414,37 @@ class _StudioDisclosureSectionState extends State<StudioDisclosureSection>
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: inset * .5,
-            vertical: gap * .125,
+        if (widget.showTopDividerWhenExpanded &&
+            (_expanded || !_controller.isDismissed))
+          SizeTransition(
+            sizeFactor: _progress,
+            alignment: Alignment.topCenter,
+            fixedCrossAxisSizeFactor: 1,
+            child: const Divider(),
           ),
-          child: Semantics(
-            expanded: _expanded,
-            child: GhostButton(
-              key: widget.triggerKey,
-              density: ButtonDensity.compact,
-              onPressed: _toggleExpanded,
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: inset * .5,
-                  vertical: gap * .625,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(widget.title).small().medium()),
-                    RotationTransition(
-                      turns: _progress.drive(Tween(begin: 0.0, end: .25)),
-                      child: Icon(
-                        LucideIcons.chevronRight,
-                        size: theme.typography.small.fontSize,
-                        color: theme.colorScheme.mutedForeground,
-                      ),
+        Semantics(
+          expanded: _expanded,
+          child: GhostButton(
+            key: widget.triggerKey,
+            density: ButtonDensity.compact,
+            onPressed: _toggleExpanded,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: inset,
+                vertical: gap * .75,
+              ),
+              child: Row(
+                children: [
+                  Expanded(child: Text(widget.title).small().medium()),
+                  RotationTransition(
+                    turns: _progress.drive(Tween(begin: 0.0, end: .25)),
+                    child: Icon(
+                      LucideIcons.chevronRight,
+                      size: theme.typography.small.fontSize,
+                      color: theme.colorScheme.mutedForeground,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -458,23 +462,21 @@ class _StudioDisclosureSectionState extends State<StudioDisclosureSection>
                 excluding: !_expanded,
                 child: ExcludeSemantics(
                   excluding: !_expanded,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      inset * .5,
-                      gap * .125,
-                      inset * .5,
-                      gap * .75,
-                    ),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.muted.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(theme.radiusMd),
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.all(inset * .625),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          inset,
+                          gap * .25,
+                          inset,
+                          inset,
+                        ),
                         child: widget.child,
                       ),
-                    ),
+                      const Divider(),
+                    ],
                   ),
                 ),
               ),

@@ -127,27 +127,33 @@ class _InspectorForm extends StatelessWidget {
           NodeLayoutInspector(editor: session),
           StudioDisclosureSection(
             title: 'Visual style',
+            showTopDividerWhenExpanded: true,
             child: NodeStyleInspector(editor: session),
           ),
           StudioDisclosureSection(
             title: 'State rules',
+            showTopDividerWhenExpanded: true,
             child: NodeStateInspector(editor: session),
           ),
         ],
         StudioDisclosureSection(
           title: 'Advanced layout',
+          showTopDividerWhenExpanded: editor != null,
           child: DensityColumn(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             spacing: 1.5,
             children: [
               _buildLayeringSection(),
+              const Divider(),
               _buildTransformSection(),
+              const Divider(),
               _buildMotionSection(),
             ],
           ),
         ),
         StudioDisclosureSection(
           title: 'Advanced properties',
+          showTopDividerWhenExpanded: true,
           child: _buildField('Properties', maxLines: 6),
         ),
         const Gap(6),
