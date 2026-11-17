@@ -257,7 +257,7 @@ class StudioToolbar extends StatelessWidget {
       label: label,
       child: ComponentTheme<OutlineButtonTheme>(
         data: OutlineButtonTheme(
-          decoration: (context, states, value) =>
+          decoration: (context, states, decoration) =>
               ButtonVariance.ghost.decoration(context, states),
         ),
         child: OutlineButton(
@@ -286,109 +286,132 @@ class StudioToolbar extends StatelessWidget {
       return Padding(
         key: const ValueKey('studio-toolbar'),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        child: Row(
-          children: [
-            Flexible(
-              child: LayoutBuilder(
-                builder: (context, constraints) => StudioTooltip(
-                  tooltip: (_) =>
-                      Text('$themeId / ${scenePath.split('/').last}'),
-                  child: GhostButton(
-                    key: const ValueKey('studio-scene-menu'),
-                    density: ButtonDensity.compact,
-                    onPressed: () => _openSceneMenu(context),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 960;
+            return Row(
+              children: [
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: compact ? 180 : 360),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final theme = Theme.of(context);
+                      final breadcrumb = TextSpan(
+                        style: theme.typography.small.copyWith(
+                          color: colors.foreground,
+                        ),
                         children: [
-                          Flexible(
-                            child: Text(
-                              themeId,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ).small().semiBold(),
+                          TextSpan(
+                            text: themeId,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          if (constraints.maxWidth >= 240) ...[
-                            const Gap(6),
-                            const Text('/').small().muted(),
-                            const Gap(6),
-                            Flexible(
-                              child: Text(
-                                scenePath.split('/').last,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ).small().muted(),
-                            ),
-                          ],
-                          const Gap(6),
-                          Icon(
-                            LucideIcons.chevronDown,
-                            size: 14,
-                            color: colors.mutedForeground,
+                          TextSpan(
+                            text: ' / ${scenePath.split('/').last}',
+                            style: TextStyle(color: colors.mutedForeground),
                           ),
                         ],
-                      ),
-                    ),
+                      );
+                      final painter = TextPainter(
+                        text: breadcrumb,
+                        maxLines: 1,
+                        ellipsis: '…',
+                        textDirection: Directionality.of(context),
+                        textScaler: MediaQuery.textScalerOf(context),
+                      )..layout(maxWidth: constraints.maxWidth - 28);
+                      final truncated = painter.didExceedMaxLines;
+                      final width = painter.width + 28;
+                      painter.dispose();
+                      return SizedBox(
+                        width: width,
+                        child: StudioTooltip(
+                          enabled: truncated,
+                          tooltip: (_) =>
+                              Text('$themeId / ${scenePath.split('/').last}'),
+                          child: GhostButton(
+                            key: const ValueKey('studio-scene-menu'),
+                            density: ButtonDensity.compact,
+                            onPressed: () => _openSceneMenu(context),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text.rich(
+                                      breadcrumb,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const Gap(6),
+                                  Icon(
+                                    LucideIcons.chevronDown,
+                                    size: 14,
+                                    color: colors.mutedForeground,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
-              ),
-            ),
-            const Spacer(),
-            const Gap(12),
-            if (workspaceControls != null) ...[
-              workspaceControls,
-              const Gap(8),
-              const SizedBox(height: 18, child: VerticalDivider()),
-              const Gap(8),
-            ],
-            // Undo clears an uncommitted inspector draft before it consumes
-            // a scene history entry.
-            _buildAction(
-              key: 'toolbar-undo',
-              label: 'Undo',
-              icon: LucideIcons.undo2,
-              onPressed: !readOnly && (hasDraft || canUndo)
-                  ? session.undo
-                  : null,
-            ),
-            const Gap(2),
-            _buildAction(
-              key: 'toolbar-redo',
-              label: 'Redo',
-              icon: LucideIcons.redo2,
-              onPressed: !readOnly && canRedo ? session.redo : null,
-            ),
-            const Gap(8),
-            const SizedBox(height: 18, child: VerticalDivider()),
-            const Gap(8),
-            _buildAction(
-              key: 'toolbar-settings',
-              label: 'Settings',
-              icon: LucideIcons.settings2,
-              onPressed: !readOnly && session != null && preferencesReady
-                  ? onOpenSettings
-                  : null,
-            ),
-            const Gap(8),
-            StudioTooltip(
-              tooltip: (_) =>
-                  Text(hasDraft || isDirty ? 'Unsaved changes' : 'Saved'),
-              child: Text(hasDraft || isDirty ? 'Unsaved changes' : 'Saved')
-                  .xSmall()
-                  .muted(),
-            ),
-            const Gap(10),
-            PrimaryButton(
-              key: const ValueKey('toolbar-save'),
-              density: ButtonDensity.dense,
-              onPressed: session == null ? null : onSave,
-              child: const Text('Save scene').small(),
-            ),
-          ],
+                const Gap(12),
+                const SizedBox(height: 18, child: VerticalDivider()),
+                const Gap(8),
+                // Undo clears an uncommitted inspector draft before it consumes
+                // a scene history entry.
+                _buildAction(
+                  key: 'toolbar-undo',
+                  label: 'Undo',
+                  icon: LucideIcons.undo2,
+                  onPressed: !readOnly && (hasDraft || canUndo)
+                      ? session.undo
+                      : null,
+                ),
+                const Gap(2),
+                _buildAction(
+                  key: 'toolbar-redo',
+                  label: 'Redo',
+                  icon: LucideIcons.redo2,
+                  onPressed: !readOnly && canRedo ? session.redo : null,
+                ),
+                const Gap(12),
+                const Spacer(),
+                if (workspaceControls != null) ...[
+                  workspaceControls,
+                  const Gap(8),
+                  const SizedBox(height: 18, child: VerticalDivider()),
+                  const Gap(8),
+                ],
+                _buildAction(
+                  key: 'toolbar-settings',
+                  label: 'Settings',
+                  icon: LucideIcons.settings2,
+                  onPressed: !readOnly && session != null && preferencesReady
+                      ? onOpenSettings
+                      : null,
+                ),
+                if (!compact) ...[
+                  const Gap(8),
+                  Text(hasDraft || isDirty ? 'Unsaved changes' : 'Saved')
+                      .xSmall()
+                      .muted(),
+                ],
+                const Gap(10),
+                PrimaryButton(
+                  key: const ValueKey('toolbar-save'),
+                  density: ButtonDensity.dense,
+                  onPressed: session == null ? null : onSave,
+                  child: const Text('Save scene').small(),
+                ),
+              ],
+            );
+          },
         ),
       );
     },
