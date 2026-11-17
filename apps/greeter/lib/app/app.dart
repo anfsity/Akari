@@ -38,6 +38,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late ThemeDefinition _theme;
   late List<FlutterView> _views;
   late int _activeViewId;
+  int? _pendingFocusViewId;
   Color? _themeSeed;
 
   int _findDefaultViewId(List<FlutterView> views) =>
@@ -45,16 +46,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       (views.isEmpty ? 0 : views.first.viewId);
 
   GreeterFeature _createFeature() {
-    final backendMode = const String.fromEnvironment(
+    const backendMode = String.fromEnvironment(
       'AKARI_BACKEND',
       defaultValue: 'demo',
     );
-    return GreeterFeature(
-      gateway:
-          widget.gateway ??
-          (backendMode == 'demo' ? DemoGreeterGateway() : DBusGreeterGateway()),
-      sessionStore: widget.sessionStore,
-    );
+    final gateway =
+        widget.gateway ??
+        switch (backendMode) {
+          'demo' => DemoGreeterGateway(),
+          'real' => DBusGreeterGateway(),
+          _ => throw StateError('Unsupported AKARI_BACKEND: $backendMode'),
+        };
+    return GreeterFeature(gateway: gateway, sessionStore: widget.sessionStore);
   }
 
   @override
@@ -125,24 +128,45 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void didChangeMetrics() {
     final views = WidgetsBinding.instance.platformDispatcher.views.toList();
-    if (views.length == _views.length &&
+    final pending = _pendingFocusViewId;
+    final activatePending =
+        pending != null && views.any((view) => view.viewId == pending);
+    if (!activatePending &&
+        views.length == _views.length &&
         views.every((view) => _views.any((old) => old.viewId == view.viewId))) {
       return;
     }
     setState(() {
       _views = views;
-      if (!views.any((view) => view.viewId == _activeViewId)) {
+      if (activatePending) {
+        _activeViewId = pending;
+        _pendingFocusViewId = null;
+      } else if (!views.any((view) => view.viewId == _activeViewId)) {
         _activeViewId = _findDefaultViewId(views);
       }
     });
   }
 
   void _activateView(int viewId) {
-    if (!mounted ||
-        _activeViewId == viewId ||
-        !_views.any((view) => view.viewId == viewId)) {
+    if (!mounted || _activeViewId == viewId) {
       return;
     }
+    if (!_views.any((view) => view.viewId == viewId)) {
+      final latest = WidgetsBinding.instance.platformDispatcher.views.toList();
+      if (!latest.any((view) => view.viewId == viewId)) {
+        // GTK can emit focus-in-event before the engine metrics callback adds
+        // the new FlutterView. Defer activation until didChangeMetrics sees it.
+        _pendingFocusViewId = viewId;
+        return;
+      }
+      setState(() {
+        _views = latest;
+        _activeViewId = viewId;
+        _pendingFocusViewId = null;
+      });
+      return;
+    }
+    _pendingFocusViewId = null;
     setState(() => _activeViewId = viewId);
   }
 

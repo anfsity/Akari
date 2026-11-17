@@ -13,13 +13,19 @@ struct _MyApplication {
   GtkWindow* primary_window;
   GdkMonitor* primary_monitor;
   gboolean monitor_signals_connected;
+  gboolean multi_monitor_mode;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
 // Called when first Flutter frame received.
-static void first_frame_cb(FlView* view, gpointer user_data) {
-  gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
+static void first_frame_cb(FlView* view, MyApplication* self) {
+  GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(view));
+  if (self->multi_monitor_mode && GTK_WINDOW(toplevel) == self->primary_window &&
+      self->primary_monitor == nullptr) {
+    return;
+  }
+  gtk_widget_show(toplevel);
 }
 
 static gboolean focus_in_cb(FlView* view, GdkEventFocus* event,
@@ -55,10 +61,16 @@ static GtkWindow* create_window(MyApplication* self, GdkMonitor* monitor) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(self)));
 
-  gtk_window_set_title(window, "Akari Greeter");
-  // The greeter owns the whole display; compositor border rules cannot remove
-  // a GTK client-side header. Windowed previews use the desktop's own scale.
-  gtk_window_set_decorated(window, FALSE);
+  const gchar* custom_title = g_getenv("AKARI_WINDOW_TITLE");
+  gtk_window_set_title(
+      window, (custom_title != nullptr && custom_title[0] != '\0')
+                  ? custom_title
+                  : "Akari Greeter");
+  const gboolean is_windowed =
+      g_strcmp0(g_getenv("AKARI_WINDOW_MODE"), "windowed") == 0;
+  // Fullscreen greeter windows own the whole display without GTK client-side
+  // headers; windowed previews and Theme Studio retain native OS decorations.
+  gtk_window_set_decorated(window, is_windowed);
   if (monitor == nullptr) {
     gtk_window_set_default_size(window, 1280, 720);
   } else {
@@ -93,8 +105,9 @@ static GtkWindow* create_window(MyApplication* self, GdkMonitor* monitor) {
 
   // Show the window when Flutter renders.
   // Requires the view to be realized so we can start rendering.
-  g_signal_connect(view, "first-frame", G_CALLBACK(first_frame_cb), nullptr);
-  if (monitor != nullptr) {
+  g_signal_connect_object(view, "first-frame", G_CALLBACK(first_frame_cb), self,
+                          G_CONNECT_DEFAULT);
+  if (self->multi_monitor_mode) {
     g_signal_connect_object(view, "focus-in-event", G_CALLBACK(focus_in_cb),
                             self, G_CONNECT_DEFAULT);
   }
@@ -123,10 +136,29 @@ static void monitor_added_cb(GdkDisplay* display, GdkMonitor* monitor,
     self->primary_monitor = monitor;
     fullscreen_on_monitor(window, monitor);
     gtk_widget_show(GTK_WIDGET(window));
+    gtk_window_present(window);
+    GtkWidget* child = gtk_bin_get_child(GTK_BIN(window));
+    if (child != nullptr) {
+      gtk_widget_grab_focus(child);
+    }
   } else {
     window = create_window(self, monitor);
   }
   g_hash_table_insert(self->monitor_windows, g_object_ref(monitor), window);
+}
+
+static gboolean any_surviving_window_has_focus(MyApplication* self,
+                                               GtkWindow* excluded) {
+  GHashTableIter iterator;
+  gpointer key, value;
+  g_hash_table_iter_init(&iterator, self->monitor_windows);
+  while (g_hash_table_iter_next(&iterator, &key, &value)) {
+    GtkWindow* candidate = GTK_WINDOW(value);
+    if (candidate != excluded && gtk_window_has_toplevel_focus(candidate)) {
+      return TRUE;
+    }
+  }
+  return FALSE;
 }
 
 static void monitor_removed_cb(GdkDisplay* display, GdkMonitor* monitor,
@@ -140,6 +172,7 @@ static void monitor_removed_cb(GdkDisplay* display, GdkMonitor* monitor,
           window == self->primary_window, gdk_display_get_n_monitors(display));
   g_hash_table_remove(self->monitor_windows, monitor);
   GtkWindow* promoted_primary = nullptr;
+  gboolean should_restore_focus = FALSE;
   if (window == self->primary_window) {
     // Keep the implicit view alive: it owns the app root and engine lifecycle.
     // Replace a surviving output's secondary window with this primary window.
@@ -152,6 +185,8 @@ static void monitor_removed_cb(GdkDisplay* display, GdkMonitor* monitor,
     GdkMonitor* replacement = gdk_display_get_monitor(display, 0);
     GtkWindow* secondary =
         GTK_WINDOW(g_hash_table_lookup(self->monitor_windows, replacement));
+    should_restore_focus =
+        !any_surviving_window_has_focus(self, secondary);
     if (secondary != nullptr) {
       gtk_widget_destroy(GTK_WIDGET(secondary));
     }
@@ -170,7 +205,7 @@ static void monitor_removed_cb(GdkDisplay* display, GdkMonitor* monitor,
   while (g_hash_table_iter_next(&iterator, &key, &value)) {
     fullscreen_on_monitor(GTK_WINDOW(value), GDK_MONITOR(key));
   }
-  if (promoted_primary != nullptr) {
+  if (promoted_primary != nullptr && should_restore_focus) {
     gtk_window_present(promoted_primary);
     GtkWidget* child = gtk_bin_get_child(GTK_BIN(promoted_primary));
     if (child != nullptr) {
@@ -195,6 +230,7 @@ static void my_application_activate(GApplication* application) {
     return;
   }
 
+  self->multi_monitor_mode = TRUE;
   GdkDisplay* display = gdk_display_get_default();
   if (!self->monitor_signals_connected) {
     self->monitor_signals_connected = TRUE;
@@ -205,7 +241,14 @@ static void my_application_activate(GApplication* application) {
                             G_CALLBACK(monitor_removed_cb), self,
                             G_CONNECT_DEFAULT);
   }
-  for (int index = 0; index < gdk_display_get_n_monitors(display); index++) {
+  const int monitor_count = gdk_display_get_n_monitors(display);
+  if (monitor_count == 0) {
+    // Park an unshown primary window so GApplication stays alive and starts
+    // the Dart engine while waiting for the first monitor hotplug event.
+    gtk_widget_hide(GTK_WIDGET(create_window(self, nullptr)));
+    return;
+  }
+  for (int index = 0; index < monitor_count; index++) {
     monitor_added_cb(display, gdk_display_get_monitor(display, index), self);
   }
 }
@@ -216,7 +259,10 @@ static gboolean my_application_local_command_line(GApplication* application,
                                                   int* exit_status) {
   MyApplication* self = MY_APPLICATION(application);
   // Strip out the first argument as it is the binary name.
-  self->dart_entrypoint_arguments = g_strdupv(*arguments + 1);
+  self->dart_entrypoint_arguments =
+      (*arguments != nullptr && (*arguments)[0] != nullptr)
+          ? g_strdupv(*arguments + 1)
+          : g_new0(gchar*, 1);
 
   g_autoptr(GError) error = nullptr;
   if (!g_application_register(application, nullptr, &error)) {

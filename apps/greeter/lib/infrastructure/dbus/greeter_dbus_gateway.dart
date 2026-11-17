@@ -22,14 +22,23 @@ class DBusGreeterGateway implements GreeterGateway {
   }) : _clientFactory = clientFactory ?? DBusClient.session,
        _signalStreamFactory = signalStreamFactory ?? _createSignalStream,
        _events = StreamController<GreeterEvent>.broadcast() {
-    _connection = _connect();
+    _connection = _tryConnect();
   }
 
   final DBusClientFactory _clientFactory;
   final DBusSignalStreamFactory _signalStreamFactory;
   final StreamController<GreeterEvent> _events;
-  late _DBusConnection _connection;
+  _DBusConnection? _connection;
+  Future<void>? _reconnecting;
   bool _closed = false;
+
+  _DBusConnection? _tryConnect() {
+    try {
+      return _connect();
+    } on Object {
+      return null;
+    }
+  }
 
   static Stream<DBusSignal> _createSignalStream(DBusClient client) =>
       DBusSignalStream(
@@ -81,7 +90,7 @@ class DBusGreeterGateway implements GreeterGateway {
 
   @override
   Future<BackendStateSnapshot> getState() async {
-    if (!_closed && _connection.disconnected) {
+    if (!_closed && (_connection == null || _connection!.disconnected)) {
       await _reconnect();
     }
     final response = await _call(
@@ -143,6 +152,7 @@ class DBusGreeterGateway implements GreeterGateway {
       'Respond',
       errorKind: GreeterErrorKind.authentication,
       values: [DBusString(attemptId), DBusString(response)],
+      replySignature: DBusSignature(''),
     );
   }
 
@@ -152,6 +162,7 @@ class DBusGreeterGateway implements GreeterGateway {
       'Cancel',
       errorKind: GreeterErrorKind.authentication,
       values: [DBusString(attemptId)],
+      replySignature: DBusSignature(''),
     );
   }
 
@@ -161,6 +172,7 @@ class DBusGreeterGateway implements GreeterGateway {
       'StartSession',
       errorKind: GreeterErrorKind.session,
       values: [DBusString(attemptId), DBusString(sessionId)],
+      replySignature: DBusSignature(''),
     );
   }
 
@@ -170,6 +182,7 @@ class DBusGreeterGateway implements GreeterGateway {
       'PowerAction',
       errorKind: GreeterErrorKind.power,
       values: [DBusString(_getPowerActionName(action))],
+      replySignature: DBusSignature(''),
     );
   }
 
@@ -181,10 +194,10 @@ class DBusGreeterGateway implements GreeterGateway {
     GreeterErrorKind errorKind = GreeterErrorKind.transport,
     DBusSignature? replySignature,
   }) async {
-    if (_closed) {
+    final connection = _connection;
+    if (_closed || connection == null) {
       throw const GreeterGatewayException(serviceUnavailableMessage);
     }
-    final connection = _connection;
     try {
       return await connection.object.callMethod(
         _interfaceName,
@@ -245,15 +258,21 @@ class DBusGreeterGateway implements GreeterGateway {
     }
   }
 
-  Future<void> _reconnect() async {
-    final previous = _connection;
-    previous.disconnected = true;
-    await _closeConnection(previous);
-    if (_closed) {
-      return;
+  Future<void> _reconnect() => _reconnecting ??= () async {
+    try {
+      final previous = _connection;
+      if (previous != null) {
+        previous.disconnected = true;
+        await _closeConnection(previous);
+      }
+      if (_closed) {
+        return;
+      }
+      _connection = _tryConnect();
+    } finally {
+      _reconnecting = null;
     }
-    _connection = _connect();
-  }
+  }();
 
   Future<void> _closeConnection(_DBusConnection connection) async {
     await connection.signalSubscription.cancel();
@@ -339,7 +358,10 @@ class DBusGreeterGateway implements GreeterGateway {
       return;
     }
     _closed = true;
-    await _closeConnection(_connection);
+    final connection = _connection;
+    if (connection != null) {
+      await _closeConnection(connection);
+    }
     await _events.close();
   }
 }

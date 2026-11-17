@@ -13,6 +13,8 @@ class FileSessionStore implements SessionStore {
   Future<void> _pendingWrite = Future<void>.value();
   static int _nextTempId = 0;
 
+  static const _maxPreferenceBytes = 64 * 1024;
+
   @override
   Future<String?> findSelectedSessionId() async {
     final file = _file;
@@ -20,6 +22,12 @@ class FileSessionStore implements SessionStore {
       return null;
     }
     try {
+      final stat = await file.stat();
+      if (stat.type != FileSystemEntityType.file ||
+          stat.size > _maxPreferenceBytes ||
+          await FileSystemEntity.isLink(file.path)) {
+        return null;
+      }
       return switch (jsonDecode(await file.readAsString())) {
         {'sessionId': final String id} when id.isNotEmpty => id,
         _ => null,
@@ -75,9 +83,9 @@ class FileSessionStore implements SessionStore {
     final stateHome = Platform.environment['XDG_STATE_HOME'];
     final home = Platform.environment['HOME'];
     final String base;
-    if (stateHome != null && stateHome.isNotEmpty) {
+    if (stateHome != null && stateHome.startsWith('/')) {
       base = stateHome;
-    } else if (home != null && home.isNotEmpty) {
+    } else if (home != null && home.startsWith('/')) {
       base = '$home/.local/state';
     } else {
       return null;
