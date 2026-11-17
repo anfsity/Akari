@@ -609,6 +609,40 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         radius: 0.5,
       ),
       themeMode: _preferences.themeMode,
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        final colors = theme.colorScheme;
+        return ComponentTheme<OutlineButtonTheme>(
+          data: OutlineButtonTheme(
+            decoration: (context, states, decoration) =>
+                (decoration as BoxDecoration).copyWith(
+                  color:
+                      states.contains(WidgetState.hovered) ||
+                          states.contains(WidgetState.pressed)
+                      ? colors.accent
+                      : colors.background,
+                ),
+          ),
+          child: ComponentTheme<SliderTheme>(
+            data: SliderTheme(
+              trackHeight: 4,
+              trackColor: colors.muted,
+              thumbColor: colors.background,
+              thumbBorderColor: colors.primary.withValues(alpha: .5),
+              thumbFocusedBorderColor: colors.primary,
+              thumbSize: 16,
+            ),
+            child: ComponentTheme<ScrollbarTheme>(
+              data: ScrollbarTheme(
+                thickness: 4 * theme.scaling,
+                color: colors.mutedForeground.withValues(alpha: .35),
+                radius: const Radius.circular(8),
+              ),
+              child: child!,
+            ),
+          ),
+        );
+      },
       home: Builder(builder: _buildWorkspace),
     );
   }
