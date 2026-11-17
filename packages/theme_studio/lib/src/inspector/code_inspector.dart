@@ -22,6 +22,80 @@ class _CodeInspectorState extends State<CodeInspector> {
   _CodeFormat _format = _CodeFormat.json;
   bool _wholeScene = false;
 
+  Widget _buildSegmentedControl<T>({
+    required BuildContext context,
+    required T value,
+    required List<T> values,
+    required String Function(T) getLabel,
+    required ValueChanged<T> onChanged,
+  }) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.muted.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(theme.radiusMd),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(2),
+        child: Row(
+          spacing: 2,
+          children: [
+            for (final option in values)
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  selected: value == option,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onChanged(option),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        curve: Curves.easeOut,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
+                        ),
+                        alignment: Alignment.center,
+                        decoration: value == option
+                            ? BoxDecoration(
+                                color: colors.background,
+                                borderRadius: BorderRadius.circular(
+                                  (theme.radiusMd - 2).clamp(
+                                    0,
+                                    double.infinity,
+                                  ),
+                                ),
+                                border: Border.all(
+                                  color: colors.border.withValues(alpha: 0.6),
+                                ),
+                              )
+                            : null,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: value == option
+                              ? Text(
+                                  getLabel(option),
+                                  maxLines: 1,
+                                ).xSmall().medium()
+                              : Text(
+                                  getLabel(option),
+                                  maxLines: 1,
+                                ).xSmall().muted(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.editor,
@@ -41,75 +115,57 @@ class _CodeInspectorState extends State<CodeInspector> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 2,
+              spacing: 10,
               children: [
-                Text(
-                  node?.id ?? 'No selection',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ).small().semiBold(),
-                Text(
-                  node == null
-                      ? 'Whole scene'
-                      : '${node.componentId} · '
-                            '${(node.rect.width * canvas.referenceWidth).toStringAsFixed(1)} × '
-                            '${(node.rect.height * canvas.referenceHeight).toStringAsFixed(1)} px',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ).xSmall().muted(),
-              ],
-            ),
-          ),
-          const Divider(),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 6,
-              children: [
-                Row(
-                  spacing: 4,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: 2,
                   children: [
-                    for (final format in _CodeFormat.values)
-                      Expanded(
-                        child: Button(
-                          style: _format == format
-                              ? const ButtonStyle.secondary(
-                                  density: ButtonDensity.dense,
-                                )
-                              : const ButtonStyle.ghost(
-                                  density: ButtonDensity.dense,
-                                ),
-                          onPressed: () => setState(() => _format = format),
-                          child: Text(
-                            format == _CodeFormat.json ? 'JSON' : 'Dart',
-                          ).small(),
-                        ),
-                      ),
+                    Text(
+                      node?.id ?? 'No selection',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ).small().semiBold(),
+                    Text(
+                      node == null
+                          ? 'Whole scene'
+                          : '${node.componentId} · '
+                                '${(node.rect.width * canvas.referenceWidth).toStringAsFixed(1)} × '
+                                '${(node.rect.height * canvas.referenceHeight).toStringAsFixed(1)} px',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ).xSmall().muted(),
                   ],
                 ),
                 Row(
-                  spacing: 4,
+                  spacing: 8,
                   children: [
-                    for (final wholeScene in [false, true])
-                      Expanded(
-                        child: Button(
-                          style: _wholeScene == wholeScene
-                              ? const ButtonStyle.secondary(
-                                  density: ButtonDensity.dense,
-                                )
-                              : const ButtonStyle.ghost(
-                                  density: ButtonDensity.dense,
-                                ),
-                          onPressed: () =>
-                              setState(() => _wholeScene = wholeScene),
-                          child: Text(wholeScene ? 'Scene' : 'Selection')
-                              .small(),
-                        ),
+                    Expanded(
+                      flex: 4,
+                      child: _buildSegmentedControl<_CodeFormat>(
+                        context: context,
+                        value: _format,
+                        values: _CodeFormat.values,
+                        getLabel: (format) =>
+                            format == _CodeFormat.json ? 'JSON' : 'Dart',
+                        onChanged: (format) => setState(() => _format = format),
                       ),
+                    ),
+                    Expanded(
+                      flex: 5,
+                      child: _buildSegmentedControl<bool>(
+                        context: context,
+                        value: _wholeScene,
+                        values: const [false, true],
+                        getLabel: (wholeScene) =>
+                            wholeScene ? 'Scene' : 'Selection',
+                        onChanged: (wholeScene) =>
+                            setState(() => _wholeScene = wholeScene),
+                      ),
+                    ),
                   ],
                 ),
               ],
