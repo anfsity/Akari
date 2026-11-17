@@ -11,6 +11,8 @@
 !/analysis_options.yaml
 !/LICENSE
 !/dartdoc_options.yaml
+!/pubspec.yaml
+!/pubspec.lock
 
 # Flutter/Dart application code and tests.
 !/apps/

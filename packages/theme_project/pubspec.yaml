@@ -1,6 +1,7 @@
 name: theme_project
 description: Shared project naming, scene discovery, and independent theme synthesis.
 publish_to: none
+resolution: workspace
 
 environment:
   sdk: ^3.13.2

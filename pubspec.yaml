@@ -1,0 +1,30 @@
+name: akari_workspace
+description: Monorepo workspace for Akari greeter, packages, and built-in themes.
+publish_to: none
+
+environment:
+  sdk: ^3.13.2
+
+workspace:
+  - apps/greeter
+  - packages/akari_cli
+  - packages/greeter_components
+  - packages/greeter_harness
+  - packages/greeter_ui
+  - packages/scene
+  - packages/scene_codegen
+  - packages/scene_schema
+  - packages/theme_project
+  - packages/theme_sdk
+  - packages/theme_studio
+  - themes/default
+  - themes/fallback
+  - themes/preset1
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+# Flutter 3.47 pins test_api 0.7.12 (test 1.31.1), whose analyzer <14.0.0 bound
+# predates analyzer 14 required by build_runner 2.16 and theme_project.
+dependency_overrides:
+  analyzer: ^14.6.0

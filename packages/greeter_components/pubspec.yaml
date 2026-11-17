@@ -1,6 +1,7 @@
 name: greeter_components
 description: Reusable visual components for compiled Akari greeter themes.
 publish_to: none
+resolution: workspace
 
 environment:
   sdk: ^3.13.2

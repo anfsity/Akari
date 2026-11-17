@@ -109,7 +109,7 @@ bool _isWithinAny(TimelineEvent event, List<TimelineEvent> scopes) {
   );
 }
 
-List<TimelineEvent> readDartTimelineEvents(List traceEvents) {
+List<TimelineEvent> readDartTimelineEvents(List<Object?> traceEvents) {
   // Traces may contain nested begin/end pairs or complete duration events.
   // Separate stacks by process/thread so scopes cannot close another thread's
   // event when names repeat during concurrent rendering work.

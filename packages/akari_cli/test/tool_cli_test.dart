@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:test/test.dart';
 
@@ -54,8 +55,8 @@ runDirectory: 'run',
 ''');
     final result = await Process.run('python3', [
       '${_repoRoot.path}/test/probes/interactive_run_probe.py',
-      '${_repoRoot.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
-      '--packages=${_repoRoot.path}/packages/akari_cli/.dart_tool/package_config.json',
+      Platform.resolvedExecutable,
+      '--packages=${Isolate.packageConfigSync!.toFilePath()}',
       runner.path,
     ], workingDirectory: tempRoot.path);
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
@@ -77,8 +78,8 @@ runDirectory: 'run',
         '2',
         '--dry-run',
       ]);
-      expect(result.exitCode, 0, reason: result.stderr);
-      final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
       expect(plan['command'], 'run studio');
       final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
       expect(steps.map((step) => step['id']), isNot(contains('backend.build')));
@@ -231,8 +232,8 @@ runDirectory: 'run',
         '3',
         '--dry-run',
       ]);
-      expect(result.exitCode, 0, reason: result.stderr);
-      final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
       expect(plan['command'], 'build');
       final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
       expect(steps.first['command'], containsAll(['--jobs', '3']));
@@ -269,8 +270,8 @@ runDirectory: 'run',
         '--help',
         r'$(touch unexpected)',
       ]);
-      expect(result.exitCode, 0, reason: result.stderr);
-      final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
       expect(plan['command'], alias == 'perf' ? 'verify-perf' : 'trace-perf');
       expect(
         (plan['steps'] as List).last['command'],
@@ -498,8 +499,8 @@ sys.exit(1)
       '2',
       '--dry-run',
     ]);
-    expect(result.exitCode, 0, reason: result.stderr);
-    final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+    expect(result.exitCode, 0, reason: '${result.stderr}');
+    final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
     final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
     final backend = steps.singleWhere((step) => step['id'] == 'backend.build');
     expect(
@@ -530,8 +531,8 @@ sys.exit(1)
         project.path,
         '--dry-run',
       ]);
-      expect(result.exitCode, 0, reason: result.stderr);
-      final steps = (jsonDecode(result.stdout)['steps'] as List)
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      final steps = (jsonDecode(result.stdout as String)['steps'] as List)
           .cast<Map<String, dynamic>>();
       expect(
         steps
@@ -625,8 +626,8 @@ sys.exit(1)
       project.path,
       '--dry-run',
     ]);
-    expect(result.exitCode, 0, reason: result.stderr);
-    final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+    expect(result.exitCode, 0, reason: '${result.stderr}');
+    final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
     final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
     expect(steps.first['working_directory'], project.path);
     expect(steps[1]['id'], 'scenes.generate_theme_ocean');
@@ -677,8 +678,8 @@ sys.exit(1)
           scenario,
           '--dry-run',
         ]);
-        expect(result.exitCode, 0, reason: result.stderr);
-        final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+        expect(result.exitCode, 0, reason: '${result.stderr}');
+        final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
         final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
         expect(
           steps.map((step) => step['id']),
@@ -723,7 +724,7 @@ fi
 exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
 ''');
     final chmod = await Process.run('chmod', ['+x', flutter.path, dart.path]);
-    expect(chmod.exitCode, 0, reason: chmod.stderr);
+    expect(chmod.exitCode, 0, reason: '${chmod.stderr}');
     final result = await _runTool(
       ['preview', '--theme', project.path, '--format', 'json'],
       environment: {
@@ -731,8 +732,8 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         'AKARI_DART_BIN': dart.path,
       },
     );
-    expect(result.exitCode, 0, reason: result.stderr);
-    final report = jsonDecode(result.stdout) as Map<String, dynamic>;
+    expect(result.exitCode, 0, reason: '${result.stderr}');
+    final report = jsonDecode(result.stdout as String) as Map<String, dynamic>;
     final runDirectory = Directory(
       '${_repoRoot.path}/${report['artifacts']['run_directory']}',
     );
@@ -788,8 +789,8 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         ['generate-scenes', '--theme', theme.path, '--format', 'json'],
         environment: {'AKARI_DART_BIN': fakeDart.path},
       );
-      expect(result.exitCode, 0, reason: result.stderr);
-      final report = jsonDecode(result.stdout) as Map<String, dynamic>;
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      final report = jsonDecode(result.stdout as String) as Map<String, dynamic>;
       expect(report['command'], 'generate-scenes');
       expect(report['status'], 'passed');
       final runDirectory =
@@ -829,8 +830,8 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         },
       );
 
-      expect(result.exitCode, 0, reason: result.stderr);
-      final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
       expect(plan['dry_run'], isTrue);
       expect(
         (plan['artifacts'] as Map<String, dynamic>).containsKey('events'),
@@ -894,9 +895,9 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         environment: {'AKARI_FLUTTER_BIN': flutterBin},
         unsetEnvironmentVariables: {'AKARI_DART_BIN'},
       );
-      expect(derivedDartResult.exitCode, 0, reason: derivedDartResult.stderr);
+      expect(derivedDartResult.exitCode, 0, reason: '${derivedDartResult.stderr}');
       final derivedDartPlan =
-          jsonDecode(derivedDartResult.stdout) as Map<String, dynamic>;
+          jsonDecode(derivedDartResult.stdout as String) as Map<String, dynamic>;
       final firstStep =
           ((derivedDartPlan['steps'] as List).first as Map<String, dynamic>);
       expect(
@@ -928,8 +929,8 @@ perf:
           r'$(touch unexpected)',
           '--help',
         ]);
-        expect(result.exitCode, 0, reason: result.stderr);
-        final plan = jsonDecode(result.stdout) as Map<String, dynamic>;
+        expect(result.exitCode, 0, reason: '${result.stderr}');
+        final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
         final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
         expect(steps.map((step) => step['id']), [
           'theme.pub_get',
@@ -1011,8 +1012,8 @@ sys.exit(int(sys.argv[1]))
               'AKARI_FLUTTER_BIN': sdk.path,
             },
           );
-          expect(result.exitCode, code, reason: result.stderr);
-          final report = jsonDecode(result.stdout) as Map<String, dynamic>;
+          expect(result.exitCode, code, reason: '${result.stderr}');
+          final report = jsonDecode(result.stdout as String) as Map<String, dynamic>;
           final runDirectory = Directory(
             '${_repoRoot.path}/${report['artifacts']['run_directory']}',
           );
@@ -1080,8 +1081,8 @@ perf:
           'AKARI_FLUTTER_BIN': sdk.path,
         },
       );
-      expect(result.exitCode, code == 0 ? 1 : code, reason: result.stderr);
-      final report = jsonDecode(result.stdout) as Map<String, dynamic>;
+      expect(result.exitCode, code == 0 ? 1 : code, reason: '${result.stderr}');
+      final report = jsonDecode(result.stdout as String) as Map<String, dynamic>;
       final runDirectory = Directory(
         '${_repoRoot.path}/${report['artifacts']['run_directory']}',
       );

@@ -273,11 +273,13 @@ void _printActionResponseSummary(Map<String, dynamic> phases) {
 void _printPhaseSummary(Map<String, dynamic> phases) {
   final entries = phases.entries.toList()
     ..sort((left, right) {
-      final leftSpan = left.value is Map<String, dynamic>
-          ? findOptionalNumber(left.value, 'p95_total_span_ms') ?? 0
+      final leftValue = left.value;
+      final rightValue = right.value;
+      final leftSpan = leftValue is Map<String, dynamic>
+          ? findOptionalNumber(leftValue, 'p95_total_span_ms') ?? 0
           : 0;
-      final rightSpan = right.value is Map<String, dynamic>
-          ? findOptionalNumber(right.value, 'p95_total_span_ms') ?? 0
+      final rightSpan = rightValue is Map<String, dynamic>
+          ? findOptionalNumber(rightValue, 'p95_total_span_ms') ?? 0
           : 0;
       return rightSpan.compareTo(leftSpan);
     });

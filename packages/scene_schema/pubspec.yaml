@@ -1,6 +1,7 @@
 name: scene_schema
 description: Flutter-free scene model and JSON codec for Akari scene documents.
 publish_to: none
+resolution: workspace
 
 environment:
   sdk: ^3.13.2

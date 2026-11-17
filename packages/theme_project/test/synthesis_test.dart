@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
 import 'package:scene_codegen/scene_codegen.dart';
@@ -332,7 +333,7 @@ ThemeDefinition buildOriginalTheme({Color? seed, SceneDocument? document}) => th
       "${generated.replaceAll('package:scene/scene.dart', 'package:scene_schema/scene_schema.dart')}\nvoid main() { print(encodeSceneDocument(${getSceneDocumentVariableName(_document.id)})); }\n",
     );
     final run = await Process.run(Platform.resolvedExecutable, [
-      '--packages=${File('.dart_tool/package_config.json').absolute.path}',
+      '--packages=${Isolate.packageConfigSync!.toFilePath()}',
       script.path,
     ]);
     expect(run.exitCode, 0, reason: '${run.stdout}\n${run.stderr}');

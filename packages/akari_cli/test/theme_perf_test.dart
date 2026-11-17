@@ -80,9 +80,9 @@ void main() {
       await outside.writeAsString('outside');
       await Link('${output.path}/outside-link').create(outside.path);
       final manifest = File('${output.path}/result.json');
-      for (final result in [
-        {'version': 2, 'artifacts': []},
-        {'version': 1, 'artifacts': {}},
+      for (final result in <Map<String, Object?>>[
+        {'version': 2, 'artifacts': <Object?>[]},
+        {'version': 1, 'artifacts': <String, Object?>{}},
         {
           'version': 1,
           'artifacts': [42],

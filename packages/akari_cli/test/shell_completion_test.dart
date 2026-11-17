@@ -33,7 +33,7 @@ _akari
 printf '%s\\0' "\${COMPREPLY[@]}"
 ''',
     ], workingDirectory: temp.path);
-    expect(result.exitCode, 0, reason: result.stderr);
+    expect(result.exitCode, 0, reason: '${result.stderr}');
     return (result.stdout as String)
         .split('\x00')
         .where((word) => word.isNotEmpty)
@@ -214,7 +214,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       completion.path,
       temp.path,
     ]);
-    expect(result.exitCode, 0, reason: result.stderr);
+    expect(result.exitCode, 0, reason: '${result.stderr}');
     final buffers = (jsonDecode(result.stdout as String) as List)
         .cast<String>();
     expect(buffers.map((value) => value.trimRight()).take(5), [
@@ -272,17 +272,14 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       '${prefix.path}/bin/akari',
       ['build', '-t', 'relative theme', '-m', 'debug', '--dry-run'],
       workingDirectory: temp.path,
-      environment: {
-        'AKARI_DART_BIN':
-            '${_repoRoot.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
-      },
+      environment: {'AKARI_DART_BIN': Platform.resolvedExecutable},
     );
-    expect(result.exitCode, 0, reason: result.stderr);
+    expect(result.exitCode, 0, reason: '${result.stderr}');
     final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
     expect(plan['command'], 'build');
     expect(
       (plan['steps'] as List).singleWhere(
-        (step) => step['id'] == 'theme.pub_get',
+        (step) => (step as Map<String, dynamic>)['id'] == 'theme.pub_get',
       )['working_directory'],
       project.path,
     );
@@ -290,24 +287,27 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       '${prefix.path}/bin/akari',
       ['run', 'studio', '-t', 'relative theme', '--dry-run'],
       workingDirectory: temp.path,
-      environment: {
-        'AKARI_DART_BIN':
-            '${_repoRoot.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
-      },
+      environment: {'AKARI_DART_BIN': Platform.resolvedExecutable},
     );
-    expect(studio.exitCode, 0, reason: studio.stderr);
+    expect(studio.exitCode, 0, reason: '${studio.stderr}');
     final studioPlan =
         jsonDecode(studio.stdout as String) as Map<String, dynamic>;
     expect(studioPlan['command'], 'run studio');
-    expect((studioPlan['steps'] as List).last['id'], 'theme.studio');
-    expect(studioPlan['artifacts']['host_project'], endsWith('/studio'));
+    expect(
+      ((studioPlan['steps'] as List).last as Map<String, dynamic>)['id'],
+      'theme.studio',
+    );
+    expect(
+      (studioPlan['artifacts'] as Map<String, dynamic>)['host_project'],
+      endsWith('/studio'),
+    );
     final activation = await Process.run('bash', [
       '--noprofile',
       '--norc',
       '-c',
       '. ${_quote(rc.path)}; command -v akari; complete -p akari',
     ]);
-    expect(activation.exitCode, 0, reason: activation.stderr);
+    expect(activation.exitCode, 0, reason: '${activation.stderr}');
     expect(activation.stdout, contains('${prefix.path}/bin/akari'));
     expect(activation.stdout, contains('-F _akari akari'));
   });
@@ -330,14 +330,14 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       ],
       environment: {'HOME': temp.path, 'ZDOTDIR': temp.path},
     );
-    expect(result.exitCode, 0, reason: result.stderr);
+    expect(result.exitCode, 0, reason: '${result.stderr}');
     expect(result.stdout, contains('_akari'));
     expect(result.stdout, contains('${prefix.path}/bin/akari'));
     for (final shell in ['bash', 'zsh']) {
       final file = File('${temp.path}/syntax.$shell');
       await file.writeAsString(getShellCompletion(shell));
       final check = await Process.run(shell, ['-n', file.path]);
-      expect(check.exitCode, 0, reason: check.stderr);
+      expect(check.exitCode, 0, reason: '${check.stderr}');
     }
   });
 

@@ -28,9 +28,9 @@ void main() {
   });
 
   test('corrupt and conflicting bindings fail at the storage boundary', () {
-    for (final value in [
-      {'keys': {}, 'panButton': kPrimaryMouseButton, 'wheelModifier': 'control'},
-      {'keys': {}, 'panButton': kMiddleMouseButton, 'wheelModifier': 'unknown'},
+    for (final value in <Map<String, Object?>>[
+      {'keys': <String, Object?>{}, 'panButton': kPrimaryMouseButton, 'wheelModifier': 'control'},
+      {'keys': <String, Object?>{}, 'panButton': kMiddleMouseButton, 'wheelModifier': 'unknown'},
       {'keys': {'unknown': null}, 'panButton': kMiddleMouseButton, 'wheelModifier': 'control'},
       StudioInputBindings(overrides: {StudioCommand.move: StudioCommand.save.defaultBinding}).encode(),
     ]) {

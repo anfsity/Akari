@@ -275,8 +275,8 @@ void main() {
   });
 
   test('theme selections validate their external shape', () {
-    for (final value in [
-      [],
+    for (final value in <Object?>[
+      <Object?>[],
       'nord',
       {'palette': 12},
       {'palette': null},

@@ -188,7 +188,7 @@ Future<String> _getPhysicalTarget(Directory destination) async {
   return p.joinAll([await parent.resolveSymbolicLinks(), ...missing.reversed]);
 }
 
-Set<String> _getSourceRoots(Map manifest) {
+Set<String> _getSourceRoots(Map<Object?, Object?> manifest) {
   final roots = {
     'lib',
     'assets',
@@ -272,7 +272,10 @@ class _SourceCopier {
   final String sourceName;
   final String targetName;
 
-  Future<void> copyProject(Directory staging, Map manifest) async {
+  Future<void> copyProject(
+    Directory staging,
+    Map<Object?, Object?> manifest,
+  ) async {
     final roots = _getSourceRoots(manifest);
     await for (final entry in Directory(sourceRoot).list(followLinks: false)) {
       final name = p.basename(entry.path);
@@ -430,7 +433,7 @@ Future<Map<String, String>> _copyReferencedAssets(
 
 String _getProjectManifest(
   String manifestText,
-  Map manifest,
+  Map<Object?, Object?> manifest,
   String sourceRoot,
   String target,
   String packageName,
@@ -439,6 +442,9 @@ String _getProjectManifest(
 ) {
   final yaml = YamlEditor(manifestText);
   yaml.update(['name'], packageName);
+  if (manifest.containsKey('resolution')) {
+    yaml.remove(['resolution']);
+  }
   for (final section in [
     'dependencies',
     'dev_dependencies',

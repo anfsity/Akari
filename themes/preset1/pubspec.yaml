@@ -1,6 +1,7 @@
 name: theme_preset1
 description: Hand-painted life and death scene with dispersed greeter controls.
 publish_to: none
+resolution: workspace
 
 environment:
   sdk: ^3.13.2

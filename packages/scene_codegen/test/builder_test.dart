@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:scene_codegen/scene_codegen.dart';
 import 'package:scene_schema/scene_schema.dart';
@@ -89,7 +90,7 @@ void main() {
 }
 ''');
     final result = await Process.run(Platform.resolvedExecutable, [
-      '--packages=${File('.dart_tool/package_config.json').absolute.path}',
+      '--packages=${Isolate.packageConfigSync!.toFilePath()}',
       script.path,
     ]);
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');

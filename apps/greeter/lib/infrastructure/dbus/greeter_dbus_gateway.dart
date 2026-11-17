@@ -60,27 +60,25 @@ class DBusGreeterGateway implements GreeterGateway {
     // One stream keeps Prompt and StateChanged in the order the backend emitted
     // them. Per-signal streams can interleave, letting a stale PromptPending
     // arrive after the Prompt and reset the credential field to a waiting state.
-    final signalSubscription = _signalStreamFactory(client).listen(
-      (signal) => _onSignal(connection, signal),
-      onError: (Object error, StackTrace stackTrace) =>
-          _handleDisconnection(connection),
-      onDone: () => _handleDisconnection(connection),
-    );
-    final nameOwnerSubscription = client.nameOwnerChanged.listen(
-      (event) {
-        if (event.name == _busName && (event.newOwner?.isEmpty ?? true)) {
-          _handleDisconnection(connection);
-        }
-      },
-      onError: (Object error, StackTrace stackTrace) =>
-          _handleDisconnection(connection),
-      onDone: () => _handleDisconnection(connection),
-    );
     connection = _DBusConnection(
       client: client,
       object: object,
-      signalSubscription: signalSubscription,
-      nameOwnerSubscription: nameOwnerSubscription,
+      signalSubscription: _signalStreamFactory(client).listen(
+        (signal) => _onSignal(connection, signal),
+        onError: (Object error, StackTrace stackTrace) =>
+            _handleDisconnection(connection),
+        onDone: () => _handleDisconnection(connection),
+      ),
+      nameOwnerSubscription: client.nameOwnerChanged.listen(
+        (event) {
+          if (event.name == _busName && (event.newOwner?.isEmpty ?? true)) {
+            _handleDisconnection(connection);
+          }
+        },
+        onError: (Object error, StackTrace stackTrace) =>
+            _handleDisconnection(connection),
+        onDone: () => _handleDisconnection(connection),
+      ),
     );
     return connection;
   }

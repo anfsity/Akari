@@ -1,6 +1,7 @@
 name: theme_studio
 description: Scene authoring tools for compiled Akari themes.
 publish_to: none
+resolution: workspace
 
 environment:
   sdk: ^3.13.2

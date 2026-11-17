@@ -244,10 +244,11 @@ SceneShader _decodeShader(Map<String, dynamic> json) {
   final names = <String>{};
   String name(Map<String, dynamic> value) {
     final name = _getString(value, 'name');
-    if (name.trim().isEmpty || !names.add(name))
+    if (name.trim().isEmpty || !names.add(name)) {
       throw const FormatException(
         'Shader binding names must be nonempty and unique.',
       );
+    }
     return name;
   }
 
@@ -588,10 +589,11 @@ List<SceneMotionTrack> _decodeTracks(Map<String, dynamic> json) {
           _getString(track, 'property'),
           'track.property',
         );
-        if (!properties.add(property))
+        if (!properties.add(property)) {
           throw const FormatException(
             'Only one track per property is allowed.',
           );
+        }
         var previous = -1;
         final frames = <SceneKeyframe>[];
         for (final raw in _getList(track, 'keyframes')) {
@@ -620,8 +622,9 @@ List<SceneMotionTrack> _decodeTracks(Map<String, dynamic> json) {
             ),
           );
         }
-        if (frames.isEmpty)
+        if (frames.isEmpty) {
           throw const FormatException('A track requires a keyframe.');
+        }
         return SceneMotionTrack(property: property, keyframes: frames);
       })(),
   ];
@@ -875,16 +878,19 @@ List<SceneBreakpoint> _decodeBreakpoints(Map<String, dynamic> json) {
       (() {
         final rule = _getMapValue(value, 'breakpoints[]');
         final width = _getNonNegative(rule, 'minWidth');
-        if (width > 16384 || !widths.add(width))
+        if (width > 16384 || !widths.add(width)) {
           throw const FormatException(
             'Breakpoints require unique widths in 0..16384.',
           );
-        if (rule['layout'] != null && json['layout'] == null)
+        }
+        if (rule['layout'] != null && json['layout'] == null) {
           throw const FormatException('Only frames can override layout.');
-        if (rule['layout'] == null && rule['sizing'] == null)
+        }
+        if (rule['layout'] == null && rule['sizing'] == null) {
           throw const FormatException(
             'A breakpoint must override layout or sizing.',
           );
+        }
         return SceneBreakpoint(
           minWidth: width,
           layout: rule['layout'] == null

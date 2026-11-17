@@ -23,8 +23,8 @@ void main() {
         '--dry-run',
       ]);
       expect(result.exitCode, 0, reason: '${result.stderr}');
-      final plan = jsonDecode(result.stdout as String) as Map;
-      final steps = (plan['steps'] as List).cast<Map>();
+      final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+      final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
       expect(steps.map((step) => step['id']), [
         'splash.build',
         'splash.preview',

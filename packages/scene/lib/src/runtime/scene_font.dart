@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
@@ -26,7 +28,7 @@ Future<String> registerSceneFont({
       return family;
     } on Object {
       if (identical(_fontLoads[key], pending)) {
-        _fontLoads.remove(key);
+        unawaited(_fontLoads.remove(key));
       }
       rethrow;
     }

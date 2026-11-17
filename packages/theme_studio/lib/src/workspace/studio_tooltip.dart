@@ -37,7 +37,7 @@ class _StudioTooltipState extends State<StudioTooltip> {
 
   void _showTooltip() {
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
-    _controller.show(
+    _controller.show<void>(
       context,
       TooltipConfiguration(
         alignment: widget.above ? Alignment.bottomCenter : Alignment.topCenter,

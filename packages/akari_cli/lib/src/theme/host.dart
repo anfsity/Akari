@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
 import 'project.dart';
@@ -52,6 +53,11 @@ void createThemeHost({
   final platform = loadYaml(
     File('${repoRoot.path}/apps/greeter/pubspec.yaml').readAsStringSync(),
   ) as YamlMap;
+  final dependencyOverrides = _collectDependencyOverrides(
+    repoRoot: repoRoot,
+    platform: platform,
+    themes: themes,
+  );
   final manifest = {
     'name': 'greeter',
     'publish_to': 'none',
@@ -79,6 +85,8 @@ void createThemeHost({
         'flutter_test': {'sdk': 'flutter'},
         'integration_test': {'sdk': 'flutter'},
       },
+    if (dependencyOverrides.isNotEmpty)
+      'dependency_overrides': dependencyOverrides,
   };
   _writeIfChanged(
     File('${output.path}/pubspec.yaml'),
@@ -189,6 +197,14 @@ void _syncDirectory(Directory source, Directory target) {
     if (_flutterGeneratedNames.contains(name)) continue;
     if (entity is Directory) {
       _syncDirectory(entity, Directory('${target.path}/$name'));
+    } else if (entity is Link) {
+      final link = Link('${target.path}/$name');
+      final linkTarget = entity.targetSync();
+      if (!link.existsSync()) {
+        link.createSync(linkTarget);
+      } else if (link.targetSync() != linkTarget) {
+        link.updateSync(linkTarget);
+      }
     } else if (entity is File) {
       final file = File('${target.path}/$name');
       final bytes = entity.readAsBytesSync();
@@ -203,6 +219,66 @@ void _syncDirectory(Directory source, Directory target) {
       entity.deleteSync(recursive: true);
     }
   }
+}
+
+Map<String, Object?> _collectDependencyOverrides({
+  required Directory repoRoot,
+  required YamlMap platform,
+  required List<ThemePackage> themes,
+}) {
+  final merged = <String, Object?>{};
+  void collectFrom(Object? raw, Directory owner) {
+    if (raw is! Map) return;
+    for (final entry in raw.entries) {
+      final key = '${entry.key}';
+      final value = entry.value;
+      if (value is Map && value['path'] is String) {
+        merged[key] = {
+          for (final field in value.entries)
+            '${field.key}': field.key == 'path'
+                ? p.normalize(p.join(owner.path, field.value as String))
+                : _toJsonValue(field.value),
+        };
+      } else {
+        merged[key] = _toJsonValue(value);
+      }
+    }
+  }
+
+  final rootPubspec = File('${repoRoot.path}/pubspec.yaml');
+  if (rootPubspec.existsSync()) {
+    final rootManifest = loadYaml(rootPubspec.readAsStringSync());
+    if (rootManifest is Map) {
+      collectFrom(rootManifest['dependency_overrides'], repoRoot);
+    }
+  }
+  collectFrom(
+    platform['dependency_overrides'],
+    Directory('${repoRoot.path}/apps/greeter'),
+  );
+  for (final theme in themes) {
+    final themePubspec = File('${theme.directory.path}/pubspec.yaml');
+    if (themePubspec.existsSync()) {
+      final themeManifest = loadYaml(themePubspec.readAsStringSync());
+      if (themeManifest is Map) {
+        collectFrom(themeManifest['dependency_overrides'], theme.directory);
+      }
+    }
+  }
+  return merged;
+}
+
+Object? _toJsonValue(Object? value) {
+  if (value is Map) {
+    return {
+      for (final entry in value.entries)
+        '${entry.key}': _toJsonValue(entry.value),
+    };
+  }
+  if (value is List) {
+    return [for (final item in value) _toJsonValue(item)];
+  }
+  return value;
 }
 
 bool _isSameBytes(List<int> source, List<int> target) {

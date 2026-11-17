@@ -1,6 +1,7 @@
 name: greeter_harness
 description: Shared preview journeys and frame/timeline performance tools for Akari.
 publish_to: none
+resolution: workspace
 
 environment:
   sdk: ^3.13.2

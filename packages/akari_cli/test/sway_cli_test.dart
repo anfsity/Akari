@@ -8,6 +8,7 @@ import 'package:akari_cli/src/execution/paths.dart';
 import 'package:akari_cli/src/commands/development.dart';
 import 'package:akari_cli/src/commands/plan.dart';
 import 'package:akari_cli/src/execution/model.dart';
+import 'package:akari_cli/src/sdk_commands.dart';
 import 'package:akari_cli/src/theme/display_profile.dart';
 
 final _repoRoot = findRepositoryRoot();
@@ -19,12 +20,19 @@ void main() {
   });
   tearDown(() => temp.delete(recursive: true));
 
-  Future<ProcessResult> runTool(List<String> arguments) => Process.run(
-    '${_repoRoot.path}/.fvm/flutter_sdk/bin/cache/dart-sdk/bin/dart',
-    ['${_repoRoot.path}/packages/akari_cli/bin/akari.dart', ...arguments],
-    workingDirectory: _repoRoot.path,
-    environment: {'XDG_STATE_HOME': temp.path},
-  );
+  Future<ProcessResult> runTool(List<String> arguments) {
+    final dart = getDartCommand(_repoRoot);
+    return Process.run(
+      dart.first,
+      [
+        ...dart.skip(1),
+        '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
+        ...arguments,
+      ],
+      workingDirectory: _repoRoot.path,
+      environment: {'XDG_STATE_HOME': temp.path},
+    );
+  }
 
   test('Sway plan reuses selected theme, mock backend and private bus without writes', () async {
     final result = await runTool([
@@ -42,12 +50,12 @@ void main() {
       '3',
       '--dry-run',
     ]);
-    expect(result.exitCode, 0, reason: result.stderr);
-    final plan = jsonDecode(result.stdout as String) as Map;
+    expect(result.exitCode, 0, reason: '${result.stderr}');
+    final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
     expect(plan['display']['custom'], true);
     expect(plan['display']['source']['kind'], 'reference');
     expect(plan['display']['outputs'].single['rect']['width'], 1280);
-    final steps = (plan['steps'] as List).cast<Map>();
+    final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
     expect(
       steps.first['command'],
       containsAllInOrder(['--features', 'mock', '--jobs', '3']),
@@ -81,9 +89,9 @@ void main() {
         '--mode=release',
         '--dry-run',
       ]);
-      expect(result.exitCode, 0, reason: result.stderr);
-      final plan = jsonDecode(result.stdout as String) as Map;
-      final steps = plan['steps'] as List;
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+      final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
       expect(steps.first['command'], contains('--release'));
       expect(steps.first['command'], isNot(contains('--features')));
       expect(

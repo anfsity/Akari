@@ -65,7 +65,7 @@ String generateSceneNode(SceneNode node) {
       parentId: ${_encodeDartNullableString(node.parentId)},
       styleToken: ${_encodeDartNullableString(node.styleToken)},
       primitive: ${node.primitive == null ? 'null' : 'ScenePrimitive.${node.primitive!.name}'},
-$assetLine${layoutLine}      sizing: ${_encodeSizing(node.sizing)},
+$assetLine$layoutLine      sizing: ${_encodeSizing(node.sizing)},
       breakpoints: <SceneBreakpoint>[
 ${node.breakpoints.map((rule) => '        SceneBreakpoint(minWidth: ${rule.minWidth}, layout: ${rule.layout == null ? 'null' : _encodeLayout(rule.layout!)}, sizing: ${rule.sizing == null ? 'null' : _encodeSizing(rule.sizing!)}),\n').join()}      ],
       rect: SceneRect(

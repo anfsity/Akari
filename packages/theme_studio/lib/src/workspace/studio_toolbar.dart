@@ -104,7 +104,7 @@ class StudioToolbar extends StatelessWidget {
                         regionGroupId: groupId,
                         onChanged: (project) {
                           if (!identical(project, selectedProject)) {
-                            closeOverlay(popoverContext);
+                            closeOverlay<void>(popoverContext);
                             onSwitchTheme(project);
                           }
                         },
@@ -126,7 +126,7 @@ class StudioToolbar extends StatelessWidget {
                         GhostButton(
                           density: ButtonDensity.dense,
                           onPressed: () {
-                            closeOverlay(popoverContext);
+                            closeOverlay<void>(popoverContext);
                             onSwitchScene(scenePaths[i]);
                           },
                           child: Row(
@@ -174,7 +174,7 @@ class StudioToolbar extends StatelessWidget {
                         icon: LucideIcons.filePlus2,
                         enabled: !readOnly && editor != null,
                         onPressed: () {
-                          closeOverlay(popoverContext);
+                          closeOverlay<void>(popoverContext);
                           onCreateScene();
                         },
                       ),
@@ -186,7 +186,7 @@ class StudioToolbar extends StatelessWidget {
                         icon: LucideIcons.folderPlus,
                         enabled: !readOnly && editor != null,
                         onPressed: () {
-                          closeOverlay(popoverContext);
+                          closeOverlay<void>(popoverContext);
                           onCreateTheme();
                         },
                       ),
@@ -203,7 +203,7 @@ class StudioToolbar extends StatelessWidget {
                         label: 'Reload from disk',
                         icon: LucideIcons.rotateCcw,
                         onPressed: () {
-                          closeOverlay(popoverContext);
+                          closeOverlay<void>(popoverContext);
                           onReload();
                         },
                       ),
@@ -215,7 +215,7 @@ class StudioToolbar extends StatelessWidget {
                         icon: LucideIcons.folderOpen,
                         enabled: !loadingFile,
                         onPressed: () {
-                          closeOverlay(popoverContext);
+                          closeOverlay<void>(popoverContext);
                           onLoadJson();
                         },
                       ),
