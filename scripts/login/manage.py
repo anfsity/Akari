@@ -27,7 +27,7 @@ STATE = Path('/var/lib/akari')
 LOGS = Path('/var/log/akari/greeter')
 UNIT = Path('/etc/systemd/system/akari.service')
 DISPLAY_MANAGER = UNIT.with_name('display-manager.service')
-LOCK = Path('/run/lock/akari-login.lock')
+LOCK = Path('/run/akari/login.lock')
 TEST_LOCK = Path('/run/lock/akari-test.lock')
 PAM = Path('/etc/pam.d/greetd')
 GREETER = 'akari-greeter'
@@ -147,15 +147,23 @@ def ensure_keyrings(provider):
 
 
 def get_pam_without_keyring(configuration):
-    if KEYRING_START.strip() not in configuration and KEYRING_END.strip() not in configuration:
+    start_line = KEYRING_START.lstrip('\n')
+    if start_line.strip() not in configuration and KEYRING_END.strip() not in configuration:
         return configuration
-    if configuration.count(KEYRING_START) != 1 or configuration.count(KEYRING_END) != 1:
+    start_matches = list(re.finditer(rf'(?m)^{re.escape(start_line)}', configuration))
+    end_matches = list(re.finditer(rf'(?m)^{re.escape(KEYRING_END.rstrip())}(?:\n|$)', configuration))
+    if len(start_matches) != 1 or len(end_matches) != 1:
         raise ValueError(f'Malformed Akari keyring block in {PAM}; repair it before continuing.')
-    start = configuration.index(KEYRING_START)
-    end = configuration.index(KEYRING_END)
+    start = start_matches[0].start()
+    end = end_matches[0].end()
     if end < start:
         raise ValueError(f'Malformed Akari keyring block in {PAM}; repair it before continuing.')
-    return configuration[:start] + configuration[end + len(KEYRING_END):]
+    if start > 0 and configuration[start - 1] == '\n':
+        start -= 1
+    before = configuration[:start]
+    after = configuration[end:]
+    separator = '\n' if before and after and not before.endswith('\n') and not after.startswith('\n') else ''
+    return before + separator + after
 
 
 def get_pam_modules(configuration, phase, ancestors):
@@ -196,6 +204,8 @@ def get_keyring_pam_configuration(configuration, providers):
         return configuration
     # PAM evaluates each phase separately. Appending keeps the distribution's
     # authentication and session setup before password capture / daemon startup.
+    if configuration and not configuration.endswith('\n'):
+        configuration += '\n'
     return configuration + KEYRING_START + ''.join(lines) + KEYRING_END
 
 
@@ -214,16 +224,16 @@ def write_pam_file(path, configuration):
     # helper is published before greetd refers to it, with normal PAM permissions.
     target = path.resolve()
     descriptor, name = tempfile.mkstemp(prefix='.greetd-', dir=target.parent)
-    os.close(descriptor)
     temporary = Path(name)
     try:
-        if target.exists():
-            shutil.copy2(target, temporary)
-            owner = target.stat()
+        owner = target.stat() if target.exists() else None
+        with os.fdopen(descriptor, 'wb') as stream:
+            os.fchmod(stream.fileno(), (owner.st_mode & 0o7777) if owner is not None else 0o644)
+            stream.write(configuration.encode())
+            stream.flush()
+            os.fsync(stream.fileno())
+        if owner is not None:
             os.chown(temporary, owner.st_uid, owner.st_gid)
-        else:
-            temporary.chmod(0o644)
-        temporary.write_text(configuration)
         temporary.replace(target)
     finally:
         temporary.unlink(missing_ok=True)
@@ -353,7 +363,9 @@ def validate_runtime():
                     'python3', 'bash', 'useradd', 'nologin']:
         if shutil.which(command) is None:
             raise ValueError(f'Missing required command: {command}')
-    for binary in [Path('/usr/bin/greetd'), Path('/usr/bin/sway')]:
+    for name, fallback in [('greetd', Path('/usr/bin/greetd')), ('sway', Path('/usr/bin/sway'))]:
+        resolved = shutil.which(name)
+        binary = Path(resolved) if resolved is not None else fallback
         if not os.access(binary, os.X_OK):
             raise ValueError(f'Missing executable: {binary}')
     if not PAM.is_file():
@@ -407,7 +419,7 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
     previous_unit = UNIT.read_bytes() if UNIT.is_file() and not UNIT.is_symlink() else None
     created_configs = []
     try:
-        shutil.copytree(bundle, release / 'frontend')
+        shutil.copytree(bundle, release / 'frontend', symlinks=True)
         shutil.copy2(backend, release / 'backend')
         shutil.copy2(splash, release / 'akari-splash')
         for name in ['launch.sh', 'run-greeter.sh']:
@@ -424,7 +436,8 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
         # Developer umasks must not make the installed bundle unreadable to
         # the separate greeter account.
         for path in release.rglob('*'):
-            path.chmod(0o755 if path.is_dir() or path.stat().st_mode & 0o111 else 0o644)
+            if not path.is_symlink():
+                path.chmod(0o755 if path.is_dir() or path.stat().st_mode & 0o111 else 0o644)
         for name in ['greetd.toml', 'sway.conf']:
             target = CONFIGURATION / name
             if not target.exists() and not target.is_symlink():
@@ -475,6 +488,7 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
                     pass
         run_systemctl('daemon-reload')
         raise
+    prune_old_releases()
     print(f'Installed release: {release}')
     print(f'Keyring PAM: {", ".join(providers) or "none"}')
     print('Run akari login enable to select Akari for the next boot.')
@@ -665,10 +679,50 @@ def parse_arguments():
     status = commands.add_parser('status')
     status.add_argument('--format', choices=['text', 'json'], default='text')
     logs = commands.add_parser('logs')
-    logs.add_argument('--component', choices=['service', 'backend', 'flutter', 'sway'], default='service')
+    logs.add_argument(
+        '--component',
+        choices=['service', 'backend', 'flutter', 'sway', 'lifecycle', 'bus'],
+        default='service',
+    )
     logs.add_argument('--lines', type=int, default=100)
     logs.add_argument('--follow', action='store_true')
     return parser.parse_args()
+
+
+def prune_old_releases():
+    releases_dir = INSTALLATION / 'releases'
+    if not releases_dir.is_dir():
+        return
+    retained = set()
+    for link in [INSTALLATION / 'current', INSTALLATION / 'previous']:
+        if link.is_symlink():
+            retained.add((link.parent / os.readlink(link)).resolve())
+    for candidate in releases_dir.iterdir():
+        if candidate.resolve() not in retained:
+            shutil.rmtree(candidate, ignore_errors=True)
+
+
+def open_lock_file(path):
+    if path.parent.is_symlink():
+        raise ValueError(f'Refusing symlink lock directory: {path.parent}')
+    if path.parent.name == 'akari':
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.parent.chmod(0o700)
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(
+        path,
+        os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC,
+        0o600,
+    )
+    try:
+        if os.fstat(descriptor).st_uid != os.getuid():
+            raise ValueError(f'Lock file {path} is not owned by the active user.')
+        os.fchmod(descriptor, 0o600)
+    except Exception:
+        os.close(descriptor)
+        raise
+    return os.fdopen(descriptor, 'r+')
 
 
 def main():
@@ -695,7 +749,7 @@ def main():
         lock_paths = {'login': [LOCK], 'test': [TEST_LOCK], 'all': [LOCK, TEST_LOCK]}[arguments.scope]
     with ExitStack() as resources:
         for path in lock_paths:
-            lock = resources.enter_context(path.open('a'))
+            lock = resources.enter_context(open_lock_file(path))
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | (fcntl.LOCK_NB if path == TEST_LOCK else 0))
             except BlockingIOError:
