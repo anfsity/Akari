@@ -90,17 +90,49 @@ class FocusGlowMotionBuilder extends SceneMotionBuilder {
     Animation<double> progress,
     Widget child,
   ) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).colorScheme.primary
-                .withValues(alpha: 0.18),
-            blurRadius: 18,
+    return _FocusGlow(spec: spec, child: child);
+  }
+}
+
+class _FocusGlow extends StatefulWidget {
+  const _FocusGlow({required this.spec, required this.child});
+
+  final SceneMotionSpec spec;
+  final Widget child;
+
+  @override
+  State<_FocusGlow> createState() => _FocusGlowState();
+}
+
+class _FocusGlowState extends State<_FocusGlow> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onFocusChange: (focused) => setState(() => _focused = focused),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(end: _focused ? 0.18 : 0),
+        duration: widget.spec.reducedMotion ? Duration.zero : widget.spec.duration,
+        curve: widget.spec.curve,
+        builder: (context, alpha, child) => DecoratedBox(
+          decoration: BoxDecoration(
+            boxShadow: alpha > 0
+                ? [
+                    BoxShadow(
+                      color: primary.withValues(alpha: alpha),
+                      blurRadius: 18,
+                    ),
+                  ]
+                : null,
           ),
-        ],
+          child: child,
+        ),
+        child: widget.child,
       ),
-      child: child,
     );
   }
 }

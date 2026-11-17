@@ -69,11 +69,15 @@ class _SceneStateEffectsState extends State<SceneStateEffects>
   }
 
   void _updatePredicates() {
+    if (widget.node.stateEffects.isEmpty && widget.node.transitions.isEmpty) {
+      _controller?.stop();
+      _controller?.value = 1;
+      _previous = const {};
+      return;
+    }
     final predicates =
         widget.predicatesListenable?.value ?? widget.activePredicates;
-    if (_reduced ||
-        widget.playback != null ||
-        (widget.node.stateEffects.isEmpty && widget.node.transitions.isEmpty)) {
+    if (_reduced || widget.playback != null) {
       _controller?.stop();
       _controller?.value = 1;
     } else {
@@ -116,26 +120,43 @@ class _SceneStateEffectsState extends State<SceneStateEffects>
     animation: _controller ?? const AlwaysStoppedAnimation(1.0),
     child: widget.child,
     builder: (context, child) {
-      var progress = _reduced ? 1.0 : _controller?.value ?? 1.0;
-      var rule = _rule;
-      if (widget.playback case final playback?) {
+      final playback = widget.playback;
+      double progress;
+      SceneStateTransition? rule;
+      if (playback != null) {
         final triggered = findSceneStateTransition(
           widget.node,
           playback.from,
           widget.predicatesListenable?.value ?? widget.activePredicates,
         );
-        if (!_reduced && triggered != null) {
-          rule = triggered;
-          final duration = getSceneMotionDuration(
-            _getEffectNode(triggered),
-            widget.duration,
-          ).inMicroseconds;
-          progress = duration == 0
-              ? 1
-              : (playback.elapsed.inMicroseconds / duration).clamp(0.0, 1.0);
-        } else {
-          progress = 1;
+        if (_reduced || triggered == null) {
+          return Transform(
+            transform: Matrix4.identity(),
+            alignment: Alignment.center,
+            child: child,
+          );
         }
+        rule = triggered;
+        final duration = getSceneMotionDuration(
+          _getEffectNode(triggered),
+          widget.duration,
+        ).inMicroseconds;
+        progress = duration == 0
+            ? 1
+            : (playback.elapsed.inMicroseconds / duration).clamp(0.0, 1.0);
+      } else {
+        final controller = _controller;
+        if (_reduced ||
+            controller == null ||
+            (!controller.isAnimating && controller.value == 1.0)) {
+          return Transform(
+            transform: Matrix4.identity(),
+            alignment: Alignment.center,
+            child: child,
+          );
+        }
+        rule = _rule;
+        progress = controller.value;
       }
       progress = getSceneMotionCurve(
         _getEffectNode(rule),

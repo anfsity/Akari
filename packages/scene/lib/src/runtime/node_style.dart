@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -5,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:scene_schema/scene_schema.dart';
 
 import 'scene_font.dart';
+
+final ui.ImageFilter _noBlurFilter = ui.ImageFilter.blur();
 
 class SceneStyleView extends StatefulWidget {
   const SceneStyleView({
@@ -24,7 +27,9 @@ class SceneStyleView extends StatefulWidget {
 }
 
 class _SceneStyleViewState extends State<SceneStyleView> {
-  Future<String>? _font;
+  String? _fontFamily;
+  int _fontRevision = 0;
+
   @override
   void initState() {
     super.initState();
@@ -41,10 +46,23 @@ class _SceneStyleViewState extends State<SceneStyleView> {
   }
 
   void _loadFont() {
+    final revision = ++_fontRevision;
     final asset = widget.style.fontAsset;
-    _font = asset == null
-        ? null
-        : (widget.loadFont ?? loadBundledSceneFont)(asset);
+    if (asset == null) {
+      _fontFamily = null;
+      return;
+    }
+    _fontFamily = null;
+    unawaited(
+      (widget.loadFont ?? loadBundledSceneFont)(asset).then(
+        (family) {
+          if (mounted && revision == _fontRevision && _fontFamily != family) {
+            setState(() => _fontFamily = family);
+          }
+        },
+        onError: (_) {},
+      ),
+    );
   }
 
   @override
@@ -54,14 +72,10 @@ class _SceneStyleViewState extends State<SceneStyleView> {
   }
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<String>(
-    future: _font,
-    builder: (context, snapshot) => _buildStyle(context, snapshot.data),
-  );
-
-  Widget _buildStyle(BuildContext context, String? family) {
+  Widget build(BuildContext context) {
     final style = widget.style;
     final shape = widget.shape;
+    final family = _fontFamily;
 
     final radius = BorderRadius.circular(style.radius);
     final angle = style.gradientAngle * math.pi / 180;
@@ -71,10 +85,12 @@ class _SceneStyleViewState extends State<SceneStyleView> {
     );
     content = BackdropFilter(
       enabled: style.backgroundBlur > 0,
-      filter: ui.ImageFilter.blur(
-        sigmaX: style.backgroundBlur,
-        sigmaY: style.backgroundBlur,
-      ),
+      filter: style.backgroundBlur > 0
+          ? ui.ImageFilter.blur(
+              sigmaX: style.backgroundBlur,
+              sigmaY: style.backgroundBlur,
+            )
+          : _noBlurFilter,
       child: content,
     );
     return SceneStyleScope(
@@ -86,7 +102,9 @@ class _SceneStyleViewState extends State<SceneStyleView> {
           decoration: BoxDecoration(
             shape: shape,
             borderRadius: shape == BoxShape.circle ? null : radius,
-            color: Color(style.fill),
+            color: style.gradientEnd == null && style.fill == 0
+                ? null
+                : Color(style.fill),
             gradient: style.gradientEnd == null
                 ? null
                 : LinearGradient(
@@ -100,14 +118,15 @@ class _SceneStyleViewState extends State<SceneStyleView> {
                     width: style.borderWidth,
                   )
                 : null,
-            boxShadow: [
-              if (style.shadowBlur > 0)
-                BoxShadow(
-                  color: Color(style.shadow),
-                  blurRadius: style.shadowBlur,
-                  offset: Offset(0, style.shadowY),
-                ),
-            ],
+            boxShadow: style.shadowBlur > 0
+                ? [
+                    BoxShadow(
+                      color: Color(style.shadow),
+                      blurRadius: style.shadowBlur,
+                      offset: Offset(0, style.shadowY),
+                    ),
+                  ]
+                : null,
           ),
           child: shape == BoxShape.circle
               ? ClipOval(child: content)

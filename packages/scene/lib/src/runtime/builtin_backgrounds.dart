@@ -82,7 +82,7 @@ class SceneBackgroundEffects extends StatelessWidget {
         ),
         ColoredBox(
           color: Color(background.color)
-              .withValues(alpha: background.scrimOpacity.clamp(0, 1)),
+              .withValues(alpha: background.scrimOpacity),
         ),
       ],
     );

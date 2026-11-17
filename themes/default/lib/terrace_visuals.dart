@@ -177,7 +177,9 @@ class TerraceFadeMotion extends SceneMotionBuilder {
 }
 
 class TerraceActionMotion extends SceneMotionBuilder {
-  const TerraceActionMotion();
+  const TerraceActionMotion({this.presence = const TerraceFadeMotion()});
+
+  final SceneMotionBuilder presence;
 
   @override
   Widget build(
@@ -185,7 +187,7 @@ class TerraceActionMotion extends SceneMotionBuilder {
     SceneMotionSpec spec,
     Animation<double> progress,
     Widget child,
-  ) => const TerraceFadeMotion().build(
+  ) => presence.build(
     context,
     spec,
     progress,

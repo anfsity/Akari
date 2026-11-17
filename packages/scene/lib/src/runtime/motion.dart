@@ -42,6 +42,7 @@ Curve getSceneMotionCurve(SceneNode node, Duration duration, Curve fallback) {
       (node.motionTiming.delayMs +
           (node.motionTiming.durationMs ?? duration.inMilliseconds)) /
       total;
+  if (end <= start) return Threshold(start);
   return Interval(start, end, curve: easing);
 }
 
@@ -59,7 +60,7 @@ double calculateSceneTrackValue(SceneMotionTrack track, Duration elapsed) {
       final progress = switch (start.curve) {
         SceneKeyframeCurve.linear => fraction,
         SceneKeyframeCurve.easeInOut => Curves.easeInOut.transform(fraction),
-        SceneKeyframeCurve.hold => time < end.timeMs ? 0.0 : 1.0,
+        SceneKeyframeCurve.hold => 0.0,
       };
       return start.value + (end.value - start.value) * progress;
     }

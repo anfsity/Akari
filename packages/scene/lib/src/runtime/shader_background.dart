@@ -37,20 +37,30 @@ class SceneShaderBackground extends StatefulWidget {
 class _SceneShaderBackgroundState extends State<SceneShaderBackground>
     with SingleTickerProviderStateMixin {
   ui.FragmentShader? _shader;
+  SceneShader? _loadedDefinition;
   List<ui.Image> _textures = [];
   final List<(ImageStream, ImageStreamListener)> _pendingStreams = [];
-  late final Ticker _clock = createTicker(
-    (elapsed) => setState(() => _time = elapsed),
-  );
+  final _ShaderRepaintNotifier _repaint = _ShaderRepaintNotifier();
+  late final Ticker _clock = createTicker((elapsed) {
+    _time = elapsed;
+    _repaint.markNeedsPaint();
+  });
   Duration _time = Duration.zero;
   Offset _pointer = Offset.zero;
   int _revision = 0;
   bool _reduced = false;
   bool _dependenciesReady = false;
+
+  bool get _usesPredicates => widget.shader.uniforms.any(
+    (uniform) =>
+        uniform.source == SceneUniformSource.dormant ||
+        uniform.source == SceneUniformSource.authError,
+  );
+
   @override
   void initState() {
     super.initState();
-    widget.predicatesListenable?.addListener(_refreshState);
+    widget.predicatesListenable?.addListener(_handlePredicatesChanged);
   }
 
   @override
@@ -68,8 +78,8 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
   void didUpdateWidget(SceneShaderBackground old) {
     super.didUpdateWidget(old);
     if (old.predicatesListenable != widget.predicatesListenable) {
-      old.predicatesListenable?.removeListener(_refreshState);
-      widget.predicatesListenable?.addListener(_refreshState);
+      old.predicatesListenable?.removeListener(_handlePredicatesChanged);
+      widget.predicatesListenable?.addListener(_handlePredicatesChanged);
     }
     if (old.shader.asset != widget.shader.asset ||
         old.loadProgram != widget.loadProgram ||
@@ -84,7 +94,11 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
     _updateClock();
   }
 
-  void _refreshState() => setState(() {});
+  void _handlePredicatesChanged() {
+    if (_usesPredicates) {
+      _repaint.markNeedsPaint();
+    }
+  }
 
   @override
   void reassemble() {
@@ -150,12 +164,6 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
     final configuration = createLocalImageConfiguration(context);
     final revision = ++_revision;
     final definition = widget.shader;
-    _shader?.dispose();
-    _shader = null;
-    for (final texture in _textures) {
-      texture.dispose();
-    }
-    _textures = [];
     final textures = <ui.Image>[];
     ui.FragmentShader? shader;
     try {
@@ -188,13 +196,25 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
         }
         _shader = shader;
         _textures = textures;
+        _loadedDefinition = definition;
       });
     } on Object catch (error) {
       shader?.dispose();
       for (final texture in textures) {
         texture.dispose();
       }
-      if (mounted && revision == _revision) widget.onError?.call('$error');
+      if (mounted && revision == _revision) {
+        setState(() {
+          _shader?.dispose();
+          _shader = null;
+          for (final texture in _textures) {
+            texture.dispose();
+          }
+          _textures = [];
+          _loadedDefinition = null;
+        });
+        widget.onError?.call('$error');
+      }
     }
   }
 
@@ -202,8 +222,9 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
   void dispose() {
     _revision++;
     _cancelPendingStreams();
-    widget.predicatesListenable?.removeListener(_refreshState);
+    widget.predicatesListenable?.removeListener(_handlePredicatesChanged);
     _clock.dispose();
+    _repaint.dispose();
     _shader?.dispose();
     for (final texture in _textures) {
       texture.dispose();
@@ -214,10 +235,14 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
   @override
   Widget build(BuildContext context) {
     final shader = _shader;
-    if (shader == null) return const SizedBox.expand();
-    final predicates =
-        widget.predicatesListenable?.value ?? widget.activePredicates;
-    final usesPointer = widget.shader.uniforms.any(
+    final loaded = _loadedDefinition;
+    if (shader == null || loaded == null) return const SizedBox.expand();
+    final definition =
+        widget.shader.asset == loaded.asset &&
+            widget.shader.uniforms.length == loaded.uniforms.length
+        ? widget.shader
+        : loaded;
+    final usesPointer = definition.uniforms.any(
       (uniform) =>
           uniform.source == SceneUniformSource.pointerX ||
           uniform.source == SceneUniformSource.pointerY,
@@ -225,36 +250,61 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
     final paint = CustomPaint(
       painter: _ShaderPainter(
         shader: shader,
-        definition: widget.shader,
-        time: _reduced ? Duration.zero : widget.elapsed ?? _time,
-        pointer: _pointer,
-        predicates: predicates,
+        definition: definition,
+        elapsed: widget.elapsed,
+        reduced: _reduced,
+        activePredicates: widget.activePredicates,
+        getTime: () => _reduced ? Duration.zero : widget.elapsed ?? _time,
+        getPointer: () => _pointer,
+        getPredicates: () =>
+            widget.predicatesListenable?.value ?? widget.activePredicates,
+        repaint: _repaint,
       ),
       child: const SizedBox.expand(),
     );
     if (!usesPointer) return paint;
     return MouseRegion(
-      onHover: (event) => setState(() => _pointer = event.localPosition),
+      onHover: (event) {
+        if (_pointer != event.localPosition) {
+          _pointer = event.localPosition;
+          _repaint.markNeedsPaint();
+        }
+      },
       child: paint,
     );
   }
+}
+
+class _ShaderRepaintNotifier extends ChangeNotifier {
+  void markNeedsPaint() => notifyListeners();
 }
 
 class _ShaderPainter extends CustomPainter {
   const _ShaderPainter({
     required this.shader,
     required this.definition,
-    required this.time,
-    required this.pointer,
-    required this.predicates,
+    required this.elapsed,
+    required this.reduced,
+    required this.activePredicates,
+    required this.getTime,
+    required this.getPointer,
+    required this.getPredicates,
+    required super.repaint,
   });
   final ui.FragmentShader shader;
   final SceneShader definition;
-  final Duration time;
-  final Offset pointer;
-  final Set<ScenePredicate> predicates;
+  final Duration? elapsed;
+  final bool reduced;
+  final Set<ScenePredicate> activePredicates;
+  final ValueGetter<Duration> getTime;
+  final ValueGetter<Offset> getPointer;
+  final ValueGetter<Set<ScenePredicate>> getPredicates;
+
   @override
   void paint(Canvas canvas, Size size) {
+    final time = getTime();
+    final pointer = getPointer();
+    final predicates = getPredicates();
     for (var index = 0; index < definition.uniforms.length; index++) {
       final uniform = definition.uniforms[index];
       final value = switch (uniform.source) {
@@ -278,7 +328,7 @@ class _ShaderPainter extends CustomPainter {
   bool shouldRepaint(_ShaderPainter old) =>
       old.shader != shader ||
       old.definition != definition ||
-      old.time != time ||
-      old.pointer != pointer ||
-      !setEquals(old.predicates, predicates);
+      old.elapsed != elapsed ||
+      old.reduced != reduced ||
+      !setEquals(old.activePredicates, activePredicates);
 }
