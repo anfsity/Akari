@@ -846,13 +846,13 @@ void main() {
     expect(editor.document.canvas.referenceWidth, 1080); expect(editor.document.canvas.referenceHeight, 1920);
     editor.undo(); await tester.pumpAndSettle(); expect(editor.canUndo, isFalse);
     final reference = editor.document.canvas;
-    await tester.tap(find.byKey(const ValueKey('canvas-compare'))); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('canvas-view-compare'))); await tester.pumpAndSettle();
     final previews = tester.widgetList<StudioPreview>(find.byType(StudioPreview));
     expect(previews.length, 4);
     expect(previews.map((preview) => preview.viewportSize).toSet().length, 4);
     expect(previews.every((preview) => identical(preview.document.canvas, reference)), isTrue);
     expect(editor.canUndo, isFalse); expect(editor.isDirty, isFalse);
-    await tester.tap(find.byKey(const ValueKey('canvas-compare'))); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('canvas-view-single'))); await tester.pumpAndSettle();
     expect(find.byType(StudioPreview), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

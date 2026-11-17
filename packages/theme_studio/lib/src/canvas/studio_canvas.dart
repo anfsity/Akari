@@ -877,6 +877,13 @@ class _CanvasDock extends StatelessWidget {
       context: context,
       alignment: Alignment.bottomLeft,
       anchorAlignment: Alignment.topLeft,
+      offset: const Offset(0, -16),
+      showDuration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 160),
+      dismissDuration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 100),
       builder: (_) => DropdownMenu(
         children: [
           const MenuLabel(child: Text('Transform')),
@@ -1033,127 +1040,77 @@ class _CanvasDock extends StatelessWidget {
                     },
                   ),
                 StudioTooltip(
-                  tooltip: (_) =>
-                      Text(responsiveActive ? 'Authored size' : 'Responsive'),
+                  above: true,
+                  enabled: compact,
+                  tooltip: (_) => const Text('Responsive viewport'),
                   child: Semantics(
                     label: 'Responsive',
                     toggled: responsiveActive,
-                    button: true,
-                    child: GestureDetector(
+                    child: Toggle(
                       key: const ValueKey('canvas-responsive'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: hasSession ? onToggleResponsive : null,
-                      child: MouseRegion(
-                        cursor: hasSession
-                            ? SystemMouseCursors.click
-                            : SystemMouseCursors.basic,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: responsiveActive
-                                ? colors.primary.withValues(alpha: 0.08)
-                                : colors.background,
-                            border: Border.all(
-                              color: responsiveActive
-                                  ? colors.primary.withValues(alpha: 0.45)
-                                  : colors.border,
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Responsive',
-                                style: TextStyle(
-                                  color: responsiveActive
-                                      ? colors.primary
-                                      : colors.foreground,
-                                ),
-                              ).small(),
-                              const Gap(6),
-                              Icon(
-                                LucideIcons.chevronDown,
-                                size: 14,
-                                color: responsiveActive
-                                    ? colors.primary
-                                    : colors.mutedForeground,
-                              ),
-                            ],
-                          ),
-                        ),
+                      value: responsiveActive,
+                      onChanged: hasSession
+                          ? (_) => onToggleResponsive()
+                          : null,
+                      style: const ButtonStyle.ghost(
+                        density: ButtonDensity.dense,
                       ),
+                      child: compact
+                          ? const Icon(LucideIcons.monitor, size: 16)
+                          : const Text('Responsive').small(),
                     ),
                   ),
                 ),
                 if (!compact)
                   const SizedBox(height: 20, child: VerticalDivider()),
-                StudioTooltip(
-                  tooltip: (_) =>
-                      Text(comparing ? 'Single view' : 'Compare view'),
-                  child: Semantics(
-                    label: comparing ? 'Single' : 'Compare',
-                    toggled: comparing,
-                    button: true,
-                    child: GestureDetector(
-                      key: const ValueKey('canvas-compare'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: hasSession ? onToggleComparison : null,
-                      child: MouseRegion(
-                        cursor: hasSession
-                            ? SystemMouseCursors.click
-                            : SystemMouseCursors.basic,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: colors.muted.withValues(alpha: 0.45),
-                            border: Border.all(
-                              color: colors.border.withValues(alpha: 0.7),
+                DecoratedBox(
+                  key: const ValueKey('canvas-compare'),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: colors.border),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 2,
+                      children: [
+                        for (final (isCompare, icon) in [
+                          (false, LucideIcons.square),
+                          (true, LucideIcons.layoutGrid),
+                        ])
+                          StudioTooltip(
+                            above: true,
+                            tooltip: (_) => Text(
+                              isCompare ? 'Compare view' : 'Single view',
                             ),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            spacing: 2,
-                            children: [
-                              for (final (isCompare, icon) in [
-                                (false, LucideIcons.square),
-                                (true, LucideIcons.layoutGrid),
-                              ])
-                                Container(
-                                  width: 28,
-                                  height: 26,
-                                  alignment: Alignment.center,
-                                  decoration: comparing == isCompare
-                                      ? BoxDecoration(
-                                          color: colors.background,
-                                          borderRadius: BorderRadius.circular(
-                                            7,
-                                          ),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Color(0x14000000),
-                                              blurRadius: 3,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ],
-                                        )
-                                      : null,
-                                  child: Icon(
-                                    icon,
-                                    size: 15,
-                                    color: comparing == isCompare
-                                        ? colors.primary
-                                        : colors.mutedForeground,
-                                  ),
+                            child: Semantics(
+                              label: isCompare ? 'Compare' : 'Single',
+                              selected: comparing == isCompare,
+                              child: Button(
+                                key: ValueKey(
+                                  isCompare
+                                      ? 'canvas-view-compare'
+                                      : 'canvas-view-single',
                                 ),
-                            ],
+                                style: comparing == isCompare
+                                    ? const ButtonStyle.secondary(
+                                        density: ButtonDensity.iconDense,
+                                      )
+                                    : const ButtonStyle.ghost(
+                                        density: ButtonDensity.iconDense,
+                                      ),
+                                onPressed: hasSession
+                                    ? () {
+                                        if (comparing != isCompare)
+                                          onToggleComparison();
+                                      }
+                                    : null,
+                                child: Icon(icon, size: 15),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
@@ -1213,6 +1170,7 @@ class _DockButton extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final isActive = active ?? false;
     return StudioTooltip(
+      above: true,
       tooltip: (_) => Text(label),
       child: Semantics(
         label: icon == null ? null : label,
@@ -1228,12 +1186,14 @@ class _DockButton extends StatelessWidget {
                     ? ButtonShape.rectangle
                     : ButtonShape.circle,
               ).copyWith(
-                decoration: (context, states, value) =>
-                    (value as BoxDecoration).copyWith(
-                      color: isActive
-                          ? colors.primary.withValues(alpha: .1)
-                          : null,
-                    ),
+                decoration: (context, states, value) {
+                  final decoration = value as BoxDecoration;
+                  return decoration.copyWith(
+                    color: isActive
+                        ? colors.primary.withValues(alpha: .08)
+                        : decoration.color,
+                  );
+                },
               ),
           onPressed: onPressed,
           child: icon == null
