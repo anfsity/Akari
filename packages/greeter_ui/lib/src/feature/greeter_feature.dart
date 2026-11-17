@@ -111,7 +111,7 @@ class GreeterFeature {
       case RequestPowerActionCommand(:final action):
         await _requestPowerAction(action);
       case RetryAuthenticationCommand():
-        _retryAuthentication();
+        await _retryAuthentication();
       case RetryPromptCommand():
         _retryPrompt();
       case ReconnectServiceCommand():
@@ -226,6 +226,8 @@ class GreeterFeature {
         selectedSession: null,
         prompt: null,
         promptError: null,
+        powerMode: PowerMode.idle,
+        powerError: null,
         backendAuthState: BackendAuthState.idle,
       ),
     );
@@ -557,15 +559,28 @@ class GreeterFeature {
     }
   }
 
-  void _retryAuthentication() {
+  Future<void> _retryAuthentication() async {
+    if (_state.serviceMode != ServiceMode.ready) {
+      return;
+    }
+    _authGeneration++;
+    final orphanedAttempt = _attemptId;
     _attemptId = null;
     _resetToUserSelection(serviceMode: ServiceMode.ready);
+    if (orphanedAttempt != null) {
+      final generation = _serviceGeneration;
+      await _cancelOrphanedAttempt(orphanedAttempt);
+      if (generation != _serviceGeneration ||
+          _state.serviceMode != ServiceMode.ready) {
+        return;
+      }
+    }
     unawaited(_beginAuthentication());
   }
 
   void _retryPrompt() {
     if (_attemptId == null || _state.prompt == null) {
-      _retryAuthentication();
+      unawaited(_retryAuthentication());
       return;
     }
     _updateState(
@@ -603,6 +618,8 @@ class GreeterFeature {
             serviceMode: ServiceMode.unavailable,
             authMode: AuthMode.error,
             dormant: false,
+            powerMode: PowerMode.idle,
+            powerError: null,
             serviceError: const (
               kind: GreeterErrorKind.transport,
               message: serviceUnavailableMessage,
@@ -852,7 +869,7 @@ class GreeterFeature {
       mode: next.powerMode,
       error: next.powerError,
     ));
-    _dormantSlots.value = next.dormant;
+    slotsChanged |= _setSlot(_dormantSlots, next.dormant);
     if (slotsChanged) {
       _slotChanges.notify();
     }

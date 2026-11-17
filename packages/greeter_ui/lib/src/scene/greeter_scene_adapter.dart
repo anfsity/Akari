@@ -53,6 +53,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
 
   late TextEditingController _credentialController;
   late bool _ownsCredentialController;
+  final FocusNode _rootFocusNode = FocusNode();
   final FocusNode _credentialFocusNode = FocusNode();
   late List<String> _typeahead;
   late StreamSubscription<FeatureEffect> _effectSubscription;
@@ -70,7 +71,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     _credentialController =
         widget.credentialController ?? TextEditingController();
     _typeahead = _getTypeaheadFor(widget.feature);
-    _activeScenePredicates = ValueNotifier(_activePredicates());
+    _activeScenePredicates = ValueNotifier(_getActivePredicates());
     _startListeningToFeature(widget.feature);
     _wakeController = AnimationController(
       vsync: this,
@@ -129,7 +130,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     }
     if (controllerChanged || featureChanged || widget.theme != oldWidget.theme) {
       _updateWakeDuration();
-      _activeScenePredicates.value = _activePredicates();
+      _activeScenePredicates.value = _getActivePredicates();
       _scene = _createScene();
     }
   }
@@ -190,12 +191,14 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       _credentialController.dispose();
     }
     _credentialFocusNode.dispose();
+    _rootFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Focus(
+      focusNode: _rootFocusNode,
       autofocus: widget.isActive,
       child: Listener(
         behavior: HitTestBehavior.translucent,
@@ -210,14 +213,14 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   }
 
   void _handleSceneSlotsChanged() {
-    final nextPredicates = _activePredicates();
+    final nextPredicates = _getActivePredicates();
     if (setEquals(_activeScenePredicates.value, nextPredicates)) {
       return;
     }
     _activeScenePredicates.value = nextPredicates;
   }
 
-  Set<ScenePredicate> _activePredicates() {
+  Set<ScenePredicate> _getActivePredicates() {
     return getActiveScenePredicates(
       service: widget.feature.serviceSlots.value,
       auth: widget.feature.authPromptSlots.value,
@@ -238,7 +241,14 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       _wakeController.forward();
       _scheduleCredentialFocus();
     }
-    _handleSceneSlotsChanged();
+  }
+
+  bool _isAnotherInteractiveControlFocused() {
+    final primary = FocusManager.instance.primaryFocus;
+    return primary != null &&
+        primary is! FocusScopeNode &&
+        !identical(primary, _rootFocusNode) &&
+        !identical(primary, _credentialFocusNode);
   }
 
   KeyEventResult _handleKeyEvent(KeyEvent event) {
@@ -264,6 +274,12 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     }
     if (event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      if (_isAnotherInteractiveControlFocused() ||
+          (_credentialFocusNode.hasFocus &&
+              _credentialController.value.isComposingRangeValid &&
+              !_credentialController.value.composing.isCollapsed)) {
+        return KeyEventResult.ignored;
+      }
       if (widget.feature.authPromptSlots.value.mode == AuthMode.prompting) {
         _respondToPrompt();
         return KeyEventResult.handled;

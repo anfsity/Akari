@@ -1203,7 +1203,7 @@ void main() {
       powerCompleter.completeError(const GreeterGatewayException('late fail'));
       await powerFuture;
 
-      expect(feature.state.powerMode, PowerMode.executing);
+      expect(feature.state.powerMode, PowerMode.idle);
       expect(feature.state.powerError, isNull);
     },
   );
