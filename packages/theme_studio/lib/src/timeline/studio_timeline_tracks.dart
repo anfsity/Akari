@@ -130,48 +130,36 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
   ) async {
     final editor = widget.editor;
     if (!editor.tryApplyDraft()) return;
-    final current = editor.document.nodes
-        .where((entry) => entry.id == nodeId)
-        .firstOrNull;
-    if (current == null) return;
-    final currentTrackIndex = current.tracks.indexWhere(
-      (track) => track.property == property,
+    final initial = _findTrackTarget(
+      editor.document,
+      nodeId,
+      property,
+      frameIndex,
     );
-    if (currentTrackIndex < 0) return;
-    final currentTrack = current.tracks[currentTrackIndex];
-    if (frameIndex >= currentTrack.keyframes.length) return;
+    if (initial == null) return;
     final result = await showOverlay<({SceneKeyframe? frame})>(
       context,
       const DialogConfiguration(),
-      builder: (_) => _KeyframeDialog(track: currentTrack, index: frameIndex),
+      builder: (_) => _KeyframeDialog(track: initial.track, index: frameIndex),
     ).future;
-    if (!mounted || result == null) return;
-    final latest = editor.document.nodes
-        .where((entry) => entry.id == nodeId)
-        .firstOrNull;
-    if (latest == null) return;
-    final latestTrackIndex = latest.tracks.indexWhere(
-      (track) => track.property == property,
+    if (!mounted || result == null || !identical(editor, widget.editor)) {
+      return;
+    }
+    final latest = _findTrackTarget(
+      editor.document,
+      nodeId,
+      property,
+      frameIndex,
     );
-    if (latestTrackIndex < 0) return;
-    final latestTrack = latest.tracks[latestTrackIndex];
-    if (frameIndex >= latestTrack.keyframes.length) return;
-    final frames = [...latestTrack.keyframes];
-    if (result.frame case final frame?) {
-      frames[frameIndex] = frame;
-    } else {
-      frames.removeAt(frameIndex);
-    }
-    final tracks = [...latest.tracks];
-    if (frames.isEmpty) {
-      tracks.removeAt(latestTrackIndex);
-    } else {
-      tracks[latestTrackIndex] = SceneMotionTrack(
-        property: latestTrack.property,
-        keyframes: frames,
-      );
-    }
-    editor.updateNode(latest.copyWith(tracks: tracks));
+    if (latest == null || latest.track != initial.track) return;
+    editor.updateNode(
+      _replaceOrRemoveKeyframe(
+        latest.node,
+        latest.trackIndex,
+        frameIndex,
+        result.frame,
+      ),
+    );
   }
 
   void _removeTrack() {
@@ -465,6 +453,49 @@ SceneNode _retimeKeyframe(
         keyframes: frames,
       ),
   );
+}
+
+({SceneNode node, int trackIndex, SceneMotionTrack track})? _findTrackTarget(
+  SceneDocument document,
+  String nodeId,
+  SceneMotionProperty property,
+  int frameIndex,
+) {
+  if (frameIndex < 0) return null;
+  final node = document.nodes.where((entry) => entry.id == nodeId).firstOrNull;
+  if (node == null) return null;
+  final trackIndex = node.tracks.indexWhere(
+    (track) => track.property == property,
+  );
+  if (trackIndex < 0) return null;
+  final track = node.tracks[trackIndex];
+  if (frameIndex >= track.keyframes.length) return null;
+  return (node: node, trackIndex: trackIndex, track: track);
+}
+
+SceneNode _replaceOrRemoveKeyframe(
+  SceneNode node,
+  int trackIndex,
+  int frameIndex,
+  SceneKeyframe? replacement,
+) {
+  final track = node.tracks[trackIndex];
+  final frames = [...track.keyframes];
+  if (replacement != null) {
+    frames[frameIndex] = replacement;
+  } else {
+    frames.removeAt(frameIndex);
+  }
+  final tracks = [...node.tracks];
+  if (frames.isEmpty) {
+    tracks.removeAt(trackIndex);
+  } else {
+    tracks[trackIndex] = SceneMotionTrack(
+      property: track.property,
+      keyframes: frames,
+    );
+  }
+  return node.copyWith(tracks: tracks);
 }
 
 class _TrackToolbar extends StatelessWidget {
