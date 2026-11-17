@@ -222,13 +222,7 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
             Err(error) => eprintln!("event=splash_card_unavailable path={path:?} error={error}"),
         }
     }
-    if session
-        .display
-        .borrow()
-        .cards
-        .iter()
-        .all(|card| card.outputs.is_empty())
-    {
+    if session.display.borrow().cards.is_empty() {
         return Err("no usable DRM outputs on the current seat".into());
     }
     let mut timing = Presentation::new(options.duration);
@@ -239,7 +233,7 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
         }
         let mut display = session.display.borrow_mut();
         for card in &mut display.cards {
-            card.present(&mut timing, &mut options.snapshot)?;
+            card.present(&mut timing)?;
         }
         drop(display);
         if !should_continue_presentation(session.activation.get(), &stop, &timing, Instant::now()) {
@@ -247,6 +241,17 @@ pub fn run(mut options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> R
         }
         // Dispatch instead of sleeping so VT revocation is acknowledged promptly.
         dispatch_seat(&mut session.seat, 33, &stop)?;
+    }
+    if let Some(path) = options.snapshot.take()
+        && let Some(output) = session
+            .display
+            .borrow()
+            .cards
+            .iter()
+            .flat_map(|card| &card.outputs)
+            .find(|output| output.presented)
+    {
+        output.scene.save_png(path)?;
     }
     drop(session);
     eprintln!("event=splash_released");
@@ -381,7 +386,7 @@ impl Card {
         Ok(())
     }
 
-    fn present(&mut self, timing: &mut Presentation, snapshot: &mut Option<PathBuf>) -> Result {
+    fn present(&mut self, timing: &mut Presentation) -> Result {
         let card = &self.device;
         for output in &mut self.outputs {
             output
@@ -390,7 +395,11 @@ impl Card {
             let pitch = output.buffer.pitch() as usize;
             {
                 let mut mapping = card.map_dumb_buffer(&mut output.buffer)?;
-                output.scene.copy_xrgb_strided(&mut mapping, pitch);
+                if output.presented {
+                    output.scene.copy_xrgb_dirty_strided(&mut mapping, pitch);
+                } else {
+                    output.scene.copy_xrgb_strided(&mut mapping, pitch);
+                }
             }
             // Shadow framebuffers need damage notification to upload CPU
             // writes. Native scanout drivers can report this as unsupported.
@@ -399,9 +408,30 @@ impl Card {
                 // The kernel rejects that count/pointer mismatch with EINVAL
                 // before checking whether the driver needs damage notification.
                 let (width, height) = output.mode.size();
-                match card
-                    .dirty_framebuffer(output.framebuffer, &[ClipRect::new(0, 0, width, height)])
-                {
+                let full_clip = [ClipRect::new(0, 0, width, height)];
+                let dirty_clips: Vec<ClipRect> = if output.presented {
+                    output
+                        .scene
+                        .get_dirty_rects()
+                        .iter()
+                        .map(|rect| {
+                            ClipRect::new(
+                                u16::try_from(rect.x).unwrap_or(u16::MAX),
+                                u16::try_from(rect.y).unwrap_or(u16::MAX),
+                                u16::try_from(rect.x.saturating_add(rect.width)).unwrap_or(width),
+                                u16::try_from(rect.y.saturating_add(rect.height)).unwrap_or(height),
+                            )
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                let clips = if dirty_clips.is_empty() {
+                    &full_clip[..]
+                } else {
+                    &dirty_clips[..]
+                };
+                match card.dirty_framebuffer(output.framebuffer, clips) {
                     Ok(()) => {}
                     Err(error) if error.raw_os_error() == Some(libc::ENOSYS) => {
                         output.flush_damage = false;
@@ -424,9 +454,6 @@ impl Card {
                     output.connectors,
                     output.mode.size()
                 );
-            }
-            if let Some(path) = snapshot.take() {
-                output.scene.save_png(path)?;
             }
         }
         Ok(())

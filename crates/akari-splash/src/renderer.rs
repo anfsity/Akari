@@ -10,12 +10,21 @@ pub struct Renderer {
     font: FontVec,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct DirtyRect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
 /// Each output owns its layout and scaled image. Animation only composites
 /// these cached layers; PNG decoding and glyph rasterization never run per frame.
 pub struct Scene {
     background: Pixmap,
     avatar: Pixmap,
     pixels: Pixmap,
+    dirty_rects: Vec<DirtyRect>,
     scale: f32,
     avatar_y: f32,
     dots_x: f32,
@@ -88,23 +97,59 @@ impl Renderer {
             muted,
         );
         let pixels = background.clone();
+        let dots_x = status_left + text_width + 11.5 * scale;
+        let dots_y = avatar_y + 350.5 * scale;
+        let avatar_x = (width as f32 - size as f32) / 2.0;
+        let avatar_pad = (6.0 * scale).ceil() + 4.0;
+        let dot_pad = (2.0 * scale).ceil() + 2.0;
+        let dirty_rects = [
+            clamp_rect(
+                avatar_x - avatar_pad,
+                avatar_y - 4.0 * scale - avatar_pad,
+                avatar_x + size as f32 + avatar_pad,
+                avatar_y + size as f32 + avatar_pad,
+                width,
+                height,
+            ),
+            clamp_rect(
+                dots_x - dot_pad,
+                dots_y - dot_pad,
+                dots_x + 14.0 * scale + dot_pad,
+                dots_y + dot_pad,
+                width,
+                height,
+            ),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
         Ok(Scene {
             background,
             avatar,
             pixels,
+            dirty_rects,
             scale,
             avatar_y,
-            dots_x: status_left + text_width + 11.5 * scale,
-            dots_y: avatar_y + 350.5 * scale,
+            dots_x,
+            dots_y,
         })
     }
 }
 
 impl Scene {
     pub fn draw(&mut self, seconds: f32) {
-        self.pixels
-            .data_mut()
-            .copy_from_slice(self.background.data());
+        let stride = self.pixels.width() as usize * 4;
+        let bg_data = self.background.data();
+        let px_data = self.pixels.data_mut();
+        for rect in &self.dirty_rects {
+            let x_bytes = rect.x as usize * 4;
+            let len_bytes = rect.width as usize * 4;
+            for row in rect.y as usize..(rect.y + rect.height) as usize {
+                let start = row * stride + x_bytes;
+                px_data[start..start + len_bytes]
+                    .copy_from_slice(&bg_data[start..start + len_bytes]);
+            }
+        }
         let phase = seconds * std::f32::consts::TAU / 4.0;
         let x = (self.pixels.width() - self.avatar.width()) as f32 / 2.0;
         let y = self.avatar_y - (1.0 - phase.cos()) * 2.0 * self.scale;
@@ -165,6 +210,10 @@ impl Scene {
         }
     }
 
+    pub fn get_dirty_rects(&self) -> &[DirtyRect] {
+        &self.dirty_rects
+    }
+
     pub fn copy_xrgb_strided(&self, target: &mut [u8], pitch: usize) {
         let row_bytes = self.pixels.width() as usize * 4;
         for (source, target_row) in self
@@ -183,6 +232,51 @@ impl Scene {
             }
         }
     }
+
+    pub fn copy_xrgb_dirty_strided(&self, target: &mut [u8], pitch: usize) {
+        let src_stride = self.pixels.width() as usize * 4;
+        let src_data = self.pixels.data();
+        for rect in &self.dirty_rects {
+            let x_bytes = rect.x as usize * 4;
+            let len_bytes = rect.width as usize * 4;
+            for row in rect.y as usize..(rect.y + rect.height) as usize {
+                let src_start = row * src_stride + x_bytes;
+                let dst_start = row * pitch + x_bytes;
+                for (rgba, pixel) in src_data[src_start..src_start + len_bytes]
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .zip(
+                        target[dst_start..dst_start + len_bytes]
+                            .as_chunks_mut::<4>()
+                            .0,
+                    )
+                {
+                    pixel.copy_from_slice(&get_xrgb_pixel(rgba).to_le_bytes());
+                }
+            }
+        }
+    }
+}
+
+fn clamp_rect(
+    min_x: f32,
+    min_y: f32,
+    max_x: f32,
+    max_y: f32,
+    width: u32,
+    height: u32,
+) -> Option<DirtyRect> {
+    let x0 = (min_x.floor().max(0.0) as u32).min(width);
+    let y0 = (min_y.floor().max(0.0) as u32).min(height);
+    let x1 = (max_x.ceil().max(0.0) as u32).min(width);
+    let y1 = (max_y.ceil().max(0.0) as u32).min(height);
+    (x1 > x0 && y1 > y0).then_some(DirtyRect {
+        x: x0,
+        y: y0,
+        width: x1 - x0,
+        height: y1 - y0,
+    })
 }
 
 fn get_xrgb_pixel(rgba: &[u8; 4]) -> u32 {

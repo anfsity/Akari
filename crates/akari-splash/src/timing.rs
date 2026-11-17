@@ -24,6 +24,12 @@ impl Presentation {
             .map_or(Duration::ZERO, |first| now.duration_since(first))
     }
 
+    pub fn find_deadline(&self) -> Option<Instant> {
+        self.first
+            .zip(self.duration)
+            .map(|(first, duration)| first + duration)
+    }
+
     pub fn is_finished(&self, now: Instant) -> bool {
         self.first
             .zip(self.duration)

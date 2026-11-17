@@ -27,6 +27,23 @@ use crate::{
 
 pub fn run(options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> Result {
     let event_loop = EventLoop::new()?;
+    let proxy = event_loop.create_proxy();
+    let mut signals = signal_hook::iterator::Signals::new([
+        libc::SIGTERM,
+        libc::SIGINT,
+        libc::SIGHUP,
+        libc::SIGQUIT,
+    ])?;
+    let signal_handle = signals.handle();
+    let signal_stop = Arc::clone(&stop);
+    // winit's Wayland poll loop ignores EINTR when ControlFlow::Wait is active.
+    // Forwarding signals through EventLoopProxy wakes the loop immediately.
+    let watcher = std::thread::spawn(move || {
+        if signals.forever().next().is_some() {
+            signal_stop.store(true, Ordering::Relaxed);
+            let _ = proxy.send_event(());
+        }
+    });
     let mut app = Preview {
         timing: Presentation::new(options.duration),
         options,
@@ -39,7 +56,10 @@ pub fn run(options: Options, renderer: Renderer, stop: Arc<AtomicBool>) -> Resul
         pending_redraw: false,
         error: None,
     };
-    event_loop.run_app(&mut app)?;
+    let run_result = event_loop.run_app(&mut app);
+    signal_handle.close();
+    let _ = watcher.join();
+    run_result?;
     // Destruction closes the surface before returning control to the launcher.
     app.close();
     app.error.map_or(Ok(()), Err)
@@ -100,9 +120,11 @@ impl Preview {
                 self.options.dark,
             )?);
         }
-        let (Some(surface), Some(scene)) = (self.surface.as_mut(), self.scene.as_mut()) else {
-            return Ok(());
-        };
+        let surface = self
+            .surface
+            .as_mut()
+            .expect("open initializes surface alongside window");
+        let scene = self.scene.as_mut().expect("scene initialized above");
         surface.resize(width, height)?;
         scene.draw(self.timing.get_elapsed(Instant::now()).as_secs_f32());
         if let Some(path) = self.options.snapshot.take() {
@@ -152,6 +174,12 @@ impl ApplicationHandler for Preview {
         }
     }
 
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, (): ()) {
+        if self.stop.load(Ordering::Relaxed) {
+            event_loop.exit();
+        }
+    }
+
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let now = Instant::now();
         if self.stop.load(Ordering::Relaxed) || self.timing.is_finished(now) {
@@ -163,14 +191,18 @@ impl ApplicationHandler for Preview {
             self.pending_redraw,
             now,
             self.next_frame,
+            self.timing.find_deadline(),
         ) {
             FrameWaitPlan::Wait => event_loop.set_control_flow(ControlFlow::Wait),
-            FrameWaitPlan::RequestRedrawAndWait => {
-                if let Some(window) = self.window.as_ref() {
-                    self.pending_redraw = true;
-                    window.request_redraw();
-                }
-                event_loop.set_control_flow(ControlFlow::Wait);
+            FrameWaitPlan::RequestRedraw(deadline) => {
+                let window = self
+                    .window
+                    .as_ref()
+                    .expect("redraw plan requires an open window");
+                self.pending_redraw = true;
+                window.request_redraw();
+                event_loop
+                    .set_control_flow(deadline.map_or(ControlFlow::Wait, ControlFlow::WaitUntil));
             }
             FrameWaitPlan::WaitUntil(deadline) => {
                 event_loop.set_control_flow(ControlFlow::WaitUntil(deadline));
@@ -182,7 +214,7 @@ impl ApplicationHandler for Preview {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FrameWaitPlan {
     Wait,
-    RequestRedrawAndWait,
+    RequestRedraw(Option<Instant>),
     WaitUntil(Instant),
 }
 
@@ -191,14 +223,19 @@ fn plan_frame_wait(
     pending_redraw: bool,
     now: Instant,
     next_frame: Instant,
+    finish_deadline: Option<Instant>,
 ) -> FrameWaitPlan {
-    if !has_window || pending_redraw {
+    if !has_window {
         return FrameWaitPlan::Wait;
     }
-    if now >= next_frame {
-        return FrameWaitPlan::RequestRedrawAndWait;
+    if pending_redraw {
+        return finish_deadline.map_or(FrameWaitPlan::Wait, FrameWaitPlan::WaitUntil);
     }
-    FrameWaitPlan::WaitUntil(next_frame)
+    if now >= next_frame {
+        return FrameWaitPlan::RequestRedraw(finish_deadline);
+    }
+    let wake_at = finish_deadline.map_or(next_frame, |deadline| deadline.min(next_frame));
+    FrameWaitPlan::WaitUntil(wake_at)
 }
 
 #[cfg(test)]
@@ -209,18 +246,30 @@ mod tests {
     fn frame_wait_avoids_busy_spinning_without_window_or_with_pending_redraw() {
         let now = Instant::now();
         let past = now - Duration::from_millis(5);
+        let deadline = now + Duration::from_secs(3);
         assert_eq!(
-            plan_frame_wait(false, false, now, past),
+            plan_frame_wait(false, false, now, past, Some(deadline)),
             FrameWaitPlan::Wait
         );
-        assert_eq!(plan_frame_wait(true, true, now, past), FrameWaitPlan::Wait);
         assert_eq!(
-            plan_frame_wait(true, false, now, past),
-            FrameWaitPlan::RequestRedrawAndWait
+            plan_frame_wait(true, true, now, past, None),
+            FrameWaitPlan::Wait
+        );
+        assert_eq!(
+            plan_frame_wait(true, true, now, past, Some(deadline)),
+            FrameWaitPlan::WaitUntil(deadline)
+        );
+        assert_eq!(
+            plan_frame_wait(true, false, now, past, None),
+            FrameWaitPlan::RequestRedraw(None)
+        );
+        assert_eq!(
+            plan_frame_wait(true, false, now, past, Some(deadline)),
+            FrameWaitPlan::RequestRedraw(Some(deadline))
         );
         let future = now + Duration::from_millis(33);
         assert_eq!(
-            plan_frame_wait(true, false, now, future),
+            plan_frame_wait(true, false, now, future, Some(deadline)),
             FrameWaitPlan::WaitUntil(future)
         );
     }
