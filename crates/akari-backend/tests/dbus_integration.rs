@@ -2,12 +2,11 @@
 
 use std::{
     io::{BufRead, BufReader},
+    os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
     process::{Child, Command, ExitStatus, Stdio},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-
-static TEST_LOCK: std::sync::OnceLock<tokio::sync::Mutex<()>> = std::sync::OnceLock::new();
 
 use futures_util::StreamExt;
 use serde_json::Value;
@@ -20,14 +19,13 @@ use zbus::Proxy;
 
 #[tokio::test]
 async fn auth_roundtrip() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = spawn_server(fake_auth(listener));
     let backend = start_backend(&socket);
 
-    let connection = connect_backend().await;
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
 
     #[cfg(feature = "mock-power")]
@@ -69,15 +67,14 @@ async fn auth_roundtrip() {
 
 #[tokio::test]
 async fn other_callers_cannot_control_or_replace_an_attempt() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
     let server = spawn_server(fake_auth(listener));
-    let _backend = start_backend(&socket);
-    let owner_connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let owner_connection = backend.connect().await;
     let owner = create_proxy(&owner_connection).await;
-    let other_connection = zbus::Connection::session().await.unwrap();
+    let other_connection = backend.connect_client().await;
     let other = create_proxy(&other_connection).await;
     let attempt: String = owner
         .call("BeginAuthentication", &("alice",))
@@ -122,13 +119,12 @@ async fn other_callers_cannot_control_or_replace_an_attempt() {
 
 #[tokio::test]
 async fn same_caller_can_replace_an_attempt() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("replacement");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
     let server = spawn_server(fake_replacement(listener));
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
     let first: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -151,13 +147,12 @@ async fn same_caller_can_replace_an_attempt() {
 
 #[tokio::test]
 async fn owner_disconnect_releases_attempt_for_another_client() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("owner-disconnect");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
     let server = spawn_server(fake_replacement(listener));
-    let _backend = start_backend(&socket);
-    let owner = connect_backend().await;
+    let backend = start_backend(&socket);
+    let owner = backend.connect().await;
     let _: String = create_proxy(&owner)
         .await
         .call("BeginAuthentication", &("alice",))
@@ -165,7 +160,7 @@ async fn owner_disconnect_releases_attempt_for_another_client() {
         .unwrap();
     wait_for_state(&create_proxy(&owner).await, "WaitingForInput").await;
     owner.close().await.unwrap();
-    let other = zbus::Connection::session().await.unwrap();
+    let other = backend.connect_client().await;
     let proxy = create_proxy(&other).await;
     wait_for_state(&proxy, "Idle").await;
     let attempt: String = proxy.call("BeginAuthentication", &("bob",)).await.unwrap();
@@ -176,7 +171,6 @@ async fn owner_disconnect_releases_attempt_for_another_client() {
 
 #[tokio::test]
 async fn owner_disconnect_interrupts_pending_greetd_io() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("disconnect-io");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
@@ -192,8 +186,8 @@ async fn owner_disconnect_interrupts_pending_greetd_io() {
             "cancel must close interrupted protocol exchange"
         );
     });
-    let _backend = start_backend(&socket);
-    let owner = connect_backend().await;
+    let backend = start_backend(&socket);
+    let owner = backend.connect().await;
     let begin_connection = owner.clone();
     let begin = tokio::spawn(async move {
         create_proxy(&begin_connection)
@@ -208,13 +202,12 @@ async fn owner_disconnect_interrupts_pending_greetd_io() {
     assert!(begin.await.unwrap().is_ok());
     owner.close().await.unwrap();
     server.finish().await;
-    let observer = zbus::Connection::session().await.unwrap();
+    let observer = backend.connect_client().await;
     wait_for_state(&create_proxy(&observer).await, "Idle").await;
 }
 
 #[tokio::test]
 async fn cancel_interrupts_io_with_a_full_command_queue() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("queued-cancel");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
@@ -231,8 +224,8 @@ async fn cancel_interrupts_io_with_a_full_command_queue() {
         let mut byte = [0];
         assert_eq!(stream.read(&mut byte).await.unwrap(), 0);
     });
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
     let attempt: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -286,12 +279,8 @@ async fn greeter_bus_disconnect_cleans_authentication_and_exits() {
     let server = spawn_server(fake_cancel(listener));
     let mut command = create_backend_command(&socket);
     command.env("DBUS_SESSION_BUS_ADDRESS", &bus.address);
-    let mut backend = start_backend_command(&socket, command);
-    let connection = zbus::connection::Builder::address(bus.address.as_str())
-        .unwrap()
-        .build()
-        .await
-        .unwrap();
+    let mut backend = start_backend_process(&socket, command);
+    let connection = bus.connect().await;
     wait_for_backend(&connection).await;
     let _: String = create_proxy(&connection)
         .await
@@ -332,7 +321,6 @@ async fn start_accounts_service(address: &str) -> zbus::Connection {
 
 #[tokio::test]
 async fn user_catalog_recovers_after_system_bus_restart() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("accounts-recovery");
     let socket = directory.join("greetd.sock");
     let bus_path = directory.join("system-bus.sock");
@@ -340,8 +328,8 @@ async fn user_catalog_recovers_after_system_bus_restart() {
     let accounts = start_accounts_service(&system_bus.address).await;
     let mut command = create_backend_command(&socket);
     command.env("DBUS_SYSTEM_BUS_ADDRESS", &system_bus.address);
-    let _backend = start_backend_command(&socket, command);
-    let connection = connect_backend().await;
+    let backend = start_backend_command(&socket, command);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
     let users: Vec<(String, String, String)> = proxy.call("ListUsers", &()).await.unwrap();
     assert!(users.is_empty());
@@ -374,7 +362,7 @@ async fn startup_failure_is_logged_with_its_cause() {
         "DBUS_SESSION_BUS_ADDRESS",
         format!("unix:path={}", directory.join("missing-bus").display()),
     );
-    let mut backend = start_backend_command(&socket, command);
+    let mut backend = start_backend_process(&socket, command);
     assert!(!backend.wait_for_exit().await.success());
     let logs = backend.get_logs();
     assert!(logs.contains("startup_failed"));
@@ -383,11 +371,10 @@ async fn startup_failure_is_logged_with_its_cause() {
 
 #[tokio::test]
 async fn greetd_connection_failure_retains_source_in_logs() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("connect-failure");
     let socket = directory.join("missing-greetd.sock");
     let backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
     let result = proxy
         .call::<_, _, String>("BeginAuthentication", &("alice",))
@@ -402,11 +389,10 @@ async fn greetd_connection_failure_retains_source_in_logs() {
 
 #[tokio::test]
 async fn blank_username_is_rejected() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
 
     let result: zbus::Result<String> = proxy.call("BeginAuthentication", &("   ",)).await;
@@ -416,7 +402,6 @@ async fn blank_username_is_rejected() {
 
 #[tokio::test]
 async fn auth_error_without_user_input_does_not_retry() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("no-input-retry");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
@@ -458,8 +443,8 @@ async fn auth_error_without_user_input_does_not_retry() {
             "an automatic PAM acknowledgment must not trigger another login attempt"
         );
     });
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
     let result = tokio::time::timeout(
         Duration::from_secs(2),
@@ -476,7 +461,6 @@ async fn auth_error_without_user_input_does_not_retry() {
 
 #[tokio::test]
 async fn begin_authentication_recovers_after_failed_state() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("retry-after-failed");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
@@ -504,8 +488,8 @@ async fn begin_authentication_recovers_after_failed_state() {
         assert_eq!(response["response"], "password");
         write_response(&mut stream, serde_json::json!({"type": "success"})).await;
     });
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
 
     let first: String = proxy
@@ -528,13 +512,12 @@ async fn begin_authentication_recovers_after_failed_state() {
 
 #[tokio::test]
 async fn wrong_password_prompts_again() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = spawn_server(fake_bad_password_then_prompt(listener));
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
 
     let attempt_id: String = proxy
@@ -568,7 +551,6 @@ async fn wrong_password_prompts_again() {
 
 #[tokio::test]
 async fn invalid_rejection_cleanup_does_not_retry() {
-    let _guard = lock_test_bus().await;
     for unexpected_prompt in [false, true] {
         let directory = temp_dir("rejection-cleanup");
         let socket = directory.join("greetd.sock");
@@ -595,8 +577,8 @@ async fn invalid_rejection_cleanup_does_not_retry() {
                     .is_err()
             );
         });
-        let _backend = start_backend(&socket);
-        let connection = connect_backend().await;
+        let backend = start_backend(&socket);
+        let connection = backend.connect().await;
         let proxy = create_proxy(&connection).await;
         let attempt: String = proxy
             .call("BeginAuthentication", &("alice",))
@@ -616,13 +598,12 @@ async fn invalid_rejection_cleanup_does_not_retry() {
 
 #[tokio::test]
 async fn stale_attempt() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = spawn_server(fake_auth(listener));
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
 
     let _attempt_id: String = proxy
@@ -637,7 +618,6 @@ async fn stale_attempt() {
 
 #[tokio::test]
 async fn respond_without_prompt_is_rejected() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
@@ -647,8 +627,8 @@ async fn respond_without_prompt_is_rejected() {
         assert_eq!(create["type"], "create_session");
         write_response(&mut stream, serde_json::json!({ "type": "success" })).await;
     });
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
 
     let attempt: String = proxy
@@ -669,7 +649,6 @@ async fn respond_without_prompt_is_rejected() {
 
 #[tokio::test]
 async fn facial_authentication_progress_and_password_fallback() {
-    let _guard = lock_test_bus().await;
     for password_fallback in [false, true] {
         let directory = temp_dir("face-auth");
         let socket = directory.join("greetd.sock");
@@ -714,7 +693,7 @@ async fn facial_authentication_progress_and_password_fallback() {
             write_response(&mut stream, serde_json::json!({"type": "success"})).await;
         });
         let mut backend = start_backend_for_sessions(&socket, &sessions);
-        let connection = connect_backend().await;
+        let connection = backend.connect().await;
         let proxy = create_proxy(&connection).await;
         let mut prompts = proxy.receive_signal("Prompt").await.unwrap();
         let attempt: String = tokio::time::timeout(
@@ -754,13 +733,12 @@ async fn facial_authentication_progress_and_password_fallback() {
 
 #[tokio::test]
 async fn bad_session() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = spawn_server(fake_auth(listener));
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
 
     let attempt_id: String = proxy
@@ -784,13 +762,12 @@ async fn bad_session() {
 
 #[tokio::test]
 async fn cancel_to_idle() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = spawn_server(fake_cancel(listener));
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
 
     let attempt_id: String = proxy
@@ -808,13 +785,12 @@ async fn cancel_to_idle() {
 
 #[tokio::test]
 async fn sigterm_cancels_authentication_and_exits() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
     let server = spawn_server(fake_cancel(listener));
     let mut backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
     let _: String = proxy
         .call("BeginAuthentication", &("alice",))
@@ -823,7 +799,7 @@ async fn sigterm_cancels_authentication_and_exits() {
     wait_for_state(&proxy, "WaitingForInput").await;
     assert!(
         Command::new("kill")
-            .args(["-TERM", &backend.child.id().to_string()])
+            .args(["-TERM", &backend.id().to_string()])
             .status()
             .unwrap()
             .success()
@@ -834,11 +810,10 @@ async fn sigterm_cancels_authentication_and_exits() {
 
 #[tokio::test]
 async fn bad_power_action() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
 
     let result: zbus::Result<()> = proxy.call("PowerAction", &("Shutdown",)).await;
@@ -848,7 +823,6 @@ async fn bad_power_action() {
 
 #[tokio::test]
 async fn start_session() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let session_root = temp_dir("sessions");
@@ -856,7 +830,7 @@ async fn start_session() {
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = spawn_server(fake_start(listener, false));
     let mut backend = start_backend_for_sessions(&socket, &session_root);
-    let connection = connect_backend().await;
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
 
     let attempt_id: String = proxy
@@ -878,15 +852,14 @@ async fn start_session() {
 
 #[tokio::test]
 async fn start_session_fails() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("dbus");
     let socket = directory.join("greetd.sock");
     let session_root = temp_dir("sessions-fail");
     write_session(&session_root, "test.desktop", "Test");
     let listener = UnixListener::bind(&socket).expect("fake greetd socket should bind");
     let server = spawn_server(fake_start(listener, true));
-    let _backend = start_backend_for_sessions(&socket, &session_root);
-    let connection = connect_backend().await;
+    let backend = start_backend_for_sessions(&socket, &session_root);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
 
     let attempt_id: String = proxy
@@ -1099,12 +1072,6 @@ async fn fake_start(listener: UnixListener, fail_start: bool) {
     }
 }
 
-async fn connect_backend() -> zbus::Connection {
-    let connection = zbus::Connection::session().await.unwrap();
-    wait_for_backend(&connection).await;
-    connection
-}
-
 async fn wait_for_backend(connection: &zbus::Connection) {
     let proxy = create_proxy(connection).await;
     tokio::time::timeout(Duration::from_secs(3), async {
@@ -1134,19 +1101,20 @@ async fn create_proxy(connection: &zbus::Connection) -> zbus::Proxy<'_> {
     .expect("backend proxy should be available")
 }
 
-async fn lock_test_bus() -> tokio::sync::MutexGuard<'static, ()> {
-    TEST_LOCK
-        .get_or_init(|| tokio::sync::Mutex::new(()))
-        .lock()
-        .await
-}
-
 struct BusProcess {
     child: Child,
     address: String,
 }
 
 impl BusProcess {
+    async fn connect(&self) -> zbus::Connection {
+        zbus::connection::Builder::address(self.address.as_str())
+            .unwrap()
+            .build()
+            .await
+            .unwrap()
+    }
+
     fn stop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
@@ -1159,12 +1127,25 @@ impl Drop for BusProcess {
     }
 }
 
+fn encode_dbus_unix_path(path: &Path) -> String {
+    let mut encoded = String::from("unix:path=");
+    for &byte in path.as_os_str().as_bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.' | b'/' | b'-') {
+            encoded.push(char::from(byte));
+        } else {
+            encoded.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    encoded
+}
+
 fn start_private_bus(path: &Path) -> BusProcess {
-    let address = format!("unix:path={}", path.display());
+    let address = encode_dbus_unix_path(path);
     let child = Command::new("dbus-daemon")
         .args([
             "--session",
             "--nofork",
+            "--nopidfile",
             "--print-address=1",
             "--address",
             &address,
@@ -1222,19 +1203,55 @@ impl Drop for BackendProcess {
     }
 }
 
+/// Pairs a backend child with its dedicated session D-Bus daemon so every test
+/// runs hermetically without requiring or touching an ambient desktop bus.
+/// Field order ensures `process` terminates before `session_bus` is stopped.
+struct TestBackend {
+    process: BackendProcess,
+    session_bus: BusProcess,
+}
+
+impl TestBackend {
+    async fn connect(&self) -> zbus::Connection {
+        let connection = self.session_bus.connect().await;
+        wait_for_backend(&connection).await;
+        connection
+    }
+
+    async fn connect_client(&self) -> zbus::Connection {
+        self.session_bus.connect().await
+    }
+
+    async fn wait_for_exit(&mut self) -> ExitStatus {
+        self.process.wait_for_exit().await
+    }
+
+    fn get_logs(&self) -> String {
+        self.process.get_logs()
+    }
+
+    fn id(&self) -> u32 {
+        self.process.child.id()
+    }
+}
+
 fn create_backend_command(socket: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_backend"));
     command
         .env("GREETD_SOCK", socket)
+        .env(
+            "DBUS_SYSTEM_BUS_ADDRESS",
+            "unix:path=/akari/missing-system-bus",
+        )
         .env("RUST_LOG", "backend=info,warn");
     command
 }
 
-fn start_backend(socket: &Path) -> BackendProcess {
+fn start_backend(socket: &Path) -> TestBackend {
     start_backend_command(socket, create_backend_command(socket))
 }
 
-fn start_backend_for_sessions(socket: &Path, session_root: &Path) -> BackendProcess {
+fn start_backend_for_sessions(socket: &Path, session_root: &Path) -> TestBackend {
     let mut command = create_backend_command(socket);
     command
         .env("AKARI_WAYLAND_SESSIONS", session_root)
@@ -1242,7 +1259,17 @@ fn start_backend_for_sessions(socket: &Path, session_root: &Path) -> BackendProc
     start_backend_command(socket, command)
 }
 
-fn start_backend_command(socket: &Path, mut command: Command) -> BackendProcess {
+fn start_backend_command(socket: &Path, mut command: Command) -> TestBackend {
+    let session_bus = start_private_bus(&socket.with_extension("session-bus"));
+    command.env("DBUS_SESSION_BUS_ADDRESS", &session_bus.address);
+    let process = start_backend_process(socket, command);
+    TestBackend {
+        process,
+        session_bus,
+    }
+}
+
+fn start_backend_process(socket: &Path, mut command: Command) -> BackendProcess {
     let log_path = socket.with_extension("log");
     let output = std::fs::File::create(&log_path).unwrap();
     let child = command
@@ -1343,7 +1370,6 @@ async fn assert_mock_power(proxy: &Proxy<'_>) {
 
 #[tokio::test]
 async fn failed_previous_cancel_does_not_block_replacement_and_prompts_are_sanitized() {
-    let _guard = lock_test_bus().await;
     let directory = temp_dir("replace-sanitized");
     let socket = directory.join("greetd.sock");
     let listener = UnixListener::bind(&socket).unwrap();
@@ -1377,8 +1403,8 @@ async fn failed_previous_cancel_does_not_block_replacement_and_prompts_are_sanit
         assert_eq!(read_request(&mut stream).await["type"], "cancel_session");
         write_response(&mut stream, serde_json::json!({"type": "success"})).await;
     });
-    let _backend = start_backend(&socket);
-    let connection = connect_backend().await;
+    let backend = start_backend(&socket);
+    let connection = backend.connect().await;
     let proxy = create_proxy(&connection).await;
     let mut prompts = proxy.receive_signal("Prompt").await.unwrap();
 
