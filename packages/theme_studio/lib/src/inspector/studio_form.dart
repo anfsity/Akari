@@ -556,6 +556,7 @@ class StudioSelect<T> extends StatefulWidget {
     this.enabled = true,
     this.theme,
     this.regionGroupId,
+    this.above = false,
     super.key,
   });
 
@@ -568,6 +569,7 @@ class StudioSelect<T> extends StatefulWidget {
   final bool enabled;
   final SelectTheme? theme;
   final Object? regionGroupId;
+  final bool above;
 
   @override
   State<StudioSelect<T>> createState() => _StudioSelectState<T>();
@@ -585,9 +587,19 @@ class _StudioSelectState<T> extends State<StudioSelect<T>> {
       ),
       overlayConfiguration: PopoverConfiguration(
         anchor: LinkedAnchor(_anchor),
-        alignment: Alignment.topCenter,
+        alignment: widget.above ? Alignment.bottomCenter : Alignment.topCenter,
+        anchorAlignment: widget.above
+            ? Alignment.topCenter
+            : Alignment.bottomCenter,
         widthConstraint: PopoverConstraint.anchorFixedSize,
-        offset: const Offset(0, 4),
+        offset: Offset(0, widget.above ? -16 : 6),
+        consumeOutsideTaps: false,
+        showDuration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 160),
+        dismissDuration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 100),
         regionGroupId: widget.regionGroupId,
       ),
       value: widget.value,

@@ -1017,15 +1017,16 @@ class _CanvasDock extends StatelessWidget {
                       return SizedBox(
                         width: 132,
                         child: StudioSelect<StudioCanvasPreset>(
+                          above: true,
                           theme: SelectTheme(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 8,
                             ),
                             decoration: (context, states, value) =>
-                                (value as BoxDecoration).copyWith(
-                                  border: const Border(),
-                                  color: Colors.transparent,
+                                ButtonVariance.ghost.decoration(
+                                  context,
+                                  states,
                                 ),
                           ),
                           key: const ValueKey('quick-resolution'),
