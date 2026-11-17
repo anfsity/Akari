@@ -101,6 +101,7 @@ class FrameTimingRecorder {
     }
     activePhase = phase;
     final firstFrame = Completer<void>();
+    firstFrame.future.ignore();
     _actionFrame = firstFrame;
     try {
       await action();

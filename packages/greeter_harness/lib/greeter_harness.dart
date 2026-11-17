@@ -1,7 +1,7 @@
 /// Preview journeys and performance instrumentation shared by theme fixtures.
 library;
 
-export 'package:akari_cli/akari_cli.dart' show previewScenarioNames;
+export 'package:scene_schema/preview_scenarios.dart' show previewScenarioNames;
 
 export 'src/preview/journey.dart';
 export 'src/performance/frame_metrics.dart';

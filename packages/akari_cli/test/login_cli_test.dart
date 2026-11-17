@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:test/test.dart';
 
@@ -85,7 +86,12 @@ Future<void> main(List<String> arguments) async {
     final dart = getDartCommand(_repoRoot);
     return Process.run(
       dart.first,
-      [...dart.skip(1), runner.path, ...arguments],
+      [
+        ...dart.skip(1),
+        '--packages=${Isolate.packageConfigSync!.toFilePath()}',
+        runner.path,
+        ...arguments,
+      ],
       workingDirectory: temporary.path,
       environment: {
         'PATH': '${bin.path}:${Platform.environment['PATH']}',

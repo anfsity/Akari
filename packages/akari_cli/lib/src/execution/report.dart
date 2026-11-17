@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'model.dart';
 import 'paths.dart';
+import 'process.dart' show getStepLogName;
 import 'redaction.dart';
 
 /// Owns the event stream and presentation for one run. Command-specific result
@@ -86,11 +87,11 @@ class RunReport {
               if (step.action != null) 'in_process': true,
               'stdout_log': getJoinedPath(
                 runDirectory,
-                '${step.id}.stdout.log',
+                '${getStepLogName(step.id)}.stdout.log',
               ),
               'stderr_log': getJoinedPath(
                 runDirectory,
-                '${step.id}.stderr.log',
+                '${getStepLogName(step.id)}.stderr.log',
               ),
             },
         ],

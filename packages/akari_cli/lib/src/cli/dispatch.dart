@@ -31,15 +31,20 @@ Future<int> runCliCommand(CliCommand command, CliArguments input) async {
       return 0;
     case 'install':
     case 'uninstall':
-    case 'login enable':
-    case 'login disable':
-    case 'login rollback':
     case 'login configure-keyring':
     case 'login enable-gaze':
     case 'login disable-gaze':
+      return runLoginCommand(command, arguments, repoRoot: findRepositoryRoot());
+    case 'login enable':
+    case 'login disable':
+    case 'login rollback':
     case 'login status':
     case 'login logs':
-      return runLoginCommand(command, arguments, repoRoot: findRepositoryRoot());
+      return runLoginCommand(
+        command,
+        arguments,
+        repoRoot: _findOptionalRepositoryRoot(),
+      );
     case 'greetd-test install':
     case 'greetd-test start':
     case 'greetd-test restore':
@@ -79,5 +84,13 @@ Future<int> runCliCommand(CliCommand command, CliArguments input) async {
         DevCommandOptions.parse(command, input),
         repoRoot,
       );
+  }
+}
+
+Directory? _findOptionalRepositoryRoot() {
+  try {
+    return findRepositoryRoot();
+  } on StateError {
+    return null;
   }
 }

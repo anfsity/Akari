@@ -1,1 +1,1 @@
-const previewScenarioNames = ['face-success', 'password-fallback'];
+export 'package:scene_schema/preview_scenarios.dart' show previewScenarioNames;

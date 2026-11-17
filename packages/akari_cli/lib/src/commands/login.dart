@@ -10,7 +10,7 @@ const loginInstallationPath = '/opt/akari';
 Future<int> runLoginCommand(
   CliCommand command,
   List<String> arguments, {
-  required Directory repoRoot,
+  Directory? repoRoot,
   Directory? installation,
 }) async {
   final values = getCliOptionValues(command, arguments);
@@ -32,16 +32,20 @@ Future<int> runLoginCommand(
         )
       : 4;
   final controller = File('${root.path}/manage.py');
-  final script =
+  final needsRepoScript =
       const {
-            'install',
-            'uninstall',
-            'configure-keyring',
-            'enable-gaze',
-            'disable-gaze',
-          }.contains(operation) ||
-          (query && !controller.existsSync())
-      ? File('${repoRoot.path}/scripts/login/manage.py')
+        'install',
+        'uninstall',
+        'configure-keyring',
+        'enable-gaze',
+        'disable-gaze',
+      }.contains(operation) ||
+      (query && !controller.existsSync() && repoRoot != null);
+  if (needsRepoScript && repoRoot == null) {
+    throw StateError('Run akari $operation from inside an Akari repository.');
+  }
+  final script = needsRepoScript
+      ? File('${repoRoot!.path}/scripts/login/manage.py')
       : controller;
   final privilege = <String>[];
   if (!query) {
@@ -82,7 +86,7 @@ Future<int> runLoginCommand(
   ];
   final build = operation == 'install'
       ? [
-          ...getDartCommand(repoRoot),
+          ...getDartCommand(repoRoot!),
           '${repoRoot.path}/packages/akari_cli/bin/akari.dart',
           'build',
           '--theme',
@@ -109,7 +113,7 @@ Future<int> runLoginCommand(
           ...invocation,
           if (build != null) ...[
             '--source',
-            repoRoot.path,
+            repoRoot!.path,
             '--bundle',
             '<successful-build-bundle>',
             '--backend',
@@ -130,6 +134,7 @@ Future<int> runLoginCommand(
   }
   if (build == null) return _runInvocation(invocation);
 
+  final sourceRoot = repoRoot!;
   stderr.writeln('Building the production theme and backend without root...');
   final process = await Process.start(build.first, build.skip(1).toList());
   final output = process.stdout
@@ -145,13 +150,13 @@ Future<int> runLoginCommand(
   }
   final report = jsonDecode(reportText) as Map<String, dynamic>;
   final artifacts = report['artifacts'] as Map<String, dynamic>;
-  final bundle = File('${repoRoot.path}/${artifacts['executable']}').parent;
-  final backend = File('${repoRoot.path}/${artifacts['backend_executable']}');
-  stderr.writeln('Build report: ${repoRoot.path}/${report['report_path']}');
+  final bundle = File('${sourceRoot.path}/${artifacts['executable']}').parent;
+  final backend = File('${sourceRoot.path}/${artifacts['backend_executable']}');
+  stderr.writeln('Build report: ${sourceRoot.path}/${report['report_path']}');
   final temporary = await Directory.systemTemp.createTemp('akari-login-');
   try {
     final capture = await Process.run('python3', [
-      '${repoRoot.path}/scripts/greetd-test/display-layout.py',
+      '${sourceRoot.path}/scripts/greetd-test/display-layout.py',
       'capture',
     ]);
     File? layout;
@@ -166,13 +171,13 @@ Future<int> runLoginCommand(
     return await _runInvocation([
       ...invocation,
       '--source',
-      repoRoot.path,
+      sourceRoot.path,
       '--bundle',
       bundle.path,
       '--backend',
       backend.path,
       '--splash',
-      '${repoRoot.path}/${artifacts['splash_executable']}',
+      '${sourceRoot.path}/${artifacts['splash_executable']}',
       if (layout != null) ...['--layout', layout.path],
     ]);
   } finally {

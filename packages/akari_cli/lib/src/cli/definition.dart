@@ -209,7 +209,7 @@ const cliOptions = {
     '--component',
     'Production log component (default: service journal).',
     valueName: 'NAME',
-    values: ['service', 'backend', 'flutter', 'sway'],
+    values: ['service', 'backend', 'flutter', 'sway', 'lifecycle', 'bus'],
   ),
 };
 
@@ -554,8 +554,7 @@ Map<String, String> getCliOptionValues(
     } else if (equals >= 0) {
       value = argument.substring(equals + 1);
     } else {
-      if (index + 1 >= arguments.length ||
-          arguments[index + 1].startsWith('-')) {
+      if (index + 1 >= arguments.length || _isOptionFlag(arguments[index + 1])) {
         throw FormatException('Missing value for ${option.name}.');
       }
       value = arguments[++index];
@@ -595,3 +594,6 @@ enum DevelopmentCommand {
     _ => true,
   };
 }
+
+bool _isOptionFlag(String argument) =>
+    argument.startsWith('-') && !RegExp(r'^-[0-9]').hasMatch(argument);

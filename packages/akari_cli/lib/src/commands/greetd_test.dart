@@ -27,7 +27,7 @@ Future<int> runGreetdTestCommand(
   final callerUid = uid == '0' ? Platform.environment['SUDO_UID'] ?? uid : uid;
 
   if (command.name == 'greetd-test status') {
-    final status = await getGreetdTestStatus(root, callerUid);
+    final status = await readGreetdTestStatus(root, callerUid);
     if (values['--format'] == 'json') {
       stdout.writeln(jsonEncode(status));
     } else {
@@ -174,7 +174,7 @@ File getGreetdTestLogFile(
   return File('${sessions.first.path}/$log.log');
 }
 
-Future<Map<String, Object?>> getGreetdTestStatus(
+Future<Map<String, Object?>> readGreetdTestStatus(
   Directory installation,
   String callerUid,
 ) async {

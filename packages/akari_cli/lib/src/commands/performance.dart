@@ -104,7 +104,7 @@ RunPlan createPerformancePlan(
       'performance_output': output,
       'performance_result': '$output/result.json',
     },
-    getCompletion: (result) => getPerformanceCompletion(
+    getCompletion: (result) => readPerformanceCompletion(
       repoRoot,
       File(getAbsolutePath(repoRoot, '$output/result.json')),
       result,
@@ -134,7 +134,7 @@ RunPlan createPerformancePlan(
   );
 }
 
-Future<RunCompletion> getPerformanceCompletion(
+Future<RunCompletion> readPerformanceCompletion(
   Directory repoRoot,
   File manifest,
   RunResult result,

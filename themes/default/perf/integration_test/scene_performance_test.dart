@@ -57,11 +57,11 @@ void main() {
     }
 
     Future<void> tracePhase(String name, Future<void> Function() action) async {
-      developer.Timeline.startSync(name);
+      final task = developer.TimelineTask()..start(name);
       try {
         await action();
       } finally {
-        developer.Timeline.finishSync();
+        task.finish();
       }
     }
 

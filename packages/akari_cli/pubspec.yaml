@@ -9,6 +9,8 @@ environment:
 
 dependencies:
   path: ^1.9.1
+  scene_schema:
+    path: ../scene_schema
   theme_project:
     path: ../theme_project
   yaml: ^3.1.3

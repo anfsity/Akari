@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
+
 import '../execution/model.dart';
 import '../execution/paths.dart';
 import '../sdk_commands.dart';
@@ -9,43 +12,109 @@ import '../theme/scene_generation.dart';
 import 'plan.dart';
 import 'theme.dart' show createBackendBuildStep;
 
+const _standaloneWorkflowSuites = [
+  'test/workflows/greetd_test_workflow_test.py',
+  'test/workflows/greetd_screenshot_test.py',
+  'test/workflows/display_profile_test.py',
+  'test/workflows/display_layout_test.py',
+  'test/workflows/sway_session_test.py',
+];
+
 RunPlan createVerificationPlan(
   Directory repoRoot,
   String runDirectory,
   List<ThemePackage> themes, {
   required bool selectedThemeOnly,
 }) {
+  final generationThemes = [...themes];
+  final defaultThemeDirectory = Directory(
+    getJoinedPath(repoRoot.path, 'themes/default'),
+  );
+  final defaultSceneOutput = File(
+    getJoinedPath(repoRoot.path, 'themes/default/lib/default.scene.g.dart'),
+  );
+  if (selectedThemeOnly &&
+      !generationThemes.any((t) => t.packageName == 'theme_default') &&
+      defaultThemeDirectory.existsSync() &&
+      !defaultSceneOutput.existsSync()) {
+    generationThemes.add(getThemePackage(defaultThemeDirectory));
+  }
   final sceneSteps = [
-    for (final theme in themes) 'scenes.generate_${theme.packageName}',
+    for (final theme in generationThemes)
+      'scenes.generate_${theme.packageName}',
   ];
+  final defaultSceneStep = sceneSteps.contains('scenes.generate_theme_default')
+      ? const ['scenes.generate_theme_default']
+      : const <String>[];
+  final externalThemes = [
+    for (final theme in generationThemes)
+      if (!_isWorkspaceMember(repoRoot, theme.directory)) theme,
+  ];
+  final externalPubGetIds = {
+    for (final theme in externalThemes)
+      theme.packageName: '${theme.packageName}.pub_get',
+  };
+
   return RunPlan(
     command: 'verify',
     themes: themes,
     steps: [
-      RunStep(
+      const RunStep(
         id: 'toolchain.check',
         command: ['bash', 'scripts/check-toolchain.sh'],
-        dependencies: const [],
+        dependencies: [],
       ),
-      RunStep(
+      const RunStep(
         id: 'rust.format',
         command: ['cargo', 'fmt', '--all', '--', '--check'],
         workingDirectory: 'crates',
-        dependencies: const [],
+        dependencies: [],
       ),
-      RunStep(
+      const RunStep(
         id: 'rust.check',
         command: ['cargo', 'check', '--locked', '--workspace'],
         workingDirectory: 'crates',
-        dependencies: const ['rust.format'],
+        dependencies: ['rust.format'],
       ),
-      RunStep(
+      const RunStep(
+        id: 'rust.clippy',
+        command: [
+          'cargo',
+          'clippy',
+          '--locked',
+          '--workspace',
+          '--all-targets',
+          '--',
+          '-D',
+          'warnings',
+        ],
+        workingDirectory: 'crates',
+        dependencies: ['rust.check'],
+      ),
+      const RunStep(
+        id: 'rust.clippy_mock',
+        command: [
+          'cargo',
+          'clippy',
+          '--locked',
+          '--workspace',
+          '--all-targets',
+          '--features',
+          'mock',
+          '--',
+          '-D',
+          'warnings',
+        ],
+        workingDirectory: 'crates',
+        dependencies: ['rust.check'],
+      ),
+      const RunStep(
         id: 'backend.test',
         command: ['cargo', 'test', '--locked', '--', '--test-threads=1'],
         workingDirectory: 'crates/akari-backend',
-        dependencies: const ['rust.check'],
+        dependencies: ['rust.check'],
       ),
-      RunStep(
+      const RunStep(
         id: 'backend.test_mock',
         command: [
           'cargo',
@@ -57,31 +126,47 @@ RunPlan createVerificationPlan(
           '--test-threads=1',
         ],
         workingDirectory: 'crates/akari-backend',
-        dependencies: const ['rust.check'],
+        dependencies: ['rust.check'],
       ),
-      RunStep(
+      const RunStep(
         id: 'splash.test',
         command: ['cargo', 'test', '--locked'],
         workingDirectory: 'crates/akari-splash',
-        dependencies: const ['rust.check'],
+        dependencies: ['rust.check'],
       ),
-      for (final theme in themes)
+      if (_standaloneWorkflowSuites.any(
+        (suite) => File(getJoinedPath(repoRoot.path, suite)).existsSync(),
+      ))
         RunStep(
-          id: '${theme.packageName}.pub_get',
+          id: 'workflows.test',
+          command: [
+            'python3',
+            '-m',
+            'unittest',
+            for (final suite in _standaloneWorkflowSuites)
+              if (File(getJoinedPath(repoRoot.path, suite)).existsSync()) suite,
+          ],
+          dependencies: const [],
+        ),
+      RunStep(
+        id: 'workspace.pub_get',
+        command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+        workingDirectory: '.',
+        dependencies: const [],
+      ),
+      for (final theme in externalThemes)
+        RunStep(
+          id: externalPubGetIds[theme.packageName]!,
           command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
           workingDirectory: theme.directory.path,
-          dependencies: const [],
+          dependencies: const ['workspace.pub_get'],
         ),
       ...createSceneGenerationSteps(
         repoRoot,
-        themes,
-        dependenciesFor: (theme) => ['${theme.packageName}.pub_get'],
-      ),
-      RunStep(
-        id: 'greeter.pub_get',
-        command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
-        workingDirectory: 'apps/greeter',
-        dependencies: const [],
+        generationThemes,
+        dependenciesFor: (theme) => [
+          externalPubGetIds[theme.packageName] ?? 'workspace.pub_get',
+        ],
       ),
       RunStep(
         id: 'flutter.analyze',
@@ -94,13 +179,13 @@ RunPlan createVerificationPlan(
           if (!selectedThemeOnly) 'lib/main.dart',
         ],
         workingDirectory: 'apps/greeter',
-        dependencies: ['greeter.pub_get', ...sceneSteps],
+        dependencies: ['workspace.pub_get', ...sceneSteps],
       ),
       RunStep(
         id: 'flutter.test',
         command: [...getFlutterCommand(repoRoot), 'test'],
         workingDirectory: 'apps/greeter',
-        dependencies: ['greeter.pub_get', ...sceneSteps],
+        dependencies: ['workspace.pub_get', ...sceneSteps],
       ),
       for (final packageName in [
         'scene_schema',
@@ -116,20 +201,17 @@ RunPlan createVerificationPlan(
         'greeter_components',
         'theme_sdk',
         'theme_studio',
-      ]) ...[
-        RunStep(
-          id: '$packageName.pub_get',
-          command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
-          workingDirectory: 'packages/$packageName',
-          dependencies: const [],
-        ),
+      ])
         ..._getFlutterPackageVerificationSteps(
           repoRoot,
           Directory(getJoinedPath(repoRoot.path, 'packages/$packageName')),
           packageName,
-          dependencies: ['$packageName.pub_get'],
+          dependencies: [
+            'workspace.pub_get',
+            if (packageName == 'greeter_ui' || packageName == 'greeter_harness')
+              ...defaultSceneStep,
+          ],
         ),
-      ],
       for (final theme in themes)
         ..._getFlutterPackageVerificationSteps(
           repoRoot,
@@ -148,7 +230,7 @@ RunPlan createVerificationPlan(
           'test/dbus_gateway_smoke.dart',
         ],
         workingDirectory: 'apps/greeter',
-        dependencies: ['backend.build', 'greeter.pub_get', ...sceneSteps],
+        dependencies: ['backend.build', 'workspace.pub_get', ...sceneSteps],
         environment: {
           'AKARI_BACKEND_BIN': getAbsolutePath(
             repoRoot,
@@ -159,6 +241,20 @@ RunPlan createVerificationPlan(
       ),
     ],
   );
+}
+
+bool _isWorkspaceMember(Directory repoRoot, Directory packageDirectory) {
+  final rootPath = p.normalize(repoRoot.absolute.path);
+  final packagePath = p.normalize(packageDirectory.absolute.path);
+  if (!p.isWithin(rootPath, packagePath)) {
+    return false;
+  }
+  final pubspec = File(p.join(packagePath, 'pubspec.yaml'));
+  if (!pubspec.existsSync()) {
+    return false;
+  }
+  final parsed = loadYaml(pubspec.readAsStringSync());
+  return parsed is Map && parsed['resolution'] == 'workspace';
 }
 
 List<RunStep> _getFlutterPackageVerificationSteps(
@@ -200,15 +296,14 @@ List<RunStep> _getDartPackageVerificationSteps(
   final dart = getDartCommand(repoRoot);
   return [
     for (final operation in [
-      ('pub_get', ['pub', 'get'], const <String>[]),
-      ('analyze', ['analyze'], ['$packageName.pub_get']),
-      ('test', ['test'], ['$packageName.pub_get']),
+      ('analyze', ['analyze']),
+      ('test', ['test']),
     ])
       RunStep(
         id: '$packageName.${operation.$1}',
         command: [...dart, ...operation.$2],
         workingDirectory: 'packages/$packageName',
-        dependencies: operation.$3,
+        dependencies: const ['workspace.pub_get'],
       ),
   ];
 }

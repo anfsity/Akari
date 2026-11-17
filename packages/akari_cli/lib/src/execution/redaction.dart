@@ -29,7 +29,8 @@ class SecretRedactor {
     r'pam[_-]?(?:secret|password|response|answer)',
   ];
   static final _credentialName = '(?:${_credentialNames.join('|')})';
-  static const _quotedOrBareValue = r"""(?:"[^"]*"|'[^']*'|[^\s,;]+)""";
+  static const _quotedOrBareValue =
+      r'''(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;]+)''';
 
   // Environment names match complete words; PAM response/answer variables also
   // occur with provider-specific prefixes. Printed assignments and CLI options
@@ -40,9 +41,9 @@ class SecretRedactor {
     caseSensitive: false,
   );
   static final _sensitiveAssignment = RegExp(
-    r"""(["']?"""
+    r'''(["']?(?<![A-Za-z0-9_-])'''
     '$_credentialName'
-    r"""["']?\s*[:=]\s*)"""
+    r'''["']?\s*[:=]\s*)'''
     '$_quotedOrBareValue',
     caseSensitive: false,
   );

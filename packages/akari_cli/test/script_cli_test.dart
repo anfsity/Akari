@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:test/test.dart';
 
@@ -55,6 +56,7 @@ Future<void> main(List<String> arguments) async {
       ]) {
         final result = await Process.run(dart.first, [
           ...dart.skip(1),
+          '--packages=${Isolate.packageConfigSync!.toFilePath()}',
           runner.path,
           ...command,
           '--',

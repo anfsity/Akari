@@ -6,6 +6,23 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$script_dir/lib.sh"
 repo_root="$(akari_repo_root)"
 missing=0
+require_runtime=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --runtime)
+      require_runtime=1
+      ;;
+    --help|-h)
+      printf 'Usage: %s [--runtime]\n' "${BASH_SOURCE[0]}"
+      exit 0
+      ;;
+    *)
+      printf 'Unknown option: %s\n' "$arg" >&2
+      exit 2
+      ;;
+  esac
+done
 
 check_command() {
   local command_name="$1"
@@ -13,6 +30,29 @@ check_command() {
     printf 'ok   %-20s %s\n' "$command_name" "$(command -v "$command_name")"
   else
     printf 'miss %-20s\n' "$command_name"
+    missing=1
+  fi
+}
+
+check_runtime_command() {
+  local command_name="$1"
+  if command -v "$command_name" >/dev/null 2>&1; then
+    printf 'ok   %-20s %s\n' "$command_name" "$(command -v "$command_name")"
+  elif [[ "$require_runtime" -eq 1 ]]; then
+    printf 'miss %-20s\n' "$command_name"
+    missing=1
+  else
+    printf 'warn %-20s not installed; needed for Sway/greetd runtime targets\n' "$command_name"
+  fi
+}
+
+check_pkg_config() {
+  local module_name="$1"
+  local description="$2"
+  if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists "$module_name"; then
+    printf 'ok   %-20s %s\n' "$module_name" "$description"
+  else
+    printf 'miss %-20s install %s\n' "$module_name" "$description"
     missing=1
   fi
 }
@@ -33,24 +73,13 @@ check_command dbus-daemon
 check_command busctl
 check_command setpriv
 check_command setsid
-check_command grim
 check_command clang
 check_command cmake
 check_command ninja
 check_command pkg-config
-if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists libseat; then
-  printf 'ok   %-20s libseat development files\n' libseat
-else
-  printf 'miss %-20s install libseat development files\n' libseat
-  missing=1
-fi
-
-if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists gtk+-3.0; then
-  printf 'ok   %-20s GTK 3 development files\n' gtk+-3.0
-else
-  printf 'miss %-20s install the gtk3 package\n' gtk+-3.0
-  missing=1
-fi
+check_pkg_config libseat 'libseat development files'
+check_pkg_config gtk+-3.0 'GTK 3 development files'
+check_pkg_config epoxy 'libepoxy development files'
 
 if command -v cargo >/dev/null 2>&1 && [[ -f "$repo_root/crates/akari-backend/Cargo.toml" ]]; then
   if cargo metadata \
@@ -105,9 +134,10 @@ check_sdk() {
 check_sdk flutter "${flutter_command[@]}"
 check_sdk dart "${dart_command[@]}"
 
-check_command sway
-check_command swaybg
-check_command greetd
+check_runtime_command sway
+check_runtime_command swaybg
+check_runtime_command grim
+check_runtime_command greetd
 
 if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
   printf 'ok   %-20s %s\n' WAYLAND_DISPLAY "$WAYLAND_DISPLAY"

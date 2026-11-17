@@ -3,8 +3,12 @@ import 'dart:io';
 import 'project.dart';
 import 'model.dart';
 
-Map<String, String> getBuildLinkPaths(ThemePackage theme) => {
-  'bundle_link': 'build/out/${theme.packageName.substring('theme_'.length)}',
+Map<String, String> getBuildLinkPaths(
+  ThemePackage theme, {
+  bool includeBundleLink = true,
+}) => {
+  if (includeBundleLink)
+    'bundle_link': 'build/out/${theme.packageName.substring('theme_'.length)}',
   'backend_link': 'build/out/backend',
   'splash_link': 'build/out/akari-splash',
 };
@@ -15,8 +19,9 @@ Map<String, String> getBuildLinkPaths(ThemePackage theme) => {
 Future<void> updateBuildLinks(
   Directory repoRoot,
   ThemePackage theme,
-  BuildMode buildMode,
-) async {
+  BuildMode buildMode, {
+  bool includeBundleLink = true,
+}) async {
   final host = getThemeHostDirectory(theme, ThemeHostKind.greeter);
   final frontend = getLinuxExecutablePath(host, buildMode);
   final backend = getBackendExecutablePath(BackendMode.real, buildMode);
@@ -26,7 +31,7 @@ Future<void> updateBuildLinks(
     'backend_link': backend,
     'splash_link': splash,
   };
-  final paths = getBuildLinkPaths(theme);
+  final paths = getBuildLinkPaths(theme, includeBundleLink: includeBundleLink);
   if (paths['bundle_link'] == paths['backend_link'] ||
       paths['bundle_link'] == paths['splash_link']) {
     throw FormatException(

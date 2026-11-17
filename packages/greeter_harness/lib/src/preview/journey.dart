@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:akari_cli/akari_cli.dart' show previewScenarioNames;
+import 'package:scene_schema/preview_scenarios.dart' show previewScenarioNames;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

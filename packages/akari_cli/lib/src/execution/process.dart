@@ -6,6 +6,9 @@ import 'model.dart';
 import 'paths.dart';
 import 'redaction.dart';
 
+String getStepLogName(String stepId) =>
+    stepId.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
+
 Future<StepResult> runStep({
   required RunStep step,
   required Directory repoRoot,
@@ -13,10 +16,11 @@ Future<StepResult> runStep({
   required String runDirectory,
   required RunOutputFormat format,
   required SecretRedactor redactor,
+  Future<void>? abortSignal,
 }) async {
   final startedAt = DateTime.now().toUtc();
   final stopwatch = Stopwatch()..start();
-  final logName = step.id.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
+  final logName = getStepLogName(step.id);
   final stdoutPath = getJoinedPath(runDirectoryPath, '$logName.stdout.log');
   final stderrPath = getJoinedPath(runDirectoryPath, '$logName.stderr.log');
   final stdoutLog = File(stdoutPath).openWrite();
@@ -51,6 +55,15 @@ Future<StepResult> runStep({
           }),
         );
       }
+      var terminatedByAbort = false;
+      if (!step.interactive && abortSignal != null) {
+        unawaited(
+          abortSignal.then((_) {
+            terminatedByAbort = true;
+            Process.killPid(-process.pid, ProcessSignal.sigterm);
+          }),
+        );
+      }
       if (step.interactive) {
         if (terminal) {
           stdin.lineMode = false;
@@ -72,6 +85,9 @@ Future<StepResult> runStep({
       );
       processExitCode = await process.exitCode;
       await Future.wait([stdoutCopy, stderrCopy]);
+      if (terminatedByAbort && processExitCode != 0) {
+        failure ??= 'Aborted after another step failed.';
+      }
     }
   } catch (error) {
     failure = error;

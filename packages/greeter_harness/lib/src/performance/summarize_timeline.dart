@@ -114,6 +114,7 @@ List<TimelineEvent> readDartTimelineEvents(List<Object?> traceEvents) {
   // Separate stacks by process/thread so scopes cannot close another thread's
   // event when names repeat during concurrent rendering work.
   final openEvents = <String, List<_OpenTimelineEvent>>{};
+  final openAsyncEvents = <String, _OpenAsyncTimelineEvent>{};
   final completeEvents = <TimelineEvent>[];
 
   for (final value in traceEvents) {
@@ -159,6 +160,31 @@ List<TimelineEvent> readDartTimelineEvents(List<Object?> traceEvents) {
           ),
         );
       }
+    } else if (phase == 'b' && name is String) {
+      final asyncKey = '${value['pid']}:${value['id'] ?? name}';
+      openAsyncEvents[asyncKey] = _OpenAsyncTimelineEvent(
+        name: name,
+        threadId: threadId,
+        timestampMicros: timestamp.toInt(),
+      );
+    } else if (phase == 'e') {
+      final asyncKey = '${value['pid']}:${value['id'] ?? name}';
+      final start = openAsyncEvents.remove(asyncKey);
+      if (start == null) {
+        continue;
+      }
+      final durationMicros = timestamp.toInt() - start.timestampMicros;
+      if (durationMicros > 0) {
+        completeEvents.add(
+          TimelineEvent(
+            name: start.name,
+            threadId: start.threadId,
+            startMicros: start.timestampMicros,
+            endMicros: timestamp.toInt(),
+            durationMs: durationMicros / 1000,
+          ),
+        );
+      }
     } else if (phase == 'X' && name is String && value['dur'] is num) {
       final durationMs = (value['dur'] as num) / 1000;
       if (durationMs > 0) {
@@ -195,6 +221,18 @@ class _OpenTimelineEvent {
   const _OpenTimelineEvent({required this.name, required this.timestampMicros});
 
   final String name;
+  final int timestampMicros;
+}
+
+class _OpenAsyncTimelineEvent {
+  const _OpenAsyncTimelineEvent({
+    required this.name,
+    required this.threadId,
+    required this.timestampMicros,
+  });
+
+  final String name;
+  final int threadId;
   final int timestampMicros;
 }
 

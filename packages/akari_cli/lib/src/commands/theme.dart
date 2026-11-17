@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import '../execution/model.dart';
 import '../theme/preview_scenarios.dart';
 import '../execution/paths.dart';
@@ -21,6 +23,7 @@ RunPlan createBuildPlan(
   int? jobs,
 }) {
   final host = getThemeHostDirectory(theme, ThemeHostKind.greeter);
+  final includeBundleLink = !_conflictsWithBuiltinTheme(repoRoot, theme);
   return RunPlan(
     command: 'build',
     themes: [theme],
@@ -31,7 +34,7 @@ RunPlan createBuildPlan(
       if (platform == 'linux') ...{
         'executable': getLinuxExecutablePath(host, mode),
         'splash_executable': getSplashExecutablePath(mode),
-        ...getBuildLinkPaths(theme),
+        ...getBuildLinkPaths(theme, includeBundleLink: includeBundleLink),
       },
     },
     steps: [
@@ -72,7 +75,12 @@ RunPlan createBuildPlan(
             'splash.build',
             'flutter.build_linux',
           ],
-          action: () => updateBuildLinks(repoRoot, theme, mode),
+          action: () => updateBuildLinks(
+            repoRoot,
+            theme,
+            mode,
+            includeBundleLink: includeBundleLink,
+          ),
         ),
     ],
   );
@@ -157,10 +165,12 @@ RunPlan createThemeRunPlan(
         dependencies: [if (hasBackend) 'backend.build', 'theme.host.pub_get'],
         interactive: true,
         environment: {
-          if (kind == ThemeHostKind.studio)
+          if (kind == ThemeHostKind.studio) ...{
             'AKARI_THEME_DIRECTORIES_JSON': jsonEncode(
               themes.map((project) => project.directory.path).toList(),
             ),
+            'AKARI_WINDOW_TITLE': 'Akari Theme Studio',
+          },
           'AKARI_DISPLAY_MODE': kind == ThemeHostKind.studio
               ? 'single'
               : 'mirror',
@@ -387,4 +397,19 @@ List<RunStep> _createHostPreparationSteps(
       dependencies: const ['theme.host.generate'],
     ),
   ];
+}
+
+bool _conflictsWithBuiltinTheme(Directory repoRoot, ThemePackage theme) {
+  final themesRoot = Directory(p.join(repoRoot.path, 'themes'));
+  if (!themesRoot.existsSync()) {
+    return false;
+  }
+  final normalizedRoot = p.normalize(themesRoot.absolute.path);
+  final normalizedTheme = p.normalize(theme.directory.absolute.path);
+  if (p.isWithin(normalizedRoot, normalizedTheme)) {
+    return false;
+  }
+  return findThemePackages(
+    repoRoot,
+  ).any((builtin) => builtin.packageName == theme.packageName);
 }
