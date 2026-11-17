@@ -6,13 +6,15 @@
 //! callers never submit an arbitrary `Exec` command.
 
 use std::{
+    collections::HashSet,
     env, fs, io,
     path::{Path, PathBuf},
 };
 
 use thiserror::Error;
 
-pub(crate) const DEFAULT_SESSION_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
+pub(crate) const DEFAULT_SESSION_PATH: &str =
+    "/usr/local/bin:/usr/bin:/bin:/run/current-system/sw/bin";
 
 /// Errors encountered while reading a configured session directory.
 #[derive(Debug, Error)]
@@ -69,19 +71,42 @@ pub struct SessionCatalog {
 
 impl Default for SessionCatalog {
     fn default() -> Self {
-        let wayland_root = env::var_os("AKARI_WAYLAND_SESSIONS")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("/usr/share/wayland-sessions"));
-        let x11_root = env::var_os("AKARI_X11_SESSIONS")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("/usr/share/xsessions"));
-
-        Self::from_roots(wayland_root, x11_root)
+        let wayland_roots = find_session_roots("AKARI_WAYLAND_SESSIONS", "wayland-sessions");
+        let x11_roots = find_session_roots("AKARI_X11_SESSIONS", "xsessions");
+        let mut roots = Vec::with_capacity(wayland_roots.len() + x11_roots.len());
+        roots.extend(
+            wayland_roots
+                .into_iter()
+                .map(|root| (SessionType::Wayland, root)),
+        );
+        roots.extend(x11_roots.into_iter().map(|root| (SessionType::X11, root)));
+        Self { roots }
     }
 }
 
+fn find_session_roots(override_var: &str, subdir: &str) -> Vec<PathBuf> {
+    if let Some(paths) = env::var_os(override_var).filter(|value| !value.is_empty()) {
+        return env::split_paths(&paths).collect();
+    }
+    if let Some(data_dirs) = env::var_os("XDG_DATA_DIRS").filter(|value| !value.is_empty()) {
+        return env::split_paths(&data_dirs)
+            .filter(|dir| dir.is_absolute())
+            .map(|dir| dir.join(subdir))
+            .collect();
+    }
+    [
+        "/usr/local/share",
+        "/usr/share",
+        "/run/current-system/sw/share",
+    ]
+    .into_iter()
+    .map(|dir| Path::new(dir).join(subdir))
+    .collect()
+}
+
 impl SessionCatalog {
-    /// Creates a catalog from explicit roots, primarily for isolated tests and alternate layouts.
+    /// Creates a catalog from explicit roots for isolated tests.
+    #[cfg(test)]
     pub fn from_roots(wayland_root: PathBuf, x11_root: PathBuf) -> Self {
         Self {
             roots: vec![
@@ -98,6 +123,7 @@ impl SessionCatalog {
     /// while failures reading an existing directory are returned.
     pub fn list(&self) -> Result<Vec<SessionEntry>, SessionCatalogError> {
         let mut sessions = Vec::new();
+        let mut seen_ids = HashSet::new();
 
         for (session_type, root) in &self.roots {
             let entries = match fs::read_dir(root) {
@@ -125,7 +151,15 @@ impl SessionCatalog {
                     continue;
                 }
 
+                let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
+                    continue;
+                };
+                let session_id = format!("{}:{stem}", session_type.as_str());
+                if seen_ids.contains(&session_id) {
+                    continue;
+                }
                 if let Some(session) = parse_session_file(&path, *session_type) {
+                    seen_ids.insert(session_id);
                     sessions.push(session);
                 }
             }
@@ -163,8 +197,8 @@ fn parse_session_file(path: &Path, session_type: SessionType) -> Option<SessionE
     }
 
     let name = fields.get("Name")?.to_owned();
-    let mut exec = tokenize_exec(fields.get("Exec")?).ok()?;
-    if exec.is_empty() || exec.iter().any(|token| token.contains(['%', '\0'])) {
+    let mut exec = expand_exec_tokens(tokenize_exec(fields.get("Exec")?).ok()?)?;
+    if exec.is_empty() {
         return None;
     }
     exec[0] = resolve_command(&exec[0])?;
@@ -220,33 +254,40 @@ fn parse_desktop_entry(contents: &str) -> std::collections::BTreeMap<String, Str
             continue;
         }
 
-        let Some((key, value)) = line.split_once('=') else {
+        let Some((raw_key, raw_value)) = line.split_once('=') else {
             continue;
         };
-        if key.contains('[') {
+        let key = raw_key.trim();
+        if key.is_empty() || key.contains('[') {
             continue;
         }
-        fields.insert(key.to_owned(), unescape_desktop_value(value));
+        let value = raw_value.trim_start();
+        fields.insert(key.to_owned(), unescape_desktop_value(value, key == "Exec"));
     }
 
     fields
 }
 
 /// Decodes the desktop-entry escapes needed by session metadata and commands.
-fn unescape_desktop_value(value: &str) -> String {
+fn unescape_desktop_value(value: &str, preserve_exec_escapes: bool) -> String {
     let mut result = String::with_capacity(value.len());
     let mut escaped = false;
 
     for character in value.chars() {
         if escaped {
-            result.push(match character {
-                's' => ' ',
-                'n' => '\n',
-                't' => '\t',
-                'r' => '\r',
-                '\\' => '\\',
-                other => other,
-            });
+            match character {
+                's' => result.push(' '),
+                'n' => result.push('\n'),
+                't' => result.push('\t'),
+                'r' => result.push('\r'),
+                '\\' if !preserve_exec_escapes => result.push('\\'),
+                other => {
+                    if preserve_exec_escapes {
+                        result.push('\\');
+                    }
+                    result.push(other);
+                }
+            }
             escaped = false;
         } else if character == '\\' {
             escaped = true;
@@ -261,11 +302,47 @@ fn unescape_desktop_value(value: &str) -> String {
     result
 }
 
+/// Unescapes literal `%%` sequences, strips empty file/URL field codes after
+/// the executable, and rejects NUL bytes or unsupported `%` substitutions.
+fn expand_exec_tokens(tokens: Vec<String>) -> Option<Vec<String>> {
+    let mut expanded = Vec::with_capacity(tokens.len());
+    for (index, token) in tokens.into_iter().enumerate() {
+        if token.contains('\0') {
+            return None;
+        }
+        if index > 0
+            && matches!(
+                token.as_str(),
+                "%f" | "%F" | "%u" | "%U" | "%d" | "%D" | "%n" | "%N" | "%v" | "%m"
+            )
+        {
+            continue;
+        }
+        if !token.contains('%') {
+            expanded.push(token);
+            continue;
+        }
+        let mut unescaped = String::with_capacity(token.len());
+        let mut chars = token.chars();
+        while let Some(ch) = chars.next() {
+            if ch == '%' {
+                if chars.next() != Some('%') {
+                    return None;
+                }
+                unescaped.push('%');
+            } else {
+                unescaped.push(ch);
+            }
+        }
+        expanded.push(unescaped);
+    }
+    Some(expanded)
+}
+
 /// Tokenizes an `Exec=` value while preserving quoted arguments.
 ///
-/// This implements the small command-line grammar needed for these desktop
-/// entries; field-code substitutions are rejected by the caller. Unclosed
-/// quotes and trailing escapes return `Err(())`.
+/// This implements the command-line grammar needed for session desktop entries.
+/// Unclosed quotes and trailing escapes return `Err(())`.
 /// Quotes group arguments; shell expansion, pipelines, and redirections are
 /// not interpreted here. The greetd transport quotes the resulting argv for
 /// greetd's sh execution boundary.
@@ -288,7 +365,7 @@ fn tokenize_exec(value: &str) -> Result<Vec<String>, ()> {
         }
         match quote {
             Some(current_quote) if character == current_quote => quote = None,
-            Some(_) if character == '\\' => escaped = true,
+            Some('"') if character == '\\' => escaped = true,
             Some(_) => token.push(character),
             None if character == '\\' => escaped = true,
             None if character == '\'' || character == '"' => quote = Some(character),

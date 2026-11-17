@@ -73,14 +73,25 @@ pub fn start_session() -> io::Result<()> {
     // state directory before the executor creates the desktop session log.
     let mut log = open_session_log_or_null("startup")?;
     let shell = env::var_os("SHELL")
+        .filter(|value| !value.is_empty())
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "PAM did not supply SHELL"))?;
     let _ = writeln!(log, "event=native_shell_start shell={shell:?}");
-    let error = Command::new(&shell)
-        .args([
+    let shell_name = Path::new(&shell).file_name().and_then(|name| name.to_str());
+    let shell_args: &[&str] = match shell_name {
+        Some("nu") => &[
+            "-l",
+            "-c",
+            "exec $env.AKARI_SESSION_EXECUTABLE --exec-desktop",
+        ],
+        Some("csh" | "tcsh") => &["-c", "exec \"$AKARI_SESSION_EXECUTABLE\" --exec-desktop"],
+        _ => &[
             "-l",
             "-c",
             "exec \"$AKARI_SESSION_EXECUTABLE\" --exec-desktop",
-        ])
+        ],
+    };
+    let error = Command::new(&shell)
+        .args(shell_args)
         .stdout(Stdio::from(log.try_clone()?))
         .stderr(Stdio::from(log.try_clone()?))
         .exec();
