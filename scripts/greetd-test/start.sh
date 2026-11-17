@@ -22,7 +22,9 @@ if [[ "$EUID" -ne 0 ]]; then
   exit 1
 fi
 
+umask 077
 exec 9>/run/lock/akari-test.lock
+umask 022
 flock -n 9 || { echo 'Another test setup is running.' >&2; exit 1; }
 IFS=: read -r _ _ log_uid _ _ _ _ < <(getent passwd "${SUDO_USER:-root}")
 log_root="${log_root:-/var/tmp/akari-greetd-test-$log_uid}"

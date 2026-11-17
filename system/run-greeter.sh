@@ -3,12 +3,29 @@ set -uo pipefail
 exec >> "$AKARI_LOG_DIR/lifecycle.log" 2>&1
 frontend_pid=''
 watcher_pid=''
+terminate_child() {
+  local pid="$1"
+  if [[ -z "$pid" ]]; then
+    return 0
+  fi
+  if kill -0 "$pid" >/dev/null 2>&1; then
+    kill "$pid" >/dev/null 2>&1 || true
+    for _ in {1..30}; do
+      if ! kill -0 "$pid" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 0.1
+    done
+    if kill -0 "$pid" >/dev/null 2>&1; then
+      kill -KILL "$pid" >/dev/null 2>&1 || true
+    fi
+  fi
+  wait "$pid" >/dev/null 2>&1 || true
+}
+
 cleanup() {
   for child in "$watcher_pid" "$frontend_pid"; do
-    if [[ -n "$child" ]]; then
-      kill "$child" >/dev/null 2>&1 || true
-      wait "$child" >/dev/null 2>&1 || true
-    fi
+    terminate_child "$child"
   done
   swaymsg exit >/dev/null 2>&1 || true
 }
@@ -24,10 +41,10 @@ frontend_pid=$!
 (
   while kill -0 "$frontend_pid" >/dev/null 2>&1; do
     if ! busctl --user status io.akari.Greeter >/dev/null 2>&1; then
-      kill "$frontend_pid" >/dev/null 2>&1 || true
+      terminate_child "$frontend_pid"
       break
     fi
-    sleep 1
+    sleep 0.2
   done
 ) &
 watcher_pid=$!

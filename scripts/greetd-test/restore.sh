@@ -7,7 +7,9 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 # Parent start.sh already holds akari-test.lock during synchronous EXIT cleanup.
 if [[ "${AKARI_TEST_LOCK_PARENT:-}" != "$PPID" ]]; then
+  umask 077
   exec 9>/run/lock/akari-test.lock
+  umask 022
   flock 9
 fi
 if [[ "${1:-}" != --service-stopped ]]; then

@@ -129,21 +129,35 @@ def run_greeter(layout, command):
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
                 print(f'Display layout update failed: {error}', file=sys.stderr)
 
-        with subprocess.Popen(command) as app:
-            handlers = {}
-            for signum in [signal.SIGTERM, signal.SIGINT]:
-                handlers[signum] = signal.signal(
-                    signum, lambda received, frame: app.send_signal(received))
-            watcher = threading.Thread(target=update_on_output_changes)
-            watcher.start()
-            try:
-                return app.wait()
-            finally:
-                events.shutdown(socket.SHUT_RDWR)
-                watcher.join(timeout=5)
-                stream.close()
-                for signum, handler in handlers.items():
-                    signal.signal(signum, handler)
+        app_ref = [None]
+        pending_signal = [None]
+
+        def forward_signal(received, frame):
+            if app_ref[0] is not None:
+                app_ref[0].send_signal(received)
+            else:
+                pending_signal[0] = received
+
+        handlers = {
+            signum: signal.signal(signum, forward_signal)
+            for signum in [signal.SIGTERM, signal.SIGINT]
+        }
+        try:
+            with subprocess.Popen(command) as app:
+                app_ref[0] = app
+                if pending_signal[0] is not None:
+                    app.send_signal(pending_signal[0])
+                watcher = threading.Thread(target=update_on_output_changes)
+                watcher.start()
+                try:
+                    return app.wait()
+                finally:
+                    events.shutdown(socket.SHUT_RDWR)
+                    watcher.join(timeout=5)
+                    stream.close()
+        finally:
+            for signum, handler in handlers.items():
+                signal.signal(signum, handler)
 
 
 def main():

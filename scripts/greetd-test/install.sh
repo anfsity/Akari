@@ -12,7 +12,9 @@ if [[ "$EUID" -ne 0 ]]; then
   echo 'Run this installer with sudo to build and install the test artifacts.' >&2
   exit 1
 fi
+umask 077
 exec 9>/run/lock/akari-test.lock
+umask 022
 flock -n 9 || { echo 'Another test setup is running.' >&2; exit 1; }
 for unit in akari-test.service akari-restore.timer; do
   if systemctl is-active --quiet "$unit"; then
@@ -117,5 +119,14 @@ if [[ "$EUID" -eq 0 ]]; then
   chown greeter:greeter "$test_root/state"
 fi
 trap - EXIT
+shopt -s nullglob
+old_backups=( "$test_root/backups"/* )
+shopt -u nullglob
+if (( ${#old_backups[@]} > 10 )); then
+  mapfile -t sorted_backups < <(ls -1dt -- "${old_backups[@]}" 2>/dev/null)
+  for stale_backup in "${sorted_backups[@]:10}"; do
+    [[ -L "$stale_backup" ]] || rm -rf -- "$stale_backup"
+  done
+fi
 echo "Installed test files; previous version: $backup"
 echo 'No display manager was started or stopped.'

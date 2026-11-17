@@ -6,13 +6,30 @@ set -euo pipefail
 splash_pid=''
 compositor_pid=''
 splash_status=0
+terminate_child() {
+  local pid="$1"
+  if [[ -z "$pid" ]]; then
+    return 0
+  fi
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+    for _ in {1..30}; do
+      if ! kill -0 "$pid" 2>/dev/null; then
+        break
+      fi
+      sleep 0.1
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+  fi
+  wait "$pid" 2>/dev/null || true
+}
+
 cleanup() {
   trap '' INT TERM HUP
   for child in "$splash_pid" "$compositor_pid"; do
-    if [[ -n "$child" ]]; then
-      kill "$child" 2>/dev/null || true
-      wait "$child" 2>/dev/null || true
-    fi
+    terminate_child "$child"
   done
   # Sway exec children have no controlling terminal. Keep VT cleanup in this
   # launcher, which retains greetd's terminal until the compositor has exited.

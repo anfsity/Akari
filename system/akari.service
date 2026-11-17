@@ -6,8 +6,8 @@ StartLimitIntervalSec=30
 StartLimitBurst=5
 
 [Service]
-Type=simple
-ExecStart=/usr/bin/greetd --config /etc/akari/greetd.toml
+Type=idle
+ExecStart=/bin/sh -c 'exec "${AKARI_GREETD_BIN:-$(command -v greetd || printf /usr/bin/greetd)}" --config /etc/akari/greetd.toml'
 IgnoreSIGPIPE=no
 SendSIGHUP=yes
 TimeoutStopSec=30

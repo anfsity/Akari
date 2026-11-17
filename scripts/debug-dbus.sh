@@ -47,22 +47,46 @@ command_pid=''
 bus_pid=''
 bus_directory=''
 
+terminate_pid() {
+  local pid="$1"
+  if [[ -z "$pid" ]]; then
+    return 0
+  fi
+  if kill -0 "$pid" >/dev/null 2>&1; then
+    kill "$pid" >/dev/null 2>&1 || true
+    for _ in {1..30}; do
+      if ! kill -0 "$pid" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 0.1
+    done
+    if kill -0 "$pid" >/dev/null 2>&1; then
+      kill -KILL "$pid" >/dev/null 2>&1 || true
+    fi
+  fi
+  wait "$pid" >/dev/null 2>&1 || true
+}
+
+escape_dbus_path() {
+  local raw="$1" out="" ch hex
+  local LC_ALL=C i
+  for (( i = 0; i < ${#raw}; i++ )); do
+    ch="${raw:i:1}"
+    if [[ "$ch" =~ [0-9A-Za-z_./-] ]]; then
+      out+="$ch"
+    else
+      printf -v hex '%%%02X' "'$ch"
+      out+="$hex"
+    fi
+  done
+  printf '%s' "$out"
+}
+
 cleanup() {
   trap '' INT TERM HUP
-  if [[ -n "$command_pid" ]] && kill -0 "$command_pid" >/dev/null 2>&1; then
-    kill "$command_pid" >/dev/null 2>&1 || true
-    wait "$command_pid" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "$backend_pid" ]] && kill -0 "$backend_pid" >/dev/null 2>&1; then
-    kill "$backend_pid" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "$backend_pid" ]]; then
-    wait "$backend_pid" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "$bus_pid" ]]; then
-    kill "$bus_pid" >/dev/null 2>&1 || true
-    wait "$bus_pid" >/dev/null 2>&1 || true
-  fi
+  terminate_pid "$command_pid"
+  terminate_pid "$backend_pid"
+  terminate_pid "$bus_pid"
   if [[ -n "$bus_directory" ]]; then
     rm -rf -- "$bus_directory"
   fi
@@ -81,7 +105,7 @@ if [[ "$inside_private_bus" -eq 0 ]]; then
   # Own normal shutdown and also bind the bus to this supervisor's lifetime.
   # greetd teardown can end the launcher before its shell traps finish.
   bus_directory="$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/akari-bus-XXXXXXXX")"
-  export DBUS_SESSION_BUS_ADDRESS="unix:path=$bus_directory/bus"
+  export DBUS_SESSION_BUS_ADDRESS="unix:path=$(escape_dbus_path "$bus_directory/bus")"
   export AKARI_PRIVATE_BUS=1
   setpriv --pdeathsig TERM dbus-daemon --session --nofork --nopidfile \
     --address="$DBUS_SESSION_BUS_ADDRESS" > "$log_dir/bus.log" 2>&1 &
@@ -125,10 +149,11 @@ if [[ "$start_backend" -eq 1 ]]; then
   akari_require_command busctl
   if [[ -n "${AKARI_BACKEND_BIN:-}" ]]; then
     akari_require_file "$AKARI_BACKEND_BIN" 'built backend executable'
-    "$AKARI_BACKEND_BIN" >"$log_dir/backend.log" 2>&1 &
+    resolved_backend="$AKARI_BACKEND_BIN"
   else
-    "$script_dir/run-backend.sh" "--$backend_mode" >"$log_dir/backend.log" 2>&1 &
+    resolved_backend="$("$script_dir/run-backend.sh" "--$backend_mode" --print-bin 2>>"$log_dir/backend.log")"
   fi
+  "$resolved_backend" >>"$log_dir/backend.log" 2>&1 &
   backend_pid=$!
 
   backend_ready=0

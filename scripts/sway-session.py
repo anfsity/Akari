@@ -14,6 +14,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 
@@ -149,7 +150,10 @@ def start_session(directory, backend, command):
     parent_environment = dict(os.environ)
     hyprland = (backend == 'wayland' and not parent_environment.get('SWAYSOCK')
                 and bool(parent_environment.get('HYPRLAND_INSTANCE_SIGNATURE')))
-    runtime = directory / 'runtime'
+    # Keep Unix domain sockets in a short /tmp directory so deeply nested repo
+    # paths never overflow the 108-byte sockaddr_un.sun_path limit.
+    runtime = Path(tempfile.mkdtemp(prefix='akari-sway-'))
+    runtime.chmod(0o700)
     screenshots = directory / 'screenshots'
     directory.mkdir(parents=True, exist_ok=True)
     screenshots.mkdir()
@@ -189,7 +193,6 @@ def start_session(directory, backend, command):
           f'{" (user overrides)" if profile["custom"] else ""}\n'
           f'Target outputs: {json.dumps(target)}\n'
           f'Sway logs: {directory}\nInner screenshots: {screenshots}', flush=True)
-    runtime.mkdir(mode=0o700)
     try:
         for executable in ['sway', 'swaymsg', 'grim']:
             if shutil.which(executable) is None:

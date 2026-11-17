@@ -8,13 +8,15 @@ repo_root="$(akari_repo_root)"
 
 mode=mock
 profile=debug
+print_bin=0
 
 usage() {
   printf '%s\n' \
-    'Usage: scripts/run-backend.sh [--mock|--real] [--release]' \
-    '  --mock       Build the deterministic mock greetd transport (default).' \
-    '  --real       Build the production transport using GREETD_SOCK.' \
-    '  --release    Build the backend in release mode.'
+    'Usage: scripts/run-backend.sh [--mock|--real] [--release] [--print-bin]' \
+    '  --mock         Build the deterministic mock greetd transport (default).' \
+    '  --real         Build the production transport using GREETD_SOCK.' \
+    '  --release      Build the backend in release mode.' \
+    '  --print-bin    Build and print the binary path without executing it.'
 }
 
 while [[ "$#" -gt 0 ]]; do
@@ -27,6 +29,9 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --release)
       profile=release
+      ;;
+    --print-bin)
+      print_bin=1
       ;;
     -h|--help)
       usage
@@ -58,12 +63,21 @@ if [[ "$profile" == release ]]; then
 fi
 
 cd -- "$repo_root"
-cargo "${build_args[@]}"
+if [[ "$print_bin" -eq 1 ]]; then
+  cargo "${build_args[@]}" >&2
+else
+  cargo "${build_args[@]}"
+fi
 
 backend_binary="$repo_root/crates/target/akari-$mode/$profile/backend"
 if [[ ! -x "$backend_binary" ]]; then
   printf 'Backend binary was not produced: %s\n' "$backend_binary" >&2
   exit 1
+fi
+
+if [[ "$print_bin" -eq 1 ]]; then
+  printf '%s\n' "$backend_binary"
+  exit 0
 fi
 
 exec "$backend_binary"
