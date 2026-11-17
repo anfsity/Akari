@@ -462,7 +462,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   }
 
   Future<void> _runAssetAction(
-    Future<void> Function(SceneEditor editor, bool Function() isCurrent) action, {
+    Future<void> Function(SceneEditor editor, bool Function() isCurrent)
+    action, {
     required String errorPrefix,
     bool requiresSelection = false,
   }) async {
@@ -488,25 +489,23 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     }
   }
 
-  Future<void> _applyBackground(String asset) => _runAssetAction((
-    editor,
-    isCurrent,
-  ) async {
-    final file = _assets.findFile(asset);
-    if (file == null) {
-      throw FormatException('Asset "$asset" is not a local theme file.');
-    }
-    final bytes = await file.readAsBytes();
-    final codec = await ui.instantiateImageCodec(bytes);
-    codec.dispose();
-    if (!isCurrent()) return;
-    editor.updateScene(
-      background: editor.document.background.copyWith(
-        kind: SceneBackgroundKind.image,
-        asset: asset,
-      ),
-    );
-  }, errorPrefix: 'Cannot use image');
+  Future<void> _applyBackground(String asset) =>
+      _runAssetAction((editor, isCurrent) async {
+        final file = _assets.findFile(asset);
+        if (file == null) {
+          throw FormatException('Asset "$asset" is not a local theme file.');
+        }
+        final bytes = await file.readAsBytes();
+        final codec = await ui.instantiateImageCodec(bytes);
+        codec.dispose();
+        if (!isCurrent()) return;
+        editor.updateScene(
+          background: editor.document.background.copyWith(
+            kind: SceneBackgroundKind.image,
+            asset: asset,
+          ),
+        );
+      }, errorPrefix: 'Cannot use image');
 
   Future<void> _applyFont(String asset) => _runAssetAction(
     (editor, isCurrent) async {
@@ -521,24 +520,22 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     requiresSelection: true,
   );
 
-  Future<void> _placeAsset(SceneAsset asset) => _runAssetAction((
-    editor,
-    isCurrent,
-  ) async {
-    if (asset.kind == SceneAssetKind.svg) {
-      final source = await _assets.loadTextAsset(asset.path);
-      final picture = await vg.loadPicture(SvgStringLoader(source), null);
-      picture.picture.dispose();
-    } else {
-      final bytes = await _assets.loadBytes(asset.path);
-      final codec = await ui.instantiateImageCodec(
-        bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
-      );
-      codec.dispose();
-    }
-    if (!isCurrent()) return;
-    editor.createAssetNode(asset);
-  }, errorPrefix: 'Cannot place asset');
+  Future<void> _placeAsset(SceneAsset asset) =>
+      _runAssetAction((editor, isCurrent) async {
+        if (asset.kind == SceneAssetKind.svg) {
+          final source = await _assets.loadTextAsset(asset.path);
+          final picture = await vg.loadPicture(SvgStringLoader(source), null);
+          picture.picture.dispose();
+        } else {
+          final bytes = await _assets.loadBytes(asset.path);
+          final codec = await ui.instantiateImageCodec(
+            bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
+          );
+          codec.dispose();
+        }
+        if (!isCurrent()) return;
+        editor.createAssetNode(asset);
+      }, errorPrefix: 'Cannot place asset');
 
   void _save() {
     final editor = _editor;
@@ -556,101 +553,24 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   Future<void> _createScene(BuildContext context) async {
     if (!await _confirmSwitch(context) || !context.mounted) return;
-    final name = TextEditingController(text: 'new-scene');
-    String? error;
-    try {
-      final path = await showOverlay<String>(
-        context,
-        const DialogConfiguration(),
-        builder: (context) => StatefulBuilder(
-          builder: (context, update) => AlertDialog(
-            title: const Text('New scene'),
-            content: SizedBox(
-              width: 320,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Start with an empty artboard in the current theme.',
-                  ),
-                  const Gap(12),
-                  TextField(
-                    key: const ValueKey('new-scene-name'),
-                    controller: name,
-                  ),
-                  if (error != null) StudioFormError(error!),
-                ],
-              ),
-            ),
-            actions: [
-              OutlineButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              PrimaryButton(
-                key: const ValueKey('confirm-new-scene'),
-                onPressed: () {
-                  final id = name.text.trim();
-                  if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(id)) {
-                    update(() => error = 'Use a lower-case scene name.');
-                    return;
-                  }
-                  final file = File(
-                    '${_assets.directory.path}/lib/$id.scene.json',
-                  );
-                  if (file.existsSync()) {
-                    update(() => error = 'This scene already exists.');
-                    return;
-                  }
-                  try {
-                    final source = encodeSceneDocument(
-                      SceneDocument(
-                        id: id,
-                        version: currentSceneVersion,
-                        canvas: _editor?.document.canvas ?? const SceneCanvas(),
-                        background: const SceneBackground(
-                          kind: SceneBackgroundKind.solid,
-                        ),
-                        nodes: const [
-                          SceneNode(
-                            id: 'artboard',
-                            componentId: 'frame',
-                            layout: SceneLayout(),
-                            rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
-                          ),
-                        ],
-                      ),
-                    );
-                    writeFileAtomically(
-                      file,
-                      '$source\n',
-                      tempName: '$id.scene.json',
-                    );
-                    Navigator.of(context).pop(file.path);
-                  } on FileSystemException catch (failure) {
-                    update(() => error = failure.message);
-                  }
-                },
-                child: const Text('Create scene'),
-              ),
-            ],
-          ),
-        ),
-      ).future;
-      if (mounted && path != null) {
-        final projectKey = _getCanonicalDirectoryPath(_project.directory);
-        if (_assets.directory.path == projectKey) {
-          final created = _createdScenesByProject.putIfAbsent(
-            projectKey,
-            () => [],
-          );
-          if (!created.contains(path)) created.add(path);
-        }
-        setState(() => _openScene(path));
+    final path = await showOverlay<String>(
+      context,
+      const DialogConfiguration(),
+      builder: (context) => _NewSceneDialog(
+        directoryPath: _assets.directory.path,
+        canvas: _editor?.document.canvas ?? const SceneCanvas(),
+      ),
+    ).future;
+    if (mounted && path != null) {
+      final projectKey = _getCanonicalDirectoryPath(_project.directory);
+      if (_assets.directory.path == projectKey) {
+        final created = _createdScenesByProject.putIfAbsent(
+          projectKey,
+          () => [],
+        );
+        if (!created.contains(path)) created.add(path);
       }
-    } finally {
-      name.dispose();
+      setState(() => _openScene(path));
     }
   }
 
@@ -715,39 +635,25 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         onCreateTheme: () => _openCreateTheme(context),
         onCreateScene: () => _createScene(context),
       ),
-      sidebar: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          StudioThemeSelector(
-            projects: _projects,
-            selected: _project,
-            onChanged: (project) => unawaited(_switchTheme(project, context)),
-          ),
-          const Divider(),
-          Expanded(
-            child: StudioSidebar(
-              scenePaths: _scenePaths,
-              assetPaths: _assetPaths,
-              resolveAssetImage: _assets.getImageProvider,
-              loadAssetText: _assets.loadTextAsset,
-              loadFontPreview: _assets.loadFontPreview,
-              onPlaceAsset: _placeAsset,
-              onApplyFont: _applyFont,
-              editor: editor,
-              loadingFile: _loadingFile,
-              readOnly: _inspect,
-              onLoadJson: () => _loadJson(context),
-              onSwitchScene: (path) => _switchScene(path, context),
-              onImportAsset: _importAsset,
-              onApplyBackground:
-                  _theme.bundle.backgrounds.containsKey(
-                    SceneBackgroundKind.image,
-                  )
-                  ? _applyBackground
-                  : null,
-            ),
-          ),
-        ],
+      sidebar: _StudioProjectSidebar(
+        projects: _projects,
+        selectedProject: _project,
+        onSwitchTheme: (project) => unawaited(_switchTheme(project, context)),
+        scenePaths: _scenePaths,
+        assetPaths: _assetPaths,
+        assets: _assets,
+        editor: editor,
+        loadingFile: _loadingFile,
+        readOnly: _inspect,
+        supportsImageBackground: _theme.bundle.backgrounds.containsKey(
+          SceneBackgroundKind.image,
+        ),
+        onPlaceAsset: _placeAsset,
+        onApplyFont: _applyFont,
+        onLoadJson: () => _loadJson(context),
+        onSwitchScene: (path) => _switchScene(path, context),
+        onImportAsset: _importAsset,
+        onApplyBackground: _applyBackground,
       ),
       canvas: StudioCanvas(
         key: _canvasKey,
@@ -764,67 +670,21 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       ),
       inspector: editor == null
           ? const SizedBox()
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  child: Tabs(
-                    index: _inspect
-                        ? 2
-                        : _effects
-                        ? 1
-                        : 0,
-                    expand: true,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 8,
-                    ),
-                    onChanged: (index) {
-                      if (!editor.tryApplyDraft()) return;
-                      setState(() {
-                        _inspect = index == 2;
-                        _effects = index == 1;
-                      });
-                    },
-                    children: [
-                      for (final label in ['Design', 'Effects', 'Inspect code'])
-                        TabItem(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              label,
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                            ).small(),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                Expanded(
-                  child: _inspect
-                      ? CodeInspector(key: ObjectKey(editor), editor: editor)
-                      : _effects
-                      ? StudioEffectsInspector(
-                          editor: editor,
-                          theme: _theme,
-                          assets: _assets,
-                          onAssetsChanged: () =>
-                              setState(() => _assetPaths = _assets.getAssets()),
-                        )
-                      : NodeInspector(
-                          editor: editor,
-                          controller: editor.inspector,
-                          componentCatalog: editor.componentCatalog,
-                          onApply: editor.tryApplyDraft,
-                        ),
-                ),
-              ],
+          : _StudioInspectorPane(
+              editor: editor,
+              theme: _theme,
+              assets: _assets,
+              inspect: _inspect,
+              effects: _effects,
+              onSelectTab: (index) {
+                if (!editor.tryApplyDraft()) return;
+                setState(() {
+                  _inspect = index == 2;
+                  _effects = index == 1;
+                });
+              },
+              onAssetsChanged: () =>
+                  setState(() => _assetPaths = _assets.getAssets()),
             ),
       statusBar: StudioStatusBar(
         path: _path,
@@ -835,4 +695,229 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       ),
     );
   }
+}
+
+class _StudioProjectSidebar extends StatelessWidget {
+  const _StudioProjectSidebar({
+    required this.projects,
+    required this.selectedProject,
+    required this.onSwitchTheme,
+    required this.scenePaths,
+    required this.assetPaths,
+    required this.assets,
+    required this.editor,
+    required this.loadingFile,
+    required this.readOnly,
+    required this.supportsImageBackground,
+    required this.onPlaceAsset,
+    required this.onApplyFont,
+    required this.onLoadJson,
+    required this.onSwitchScene,
+    required this.onImportAsset,
+    required this.onApplyBackground,
+  });
+
+  final List<StudioThemeProject> projects;
+  final StudioThemeProject selectedProject;
+  final ValueChanged<StudioThemeProject> onSwitchTheme;
+  final List<String> scenePaths;
+  final List<String> assetPaths;
+  final StudioAssets assets;
+  final SceneEditor? editor;
+  final bool loadingFile;
+  final bool readOnly;
+  final bool supportsImageBackground;
+  final ValueChanged<SceneAsset> onPlaceAsset;
+  final ValueChanged<String> onApplyFont;
+  final VoidCallback onLoadJson;
+  final ValueChanged<String> onSwitchScene;
+  final VoidCallback onImportAsset;
+  final ValueChanged<String> onApplyBackground;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      StudioThemeSelector(
+        projects: projects,
+        selected: selectedProject,
+        onChanged: onSwitchTheme,
+      ),
+      const Divider(),
+      Expanded(
+        child: StudioSidebar(
+          scenePaths: scenePaths,
+          assetPaths: assetPaths,
+          resolveAssetImage: assets.getImageProvider,
+          loadAssetText: assets.loadTextAsset,
+          loadFontPreview: assets.loadFontPreview,
+          onPlaceAsset: onPlaceAsset,
+          onApplyFont: onApplyFont,
+          editor: editor,
+          loadingFile: loadingFile,
+          readOnly: readOnly,
+          onLoadJson: onLoadJson,
+          onSwitchScene: onSwitchScene,
+          onImportAsset: onImportAsset,
+          onApplyBackground: supportsImageBackground ? onApplyBackground : null,
+        ),
+      ),
+    ],
+  );
+}
+
+class _StudioInspectorPane extends StatelessWidget {
+  const _StudioInspectorPane({
+    required this.editor,
+    required this.theme,
+    required this.assets,
+    required this.inspect,
+    required this.effects,
+    required this.onSelectTab,
+    required this.onAssetsChanged,
+  });
+
+  final SceneEditor editor;
+  final ThemeDefinition theme;
+  final StudioAssets assets;
+  final bool inspect;
+  final bool effects;
+  final ValueChanged<int> onSelectTab;
+  final VoidCallback onAssetsChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Tabs(
+          index: inspect
+              ? 2
+              : effects
+              ? 1
+              : 0,
+          expand: true,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          onChanged: onSelectTab,
+          children: [
+            for (final label in ['Design', 'Effects', 'Inspect code'])
+              TabItem(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                  ).small(),
+                ),
+              ),
+          ],
+        ),
+      ),
+      const Divider(),
+      Expanded(
+        child: inspect
+            ? CodeInspector(key: ObjectKey(editor), editor: editor)
+            : effects
+            ? StudioEffectsInspector(
+                editor: editor,
+                theme: theme,
+                assets: assets,
+                onAssetsChanged: onAssetsChanged,
+              )
+            : NodeInspector(
+                editor: editor,
+                controller: editor.inspector,
+                componentCatalog: editor.componentCatalog,
+                onApply: editor.tryApplyDraft,
+              ),
+      ),
+    ],
+  );
+}
+
+class _NewSceneDialog extends StatefulWidget {
+  const _NewSceneDialog({required this.directoryPath, required this.canvas});
+
+  final String directoryPath;
+  final SceneCanvas canvas;
+
+  @override
+  State<_NewSceneDialog> createState() => _NewSceneDialogState();
+}
+
+class _NewSceneDialogState extends State<_NewSceneDialog> {
+  final _name = TextEditingController(text: 'new-scene');
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _create() {
+    final id = _name.text.trim();
+    if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(id)) {
+      setState(() => _error = 'Use a lower-case scene name.');
+      return;
+    }
+    final file = File('${widget.directoryPath}/lib/$id.scene.json');
+    if (file.existsSync()) {
+      setState(() => _error = 'This scene already exists.');
+      return;
+    }
+    try {
+      final source = encodeSceneDocument(
+        SceneDocument(
+          id: id,
+          version: currentSceneVersion,
+          canvas: widget.canvas,
+          background: const SceneBackground(kind: SceneBackgroundKind.solid),
+          nodes: const [
+            SceneNode(
+              id: 'artboard',
+              componentId: 'frame',
+              layout: SceneLayout(),
+              rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
+            ),
+          ],
+        ),
+      );
+      writeFileAtomically(file, '$source\n', tempName: '$id.scene.json');
+      Navigator.of(context).pop(file.path);
+    } on FileSystemException catch (failure) {
+      setState(() => _error = failure.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('New scene'),
+    content: SizedBox(
+      width: 320,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Start with an empty artboard in the current theme.'),
+          const Gap(12),
+          TextField(key: const ValueKey('new-scene-name'), controller: _name),
+          if (_error != null) StudioFormError(_error!),
+        ],
+      ),
+    ),
+    actions: [
+      OutlineButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Cancel'),
+      ),
+      PrimaryButton(
+        key: const ValueKey('confirm-new-scene'),
+        onPressed: _create,
+        child: const Text('Create scene'),
+      ),
+    ],
+  );
 }
