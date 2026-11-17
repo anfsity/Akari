@@ -891,8 +891,18 @@ class _NewSceneDialogState extends State<_NewSceneDialog> {
       setState(() => _error = 'Use a lower-case scene name.');
       return;
     }
-    final file = File('${widget.directoryPath}/lib/$id.scene.json');
-    if (file.existsSync()) {
+    final file = findConfinedFile(
+      Directory(widget.directoryPath),
+      'lib/$id.scene.json',
+    );
+    if (file == null) {
+      setState(
+        () => _error = 'Scene files must stay inside the current theme.',
+      );
+      return;
+    }
+    if (FileSystemEntity.typeSync(file.path, followLinks: false) !=
+        FileSystemEntityType.notFound) {
       setState(() => _error = 'This scene already exists.');
       return;
     }

@@ -35,20 +35,35 @@ class StudioShaderCompiler {
       <String, ({String source, Future<ui.FragmentProgram> program})>{};
   final _dispatchLocks = <String, Future<void>>{};
 
-  static final _localIncludePattern = RegExp(
-    r'^\s*#\s*include\s+"([^"]*)"',
+  static final _includePattern = RegExp(
+    r'^\s*#\s*include\s+(?:"([^"]*)"|<([^>]*)>)',
     multiLine: true,
   );
   static int _nextCacheId = 0;
-  static int _activeTempLoads = 0;
+  static final _activeTempLoadsByCache = <String, int>{};
   static final _cleanedCaches = <String>{};
 
   String _findCompiler() {
     if (compilerPath != null) return compilerPath!;
+    final siblingCompiler = File(
+      '${File(Platform.resolvedExecutable).parent.path}/impellerc',
+    );
+    if (siblingCompiler.existsSync()) return siblingCompiler.path;
     final roots = <Directory>[
-      if (Platform.environment['FLUTTER_ROOT'] case final root?)
+      if (Platform.environment['FLUTTER_ROOT'] case final root?
+          when root.isNotEmpty)
         Directory(root),
     ];
+    var executableAncestor = File(Platform.resolvedExecutable).parent;
+    for (var depth = 0; depth < 5; depth++) {
+      if (File('${executableAncestor.path}/bin/flutter').existsSync()) {
+        roots.add(executableAncestor);
+        break;
+      }
+      final parent = executableAncestor.parent;
+      if (parent.path == executableAncestor.path) break;
+      executableAncestor = parent;
+    }
     var ancestor = directory.absolute;
     while (true) {
       roots.add(Directory('${ancestor.path}/.fvm/flutter_sdk'));
@@ -88,36 +103,76 @@ class StudioShaderCompiler {
   void _validateLocalIncludes(String source, Directory includeDir) {
     final checkSymlinks = directory.existsSync() && includeDir.existsSync();
     final rootPath = checkSymlinks ? directory.resolveSymbolicLinksSync() : '';
-    final includePath = checkSymlinks
+    final rootIncludePath = checkSymlinks
         ? includeDir.resolveSymbolicLinksSync()
         : '';
-    for (final match in _localIncludePattern.allMatches(source)) {
-      final included = match.group(1)!;
-      final segments = parseSafeRelativeSegments(included);
-      if (segments == null) {
-        throw FormatException(
-          'Shader #include path must stay within the current theme: $included',
-        );
-      }
-      if (!checkSymlinks) continue;
-      final candidate = '$includePath/${segments.join(Platform.pathSeparator)}';
-      if (FileSystemEntity.typeSync(candidate, followLinks: false) ==
-          FileSystemEntityType.notFound) {
-        continue;
-      }
-      try {
-        final resolved = File(candidate).resolveSymbolicLinksSync();
-        if (!isCanonicalPathWithin(rootPath, resolved)) {
+    final visited = <String>{};
+
+    void validateSource(String content, String currentDirPath) {
+      for (final match in _includePattern.allMatches(content)) {
+        final included = (match.group(1) ?? match.group(2))!;
+        final segments = parseSafeRelativeSegments(included);
+        if (segments == null) {
           throw FormatException(
             'Shader #include path must stay within the current theme: $included',
           );
         }
+        if (!checkSymlinks) continue;
+        final searchDirs = <String>{currentDirPath, rootIncludePath};
+        for (final baseDir in searchDirs) {
+          final resolved = _resolveConfinedInclude(
+            rootPath,
+            baseDir,
+            segments,
+            included,
+          );
+          if (resolved != null) {
+            if (visited.add(resolved)) {
+              validateSource(
+                File(resolved).readAsStringSync(),
+                File(resolved).parent.path,
+              );
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    validateSource(source, rootIncludePath);
+  }
+
+  String? _resolveConfinedInclude(
+    String rootPath,
+    String baseDir,
+    List<String> segments,
+    String rawInclude,
+  ) {
+    var current = baseDir;
+    for (var i = 0; i < segments.length; i++) {
+      current = '$current${Platform.pathSeparator}${segments[i]}';
+      final type = FileSystemEntity.typeSync(current, followLinks: false);
+      if (type == FileSystemEntityType.notFound) {
+        return null;
+      }
+      try {
+        final isLast = i == segments.length - 1;
+        final resolved = !isLast && type == FileSystemEntityType.directory
+            ? Directory(current).resolveSymbolicLinksSync()
+            : File(current).resolveSymbolicLinksSync();
+        if (!isCanonicalPathWithin(rootPath, resolved)) {
+          throw FormatException(
+            'Shader #include path must stay within the current theme: $rawInclude',
+          );
+        }
+        current = resolved;
       } on FileSystemException {
         throw FormatException(
-          'Shader #include path must stay within the current theme: $included',
+          'Shader #include path must stay within the current theme: $rawInclude',
         );
       }
     }
+    return current;
   }
 
   Future<StudioCompiledShader> compile(
@@ -204,12 +259,14 @@ class StudioShaderCompiler {
       );
     }
     final cache = Directory('${root.path}/.akari-studio-shaders');
-    if (_activeTempLoads == 0 && _cleanedCaches.add(cache.path)) {
+    final cacheKey = cache.path;
+    final activeLoads = _activeTempLoadsByCache[cacheKey] ?? 0;
+    if (activeLoads == 0 && _cleanedCaches.add(cacheKey)) {
       if (cache.existsSync()) cache.deleteSync(recursive: true);
     }
-    _activeTempLoads++;
+    _activeTempLoadsByCache[cacheKey] = activeLoads + 1;
     final file = File(
-      '${cache.path}/shader-${DateTime.now().microsecondsSinceEpoch}-${_nextCacheId++}.frag',
+      '$cacheKey/shader-${DateTime.now().microsecondsSinceEpoch}-${_nextCacheId++}.frag',
     );
     try {
       await cache.create(recursive: true);
@@ -219,13 +276,18 @@ class StudioShaderCompiler {
       );
     } finally {
       if (await file.exists()) await file.delete();
-      _activeTempLoads--;
-      if (_activeTempLoads == 0 && await cache.exists()) {
-        try {
-          await cache.delete(recursive: true);
-        } on FileSystemException {
-          // Another process or handle may hold the directory briefly.
+      final remaining = (_activeTempLoadsByCache[cacheKey] ?? 1) - 1;
+      if (remaining <= 0) {
+        _activeTempLoadsByCache.remove(cacheKey);
+        if (await cache.exists()) {
+          try {
+            await cache.delete(recursive: true);
+          } on FileSystemException {
+            // Another process or handle may hold the directory briefly.
+          }
         }
+      } else {
+        _activeTempLoadsByCache[cacheKey] = remaining;
       }
     }
   }

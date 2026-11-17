@@ -8,14 +8,8 @@ import 'package:theme_studio/src/resources/studio_shader_playground.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  final compiler = File(
-    '../../.fvm/flutter_sdk/bin/cache/artifacts/engine/linux-x64/impellerc',
-  ).absolute;
   test('real compiler reflects vector slots in declaration order and reports errors', () async {
-    final tool = StudioShaderCompiler(
-      directory: Directory.current,
-      compilerPath: compiler.path,
-    );
+    final tool = StudioShaderCompiler(directory: Directory.current);
     final compiled = await tool.compile(studioShaderExample);
     expect(compiled.bytes.length, greaterThan(100));
     expect(compiled.uniformNames, [
@@ -56,10 +50,7 @@ void main() {
       addTearDown(() => temp.delete(recursive: true));
       await File('${temp.path}/color.glsl')
           .writeAsString('vec4 tint(vec4 color) { return color; }');
-      final tool = StudioShaderCompiler(
-        directory: temp,
-        compilerPath: compiler.path,
-      );
+      final tool = StudioShaderCompiler(directory: temp);
       final compiled = await tool.compile(
         '''#include <flutter/runtime_effect.glsl>
 #include "color.glsl"
@@ -84,10 +75,10 @@ void main(){fragColor=tint(texture(image,FlutterFragCoord().xy/uSize))*(0.5+0.5*
         .writeAsString('vec4 secret() { return vec4(1.0); }');
     await Link('${theme.path}/link.glsl').create('${outside.path}/secret.glsl');
 
-    final tool = StudioShaderCompiler(
-      directory: theme,
-      compilerPath: compiler.path,
-    );
+    await File('${theme.path}/nested.glsl')
+        .writeAsString('#include <../outside/secret.glsl>');
+
+    final tool = StudioShaderCompiler(directory: theme);
 
     await expectLater(
       tool.compile(studioShaderExample, includeDirectory: outside),
@@ -95,9 +86,12 @@ void main(){fragColor=tint(texture(image,FlutterFragCoord().xy/uSize))*(0.5+0.5*
     );
     for (final directive in const [
       '#include "../outside/secret.glsl"',
+      '#include <../outside/secret.glsl>',
       '#include "/etc/passwd"',
       r'#include "..\outside\secret.glsl"',
       '#include "link.glsl"',
+      '#include <link.glsl>',
+      '#include "nested.glsl"',
     ]) {
       await expectLater(
         tool.compile('#include <flutter/runtime_effect.glsl>\n$directive\n$studioShaderExample'),
@@ -118,7 +112,6 @@ void main(){fragColor=tint(texture(image,FlutterFragCoord().xy/uSize))*(0.5+0.5*
     var compileRuns = 0;
     final compilerTool = _CountingShaderCompiler(
       directory: theme,
-      compilerPath: compiler.path,
       assetDirectory: assetDir,
       onCompile: () => compileRuns++,
     );
@@ -144,7 +137,6 @@ void main(){fragColor=tint(texture(image,FlutterFragCoord().xy/uSize))*(0.5+0.5*
 class _CountingShaderCompiler extends StudioShaderCompiler {
   _CountingShaderCompiler({
     required super.directory,
-    super.compilerPath,
     super.assetDirectory,
     required this.onCompile,
   });

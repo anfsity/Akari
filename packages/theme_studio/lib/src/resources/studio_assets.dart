@@ -135,7 +135,7 @@ class StudioAssets {
     }
     var target = File('$assets/$name');
     var suffix = 2;
-    while (FileSystemEntity.typeSync(target.path) !=
+    while (FileSystemEntity.typeSync(target.path, followLinks: false) !=
         FileSystemEntityType.notFound) {
       target = File('$assets/$stem-${suffix++}$extension');
     }
@@ -148,12 +148,33 @@ class StudioAssets {
     bool shader = false,
   }) {
     final yaml = YamlEditor(original);
-    final root = yaml.parseAt([]).value as Map;
-    final flutter = root['flutter'] as Map?;
+    final root = yaml.parseAt([]).value;
+    if (root is! Map) {
+      throw const FormatException('Theme pubspec.yaml must be a YAML mapping.');
+    }
+    final flutter = root['flutter'];
+    if (flutter != null && flutter is! Map) {
+      throw const FormatException(
+        'Theme pubspec.yaml flutter section must be a mapping.',
+      );
+    }
     final section = shader ? 'shaders' : 'assets';
-    final entries = (flutter?[section] as List?) ?? [];
-    if ((!shader && entries.contains('assets/')) ||
-        entries.contains(relative)) {
+    final rawEntries = (flutter as Map?)?[section];
+    final List<Object?> entries;
+    if (rawEntries == null) {
+      entries = const <Object?>[];
+    } else if (rawEntries is List) {
+      entries = rawEntries.cast<Object?>();
+    } else {
+      throw FormatException(
+        'Theme pubspec.yaml flutter.$section must be a list.',
+      );
+    }
+    bool hasEntry(String expected) => entries.any(
+      (entry) =>
+          entry == expected || (entry is Map && entry['path'] == expected),
+    );
+    if ((!shader && hasEntry('assets/')) || hasEntry(relative)) {
       return original;
     }
     if (flutter == null) {
@@ -205,23 +226,33 @@ class StudioAssets {
   List<String> getAssets() {
     final files = <String>{};
     final directories = <String>{'assets/'};
-    final root =
-        YamlEditor(File('$_rootDirectoryPath/pubspec.yaml').readAsStringSync())
-                .parseAt([])
-                .value
-            as Map;
-    final flutter = root['flutter'] as Map?;
+    final root = YamlEditor(
+      File('$_rootDirectoryPath/pubspec.yaml').readAsStringSync(),
+    ).parseAt([]).value;
+    if (root is! Map) {
+      throw const FormatException('Theme pubspec.yaml must be a YAML mapping.');
+    }
+    final flutterRaw = root['flutter'];
+    final flutter = flutterRaw is Map ? flutterRaw : null;
+    final rawAssets = flutter?['assets'];
+    final rawShaders = flutter?['shaders'];
+    final rawFonts = flutter?['fonts'];
     final declared = <String>[
-      for (final entry in flutter?['assets'] as List? ?? const [])
-        if (entry is String)
-          entry
-        else if (entry is Map && entry['path'] is String)
-          entry['path'] as String,
-      for (final shader in flutter?['shaders'] as List? ?? const [])
-        if (shader is String) shader,
-      for (final family in flutter?['fonts'] as List? ?? const [])
-        for (final font in (family as Map)['fonts'] as List)
-          (font as Map)['asset'] as String,
+      if (rawAssets is List)
+        for (final entry in rawAssets)
+          if (entry is String)
+            entry
+          else if (entry is Map && entry['path'] is String)
+            entry['path'] as String,
+      if (rawShaders is List)
+        for (final shader in rawShaders)
+          if (shader is String) shader,
+      if (rawFonts is List)
+        for (final family in rawFonts)
+          if (family is Map && family['fonts'] is List)
+            for (final font in family['fonts'] as List)
+              if (font is Map && font['asset'] is String)
+                font['asset'] as String,
     ];
     final rootPath = directory.resolveSymbolicLinksSync();
     for (final path in declared) {
