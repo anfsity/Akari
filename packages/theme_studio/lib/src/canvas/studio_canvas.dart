@@ -414,7 +414,6 @@ class StudioCanvasState extends State<StudioCanvas> {
                             _getEffectiveZoom() * 1.25,
                           ),
                         ),
-                        onZoomActual: () => setState(() => _zoom = 1),
                       ),
               ),
             ),
@@ -839,7 +838,6 @@ class _CanvasDock extends StatelessWidget {
     required this.onZoomOut,
     required this.onFitView,
     required this.onZoomIn,
-    required this.onZoomActual,
   });
 
   final SceneEditor? session;
@@ -865,7 +863,6 @@ class _CanvasDock extends StatelessWidget {
   final VoidCallback onZoomOut;
   final VoidCallback onFitView;
   final VoidCallback onZoomIn;
-  final VoidCallback onZoomActual;
 
   static IconData _getToolIcon(StudioCanvasTool tool) => switch (tool) {
     StudioCanvasTool.move => LucideIcons.mousePointer2,
@@ -925,8 +922,6 @@ class _CanvasDock extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final hasSession = session != null;
-    final responsiveLabel = responsiveActive ? 'Authored size' : 'Responsive';
-    final comparisonLabel = comparing ? 'Single' : 'Compare';
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < _compactDockWidth;
@@ -1003,7 +998,7 @@ class _CanvasDock extends StatelessWidget {
                     builder: (context, _) {
                       final canvas = activeSession.document.canvas;
                       return SizedBox(
-                        width: 148,
+                        width: 132,
                         child: StudioSelect<StudioCanvasPreset>(
                           theme: SelectTheme(
                             padding: const EdgeInsets.symmetric(
@@ -1036,24 +1031,130 @@ class _CanvasDock extends StatelessWidget {
                       );
                     },
                   ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _DockButton(
-                      id: 'canvas-responsive',
-                      label: responsiveLabel,
-                      icon: compact ? LucideIcons.monitor : null,
-                      active: responsiveActive,
-                      onPressed: hasSession ? onToggleResponsive : null,
+                Tooltip(
+                  tooltip: (_) =>
+                      Text(responsiveActive ? 'Authored size' : 'Responsive'),
+                  child: Semantics(
+                    label: 'Responsive',
+                    toggled: responsiveActive,
+                    button: true,
+                    child: GestureDetector(
+                      key: const ValueKey('canvas-responsive'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: hasSession ? onToggleResponsive : null,
+                      child: MouseRegion(
+                        cursor: hasSession
+                            ? SystemMouseCursors.click
+                            : SystemMouseCursors.basic,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: responsiveActive
+                                ? colors.primary.withValues(alpha: 0.08)
+                                : colors.background,
+                            border: Border.all(
+                              color: responsiveActive
+                                  ? colors.primary.withValues(alpha: 0.45)
+                                  : colors.border,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Responsive',
+                                style: TextStyle(
+                                  color: responsiveActive
+                                      ? colors.primary
+                                      : colors.foreground,
+                                ),
+                              ).small(),
+                              const Gap(6),
+                              Icon(
+                                LucideIcons.chevronDown,
+                                size: 14,
+                                color: responsiveActive
+                                    ? colors.primary
+                                    : colors.mutedForeground,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    _DockButton(
-                      id: 'canvas-compare',
-                      label: comparisonLabel,
-                      icon: compact ? LucideIcons.columns2 : null,
-                      active: comparing,
-                      onPressed: hasSession ? onToggleComparison : null,
+                  ),
+                ),
+                if (!compact)
+                  const SizedBox(height: 20, child: VerticalDivider()),
+                Tooltip(
+                  tooltip: (_) =>
+                      Text(comparing ? 'Single view' : 'Compare view'),
+                  child: Semantics(
+                    label: comparing ? 'Single' : 'Compare',
+                    toggled: comparing,
+                    button: true,
+                    child: GestureDetector(
+                      key: const ValueKey('canvas-compare'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: hasSession ? onToggleComparison : null,
+                      child: MouseRegion(
+                        cursor: hasSession
+                            ? SystemMouseCursors.click
+                            : SystemMouseCursors.basic,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: colors.muted.withValues(alpha: 0.45),
+                            border: Border.all(
+                              color: colors.border.withValues(alpha: 0.7),
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            spacing: 2,
+                            children: [
+                              for (final (isCompare, icon) in [
+                                (false, LucideIcons.square),
+                                (true, LucideIcons.layoutGrid),
+                              ])
+                                Container(
+                                  width: 28,
+                                  height: 26,
+                                  alignment: Alignment.center,
+                                  decoration: comparing == isCompare
+                                      ? BoxDecoration(
+                                          color: colors.background,
+                                          borderRadius: BorderRadius.circular(
+                                            7,
+                                          ),
+                                          boxShadow: const [
+                                            BoxShadow(
+                                              color: Color(0x14000000),
+                                              blurRadius: 3,
+                                              offset: Offset(0, 1),
+                                            ),
+                                          ],
+                                        )
+                                      : null,
+                                  child: Icon(
+                                    icon,
+                                    size: 15,
+                                    color: comparing == isCompare
+                                        ? colors.primary
+                                        : colors.mutedForeground,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ],
+                  ),
                 ),
                 if (!compact)
                   const SizedBox(height: 20, child: VerticalDivider()),
@@ -1077,12 +1178,6 @@ class _CanvasDock extends StatelessWidget {
                       label: 'Zoom in',
                       icon: LucideIcons.plus,
                       onPressed: hasSession ? onZoomIn : null,
-                    ),
-                    _DockButton(
-                      id: 'zoom-actual-size',
-                      label: 'Actual size · 100%',
-                      text: '100%',
-                      onPressed: hasSession ? onZoomActual : null,
                     ),
                   ],
                 ),
@@ -1135,7 +1230,7 @@ class _DockButton extends StatelessWidget {
                 decoration: (context, states, value) =>
                     (value as BoxDecoration).copyWith(
                       color: isActive
-                          ? colors.primary.withValues(alpha: .08)
+                          ? colors.primary.withValues(alpha: .1)
                           : null,
                     ),
               ),
