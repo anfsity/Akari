@@ -239,34 +239,6 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
   Future<ui.FragmentProgram> _getPreviewProgram(String asset) =>
       Future.value(_program!);
 
-  Widget _buildPreview() => AspectRatio(
-    aspectRatio: 2,
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: ColoredBox(
-        color: const Color(0xff171720),
-        child: _program == null
-            ? const Center(child: Text('Compile to preview'))
-            : _textures.any((texture) => texture.asset.isEmpty)
-            ? const Center(child: Text('Choose an image for each sampler'))
-            : SceneShaderBackground(
-                key: ObjectKey(_program),
-                shader: SceneShader(
-                  asset: 'assets/studio-preview.frag',
-                  uniforms: _uniforms,
-                  textures: _textures
-                      .where((texture) => texture.asset.isNotEmpty)
-                      .toList(),
-                ),
-                loadProgram: _getPreviewProgram,
-                resolveImage: widget.assets.getImageProvider,
-                onError: (error) {
-                  if (mounted) setState(() => _error = error);
-                },
-              ),
-      ),
-    ),
-  );
   @override
   Widget build(BuildContext context) {
     final shaders = widget.assets
@@ -274,34 +246,23 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
         .where((asset) => asset.endsWith('.frag'))
         .toList();
     final images = _getImages();
-    final current = _compiled?.source == _source.text;
-    final editor = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        StudioSelect<String>(
-          key: const ValueKey('shader-source-asset'),
-          value: shaders.contains(_selectedAsset) ? _selectedAsset : null,
-          values: shaders,
-          placeholder: const Text('Load a theme shader'),
-          formatValue: (asset) => asset.split('/').last,
-          enabled: !_busy,
-          onChanged: _loadSource,
-        ),
-        const Gap(8),
-        TextField(
-          key: const ValueKey('shader-source'),
-          controller: _source,
-          maxLines: 14,
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-          onChanged: (_) => setState(() {}),
-        ),
-        const Gap(8),
-        OutlineButton(
-          key: const ValueKey('shader-compile'),
-          onPressed: _busy ? null : _compile,
-          child: Text(_busy ? 'Compiling…' : 'Compile and preview'),
-        ),
-      ],
+    final sourcePanel = _ShaderSourcePanel(
+      selectedAsset: _selectedAsset,
+      shaders: shaders,
+      sourceController: _source,
+      busy: _busy,
+      onLoadSource: _loadSource,
+      onCompile: _compile,
+    );
+    final previewPane = _ShaderPreviewPane(
+      program: _program,
+      uniforms: _uniforms,
+      textures: _textures,
+      loadProgram: _getPreviewProgram,
+      resolveImage: widget.assets.getImageProvider,
+      onError: (error) {
+        if (mounted) setState(() => _error = error);
+      },
     );
     return AlertDialog(
       title: const Text('Shader Playground'),
@@ -320,13 +281,13 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: editor),
+                        Expanded(child: sourcePanel),
                         const Gap(16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _buildPreview(),
+                              previewPane,
                               const Gap(8),
                               const Text(
                                 'Bind float/vector components to constants, time, viewport, pointer or semantic state.',
@@ -337,9 +298,9 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
                       ],
                     )
                   else ...[
-                    editor,
+                    sourcePanel,
                     const Gap(12),
-                    _buildPreview(),
+                    previewPane,
                   ],
                   if (_error != null)
                     Padding(
@@ -354,76 +315,41 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
                         ),
                       ),
                     ),
-                  if (_compiled != null && !current)
-                    const Text('Source changed. Compile again before applying.')
-                        .small()
-                        .muted(),
+                  if (_compiled case final compiled?)
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _source,
+                      builder: (context, value, _) =>
+                          compiled.source == value.text
+                          ? const SizedBox.shrink()
+                          : const Text(
+                              'Source changed. Compile again before applying.',
+                            ).small().muted(),
+                    ),
                   if (_program != null) ...[
                     const Gap(16),
                     const Text('Uniform bindings').small().semiBold(),
                     const Gap(8),
-                    for (var index = 0; index < _uniforms.length; index++)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(_uniforms[index].name).small().semiBold(),
-                            const Gap(4),
-                            StudioEnumSelect(
-                              value: _uniforms[index].source,
-                              values: SceneUniformSource.values,
-                              onChanged: (source) => setState(
-                                () => _uniforms = [..._uniforms]
-                                  ..[index] = _uniforms[index].copyWith(
-                                    source: source,
-                                  ),
-                              ),
-                            ),
-                            const Gap(6),
-                            StudioFieldRow(
-                              left: StudioFormField(
-                                label: 'Value / offset',
-                                controller: _values[_uniforms[index].name]!,
-                                inputKey: ValueKey('shader-value-$index'),
-                                onChanged: (_) => _updateUniform(index),
-                              ),
-                              right: StudioFormField(
-                                label: 'Scale',
-                                controller: _scales[_uniforms[index].name]!,
-                                inputKey: ValueKey('shader-scale-$index'),
-                                onChanged: (_) => _updateUniform(index),
-                              ),
-                            ),
-                          ],
-                        ),
+                    _ShaderUniformBindings(
+                      uniforms: _uniforms,
+                      values: _values,
+                      scales: _scales,
+                      onSourceChanged: (index, source) => setState(
+                        () => _uniforms = [..._uniforms]
+                          ..[index] = _uniforms[index].copyWith(source: source),
                       ),
-                    for (var index = 0; index < _textures.length; index++)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text('Sampler: ${_textures[index].name}').small(),
-                            const Gap(6),
-                            StudioSelect<String>(
-                              value: images.contains(_textures[index].asset)
-                                  ? _textures[index].asset
-                                  : null,
-                              values: images,
-                              placeholder: const Text('Choose image'),
-                              formatValue: (asset) => asset.split('/').last,
-                              onChanged: (asset) => setState(
-                                () => _textures = [..._textures]
-                                  ..[index] = SceneShaderTexture(
-                                    name: _textures[index].name,
-                                    asset: asset,
-                                  ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      onValueChanged: _updateUniform,
+                    ),
+                    _ShaderSamplerBindings(
+                      textures: _textures,
+                      images: images,
+                      onChanged: (index, asset) => setState(
+                        () => _textures = [..._textures]
+                          ..[index] = SceneShaderTexture(
+                            name: _textures[index].name,
+                            asset: asset,
+                          ),
                       ),
+                    ),
                   ],
                 ],
               ),
@@ -436,12 +362,204 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        PrimaryButton(
-          key: const ValueKey('shader-apply'),
-          onPressed: _busy || !current || _program == null ? null : _apply,
-          child: const Text('Apply as new shader'),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _source,
+          builder: (context, value, _) {
+            final current = _compiled?.source == value.text;
+            return PrimaryButton(
+              key: const ValueKey('shader-apply'),
+              onPressed: _busy || !current || _program == null ? null : _apply,
+              child: const Text('Apply as new shader'),
+            );
+          },
         ),
       ],
     );
   }
+}
+
+class _ShaderSourcePanel extends StatelessWidget {
+  const _ShaderSourcePanel({
+    required this.selectedAsset,
+    required this.shaders,
+    required this.sourceController,
+    required this.busy,
+    required this.onLoadSource,
+    required this.onCompile,
+  });
+
+  final String? selectedAsset;
+  final List<String> shaders;
+  final TextEditingController sourceController;
+  final bool busy;
+  final ValueChanged<String> onLoadSource;
+  final VoidCallback onCompile;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      StudioSelect<String>(
+        key: const ValueKey('shader-source-asset'),
+        value: shaders.contains(selectedAsset) ? selectedAsset : null,
+        values: shaders,
+        placeholder: const Text('Load a theme shader'),
+        formatValue: (asset) => asset.split('/').last,
+        enabled: !busy,
+        onChanged: onLoadSource,
+      ),
+      const Gap(8),
+      TextField(
+        key: const ValueKey('shader-source'),
+        controller: sourceController,
+        maxLines: 14,
+        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+      ),
+      const Gap(8),
+      OutlineButton(
+        key: const ValueKey('shader-compile'),
+        onPressed: busy ? null : onCompile,
+        child: Text(busy ? 'Compiling…' : 'Compile and preview'),
+      ),
+    ],
+  );
+}
+
+class _ShaderPreviewPane extends StatelessWidget {
+  const _ShaderPreviewPane({
+    required this.program,
+    required this.uniforms,
+    required this.textures,
+    required this.loadProgram,
+    required this.resolveImage,
+    required this.onError,
+  });
+
+  final ui.FragmentProgram? program;
+  final List<SceneShaderUniform> uniforms;
+  final List<SceneShaderTexture> textures;
+  final Future<ui.FragmentProgram> Function(String) loadProgram;
+  final ImageProvider Function(String) resolveImage;
+  final ValueChanged<String> onError;
+
+  @override
+  Widget build(BuildContext context) => AspectRatio(
+    aspectRatio: 2,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: ColoredBox(
+        color: const Color(0xff171720),
+        child: program == null
+            ? const Center(child: Text('Compile to preview'))
+            : textures.any((texture) => texture.asset.isEmpty)
+            ? const Center(child: Text('Choose an image for each sampler'))
+            : SceneShaderBackground(
+                key: ObjectKey(program),
+                shader: SceneShader(
+                  asset: 'assets/studio-preview.frag',
+                  uniforms: uniforms,
+                  textures: textures
+                      .where((texture) => texture.asset.isNotEmpty)
+                      .toList(),
+                ),
+                loadProgram: loadProgram,
+                resolveImage: resolveImage,
+                onError: onError,
+              ),
+      ),
+    ),
+  );
+}
+
+class _ShaderUniformBindings extends StatelessWidget {
+  const _ShaderUniformBindings({
+    required this.uniforms,
+    required this.values,
+    required this.scales,
+    required this.onSourceChanged,
+    required this.onValueChanged,
+  });
+
+  final List<SceneShaderUniform> uniforms;
+  final Map<String, TextEditingController> values;
+  final Map<String, TextEditingController> scales;
+  final void Function(int index, SceneUniformSource source) onSourceChanged;
+  final ValueChanged<int> onValueChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (var index = 0; index < uniforms.length; index++)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(uniforms[index].name).small().semiBold(),
+              const Gap(4),
+              StudioEnumSelect(
+                value: uniforms[index].source,
+                values: SceneUniformSource.values,
+                onChanged: (source) => onSourceChanged(index, source),
+              ),
+              const Gap(6),
+              StudioFieldRow(
+                left: StudioFormField(
+                  label: 'Value / offset',
+                  controller: values[uniforms[index].name]!,
+                  inputKey: ValueKey('shader-value-$index'),
+                  onChanged: (_) => onValueChanged(index),
+                ),
+                right: StudioFormField(
+                  label: 'Scale',
+                  controller: scales[uniforms[index].name]!,
+                  inputKey: ValueKey('shader-scale-$index'),
+                  onChanged: (_) => onValueChanged(index),
+                ),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
+}
+
+class _ShaderSamplerBindings extends StatelessWidget {
+  const _ShaderSamplerBindings({
+    required this.textures,
+    required this.images,
+    required this.onChanged,
+  });
+
+  final List<SceneShaderTexture> textures;
+  final List<String> images;
+  final void Function(int index, String asset) onChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (var index = 0; index < textures.length; index++)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Sampler: ${textures[index].name}').small(),
+              const Gap(6),
+              StudioSelect<String>(
+                value: images.contains(textures[index].asset)
+                    ? textures[index].asset
+                    : null,
+                values: images,
+                placeholder: const Text('Choose image'),
+                formatValue: (asset) => asset.split('/').last,
+                onChanged: (asset) => onChanged(index, asset),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
 }
