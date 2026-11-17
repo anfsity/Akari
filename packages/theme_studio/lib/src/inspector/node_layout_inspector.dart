@@ -5,6 +5,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 import '../authoring/scene_editor.dart';
 import 'studio_form.dart';
 import 'studio_form_values.dart';
+import '../workspace/studio_tooltip.dart';
 
 class NodeLayoutInspector extends StatefulWidget {
   const NodeLayoutInspector({required this.editor, super.key});
@@ -227,7 +228,7 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
                       }),
                     ),
                   ),
-                  Tooltip(
+                  StudioTooltip(
                     tooltip: (_) => const Text('Add breakpoint'),
                     child: Semantics(
                       label: 'Add breakpoint',
@@ -240,7 +241,7 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
                     ),
                   ),
                   if (_editing >= 0)
-                    Tooltip(
+                    StudioTooltip(
                       tooltip: (_) => const Text('Remove breakpoint'),
                       child: Semantics(
                         label: 'Remove breakpoint',

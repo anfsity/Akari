@@ -9,6 +9,7 @@ import 'studio_input.dart';
 import 'studio_toolbar.dart';
 import '../inspector/studio_form.dart';
 import 'studio_workspace_layout.dart';
+import 'studio_tooltip.dart';
 
 String _getPanelLabel(String title) =>
     title == 'Sidebar' ? 'Project' : 'Properties';
@@ -521,7 +522,7 @@ class _WorkspaceActionButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => Tooltip(
+  Widget build(BuildContext context) => StudioTooltip(
     tooltip: (_) => Text(label),
     child: GhostButton(
       key: ValueKey(id),
@@ -901,7 +902,7 @@ class _FloatingPanelTitleBar extends StatelessWidget {
               ),
               const Gap(6),
               Expanded(child: Text(_getPanelLabel(title)).small().semiBold()),
-              Tooltip(
+              StudioTooltip(
                 tooltip: (_) => const Text('Dock left'),
                 child: GhostButton(
                   key: ValueKey('dock-left-$title'),
@@ -910,7 +911,7 @@ class _FloatingPanelTitleBar extends StatelessWidget {
                   child: const Icon(LucideIcons.panelLeft, size: 14),
                 ),
               ),
-              Tooltip(
+              StudioTooltip(
                 tooltip: (_) => const Text('Dock right'),
                 child: GhostButton(
                   key: ValueKey('dock-right-$title'),

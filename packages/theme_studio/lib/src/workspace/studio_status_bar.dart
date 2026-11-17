@@ -1,4 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'studio_tooltip.dart';
 
 class StudioStatusBar extends StatelessWidget {
   const StudioStatusBar({
@@ -49,7 +50,7 @@ class StudioStatusBar extends StatelessWidget {
                   ),
                   const Gap(6),
                   Expanded(
-                    child: Tooltip(
+                    child: StudioTooltip(
                       tooltip: (_) => Text(error ?? path),
                       child: Text(
                         error ?? displayPath,

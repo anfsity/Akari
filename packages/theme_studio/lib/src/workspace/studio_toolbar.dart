@@ -4,6 +4,7 @@ import '../authoring/scene_editor.dart';
 import '../authoring/studio_theme_project.dart';
 import '../inspector/studio_form.dart';
 import 'studio_workspace.dart';
+import 'studio_tooltip.dart';
 
 class StudioToolbar extends StatelessWidget {
   const StudioToolbar({
@@ -250,7 +251,7 @@ class StudioToolbar extends StatelessWidget {
     required String label,
     required IconData icon,
     required VoidCallback? onPressed,
-  }) => Tooltip(
+  }) => StudioTooltip(
     tooltip: (_) => Text(label),
     child: Semantics(
       label: label,
@@ -289,7 +290,7 @@ class StudioToolbar extends StatelessWidget {
           children: [
             Flexible(
               child: LayoutBuilder(
-                builder: (context, constraints) => Tooltip(
+                builder: (context, constraints) => StudioTooltip(
                   tooltip: (_) =>
                       Text('$themeId / ${scenePath.split('/').last}'),
                   child: GhostButton(
@@ -373,7 +374,7 @@ class StudioToolbar extends StatelessWidget {
                   : null,
             ),
             const Gap(8),
-            Tooltip(
+            StudioTooltip(
               tooltip: (_) =>
                   Text(hasDraft || isDirty ? 'Unsaved changes' : 'Saved'),
               child: Text(hasDraft || isDirty ? 'Unsaved changes' : 'Saved')

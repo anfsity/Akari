@@ -2,6 +2,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import 'node_geometry.dart';
 import '../authoring/scene_editor.dart';
+import '../workspace/studio_tooltip.dart';
 
 class NodeArrangementToolbar extends StatelessWidget {
   const NodeArrangementToolbar({required this.editor, super.key});
@@ -45,7 +46,7 @@ class NodeArrangementToolbar extends StatelessWidget {
           child: SizedBox(height: 18, child: VerticalDivider()),
         ),
         for (final alignment in NodeAlignment.values)
-          Tooltip(
+          StudioTooltip(
             tooltip: (_) => Text(_getAlignmentLabel(alignment)),
             child: OutlineButton(
               key: ValueKey('align-${alignment.name}'),
@@ -74,7 +75,7 @@ class NodeArrangementToolbar extends StatelessWidget {
           child: SizedBox(height: 18, child: VerticalDivider()),
         ),
         for (final horizontal in [true, false])
-          Tooltip(
+          StudioTooltip(
             tooltip: (_) => Text(
               horizontal ? 'Distribute horizontally' : 'Distribute vertically',
             ),

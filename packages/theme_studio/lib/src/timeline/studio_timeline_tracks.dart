@@ -8,6 +8,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 import '../authoring/scene_editor.dart';
 import '../inspector/studio_form.dart';
 import '../inspector/studio_form_values.dart';
+import '../workspace/studio_tooltip.dart';
 
 const studioTimelineLabelWidth = 120.0;
 const studioTimelineTrackPadding = 10.0;
@@ -812,7 +813,7 @@ class _KeyframeMarker extends StatelessWidget {
         onHorizontalDragUpdate: onUpdateDrag,
         onHorizontalDragEnd: (_) => onEndDrag(),
         onHorizontalDragCancel: onCancelDrag,
-        child: Tooltip(
+        child: StudioTooltip(
           tooltip: (_) => const Text('Drag time · Double-click to edit'),
           child: const SizedBox(
             width: 2 * studioTimelineTrackPadding,

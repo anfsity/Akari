@@ -4,6 +4,7 @@ import '../inspector/studio_form.dart';
 import '../authoring/scene_editor.dart';
 import 'studio_timeline_tracks.dart';
 import '../preview/studio_preview_host.dart';
+import '../workspace/studio_tooltip.dart';
 
 enum StudioTransition {
   entrance(
@@ -139,7 +140,7 @@ class _StudioTimelineState extends State<StudioTimeline>
               ),
             ),
             const Gap(8),
-            Tooltip(
+            StudioTooltip(
               tooltip: (_) => const Text('Restart'),
               child: OutlineButton(
                 key: const ValueKey('timeline-restart'),
@@ -152,7 +153,7 @@ class _StudioTimelineState extends State<StudioTimeline>
               ),
             ),
             const Gap(4),
-            Tooltip(
+            StudioTooltip(
               tooltip: (_) =>
                   Text(_player.isAnimating ? 'Pause' : 'Play preview'),
               child: OutlineButton(

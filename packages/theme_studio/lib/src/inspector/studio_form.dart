@@ -1,4 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+import '../workspace/studio_tooltip.dart';
 
 /// Keeps preview updates separate from one final edit. shadcn can omit its
 /// onChangeEnd after a controlled value catches up, so pointer release owns
@@ -221,7 +222,7 @@ class StudioFormField extends StatelessWidget {
           features: [
             if (prefix case final badge?)
               InputFeature.leading(
-                Tooltip(
+                StudioTooltip(
                   tooltip: (_) => Text(label),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(

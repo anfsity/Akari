@@ -18,6 +18,7 @@ import '../workspace/studio_workspace_layout.dart';
 import 'studio_canvas_presets.dart';
 import 'studio_comparison.dart';
 import '../workspace/studio_theme.dart';
+import '../workspace/studio_tooltip.dart';
 
 const _compactDockWidth = 720.0;
 
@@ -547,7 +548,7 @@ class _CanvasTopBar extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Tooltip(
+                      StudioTooltip(
                         tooltip: (_) => const Text('Timeline'),
                         child: Button(
                           key: const ValueKey('canvas-timeline'),
@@ -559,7 +560,7 @@ class _CanvasTopBar extends StatelessWidget {
                         ),
                       ),
                       const Gap(4),
-                      Tooltip(
+                      StudioTooltip(
                         tooltip: (_) => const Text('State flow'),
                         child: Button(
                           key: const ValueKey('canvas-state-graph'),
@@ -573,7 +574,7 @@ class _CanvasTopBar extends StatelessWidget {
                       const Gap(12),
                       const SizedBox(height: 20, child: VerticalDivider()),
                       const Gap(12),
-                      Tooltip(
+                      StudioTooltip(
                         tooltip: (_) =>
                             Text(previewing ? 'Edit canvas' : 'Preview'),
                         child: Button(
@@ -1031,7 +1032,7 @@ class _CanvasDock extends StatelessWidget {
                       );
                     },
                   ),
-                Tooltip(
+                StudioTooltip(
                   tooltip: (_) =>
                       Text(responsiveActive ? 'Authored size' : 'Responsive'),
                   child: Semantics(
@@ -1090,7 +1091,7 @@ class _CanvasDock extends StatelessWidget {
                 ),
                 if (!compact)
                   const SizedBox(height: 20, child: VerticalDivider()),
-                Tooltip(
+                StudioTooltip(
                   tooltip: (_) =>
                       Text(comparing ? 'Single view' : 'Compare view'),
                   child: Semantics(
@@ -1211,7 +1212,7 @@ class _DockButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final isActive = active ?? false;
-    return Tooltip(
+    return StudioTooltip(
       tooltip: (_) => Text(label),
       child: Semantics(
         label: icon == null ? null : label,
