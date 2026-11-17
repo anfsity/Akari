@@ -65,6 +65,7 @@ impl GreetdClient {
                 kind: "create_session",
                 username,
             },
+            128 + username.len().saturating_mul(6),
             cancellation,
             ResponseWait::Pam,
         )
@@ -77,11 +78,14 @@ impl GreetdClient {
         response: Option<&str>,
         cancellation: &CancellationToken,
     ) -> Result<GreetdResponse, GreetdError> {
+        // Every byte escapes to at most 6 JSON bytes (\uXXXX). Pre-sizing the
+        // zeroized buffer avoids intermediate Vec growth copies of long secrets.
         self.request(
             &AuthMessageResponseRequest {
                 kind: "post_auth_message_response",
                 response,
             },
+            128 + response.map_or(0, |secret| secret.len().saturating_mul(6)),
             cancellation,
             ResponseWait::Pam,
         )
@@ -95,12 +99,14 @@ impl GreetdClient {
         env: &[String],
         cancellation: &CancellationToken,
     ) -> Result<GreetdResponse, GreetdError> {
+        let encoded_cmd = encode_command(cmd);
         self.request(
             &StartSessionRequest {
                 kind: "start_session",
-                cmd: [encode_command(cmd)],
+                cmd: [encoded_cmd],
                 env,
             },
+            256,
             cancellation,
             ResponseWait::Immediate,
         )
@@ -116,6 +122,7 @@ impl GreetdClient {
             &CancelSessionRequest {
                 kind: "cancel_session",
             },
+            64,
             cancellation,
             ResponseWait::Immediate,
         )
@@ -133,13 +140,15 @@ impl GreetdClient {
     async fn request<T>(
         &mut self,
         request: &T,
+        capacity: usize,
         cancellation: &CancellationToken,
         response_wait: ResponseWait,
     ) -> Result<GreetdResponse, GreetdError>
     where
         T: Serialize,
     {
-        let payload = Zeroizing::new(serde_json::to_vec(request).map_err(GreetdError::Encode)?);
+        let mut payload = Zeroizing::new(Vec::with_capacity(capacity.min(MAX_FRAME_SIZE + 1)));
+        serde_json::to_writer(&mut *payload, request).map_err(GreetdError::Encode)?;
         let frame = encode_frame(payload.as_slice())?;
         tokio::select! {
             biased;
