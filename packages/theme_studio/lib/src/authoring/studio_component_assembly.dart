@@ -16,180 +16,274 @@ class StudioComponentAssembly extends StatelessWidget {
   final bool readOnly;
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: editor,
-    builder: (context, _) {
-      final theme = Theme.of(context);
-      final gap = theme.density.baseGap * theme.scaling;
-      final inset = theme.density.baseContainerPadding * theme.scaling * .75;
-      final layout = editor.layout;
-      final ids = editor.document.nodes.map((node) => node.id).toSet();
-      final slots =
-          layout?.getSlots(editor.document) ?? const <ThemeLayoutSlot>[];
-      return SingleChildScrollView(
-        key: const ValueKey('component-assembly'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: EdgeInsets.all(inset),
-              child: StudioFormSection(
-                title: 'Component library',
-                headerSpacing: gap,
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final gap = theme.density.baseGap * theme.scaling;
+    final inset = theme.density.baseContainerPadding * theme.scaling * .75;
+    return SingleChildScrollView(
+      key: const ValueKey('component-assembly'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ComponentLibrarySection(
+            inset: inset,
+            gap: gap,
+            readOnly: readOnly,
+            onCreate: editor.createComponent,
+          ),
+          ListenableBuilder(
+            listenable: editor,
+            builder: (context, _) {
+              final layout = editor.layout;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  LayoutBuilder(
-                    builder: (context, constraints) => Wrap(
-                      spacing: gap * .75,
-                      runSpacing: gap * .75,
-                      children: [
-                        for (final component in StudioComponent.values)
-                          SizedBox(
-                            width: (constraints.maxWidth - gap * .75) / 2,
-                            child: Draggable<StudioComponent>(
-                              data: component,
-                              affinity: Axis.horizontal,
-                              dragAnchorStrategy: pointerDragAnchorStrategy,
-                              maxSimultaneousDrags: readOnly ? 0 : 1,
-                              feedback: Container(
-                                padding: EdgeInsets.all(inset),
-                                color: Theme.of(context).colorScheme.background,
-                                child: Text(component.label),
-                              ),
-                              child: OutlineButton(
-                                key: ValueKey(
-                                  'add-component-${component.name}',
-                                ),
-                                density: ButtonDensity.dense,
-                                alignment: Alignment.centerLeft,
-                                onPressed: readOnly
-                                    ? null
-                                    : () => editor.createComponent(component),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      component.icon,
-                                      size: theme.typography.small.fontSize,
-                                    ),
-                                    Gap(gap * .75),
-                                    Expanded(
-                                      child: Text(
-                                        component.label,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ).xSmall(),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
+                  if (layout != null && layout.presets.length > 1) ...[
+                    const Divider(),
+                    _LayoutPresetSection(
+                      inset: inset,
+                      gap: gap,
+                      layout: layout,
+                      document: editor.document,
+                      readOnly: readOnly,
+                      onChanged: editor.updateLayoutPreset,
                     ),
-                  ),
+                  ],
+                  if (editor.presetCatalog.properties.isNotEmpty) ...[
+                    const Divider(),
+                    _ThemePresetsSection(
+                      inset: inset,
+                      gap: gap,
+                      editor: editor,
+                      readOnly: readOnly,
+                    ),
+                  ],
+                  if (layout != null) ...[
+                    const Divider(),
+                    _LayoutSlotsSection(
+                      inset: inset,
+                      gap: gap,
+                      layout: layout,
+                      editor: editor,
+                      readOnly: readOnly,
+                    ),
+                  ],
                 ],
-              ),
-            ),
-            if (layout != null && layout.presets.length > 1) ...[
-              const Divider(),
-              Padding(
-                padding: EdgeInsets.all(inset),
-                child: StudioFormSection(
-                  title: layout.label,
-                  spacing: gap,
-                  children: [
-                    StudioLabeledField(
-                      label: 'Layout preset',
-                      child: StudioSelect<String>(
-                        key: const ValueKey('layout-preset'),
-                        enabled: !readOnly,
-                        value: layout.getPresetId(editor.document),
-                        values: layout.presets.keys,
-                        formatValue: (id) => layout.presets[id]!.label,
-                        onChanged: editor.updateLayoutPreset,
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ComponentLibrarySection extends StatelessWidget {
+  const _ComponentLibrarySection({
+    required this.inset,
+    required this.gap,
+    required this.readOnly,
+    required this.onCreate,
+  });
+
+  final double inset;
+  final double gap;
+  final bool readOnly;
+  final ValueChanged<StudioComponent> onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.all(inset),
+      child: StudioFormSection(
+        title: 'Component library',
+        headerSpacing: gap,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) => Wrap(
+              spacing: gap * .75,
+              runSpacing: gap * .75,
+              children: [
+                for (final component in StudioComponent.values)
+                  SizedBox(
+                    width: (constraints.maxWidth - gap * .75) / 2,
+                    child: Draggable<StudioComponent>(
+                      data: component,
+                      affinity: Axis.horizontal,
+                      dragAnchorStrategy: pointerDragAnchorStrategy,
+                      maxSimultaneousDrags: readOnly ? 0 : 1,
+                      feedback: Container(
+                        padding: EdgeInsets.all(inset),
+                        color: theme.colorScheme.background,
+                        child: Text(component.label),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            if (editor.presetCatalog.properties.isNotEmpty) ...[
-              const Divider(),
-              Padding(
-                padding: EdgeInsets.all(inset),
-                child: StudioFormSection(
-                  title: 'Theme presets',
-                  spacing: gap,
-                  children: [
-                    for (final property in editor.presetCatalog.properties)
-                      StudioLabeledField(
-                        label: property.label,
-                        child: StudioEnumSelect<Enum>(
-                          enabled: !readOnly,
-                          key: ValueKey('preset-${property.name}'),
-                          value: property.getValue(
-                            editor.document.themeProperties,
-                          ),
-                          values: property.choices.keys,
-                          formatValue: (value) => property.choices[value]!,
-                          onChanged: (value) => editor.updateThemeProperty(
-                            property.name,
-                            value.name,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-            if (layout != null) ...[
-              const Divider(),
-              Padding(
-                padding: EdgeInsets.all(inset),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: gap * 1.5,
-                  children: [
-                    if (layout.presets.length <= 1)
-                      Text(layout.label).small().semiBold(),
-                    for (final (label, group) in [
-                      (
-                        'Optional components',
-                        slots.where((slot) => !slot.isRequired).toList(),
-                      ),
-                      (
-                        'Required controls',
-                        slots.where((slot) => slot.isRequired).toList(),
-                      ),
-                    ])
-                      if (group.isNotEmpty)
-                        StudioFormSection(
-                          title: label,
-                          headerSpacing: gap,
-                          spacing: gap * .25,
+                      child: OutlineButton(
+                        key: ValueKey('add-component-${component.name}'),
+                        density: ButtonDensity.dense,
+                        alignment: Alignment.centerLeft,
+                        onPressed: readOnly ? null : () => onCreate(component),
+                        child: Row(
                           children: [
-                            for (final slot in group)
-                              _AssemblySlot(
-                                editor: editor,
-                                slot: slot,
-                                isPresent: ids.contains(slot.defaultNode.id),
-                                readOnly: readOnly,
-                              ),
+                            Icon(
+                              component.icon,
+                              size: theme.typography.small.fontSize,
+                            ),
+                            Gap(gap * .75),
+                            Expanded(
+                              child: Text(
+                                component.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ).xSmall(),
+                            ),
                           ],
                         ),
-                    const Text(
-                      'Use Login / Dormant to preview both states. '
-                      'Turning a component back on restores its defaults; '
-                      'Undo restores your edits.',
-                    ).xSmall().muted(),
-                  ],
-                ),
-              ),
-            ],
-          ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LayoutPresetSection extends StatelessWidget {
+  const _LayoutPresetSection({
+    required this.inset,
+    required this.gap,
+    required this.layout,
+    required this.document,
+    required this.readOnly,
+    required this.onChanged,
+  });
+
+  final double inset;
+  final double gap;
+  final ThemeLayoutDefinition layout;
+  final SceneDocument document;
+  final bool readOnly;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.all(inset),
+    child: StudioFormSection(
+      title: layout.label,
+      spacing: gap,
+      children: [
+        StudioLabeledField(
+          label: 'Layout preset',
+          child: StudioSelect<String>(
+            key: const ValueKey('layout-preset'),
+            enabled: !readOnly,
+            value: layout.getPresetId(document),
+            values: layout.presets.keys,
+            formatValue: (id) => layout.presets[id]!.label,
+            onChanged: onChanged,
+          ),
         ),
-      );
-    },
+      ],
+    ),
   );
+}
+
+class _ThemePresetsSection extends StatelessWidget {
+  const _ThemePresetsSection({
+    required this.inset,
+    required this.gap,
+    required this.editor,
+    required this.readOnly,
+  });
+
+  final double inset;
+  final double gap;
+  final SceneEditor editor;
+  final bool readOnly;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.all(inset),
+    child: StudioFormSection(
+      title: 'Theme presets',
+      spacing: gap,
+      children: [
+        for (final property in editor.presetCatalog.properties)
+          StudioLabeledField(
+            label: property.label,
+            child: StudioEnumSelect<Enum>(
+              enabled: !readOnly,
+              key: ValueKey('preset-${property.name}'),
+              value: property.getValue(editor.document.themeProperties),
+              values: property.choices.keys,
+              formatValue: (value) => property.choices[value]!,
+              onChanged: (value) =>
+                  editor.updateThemeProperty(property.name, value.name),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class _LayoutSlotsSection extends StatelessWidget {
+  const _LayoutSlotsSection({
+    required this.inset,
+    required this.gap,
+    required this.layout,
+    required this.editor,
+    required this.readOnly,
+  });
+
+  final double inset;
+  final double gap;
+  final ThemeLayoutDefinition layout;
+  final SceneEditor editor;
+  final bool readOnly;
+
+  @override
+  Widget build(BuildContext context) {
+    final ids = editor.document.nodes.map((node) => node.id).toSet();
+    final slots = layout.getSlots(editor.document);
+    final groups = [
+      ('Optional components', slots.where((slot) => !slot.isRequired).toList()),
+      ('Required controls', slots.where((slot) => slot.isRequired).toList()),
+    ];
+    return Padding(
+      padding: EdgeInsets.all(inset),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: gap * 1.5,
+        children: [
+          if (layout.presets.length <= 1) Text(layout.label).small().semiBold(),
+          for (final (label, group) in groups)
+            if (group.isNotEmpty)
+              StudioFormSection(
+                title: label,
+                headerSpacing: gap,
+                spacing: gap * .25,
+                children: [
+                  for (final slot in group)
+                    _AssemblySlot(
+                      editor: editor,
+                      slot: slot,
+                      isPresent: ids.contains(slot.defaultNode.id),
+                      readOnly: readOnly,
+                    ),
+                ],
+              ),
+          const Text(
+            'Use Login / Dormant to preview both states. '
+            'Turning a component back on restores its defaults; '
+            'Undo restores your edits.',
+          ).xSmall().muted(),
+        ],
+      ),
+    );
+  }
 }
 
 class _AssemblySlot extends StatelessWidget {
