@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import 'studio_input.dart';
+import 'studio_toolbar.dart';
 import '../inspector/studio_form.dart';
 import 'studio_workspace_layout.dart';
 
@@ -17,13 +18,17 @@ class StudioWorkspaceScope extends InheritedWidget {
     required this.presenting,
     required super.child,
     this.mode = StudioWorkspaceMode.design,
+    this.workspaceControls,
     super.key,
   });
   final bool presenting;
   final StudioWorkspaceMode mode;
+  final Widget? workspaceControls;
   @override
   bool updateShouldNotify(StudioWorkspaceScope old) =>
-      old.presenting != presenting || old.mode != mode;
+      old.presenting != presenting ||
+      old.mode != mode ||
+      old.workspaceControls != workspaceControls;
 }
 
 /// Dock regions own widths; global keys carry panel state between regions and
@@ -293,18 +298,38 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
 
   @override
   Widget build(BuildContext context) {
+    final workspaceControls = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 148,
+          child: StudioEnumSelect(
+            key: const ValueKey('workspace-preset'),
+            value: _mode,
+            values: StudioWorkspaceMode.values,
+            formatValue: (value) =>
+                '${value.name[0].toUpperCase()}${value.name.substring(1)} layout',
+            onChanged: _applyPreset,
+          ),
+        ),
+        const Gap(4),
+        _WorkspaceActionButton(
+          id: 'presentation-mode',
+          label:
+              'Presentation · ${widget.input.getBinding(StudioCommand.presentation)?.getLabel() ?? 'Unbound'}',
+          icon: LucideIcons.maximize,
+          onPressed: _togglePresentation,
+        ),
+      ],
+    );
     final topBar = Visibility(
       visible: !_presenting,
       maintainState: true,
       child: _WorkspaceTopBar(
         toolbar: widget.toolbar,
-        mode: _mode,
-        presentationShortcut:
-            widget.input.getBinding(StudioCommand.presentation)?.getLabel() ??
-            'Unbound',
+        workspaceControls:
+            widget.toolbar is StudioToolbar ? null : workspaceControls,
         onToggleSidebar: () => _togglePanel('Sidebar'),
-        onSelectMode: _applyPreset,
-        onTogglePresentation: _togglePresentation,
       ),
     );
     final statusBar = Visibility(
@@ -334,6 +359,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
       child: StudioWorkspaceScope(
         presenting: _presenting,
         mode: _mode,
+        workspaceControls: workspaceControls,
         child: Focus(
           onKeyEvent: (_, event) {
             final focused = FocusManager.instance.primaryFocus?.context;
@@ -452,7 +478,6 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
                                   ],
                                 ),
                               ),
-                              if (!_presenting) const Divider(),
                               statusBar,
                               if (_workspaceError != null)
                                 StudioFormError(_workspaceError!),
@@ -510,19 +535,13 @@ class _WorkspaceActionButton extends StatelessWidget {
 class _WorkspaceTopBar extends StatelessWidget {
   const _WorkspaceTopBar({
     required this.toolbar,
-    required this.mode,
-    required this.presentationShortcut,
     required this.onToggleSidebar,
-    required this.onSelectMode,
-    required this.onTogglePresentation,
+    this.workspaceControls,
   });
 
   final Widget toolbar;
-  final StudioWorkspaceMode mode;
-  final String presentationShortcut;
+  final Widget? workspaceControls;
   final VoidCallback onToggleSidebar;
-  final ValueChanged<StudioWorkspaceMode> onSelectMode;
-  final VoidCallback onTogglePresentation;
 
   @override
   Widget build(BuildContext context) => Row(
@@ -535,25 +554,10 @@ class _WorkspaceTopBar extends StatelessWidget {
         onPressed: onToggleSidebar,
       ),
       Expanded(child: toolbar),
-      SizedBox(
-        width: 148,
-        child: StudioEnumSelect(
-          key: const ValueKey('workspace-preset'),
-          value: mode,
-          values: StudioWorkspaceMode.values,
-          formatValue: (value) =>
-              '${value.name[0].toUpperCase()}${value.name.substring(1)} layout',
-          onChanged: onSelectMode,
-        ),
-      ),
-      const Gap(4),
-      _WorkspaceActionButton(
-        id: 'presentation-mode',
-        label: 'Presentation · $presentationShortcut',
-        icon: LucideIcons.maximize,
-        onPressed: onTogglePresentation,
-      ),
-      const Gap(12),
+      if (workspaceControls case final controls?) ...[
+        controls,
+        const Gap(12),
+      ],
     ],
   );
 }

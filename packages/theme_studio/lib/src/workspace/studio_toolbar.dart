@@ -3,6 +3,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart';
 import '../authoring/scene_editor.dart';
 import '../authoring/studio_theme_project.dart';
 import '../inspector/studio_form.dart';
+import 'studio_workspace.dart';
 
 class StudioToolbar extends StatelessWidget {
   const StudioToolbar({
@@ -73,7 +74,7 @@ class StudioToolbar extends StatelessWidget {
                 const Gap(6),
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    color: colors.muted.withValues(alpha: 0.3),
+                    color: colors.background,
                     border: Border.all(color: colors.border),
                     borderRadius: BorderRadius.circular(theme.radiusMd),
                   ),
@@ -121,14 +122,8 @@ class StudioToolbar extends StatelessWidget {
                     children: [
                       for (var i = 0; i < scenePaths.length; i++) ...[
                         if (i > 0) const Gap(2),
-                        Button(
-                          style: scenePaths[i] == scenePath
-                              ? const ButtonStyle.secondary(
-                                  density: ButtonDensity.dense,
-                                )
-                              : const ButtonStyle.ghost(
-                                  density: ButtonDensity.dense,
-                                ),
+                        GhostButton(
+                          density: ButtonDensity.dense,
                           onPressed: () {
                             closeOverlay(popoverContext);
                             onSwitchScene(scenePaths[i]);
@@ -140,14 +135,23 @@ class StudioToolbar extends StatelessWidget {
                                     ? LucideIcons.check
                                     : LucideIcons.fileJson,
                                 size: 14,
+                                color: scenePaths[i] == scenePath
+                                    ? colors.primary
+                                    : colors.mutedForeground,
                               ),
                               const Gap(8),
                               Expanded(
-                                child: Text(
-                                  scenePaths[i].split('/').last,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ).small(),
+                                child: scenePaths[i] == scenePath
+                                    ? Text(
+                                        scenePaths[i].split('/').last,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ).small().medium()
+                                    : Text(
+                                        scenePaths[i].split('/').last,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ).small().muted(),
                               ),
                             ],
                           ),
@@ -163,29 +167,27 @@ class StudioToolbar extends StatelessWidget {
                   spacing: 8,
                   children: [
                     Expanded(
-                      child: OutlineButton(
-                        key: const ValueKey('new-scene'),
-                        density: ButtonDensity.dense,
+                      child: _buildPopoverButton(
+                        key: 'new-scene',
+                        label: 'New scene',
+                        icon: LucideIcons.filePlus2,
                         enabled: !readOnly && editor != null,
-                        leading: const Icon(LucideIcons.filePlus2, size: 14),
                         onPressed: () {
                           closeOverlay(popoverContext);
                           onCreateScene();
                         },
-                        child: const Text('New scene').small(),
                       ),
                     ),
                     Expanded(
-                      child: OutlineButton(
-                        key: const ValueKey('create-theme'),
-                        density: ButtonDensity.dense,
+                      child: _buildPopoverButton(
+                        key: 'create-theme',
+                        label: 'Create theme',
+                        icon: LucideIcons.folderPlus,
                         enabled: !readOnly && editor != null,
-                        leading: const Icon(LucideIcons.folderPlus, size: 14),
                         onPressed: () {
                           closeOverlay(popoverContext);
                           onCreateTheme();
                         },
-                        child: const Text('Create theme').small(),
                       ),
                     ),
                   ],
@@ -195,26 +197,26 @@ class StudioToolbar extends StatelessWidget {
                   spacing: 8,
                   children: [
                     Expanded(
-                      child: OutlineButton(
-                        key: const ValueKey('toolbar-reload-disk'),
-                        density: ButtonDensity.dense,
+                      child: _buildPopoverButton(
+                        key: 'toolbar-reload-disk',
+                        label: 'Reload from disk',
+                        icon: LucideIcons.rotateCcw,
                         onPressed: () {
                           closeOverlay(popoverContext);
                           onReload();
                         },
-                        child: const Text('Reload from disk').small(),
                       ),
                     ),
                     Expanded(
-                      child: OutlineButton(
-                        key: const ValueKey('toolbar-load-json'),
-                        density: ButtonDensity.dense,
+                      child: _buildPopoverButton(
+                        key: 'toolbar-load-json',
+                        label: 'Load JSON',
+                        icon: LucideIcons.folderOpen,
                         enabled: !loadingFile,
                         onPressed: () {
                           closeOverlay(popoverContext);
                           onLoadJson();
                         },
-                        child: const Text('Load JSON').small(),
                       ),
                     ),
                   ],
@@ -226,6 +228,22 @@ class StudioToolbar extends StatelessWidget {
       },
     );
   }
+
+  Widget _buildPopoverButton({
+    required String key,
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+    bool enabled = true,
+  }) => OutlineButton(
+    key: ValueKey(key),
+    density: ButtonDensity.dense,
+    alignment: Alignment.center,
+    enabled: enabled,
+    leading: Icon(icon, size: 14),
+    onPressed: onPressed,
+    child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis).small(),
+  );
 
   Widget _buildAction({
     required String key,
@@ -261,6 +279,9 @@ class StudioToolbar extends StatelessWidget {
       final canRedo = session != null && session.canRedo;
       final isDirty = session != null && session.isDirty;
       final colors = Theme.of(context).colorScheme;
+      final workspaceControls = context
+          .dependOnInheritedWidgetOfExactType<StudioWorkspaceScope>()
+          ?.workspaceControls;
       return Padding(
         key: const ValueKey('studio-toolbar'),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -271,11 +292,9 @@ class StudioToolbar extends StatelessWidget {
                 builder: (context, constraints) => Tooltip(
                   tooltip: (_) =>
                       Text('$themeId / ${scenePath.split('/').last}'),
-                  child: Button(
+                  child: GhostButton(
                     key: const ValueKey('studio-scene-menu'),
-                    style: const ButtonStyle.secondary(
-                      density: ButtonDensity.compact,
-                    ),
+                    density: ButtonDensity.compact,
                     onPressed: () => _openSceneMenu(context),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -319,6 +338,12 @@ class StudioToolbar extends StatelessWidget {
             ),
             const Spacer(),
             const Gap(12),
+            if (workspaceControls != null) ...[
+              workspaceControls,
+              const Gap(8),
+              const SizedBox(height: 18, child: VerticalDivider()),
+              const Gap(8),
+            ],
             // Undo clears an uncommitted inspector draft before it consumes
             // a scene history entry.
             _buildAction(

@@ -12,6 +12,21 @@ import '../resources/studio_assets.dart';
 import '../resources/studio_asset_preview.dart';
 import '../inspector/studio_form.dart';
 
+AbstractButtonStyle _getSelectableRowStyle(
+  ColorScheme colors, {
+  required bool selected,
+  ButtonDensity density = ButtonDensity.normal,
+}) {
+  return ButtonStyle.ghost(density: density).copyWith(
+    decoration: (context, states, value) => (value as BoxDecoration).copyWith(
+      color: selected ? colors.primary.withValues(alpha: 0.08) : null,
+      border: selected
+          ? Border.all(color: colors.primary.withValues(alpha: 0.25))
+          : null,
+    ),
+  );
+}
+
 enum _SidebarTab {
   components('Compose'),
   layers('Layers'),
@@ -195,19 +210,38 @@ class _ScenesSection extends StatelessWidget {
           children: [
             for (var i = 0; i < scenePaths.length; i++) ...[
               if (i > 0) const Gap(2),
-              Button(
-                key: ValueKey('scene-${scenePaths[i]}'),
-                style: activeScenePath == scenePaths[i]
-                    ? const ButtonStyle.secondary(density: ButtonDensity.dense)
-                    : const ButtonStyle.ghost(density: ButtonDensity.dense),
-                onPressed: () => onSwitchScene(scenePaths[i]),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    File(scenePaths[i]).uri.pathSegments.last,
-                    overflow: TextOverflow.ellipsis,
-                  ).small(),
-                ),
+              Builder(
+                builder: (context) {
+                  final colors = Theme.of(context).colorScheme;
+                  final selected = activeScenePath == scenePaths[i];
+                  return Button(
+                    key: ValueKey('scene-${scenePaths[i]}'),
+                    style: _getSelectableRowStyle(
+                      colors,
+                      selected: selected,
+                      density: ButtonDensity.dense,
+                    ),
+                    onPressed: () => onSwitchScene(scenePaths[i]),
+                    child: Row(
+                      children: [
+                        Icon(
+                          LucideIcons.fileJson,
+                          size: 13,
+                          color: selected
+                              ? colors.primary
+                              : colors.mutedForeground,
+                        ),
+                        const Gap(6),
+                        Expanded(
+                          child: Text(
+                            File(scenePaths[i]).uri.pathSegments.last,
+                            overflow: TextOverflow.ellipsis,
+                          ).small(),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ],
           ],
@@ -595,29 +629,30 @@ class _AssetRow extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
-    child: Button(
-      key: ValueKey('asset-$path'),
-      style: selected
-          ? const ButtonStyle.secondary()
-          : const ButtonStyle.ghost(),
-      onPressed: onSelect,
-      child: Row(
-        children: [
-          _buildThumbnail(),
-          const Gap(10),
-          Expanded(
-            child: Text(
-              path.split('/').last,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ).small(),
-          ),
-        ],
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
+      child: Button(
+        key: ValueKey('asset-$path'),
+        style: _getSelectableRowStyle(colors, selected: selected),
+        onPressed: onSelect,
+        child: Row(
+          children: [
+            _buildThumbnail(),
+            const Gap(10),
+            Expanded(
+              child: Text(
+                path.split('/').last,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ).small(),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// Fixed-height rows let canvas selection reveal a layer even when its row
@@ -1004,9 +1039,11 @@ class _LayerRowButton extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 1),
       child: Button(
         key: ValueKey('layer-${node.id}'),
-        style: selected
-            ? const ButtonStyle.secondary(density: ButtonDensity.dense)
-            : const ButtonStyle.ghost(density: ButtonDensity.dense),
+        style: _getSelectableRowStyle(
+          colors,
+          selected: selected,
+          density: ButtonDensity.dense,
+        ),
         onPressed: onPressed,
         child: Row(
           children: [
@@ -1014,7 +1051,7 @@ class _LayerRowButton extends StatelessWidget {
             Icon(
               _getLayerIcon(node),
               size: 14,
-              color: selected ? colors.foreground : colors.mutedForeground,
+              color: selected ? colors.primary : colors.mutedForeground,
             ),
             const Gap(8),
             Expanded(
