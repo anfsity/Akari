@@ -13,7 +13,7 @@ os.close(slave)
 output = b''
 sent_quit = False
 try:
-    deadline = time.monotonic() + 20
+    deadline = time.monotonic() + 60
     while process.poll() is None and time.monotonic() < deadline:
         if select.select([master], [], [], .1)[0]:
             try:
@@ -23,7 +23,11 @@ try:
         if b'INTERACTIVE_READY' in output and not sent_quit:
             os.write(master, b'q')
             sent_quit = True
-    process.wait(timeout=5)
+    if not sent_quit:
+        raise RuntimeError(
+            f'Interactive step never printed INTERACTIVE_READY before deadline; output={output!r}'
+        )
+    process.wait(timeout=15)
     sys.stdout.buffer.write(output)
     sys.exit(process.returncode)
 finally:

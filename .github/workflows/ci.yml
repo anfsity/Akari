@@ -64,4 +64,4 @@ jobs:
         run: AKARI_FLUTTER_BIN="$(command -v flutter)" AKARI_DART_BIN="$(command -v dart)" dart run packages/akari_cli/bin/akari.dart verify
 
       - name: Build Linux debug bundle
-        run: AKARI_FLUTTER_BIN="$(command -v flutter)" AKARI_DART_BIN="$(command -v dart)" dart run packages/akari_cli/bin/akari.dart build --debug
+        run: AKARI_FLUTTER_BIN="$(command -v flutter)" AKARI_DART_BIN="$(command -v dart)" dart run packages/akari_cli/bin/akari.dart build --mode debug

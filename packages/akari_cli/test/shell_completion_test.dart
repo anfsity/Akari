@@ -97,7 +97,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     ]);
     expect(
       await completeBashWords(['akari', 'login', 'logs', '--component', 'b']),
-      ['backend'],
+      ['backend', 'bus'],
     );
     expect(
       await completeBashWords([

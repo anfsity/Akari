@@ -76,6 +76,10 @@ RunPlan createVerificationPlan(
         workingDirectory: 'crates',
         dependencies: ['rust.format'],
       ),
+      // Serialize Cargo steps that share crates/target: Cargo releases its
+      // build lock before running test binaries, so concurrent feature builds
+      // would overwrite crates/target/debug/backend mid-test while blocking
+      // runner concurrency slots on crates/target/.cargo-lock.
       const RunStep(
         id: 'rust.clippy',
         command: [
@@ -106,33 +110,25 @@ RunPlan createVerificationPlan(
           'warnings',
         ],
         workingDirectory: 'crates',
-        dependencies: ['rust.check'],
+        dependencies: ['rust.clippy'],
       ),
       const RunStep(
         id: 'backend.test',
-        command: ['cargo', 'test', '--locked', '--', '--test-threads=1'],
+        command: ['cargo', 'test', '--locked'],
         workingDirectory: 'crates/akari-backend',
-        dependencies: ['rust.check'],
+        dependencies: ['rust.clippy_mock'],
       ),
       const RunStep(
         id: 'backend.test_mock',
-        command: [
-          'cargo',
-          'test',
-          '--locked',
-          '--features',
-          'mock',
-          '--',
-          '--test-threads=1',
-        ],
+        command: ['cargo', 'test', '--locked', '--features', 'mock'],
         workingDirectory: 'crates/akari-backend',
-        dependencies: ['rust.check'],
+        dependencies: ['backend.test'],
       ),
       const RunStep(
         id: 'splash.test',
         command: ['cargo', 'test', '--locked'],
         workingDirectory: 'crates/akari-splash',
-        dependencies: ['rust.check'],
+        dependencies: ['backend.test_mock'],
       ),
       if (_standaloneWorkflowSuites.any(
         (suite) => File(getJoinedPath(repoRoot.path, suite)).existsSync(),
@@ -173,6 +169,7 @@ RunPlan createVerificationPlan(
         command: [
           ...getFlutterCommand(repoRoot),
           'analyze',
+          '--no-pub',
           'lib/app',
           'lib/infrastructure',
           'test',
@@ -183,7 +180,7 @@ RunPlan createVerificationPlan(
       ),
       RunStep(
         id: 'flutter.test',
-        command: [...getFlutterCommand(repoRoot), 'test'],
+        command: [...getFlutterCommand(repoRoot), 'test', '--no-pub'],
         workingDirectory: 'apps/greeter',
         dependencies: ['workspace.pub_get', ...sceneSteps],
       ),
@@ -227,6 +224,7 @@ RunPlan createVerificationPlan(
           '${repoRoot.path}/scripts/debug-dbus.sh',
           ...getFlutterCommand(repoRoot),
           'test',
+          '--no-pub',
           'test/dbus_gateway_smoke.dart',
         ],
         workingDirectory: 'apps/greeter',
@@ -275,14 +273,14 @@ List<RunStep> _getFlutterPackageVerificationSteps(
   return [
     RunStep(
       id: '$packageName.analyze',
-      command: [...flutter, 'analyze'],
+      command: [...flutter, 'analyze', '--no-pub'],
       workingDirectory: directory.path,
       dependencies: dependencies,
     ),
     if (hasTests)
       RunStep(
         id: '$packageName.test',
-        command: [...flutter, 'test'],
+        command: [...flutter, 'test', '--no-pub'],
         workingDirectory: directory.path,
         dependencies: dependencies,
       ),
