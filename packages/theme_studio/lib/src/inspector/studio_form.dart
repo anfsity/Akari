@@ -1,4 +1,5 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
+
 import '../workspace/studio_tooltip.dart';
 
 /// Keeps preview updates separate from one final edit. shadcn can omit its
@@ -411,81 +412,106 @@ class _StudioDisclosureSectionState extends State<StudioDisclosureSection>
     final theme = Theme.of(context);
     final gap = theme.density.baseGap * theme.scaling;
     final inset = theme.density.baseContainerPadding * theme.scaling * .75;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (widget.showTopDividerWhenExpanded &&
-            (_expanded || !_controller.isDismissed))
-          SizeTransition(
-            sizeFactor: _progress,
-            alignment: Alignment.topCenter,
-            fixedCrossAxisSizeFactor: 1,
-            child: const Divider(),
-          ),
-        Semantics(
-          expanded: _expanded,
-          child: GhostButton(
-            key: widget.triggerKey,
-            density: ButtonDensity.compact,
-            onPressed: _toggleExpanded,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: inset,
-                vertical: gap * .75,
-              ),
-              child: Row(
-                children: [
-                  Expanded(child: Text(widget.title).small().medium()),
-                  RotationTransition(
-                    turns: _progress.drive(Tween(begin: 0.0, end: .25)),
-                    child: Icon(
-                      LucideIcons.chevronRight,
-                      size: theme.typography.small.fontSize,
-                      color: theme.colorScheme.mutedForeground,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // Transition widgets animate around a stable body without rebuilding its
-        // editors each frame. Unmount closed sections once the transition ends.
-        if (_expanded || !_controller.isDismissed)
-          SizeTransition(
-            sizeFactor: _progress,
-            alignment: Alignment.topCenter,
-            fixedCrossAxisSizeFactor: 1,
-            child: IgnorePointer(
-              ignoring: !_expanded,
-              child: ExcludeFocus(
-                excluding: !_expanded,
-                child: ExcludeSemantics(
-                  excluding: !_expanded,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          inset,
-                          gap * .25,
-                          inset,
-                          inset,
-                        ),
-                        child: widget.child,
+    return CustomPaint(
+      foregroundPainter: _DisclosureBorders(
+        progress: _progress,
+        color: theme.colorScheme.border,
+        showTop: widget.showTopDividerWhenExpanded,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            expanded: _expanded,
+            child: GhostButton(
+              key: widget.triggerKey,
+              density: ButtonDensity.compact,
+              onPressed: _toggleExpanded,
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: inset,
+                  vertical: gap * .75,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(widget.title).small().medium()),
+                    RotationTransition(
+                      turns: _progress.drive(Tween(begin: 0.0, end: .25)),
+                      child: Icon(
+                        LucideIcons.chevronRight,
+                        size: theme.typography.small.fontSize,
+                        color: theme.colorScheme.mutedForeground,
                       ),
-                      const Divider(),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-      ],
+          // Transition widgets animate around a stable body without rebuilding its
+          // editors each frame. Unmount closed sections once the transition ends.
+          if (_expanded || !_controller.isDismissed)
+            SizeTransition(
+              sizeFactor: _progress,
+              alignment: Alignment.topCenter,
+              fixedCrossAxisSizeFactor: 1,
+              child: IgnorePointer(
+                ignoring: !_expanded,
+                child: ExcludeFocus(
+                  excluding: !_expanded,
+                  child: ExcludeSemantics(
+                    excluding: !_expanded,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        inset,
+                        gap * .5,
+                        inset,
+                        inset,
+                      ),
+                      child: widget.child,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
+}
+
+// Center the strokes on section edges so adjacent expanded sections share a
+// single boundary without coordinating their expansion state or editor builds.
+class _DisclosureBorders extends CustomPainter {
+  _DisclosureBorders({
+    required this.progress,
+    required this.color,
+    required this.showTop,
+  }) : super(repaint: progress);
+
+  final Animation<double> progress;
+  final Color color;
+  final bool showTop;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: color.a * progress.value)
+      ..strokeWidth = 1;
+    if (showTop) canvas.drawLine(Offset.zero, Offset(size.width, 0), paint);
+    canvas.drawLine(
+      Offset(0, size.height),
+      Offset(size.width, size.height),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_DisclosureBorders oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.showTop != showTop;
 }
 
 class StudioEnumSelect<T extends Enum> extends StatelessWidget {

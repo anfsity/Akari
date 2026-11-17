@@ -338,6 +338,7 @@ class _NodeLayoutInspectorState extends State<NodeLayoutInspector> {
           key: ValueKey('sizing-constraints-${node.id}-$_editing'),
           triggerKey: const ValueKey('layout-size-constraints'),
           title: 'Size constraints',
+          showTopDividerWhenExpanded: true,
           initiallyExpanded:
               _sizing.minWidth > 0 ||
               _sizing.minHeight > 0 ||
