@@ -19,6 +19,8 @@ import 'studio_canvas_presets.dart';
 import 'studio_comparison.dart';
 import '../workspace/studio_theme.dart';
 
+const _compactDockWidth = 720.0;
+
 class StudioCanvas extends StatefulWidget {
   const StudioCanvas({
     required this.editor,
@@ -159,6 +161,18 @@ class StudioCanvasState extends State<StudioCanvas> {
     });
   }
 
+  bool get _isEditingBlocked =>
+      widget.readOnly || _previewing || _elapsed != null || _comparing;
+
+  bool get _canEditCanvas => !_isEditingBlocked && _responsiveSize == null;
+
+  bool _isPreviewReadOnly(bool presenting) =>
+      widget.readOnly ||
+      _responsiveSize != null ||
+      _previewing ||
+      _elapsed != null ||
+      presenting;
+
   KeyEventResult handleKeyEvent(KeyEvent event) {
     if (context
             .getInheritedWidgetOfExactType<StudioWorkspaceScope>()
@@ -199,7 +213,7 @@ class StudioCanvasState extends State<StudioCanvas> {
       case StudioCommand.guides:
         setState(() => _snapToGuides = !_snapToGuides);
       default:
-        if (widget.readOnly || _previewing || _elapsed != null || _comparing) {
+        if (_isEditingBlocked) {
           return KeyEventResult.ignored;
         }
         switch (command) {
@@ -256,56 +270,611 @@ class StudioCanvasState extends State<StudioCanvas> {
     return KeyEventResult.handled;
   }
 
-  IconData _getToolIcon(StudioCanvasTool tool) => switch (tool) {
+  void _selectScenario(StudioPreviewScenario scenario) {
+    if (widget.dormant) widget.onToggleDormant();
+    setState(() => _scenario = scenario);
+  }
+
+  void _toggleResponsive() {
+    final session = widget.editor;
+    if (session == null) return;
+    setState(() {
+      _responsiveSize = _responsiveSize == null
+          ? Size(
+              session.document.canvas.referenceWidth.toDouble(),
+              session.document.canvas.referenceHeight.toDouble(),
+            )
+          : null;
+    });
+  }
+
+  void _applyResolutionPreset(StudioCanvasPreset preset) {
+    final session = widget.editor;
+    if (session == null || !session.tryApplyDraft()) return;
+    session.updateScene(
+      canvas: session.document.canvas.copyWith(
+        referenceWidth: preset.width,
+        referenceHeight: preset.height,
+      ),
+    );
+    _fitView();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final presenting =
+        context
+            .dependOnInheritedWidgetOfExactType<StudioWorkspaceScope>()
+            ?.presenting ??
+        false;
+    final colors = Theme.of(context).colorScheme;
+    final session = widget.editor;
+    final hasBottomDrawer =
+        _responsiveSize != null ||
+        (session != null && (_showStateGraph || _elapsed != null));
+    return Focus(
+      focusNode: _focus,
+      onKeyEvent: (_, event) => handleKeyEvent(event),
+      onFocusChange: (focused) {
+        if (!focused && _spacePan) setState(() => _spacePan = false);
+      },
+      child: ColoredBox(
+        color: getStudioStageColor(colors),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!presenting && !_comparing)
+              _CanvasTopBar(
+                session: session,
+                readOnly: widget.readOnly,
+                dormant: widget.dormant,
+                scenario: _scenario,
+                timelineOpen: _elapsed != null,
+                showStateGraph: _showStateGraph,
+                previewing: _previewing,
+                onToggleDormant: widget.onToggleDormant,
+                onSelectScenario: _selectScenario,
+                onToggleTimeline: _toggleTimeline,
+                onToggleGraph: _toggleGraph,
+                onTogglePreview: _togglePreview,
+              ),
+            Expanded(
+              child: _CanvasStage(
+                presenting: presenting,
+                viewportKey: _viewportKey,
+                stageColor: colors.border,
+                onPointerDown: _previewing || presenting
+                    ? null
+                    : () => _focus.requestFocus(),
+                viewport: session == null
+                    ? const Center(child: Text('Unable to open scene'))
+                    : _CanvasViewportContent(
+                        session: session,
+                        theme: widget.theme,
+                        preferences: widget.preferences,
+                        readOnly: _isPreviewReadOnly(presenting),
+                        interactive:
+                            _previewing || _elapsed != null || presenting,
+                        comparing: _comparing,
+                        presenting: presenting,
+                        dormant: widget.dormant,
+                        scenario: _scenario,
+                        elapsed: presenting ? null : _elapsed,
+                        transition: _transition,
+                        tool: _tool,
+                        lockAspectRatio: _lockAspectRatio,
+                        snapToGuides: _snapToGuides,
+                        showRulers: _showRulers,
+                        zoom: presenting ? null : _zoom,
+                        responsiveSize: presenting ? null : _responsiveSize,
+                        panEnabled: !presenting && (_handTool || _spacePan),
+                        resetView: _resetView,
+                        onZoom: (zoom) => setState(() => _zoom = zoom),
+                        assetImageResolver: widget.assetImageResolver,
+                        assetSvgLoader: widget.assetSvgLoader,
+                        assetFontLoader: widget.assetFontLoader,
+                        shaderLoader: widget.shaderLoader,
+                      ),
+                dock: presenting
+                    ? null
+                    : _CanvasDock(
+                        session: session,
+                        readOnly: widget.readOnly,
+                        canEdit: _canEditCanvas && session != null,
+                        tool: _tool,
+                        handTool: _handTool,
+                        snapToGuides: _snapToGuides,
+                        lockAspectRatio: _lockAspectRatio,
+                        showRulers: _showRulers,
+                        comparing: _comparing,
+                        responsiveActive: _responsiveSize != null,
+                        zoom: _zoom,
+                        input: widget.preferences.input,
+                        onSelectTool: _selectTool,
+                        onToggleHand: () =>
+                            setState(() => _handTool = !_handTool),
+                        onToggleGuides: () =>
+                            setState(() => _snapToGuides = !_snapToGuides),
+                        onToggleLockAspect: () => setState(
+                          () => _lockAspectRatio = !_lockAspectRatio,
+                        ),
+                        onToggleRulers: () =>
+                            setState(() => _showRulers = !_showRulers),
+                        onSelectPreset: _applyResolutionPreset,
+                        onToggleResponsive: _toggleResponsive,
+                        onToggleComparison: _toggleComparison,
+                        onZoomOut: () => setState(
+                          () => _zoom = clampStudioZoom(
+                            _getEffectiveZoom() / 1.25,
+                          ),
+                        ),
+                        onFitView: _fitView,
+                        onZoomIn: () => setState(
+                          () => _zoom = clampStudioZoom(
+                            _getEffectiveZoom() * 1.25,
+                          ),
+                        ),
+                        onZoomActual: () => setState(() => _zoom = 1),
+                      ),
+              ),
+            ),
+            if (!presenting && hasBottomDrawer)
+              _CanvasBottomDrawer(
+                session: session,
+                responsiveSize: _responsiveSize,
+                showStateGraph: _showStateGraph,
+                elapsed: _elapsed,
+                dormant: widget.dormant,
+                scenario: _scenario,
+                transition: _transition,
+                fallbackDuration: widget.theme.bundle.tokens.mediumMotion,
+                onResponsiveChanged: (size) =>
+                    setState(() => _responsiveSize = size),
+                onSelectState: (dormant, scenario) {
+                  if (dormant != widget.dormant) widget.onToggleDormant();
+                  setState(() => _scenario = scenario);
+                },
+                onTimeChanged: (elapsed) => setState(() => _elapsed = elapsed),
+                onTransitionChanged: (transition) => setState(() {
+                  _transition = transition;
+                  _elapsed = Duration.zero;
+                }),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Duration _getTimelineDuration(SceneEditor session, Duration fallbackDuration) {
+  var duration = const Duration(milliseconds: 1500);
+  for (final node in session.document.nodes) {
+    final timing = getSceneMotionDuration(node, fallbackDuration);
+    if (timing > duration) duration = timing;
+    for (final rule in node.transitions) {
+      final timing = getSceneMotionDuration(
+        node.copyWith(
+          tracks: const [],
+          motionTiming: rule.timing.isDefault ? node.motionTiming : rule.timing,
+        ),
+        fallbackDuration,
+      );
+      if (timing > duration) duration = timing;
+    }
+  }
+  return duration;
+}
+
+class _CanvasTopBar extends StatelessWidget {
+  const _CanvasTopBar({
+    required this.session,
+    required this.readOnly,
+    required this.dormant,
+    required this.scenario,
+    required this.timelineOpen,
+    required this.showStateGraph,
+    required this.previewing,
+    required this.onToggleDormant,
+    required this.onSelectScenario,
+    required this.onToggleTimeline,
+    required this.onToggleGraph,
+    required this.onTogglePreview,
+  });
+
+  final SceneEditor? session;
+  final bool readOnly;
+  final bool dormant;
+  final StudioPreviewScenario scenario;
+  final bool timelineOpen;
+  final bool showStateGraph;
+  final bool previewing;
+  final VoidCallback onToggleDormant;
+  final ValueChanged<StudioPreviewScenario> onSelectScenario;
+  final VoidCallback onToggleTimeline;
+  final VoidCallback onToggleGraph;
+  final VoidCallback onTogglePreview;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final hasSession = session != null;
+    return ColoredBox(
+      color: colors.background,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ConstrainedBox(
+            key: const ValueKey('canvas-toolbar'),
+            constraints: const BoxConstraints(minHeight: 42),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              child: Wrap(
+                spacing: 16,
+                runSpacing: 8,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 128,
+                        child: GhostButton(
+                          onPressed: timelineOpen ? null : onToggleDormant,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              dormant ? 'State: Dormant' : 'State: Login',
+                            ).small(),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 144,
+                        child: StudioEnumSelect<StudioPreviewScenario>(
+                          key: const ValueKey('preview-scenario'),
+                          enabled: !timelineOpen,
+                          value: scenario,
+                          values: StudioPreviewScenario.values,
+                          formatValue: (item) => item.label,
+                          onChanged: onSelectScenario,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Tooltip(
+                        tooltip: (_) => const Text('Timeline'),
+                        child: Button(
+                          key: const ValueKey('canvas-timeline'),
+                          style: timelineOpen
+                              ? const ButtonStyle.primaryIcon()
+                              : const ButtonStyle.ghostIcon(),
+                          onPressed: hasSession ? onToggleTimeline : null,
+                          child: const Icon(LucideIcons.film, size: 16),
+                        ),
+                      ),
+                      const Gap(4),
+                      Tooltip(
+                        tooltip: (_) => const Text('State flow'),
+                        child: Button(
+                          key: const ValueKey('canvas-state-graph'),
+                          style: showStateGraph
+                              ? const ButtonStyle.primaryIcon()
+                              : const ButtonStyle.ghostIcon(),
+                          onPressed: hasSession ? onToggleGraph : null,
+                          child: const Icon(LucideIcons.gitBranch, size: 16),
+                        ),
+                      ),
+                      const Gap(12),
+                      const SizedBox(height: 20, child: VerticalDivider()),
+                      const Gap(12),
+                      Tooltip(
+                        tooltip: (_) =>
+                            Text(previewing ? 'Edit canvas' : 'Preview'),
+                        child: Button(
+                          key: const ValueKey('canvas-preview'),
+                          style: previewing
+                              ? const ButtonStyle.primaryIcon()
+                              : const ButtonStyle.ghostIcon(),
+                          onPressed: hasSession ? onTogglePreview : null,
+                          child: Semantics(
+                            label: previewing ? 'Edit canvas' : 'Preview',
+                            toggled: previewing,
+                            child: Icon(
+                              previewing
+                                  ? LucideIcons.mousePointer2
+                                  : LucideIcons.play,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (session case final activeSession?
+              when !readOnly && !previewing && !timelineOpen)
+            ListenableBuilder(
+              listenable: activeSession,
+              builder: (context, _) {
+                if (activeSession.selectedIds.isEmpty ||
+                    (activeSession.selectedIds.length <= 1 &&
+                        activeSession.selectedNode.layout == null)) {
+                  return const SizedBox.shrink();
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Divider(),
+                    NodeArrangementToolbar(editor: activeSession),
+                  ],
+                );
+              },
+            ),
+          const Divider(),
+        ],
+      ),
+    );
+  }
+}
+
+class _CanvasStage extends StatelessWidget {
+  const _CanvasStage({
+    required this.presenting,
+    required this.viewportKey,
+    required this.stageColor,
+    required this.onPointerDown,
+    required this.viewport,
+    required this.dock,
+  });
+
+  final bool presenting;
+  final GlobalKey viewportKey;
+  final Color stageColor;
+  final VoidCallback? onPointerDown;
+  final Widget viewport;
+  final Widget? dock;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Stack(
+      fit: StackFit.expand,
+      children: [
+        if (!presenting)
+          IgnorePointer(
+            child: CustomPaint(painter: _StudioStageGrid(stageColor)),
+          ),
+        Padding(
+          key: const ValueKey('canvas-viewport-area'),
+          padding: presenting
+              ? EdgeInsets.zero
+              : EdgeInsets.fromLTRB(
+                  20,
+                  20,
+                  20,
+                  constraints.maxWidth < _compactDockWidth ? 136 : 88,
+                ),
+          child: Listener(
+            key: viewportKey,
+            onPointerDown: onPointerDown == null
+                ? null
+                : (_) => onPointerDown!(),
+            child: viewport,
+          ),
+        ),
+        if (dock case final floatingDock?)
+          Positioned(left: 12, right: 12, bottom: 16, child: floatingDock),
+      ],
+    ),
+  );
+}
+
+class _CanvasViewportContent extends StatelessWidget {
+  const _CanvasViewportContent({
+    required this.session,
+    required this.theme,
+    required this.preferences,
+    required this.readOnly,
+    required this.interactive,
+    required this.comparing,
+    required this.presenting,
+    required this.dormant,
+    required this.scenario,
+    required this.elapsed,
+    required this.transition,
+    required this.tool,
+    required this.lockAspectRatio,
+    required this.snapToGuides,
+    required this.showRulers,
+    required this.zoom,
+    required this.responsiveSize,
+    required this.panEnabled,
+    required this.resetView,
+    required this.onZoom,
+    required this.assetImageResolver,
+    required this.assetSvgLoader,
+    required this.assetFontLoader,
+    required this.shaderLoader,
+  });
+
+  final SceneEditor session;
+  final ThemeDefinition theme;
+  final StudioPreferences preferences;
+  final bool readOnly;
+  final bool interactive;
+  final bool comparing;
+  final bool presenting;
+  final bool dormant;
+  final StudioPreviewScenario scenario;
+  final Duration? elapsed;
+  final StudioTransition transition;
+  final StudioCanvasTool tool;
+  final bool lockAspectRatio;
+  final bool snapToGuides;
+  final bool showRulers;
+  final double? zoom;
+  final Size? responsiveSize;
+  final bool panEnabled;
+  final int resetView;
+  final ValueChanged<double> onZoom;
+  final SceneImageProviderResolver? assetImageResolver;
+  final SceneSvgLoader? assetSvgLoader;
+  final SceneFontLoader? assetFontLoader;
+  final SceneShaderLoader? shaderLoader;
+
+  SceneNode? _startDrag(String id) {
+    if (!session.selectedIds.contains(id) &&
+        !session.selectNode(
+          id,
+          toggle: HardwareKeyboard.instance.isShiftPressed,
+        )) {
+      return null;
+    }
+    if (!session.tryApplyDraft()) return null;
+    return session.document.nodes.firstWhere((node) => node.id == id);
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: session,
+    builder: (context, _) => Stack(
+      fit: StackFit.expand,
+      children: [
+        Visibility(
+          visible: !comparing || presenting,
+          maintainState: true,
+          child: StudioPreview(
+            key: ObjectKey(session),
+            theme: theme,
+            readOnly: readOnly,
+            interactive: interactive,
+            document: session.previewDocument,
+            selectedId: session.selectedId,
+            selectedIds: session.selectedIds,
+            onSelectNodes: session.selectNodes,
+            onCommitNodes: session.updateNodes,
+            onPlaceNode: session.placeNode,
+            onCreateComponent: (component, position) =>
+                session.createComponent(component, position: position),
+            onUpdateText: session.updateNodeText,
+            snapToGuides: snapToGuides,
+            showRulers: showRulers,
+            onPrepareGuide: session.tryApplyDraft,
+            onCreateGuide: session.createGuide,
+            onUpdateGuide: session.updateGuide,
+            onDeleteGuide: session.deleteGuide,
+            assetImageResolver: assetImageResolver,
+            assetSvgLoader: assetSvgLoader,
+            assetFontLoader: assetFontLoader,
+            shaderLoader: shaderLoader,
+            dormant: dormant,
+            scenario: scenario,
+            playbackElapsed: elapsed,
+            transition: transition,
+            preferences: preferences,
+            tool: tool,
+            lockAspectRatio: lockAspectRatio,
+            zoom: zoom,
+            viewportSize: responsiveSize,
+            presenting: presenting,
+            panEnabled: panEnabled,
+            resetView: resetView,
+            onZoom: onZoom,
+            onSelect: (id) => session.selectNode(
+              id,
+              toggle: HardwareKeyboard.instance.isShiftPressed,
+            ),
+            onStartDrag: _startDrag,
+            onDragNodeChanged: session.inspector.updatePreviewNode,
+          ),
+        ),
+        if (comparing && !presenting)
+          StudioComparison(
+            theme: theme,
+            document: session.previewDocument,
+            preferences: preferences,
+            dormant: dormant,
+            scenario: scenario,
+            assetImageResolver: assetImageResolver,
+            assetSvgLoader: assetSvgLoader,
+            assetFontLoader: assetFontLoader,
+            shaderLoader: shaderLoader,
+          ),
+      ],
+    ),
+  );
+}
+
+class _CanvasDock extends StatelessWidget {
+  const _CanvasDock({
+    required this.session,
+    required this.readOnly,
+    required this.canEdit,
+    required this.tool,
+    required this.handTool,
+    required this.snapToGuides,
+    required this.lockAspectRatio,
+    required this.showRulers,
+    required this.comparing,
+    required this.responsiveActive,
+    required this.zoom,
+    required this.input,
+    required this.onSelectTool,
+    required this.onToggleHand,
+    required this.onToggleGuides,
+    required this.onToggleLockAspect,
+    required this.onToggleRulers,
+    required this.onSelectPreset,
+    required this.onToggleResponsive,
+    required this.onToggleComparison,
+    required this.onZoomOut,
+    required this.onFitView,
+    required this.onZoomIn,
+    required this.onZoomActual,
+  });
+
+  final SceneEditor? session;
+  final bool readOnly;
+  final bool canEdit;
+  final StudioCanvasTool tool;
+  final bool handTool;
+  final bool snapToGuides;
+  final bool lockAspectRatio;
+  final bool showRulers;
+  final bool comparing;
+  final bool responsiveActive;
+  final double? zoom;
+  final StudioInputBindings input;
+  final ValueChanged<StudioCanvasTool> onSelectTool;
+  final VoidCallback onToggleHand;
+  final VoidCallback onToggleGuides;
+  final VoidCallback onToggleLockAspect;
+  final VoidCallback onToggleRulers;
+  final ValueChanged<StudioCanvasPreset> onSelectPreset;
+  final VoidCallback onToggleResponsive;
+  final VoidCallback onToggleComparison;
+  final VoidCallback onZoomOut;
+  final VoidCallback onFitView;
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomActual;
+
+  static IconData _getToolIcon(StudioCanvasTool tool) => switch (tool) {
     StudioCanvasTool.move => LucideIcons.mousePointer2,
     StudioCanvasTool.scale => LucideIcons.scaling,
     StudioCanvasTool.rotate => LucideIcons.rotateCw,
     StudioCanvasTool.rotate3d => LucideIcons.rotate3d,
   };
 
-  Widget _buildDockButton({
-    required String key,
-    required String label,
-    required VoidCallback? onPressed,
-    IconData? icon,
-    String? text,
-    bool? active,
-  }) {
-    final colors = Theme.of(context).colorScheme;
-    final isActive = active ?? false;
-    return Tooltip(
-      tooltip: (_) => Text(label),
-      child: Semantics(
-        label: icon == null ? null : label,
-        toggled: active,
-        child: Button(
-          key: ValueKey(key),
-          style:
-              ButtonStyle.ghost(
-                density: icon == null
-                    ? ButtonDensity.dense
-                    : ButtonDensity.icon,
-                shape: icon == null
-                    ? ButtonShape.rectangle
-                    : ButtonShape.circle,
-              ).copyWith(
-                decoration: (context, states, value) =>
-                    (value as BoxDecoration).copyWith(
-                      color: isActive
-                          ? colors.primary.withValues(alpha: .08)
-                          : null,
-                    ),
-              ),
-          onPressed: onPressed,
-          child: icon == null
-              ? Text(text ?? label).small()
-              : Icon(icon, size: 16, color: isActive ? colors.primary : null),
-        ),
-      ),
-    );
-  }
-
-  void _openToolMenu(BuildContext context, {required bool canEdit}) {
+  void _openToolMenu(BuildContext context) {
     showDropdown<void>(
       context: context,
       alignment: Alignment.bottomLeft,
@@ -313,40 +882,38 @@ class StudioCanvasState extends State<StudioCanvas> {
       builder: (_) => DropdownMenu(
         children: [
           const MenuLabel(child: Text('Transform')),
-          for (final tool in StudioCanvasTool.values)
+          for (final item in StudioCanvasTool.values)
             MenuButton(
-              key: ValueKey('tool-menu-${tool.name}'),
-              leading: Icon(_getToolIcon(tool), size: 16),
+              key: ValueKey('tool-menu-${item.name}'),
+              leading: Icon(_getToolIcon(item), size: 16),
               trailing: Text(
-                widget.preferences.input.getBinding(tool.command)?.getLabel() ??
-                    'Unbound',
+                input.getBinding(item.command)?.getLabel() ?? 'Unbound',
               ).xSmall().muted(),
               enabled: canEdit,
-              onPressed: (_) => _selectTool(tool),
-              child: Text(tool.label),
+              onPressed: (_) => onSelectTool(item),
+              child: Text(item.label),
             ),
           const MenuDivider(),
           MenuButton(
             key: const ValueKey('lock-aspect-ratio'),
             leading: Icon(
-              _lockAspectRatio ? LucideIcons.lock : LucideIcons.lockOpen,
+              lockAspectRatio ? LucideIcons.lock : LucideIcons.lockOpen,
               size: 16,
             ),
-            trailing: _lockAspectRatio
+            trailing: lockAspectRatio
                 ? const Icon(LucideIcons.check, size: 14)
                 : null,
             enabled: canEdit,
-            onPressed: (_) =>
-                setState(() => _lockAspectRatio = !_lockAspectRatio),
+            onPressed: (_) => onToggleLockAspect(),
             child: const Text('Lock aspect ratio'),
           ),
           MenuButton(
             key: const ValueKey('canvas-rulers'),
             leading: const Icon(LucideIcons.ruler, size: 16),
-            trailing: _showRulers
+            trailing: showRulers
                 ? const Icon(LucideIcons.check, size: 14)
                 : null,
-            onPressed: (_) => setState(() => _showRulers = !_showRulers),
+            onPressed: (_) => onToggleRulers(),
             child: const Text('Rulers & guides'),
           ),
         ],
@@ -354,22 +921,15 @@ class StudioCanvasState extends State<StudioCanvas> {
     );
   }
 
-  Widget _buildCanvasDock(SceneEditor? session) {
+  @override
+  Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final canEdit =
-        session != null &&
-        !widget.readOnly &&
-        !_previewing &&
-        _elapsed == null &&
-        !_comparing &&
-        _responsiveSize == null;
+    final hasSession = session != null;
+    final responsiveLabel = responsiveActive ? 'Authored size' : 'Responsive';
+    final comparisonLabel = comparing ? 'Single' : 'Compare';
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 720;
-        final responsiveLabel = _responsiveSize == null
-            ? 'Responsive'
-            : 'Authored size';
-        final comparisonLabel = _comparing ? 'Single' : 'Compare';
+        final compact = constraints.maxWidth < _compactDockWidth;
         return Center(
           child: Container(
             key: const ValueKey('canvas-dock'),
@@ -400,118 +960,98 @@ class StudioCanvasState extends State<StudioCanvas> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildDockButton(
-                      key: 'tool-${_tool.name}',
+                    _DockButton(
+                      id: 'tool-${tool.name}',
                       label:
-                          '${_tool.label} · ${widget.preferences.input.getBinding(_tool.command)?.getLabel() ?? 'Unbound'}',
-                      icon: _getToolIcon(_tool),
-                      active: !_handTool && canEdit,
-                      onPressed: canEdit ? () => _selectTool(_tool) : null,
+                          '${tool.label} · ${input.getBinding(tool.command)?.getLabel() ?? 'Unbound'}',
+                      icon: _getToolIcon(tool),
+                      active: !handTool && canEdit,
+                      onPressed: canEdit ? () => onSelectTool(tool) : null,
                     ),
-                    _buildDockButton(
-                      key: 'canvas-hand',
+                    _DockButton(
+                      id: 'canvas-hand',
                       label:
-                          'Hand · ${widget.preferences.input.getBinding(StudioCommand.hand)?.getLabel() ?? 'Unbound'}',
+                          'Hand · ${input.getBinding(StudioCommand.hand)?.getLabel() ?? 'Unbound'}',
                       icon: LucideIcons.hand,
-                      active: _handTool,
-                      onPressed: session == null
-                          ? null
-                          : () => setState(() => _handTool = !_handTool),
+                      active: handTool,
+                      onPressed: hasSession ? onToggleHand : null,
                     ),
-                    _buildDockButton(
-                      key: 'smart-guides',
+                    _DockButton(
+                      id: 'smart-guides',
                       label: 'Smart guides · Alt to bypass',
                       icon: LucideIcons.magnet,
-                      active: _snapToGuides,
-                      onPressed: canEdit
-                          ? () => setState(() => _snapToGuides = !_snapToGuides)
-                          : null,
+                      active: snapToGuides,
+                      onPressed: canEdit ? onToggleGuides : null,
                     ),
                     Builder(
-                      builder: (context) => _buildDockButton(
-                        key: 'canvas-tool-menu',
+                      builder: (context) => _DockButton(
+                        id: 'canvas-tool-menu',
                         label: 'Canvas tools',
                         icon: LucideIcons.ellipsis,
-                        onPressed: session == null
-                            ? null
-                            : () => _openToolMenu(context, canEdit: canEdit),
+                        onPressed: hasSession
+                            ? () => _openToolMenu(context)
+                            : null,
                       ),
                     ),
                   ],
                 ),
                 if (!compact)
                   const SizedBox(height: 20, child: VerticalDivider()),
-                if (session != null)
-                  SizedBox(
-                    width: 148,
-                    child: StudioSelect<StudioCanvasPreset>(
-                      theme: SelectTheme(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
-                        ),
-                        decoration: (context, states, value) =>
-                            (value as BoxDecoration).copyWith(
-                              border: const Border(),
-                              color: Colors.transparent,
+                if (session case final activeSession?)
+                  ListenableBuilder(
+                    listenable: activeSession,
+                    builder: (context, _) {
+                      final canvas = activeSession.document.canvas;
+                      return SizedBox(
+                        width: 148,
+                        child: StudioSelect<StudioCanvasPreset>(
+                          theme: SelectTheme(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
                             ),
-                      ),
-                      key: const ValueKey('quick-resolution'),
-                      enabled: !widget.readOnly,
-                      value: StudioCanvasPreset.values
-                          .where(
-                            (preset) =>
-                                preset.width ==
-                                    session.document.canvas.referenceWidth &&
-                                preset.height ==
-                                    session.document.canvas.referenceHeight,
-                          )
-                          .firstOrNull,
-                      values: StudioCanvasPreset.values,
-                      placeholder: Text(
-                        '${session.document.canvas.referenceWidth} × ${session.document.canvas.referenceHeight}',
-                      ).small(),
-                      formatValue: (preset) =>
-                          '${preset.width} × ${preset.height}',
-                      onChanged: (preset) {
-                        if (!session.tryApplyDraft()) return;
-                        session.updateScene(
-                          canvas: session.document.canvas.copyWith(
-                            referenceWidth: preset.width,
-                            referenceHeight: preset.height,
+                            decoration: (context, states, value) =>
+                                (value as BoxDecoration).copyWith(
+                                  border: const Border(),
+                                  color: Colors.transparent,
+                                ),
                           ),
-                        );
-                        _fitView();
-                      },
-                    ),
+                          key: const ValueKey('quick-resolution'),
+                          enabled: !readOnly,
+                          value: StudioCanvasPreset.values
+                              .where(
+                                (preset) =>
+                                    preset.width == canvas.referenceWidth &&
+                                    preset.height == canvas.referenceHeight,
+                              )
+                              .firstOrNull,
+                          values: StudioCanvasPreset.values,
+                          placeholder: Text(
+                            '${canvas.referenceWidth} × ${canvas.referenceHeight}',
+                          ).small(),
+                          formatValue: (preset) =>
+                              '${preset.width} × ${preset.height}',
+                          onChanged: onSelectPreset,
+                        ),
+                      );
+                    },
                   ),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildDockButton(
-                      key: 'canvas-responsive',
+                    _DockButton(
+                      id: 'canvas-responsive',
                       label: responsiveLabel,
                       icon: compact ? LucideIcons.monitor : null,
-                      active: _responsiveSize != null,
-                      onPressed: session == null
-                          ? null
-                          : () => setState(() {
-                              _responsiveSize = _responsiveSize == null
-                                  ? Size(
-                                      session.document.canvas.referenceWidth
-                                          .toDouble(),
-                                      session.document.canvas.referenceHeight
-                                          .toDouble(),
-                                    )
-                                  : null;
-                            }),
+                      active: responsiveActive,
+                      onPressed: hasSession ? onToggleResponsive : null,
                     ),
-                    _buildDockButton(
-                      key: 'canvas-compare',
+                    _DockButton(
+                      id: 'canvas-compare',
                       label: comparisonLabel,
                       icon: compact ? LucideIcons.columns2 : null,
-                      active: _comparing,
-                      onPressed: session == null ? null : _toggleComparison,
+                      active: comparing,
+                      onPressed: hasSession ? onToggleComparison : null,
                     ),
                   ],
                 ),
@@ -520,45 +1060,29 @@ class StudioCanvasState extends State<StudioCanvas> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildDockButton(
-                      key: 'zoom-out',
+                    _DockButton(
+                      id: 'zoom-out',
                       label: 'Zoom out',
                       icon: LucideIcons.minus,
-                      onPressed: session == null
-                          ? null
-                          : () => setState(
-                              () => _zoom = clampStudioZoom(
-                                _getEffectiveZoom() / 1.25,
-                              ),
-                            ),
+                      onPressed: hasSession ? onZoomOut : null,
                     ),
-                    _buildDockButton(
-                      key: 'zoom-fit',
+                    _DockButton(
+                      id: 'zoom-fit',
                       label: 'Fit canvas',
-                      text: _zoom == null
-                          ? 'Fit'
-                          : '${(_zoom! * 100).round()}%',
-                      onPressed: session == null ? null : _fitView,
+                      text: zoom == null ? 'Fit' : '${(zoom! * 100).round()}%',
+                      onPressed: hasSession ? onFitView : null,
                     ),
-                    _buildDockButton(
-                      key: 'zoom-in',
+                    _DockButton(
+                      id: 'zoom-in',
                       label: 'Zoom in',
                       icon: LucideIcons.plus,
-                      onPressed: session == null
-                          ? null
-                          : () => setState(
-                              () => _zoom = clampStudioZoom(
-                                _getEffectiveZoom() * 1.25,
-                              ),
-                            ),
+                      onPressed: hasSession ? onZoomIn : null,
                     ),
-                    _buildDockButton(
-                      key: 'zoom-actual-size',
+                    _DockButton(
+                      id: 'zoom-actual-size',
                       label: 'Actual size · 100%',
                       text: '100%',
-                      onPressed: session == null
-                          ? null
-                          : () => setState(() => _zoom = 1),
+                      onPressed: hasSession ? onZoomActual : null,
                     ),
                   ],
                 ),
@@ -569,475 +1093,190 @@ class StudioCanvasState extends State<StudioCanvas> {
       },
     );
   }
+}
+
+class _DockButton extends StatelessWidget {
+  const _DockButton({
+    required this.id,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.text,
+    this.active,
+  });
+
+  final String id;
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final String? text;
+  final bool? active;
 
   @override
   Widget build(BuildContext context) {
-    final presenting =
-        context
-            .dependOnInheritedWidgetOfExactType<StudioWorkspaceScope>()
-            ?.presenting ??
-        false;
     final colors = Theme.of(context).colorScheme;
-    return Focus(
-      focusNode: _focus,
-      onKeyEvent: (_, event) => handleKeyEvent(event),
-      onFocusChange: (focused) {
-        if (!focused && _spacePan) setState(() => _spacePan = false);
-      },
-      child: ColoredBox(
-        color: getStudioStageColor(colors),
-        child: ListenableBuilder(
-          listenable: Listenable.merge([widget.editor]),
-          builder: (context, _) {
-            final session = widget.editor;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (!presenting && !_comparing)
-                  ColoredBox(
-                    color: colors.background,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        ConstrainedBox(
-                          key: const ValueKey('canvas-toolbar'),
-                          constraints: const BoxConstraints(minHeight: 42),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            child: Wrap(
-                              spacing: 16,
-                              runSpacing: 8,
-                              alignment: WrapAlignment.spaceBetween,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 6,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    SizedBox(
-                                      width: 128,
-                                      child: GhostButton(
-                                        onPressed: _elapsed == null
-                                            ? widget.onToggleDormant
-                                            : null,
-                                        child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: Text(
-                                            widget.dormant
-                                                ? 'State: Dormant'
-                                                : 'State: Login',
-                                          ).small(),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: 144,
-                                      child:
-                                          StudioEnumSelect<
-                                            StudioPreviewScenario
-                                          >(
-                                            key: const ValueKey(
-                                              'preview-scenario',
-                                            ),
-                                            enabled: _elapsed == null,
-                                            value: _scenario,
-                                            values:
-                                                StudioPreviewScenario.values,
-                                            formatValue: (scenario) =>
-                                                scenario.label,
-                                            onChanged: (scenario) {
-                                              if (widget.dormant) {
-                                                widget.onToggleDormant();
-                                              }
-                                              setState(
-                                                () => _scenario = scenario,
-                                              );
-                                            },
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Tooltip(
-                                      tooltip: (_) => const Text('Timeline'),
-                                      child: Button(
-                                        key: const ValueKey('canvas-timeline'),
-                                        style: _elapsed == null
-                                            ? const ButtonStyle.ghostIcon()
-                                            : const ButtonStyle.primaryIcon(),
-                                        onPressed: session == null
-                                            ? null
-                                            : _toggleTimeline,
-                                        child: const Icon(
-                                          LucideIcons.film,
-                                          size: 16,
-                                        ),
-                                      ),
-                                    ),
-                                    const Gap(4),
-                                    Tooltip(
-                                      tooltip: (_) => const Text('State flow'),
-                                      child: Button(
-                                        key: const ValueKey(
-                                          'canvas-state-graph',
-                                        ),
-                                        style: _showStateGraph
-                                            ? const ButtonStyle.primaryIcon()
-                                            : const ButtonStyle.ghostIcon(),
-                                        onPressed: session == null
-                                            ? null
-                                            : _toggleGraph,
-                                        child: const Icon(
-                                          LucideIcons.gitBranch,
-                                          size: 16,
-                                        ),
-                                      ),
-                                    ),
-                                    const Gap(12),
-                                    const SizedBox(
-                                      height: 20,
-                                      child: VerticalDivider(),
-                                    ),
-                                    const Gap(12),
-                                    Tooltip(
-                                      tooltip: (_) => Text(
-                                        _previewing ? 'Edit canvas' : 'Preview',
-                                      ),
-                                      child: Button(
-                                        key: const ValueKey('canvas-preview'),
-                                        style: _previewing
-                                            ? const ButtonStyle.primaryIcon()
-                                            : const ButtonStyle.ghostIcon(),
-                                        onPressed: session == null
-                                            ? null
-                                            : _togglePreview,
-                                        child: Semantics(
-                                          label: _previewing
-                                              ? 'Edit canvas'
-                                              : 'Preview',
-                                          toggled: _previewing,
-                                          child: Icon(
-                                            _previewing
-                                                ? LucideIcons.mousePointer2
-                                                : LucideIcons.play,
-                                            size: 16,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (session != null &&
-                            !widget.readOnly &&
-                            !_previewing &&
-                            _elapsed == null &&
-                            session.selectedIds.isNotEmpty &&
-                            (session.selectedIds.length > 1 ||
-                                session.selectedNode.layout != null)) ...[
-                          const Divider(),
-                          NodeArrangementToolbar(editor: session),
-                        ],
-                        const Divider(),
-                      ],
+    final isActive = active ?? false;
+    return Tooltip(
+      tooltip: (_) => Text(label),
+      child: Semantics(
+        label: icon == null ? null : label,
+        toggled: active,
+        child: Button(
+          key: ValueKey(id),
+          style:
+              ButtonStyle.ghost(
+                density: icon == null
+                    ? ButtonDensity.dense
+                    : ButtonDensity.icon,
+                shape: icon == null
+                    ? ButtonShape.rectangle
+                    : ButtonShape.circle,
+              ).copyWith(
+                decoration: (context, states, value) =>
+                    (value as BoxDecoration).copyWith(
+                      color: isActive
+                          ? colors.primary.withValues(alpha: .08)
+                          : null,
                     ),
-                  ),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) => Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        if (!presenting)
-                          IgnorePointer(
-                            child: CustomPaint(
-                              painter: _StudioStageGrid(colors.border),
-                            ),
-                          ),
-                        Padding(
-                          key: const ValueKey('canvas-viewport-area'),
-                          padding: presenting
-                              ? EdgeInsets.zero
-                              : EdgeInsets.fromLTRB(
-                                  20,
-                                  20,
-                                  20,
-                                  constraints.maxWidth < 720 ? 136 : 88,
-                                ),
-                          child: session == null
-                              ? const Center(
-                                  child: Text('Unable to open scene'),
-                                )
-                              : Listener(
-                                  key: _viewportKey,
-                                  onPointerDown: _previewing || presenting
-                                      ? null
-                                      : (_) => _focus.requestFocus(),
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      Visibility(
-                                        visible: !_comparing || presenting,
-                                        maintainState: true,
-                                        child: StudioPreview(
-                                          key: ObjectKey(session),
-                                          theme: widget.theme,
-                                          readOnly:
-                                              widget.readOnly ||
-                                              _responsiveSize != null ||
-                                              _previewing ||
-                                              _elapsed != null ||
-                                              presenting,
-                                          interactive:
-                                              _previewing ||
-                                              _elapsed != null ||
-                                              presenting,
-                                          document: session.previewDocument,
-                                          selectedId: session.selectedId,
-                                          selectedIds: session.selectedIds,
-                                          onSelectNodes: session.selectNodes,
-                                          onCommitNodes: session.updateNodes,
-                                          onPlaceNode: session.placeNode,
-                                          onCreateComponent:
-                                              (component, position) =>
-                                                  session.createComponent(
-                                                    component,
-                                                    position: position,
-                                                  ),
-                                          onUpdateText: session.updateNodeText,
-                                          snapToGuides: _snapToGuides,
-                                          showRulers: _showRulers,
-                                          onPrepareGuide: session.tryApplyDraft,
-                                          onCreateGuide: session.createGuide,
-                                          onUpdateGuide: session.updateGuide,
-                                          onDeleteGuide: session.deleteGuide,
-                                          assetImageResolver:
-                                              widget.assetImageResolver,
-                                          assetSvgLoader: widget.assetSvgLoader,
-                                          assetFontLoader:
-                                              widget.assetFontLoader,
-                                          shaderLoader: widget.shaderLoader,
-                                          dormant: widget.dormant,
-                                          scenario: _scenario,
-                                          playbackElapsed: presenting
-                                              ? null
-                                              : _elapsed,
-                                          transition: _transition,
-                                          preferences: widget.preferences,
-                                          tool: _tool,
-                                          lockAspectRatio: _lockAspectRatio,
-                                          zoom: presenting ? null : _zoom,
-                                          viewportSize: presenting
-                                              ? null
-                                              : _responsiveSize,
-                                          presenting: presenting,
-                                          panEnabled:
-                                              !presenting &&
-                                              (_handTool || _spacePan),
-                                          resetView: _resetView,
-                                          onZoom: (zoom) =>
-                                              setState(() => _zoom = zoom),
-                                          onSelect: (id) => session.selectNode(
-                                            id,
-                                            toggle: HardwareKeyboard
-                                                .instance
-                                                .isShiftPressed,
-                                          ),
-                                          onStartDrag: (id) {
-                                            if (!session.selectedIds.contains(
-                                                  id,
-                                                ) &&
-                                                !session.selectNode(
-                                                  id,
-                                                  toggle: HardwareKeyboard
-                                                      .instance
-                                                      .isShiftPressed,
-                                                )) {
-                                              return null;
-                                            }
-                                            if (!session.tryApplyDraft()) {
-                                              return null;
-                                            }
-                                            return session.document.nodes
-                                                .firstWhere(
-                                                  (node) => node.id == id,
-                                                );
-                                          },
-                                          onDragNodeChanged: session
-                                              .inspector
-                                              .updatePreviewNode,
-                                        ),
-                                      ),
-                                      if (_comparing && !presenting)
-                                        StudioComparison(
-                                          theme: widget.theme,
-                                          document: session.previewDocument,
-                                          preferences: widget.preferences,
-                                          dormant: widget.dormant,
-                                          scenario: _scenario,
-                                          assetImageResolver:
-                                              widget.assetImageResolver,
-                                          assetSvgLoader: widget.assetSvgLoader,
-                                          assetFontLoader:
-                                              widget.assetFontLoader,
-                                          shaderLoader: widget.shaderLoader,
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                        ),
-                        if (!presenting)
-                          Positioned(
-                            left: 12,
-                            right: 12,
-                            bottom: 16,
-                            child: _buildCanvasDock(session),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (!presenting &&
-                    (_responsiveSize != null ||
-                        _showStateGraph ||
-                        _elapsed != null))
-                  ColoredBox(
-                    color: colors.background,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (_responsiveSize != null) ...[
-                          const Divider(),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            child: Wrap(
-                              spacing: 16,
-                              runSpacing: 8,
-                              children: [
-                                for (final horizontal in [true, false])
-                                  SizedBox(
-                                    width: 240,
-                                    child: Row(
-                                      children: [
-                                        SizedBox(
-                                          width: 90,
-                                          child: Text(
-                                            '${horizontal ? 'W' : 'H'} ${(horizontal ? _responsiveSize!.width : _responsiveSize!.height).round()} px',
-                                          ).small(),
-                                        ),
-                                        Expanded(
-                                          child: Slider(
-                                            key: ValueKey(
-                                              horizontal
-                                                  ? 'responsive-width'
-                                                  : 'responsive-height',
-                                            ),
-                                            min: 240,
-                                            max: 3840,
-                                            value: SliderValue.single(
-                                              (horizontal
-                                                      ? _responsiveSize!.width
-                                                      : _responsiveSize!.height)
-                                                  .clamp(240, 3840),
-                                            ),
-                                            onChanged: (value) => setState(
-                                              () => _responsiveSize = horizontal
-                                                  ? Size(
-                                                      value.value
-                                                          .roundToDouble(),
-                                                      _responsiveSize!.height,
-                                                    )
-                                                  : Size(
-                                                      _responsiveSize!.width,
-                                                      value.value
-                                                          .roundToDouble(),
-                                                    ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        if (session != null && _showStateGraph) ...[
-                          const Divider(),
-                          StudioStateGraph(
-                            editor: session,
-                            dormant: widget.dormant,
-                            scenario: _scenario,
-                            onSelect: (dormant, scenario) {
-                              if (dormant != widget.dormant) {
-                                widget.onToggleDormant();
-                              }
-                              setState(() => _scenario = scenario);
-                            },
-                          ),
-                        ],
-                        if (session != null && _elapsed != null) ...[
-                          const Divider(),
-                          StudioTimeline(
-                            editor: session,
-                            fallbackDuration:
-                                widget.theme.bundle.tokens.mediumMotion,
-                            duration: _getTimelineDuration(session),
-                            elapsed: _elapsed!,
-                            transition: _transition,
-                            onTimeChanged: (elapsed) =>
-                                setState(() => _elapsed = elapsed),
-                            onTransitionChanged: (transition) => setState(() {
-                              _transition = transition;
-                              _elapsed = Duration.zero;
-                            }),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-              ],
-            );
-          },
+              ),
+          onPressed: onPressed,
+          child: icon == null
+              ? Text(text ?? label).small()
+              : Icon(icon, size: 16, color: isActive ? colors.primary : null),
         ),
       ),
     );
   }
+}
 
-  Duration _getTimelineDuration(SceneEditor session) {
-    var duration = const Duration(milliseconds: 1500);
-    for (final node in session.document.nodes) {
-      final timing = getSceneMotionDuration(
-        node,
-        widget.theme.tokens.mediumMotion,
-      );
-      if (timing > duration) duration = timing;
-      for (final rule in node.transitions) {
-        final timing = getSceneMotionDuration(
-          node.copyWith(
-            tracks: const [],
-            motionTiming: rule.timing.isDefault
-                ? node.motionTiming
-                : rule.timing,
-          ),
-          widget.theme.tokens.mediumMotion,
-        );
-        if (timing > duration) duration = timing;
-      }
-    }
-    return duration;
+class _CanvasBottomDrawer extends StatelessWidget {
+  const _CanvasBottomDrawer({
+    required this.session,
+    required this.responsiveSize,
+    required this.showStateGraph,
+    required this.elapsed,
+    required this.dormant,
+    required this.scenario,
+    required this.transition,
+    required this.fallbackDuration,
+    required this.onResponsiveChanged,
+    required this.onSelectState,
+    required this.onTimeChanged,
+    required this.onTransitionChanged,
+  });
+
+  final SceneEditor? session;
+  final Size? responsiveSize;
+  final bool showStateGraph;
+  final Duration? elapsed;
+  final bool dormant;
+  final StudioPreviewScenario scenario;
+  final StudioTransition transition;
+  final Duration fallbackDuration;
+  final ValueChanged<Size> onResponsiveChanged;
+  final void Function(bool, StudioPreviewScenario) onSelectState;
+  final ValueChanged<Duration> onTimeChanged;
+  final ValueChanged<StudioTransition> onTransitionChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: colors.background,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (responsiveSize case final size?) ...[
+            const Divider(),
+            _ResponsiveViewportBar(size: size, onChanged: onResponsiveChanged),
+          ],
+          if (session case final activeSession?
+              when showStateGraph || elapsed != null)
+            ListenableBuilder(
+              listenable: activeSession,
+              builder: (context, _) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (showStateGraph) ...[
+                    const Divider(),
+                    StudioStateGraph(
+                      editor: activeSession,
+                      dormant: dormant,
+                      scenario: scenario,
+                      onSelect: onSelectState,
+                    ),
+                  ],
+                  if (elapsed case final activeElapsed?) ...[
+                    const Divider(),
+                    StudioTimeline(
+                      editor: activeSession,
+                      fallbackDuration: fallbackDuration,
+                      duration: _getTimelineDuration(
+                        activeSession,
+                        fallbackDuration,
+                      ),
+                      elapsed: activeElapsed,
+                      transition: transition,
+                      onTimeChanged: onTimeChanged,
+                      onTransitionChanged: onTransitionChanged,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
+}
+
+class _ResponsiveViewportBar extends StatelessWidget {
+  const _ResponsiveViewportBar({required this.size, required this.onChanged});
+
+  final Size size;
+  final ValueChanged<Size> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    child: Wrap(
+      spacing: 16,
+      runSpacing: 8,
+      children: [
+        for (final horizontal in [true, false])
+          SizedBox(
+            width: 240,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 90,
+                  child: Text(
+                    '${horizontal ? 'W' : 'H'} ${(horizontal ? size.width : size.height).round()} px',
+                  ).small(),
+                ),
+                Expanded(
+                  child: Slider(
+                    key: ValueKey(
+                      horizontal ? 'responsive-width' : 'responsive-height',
+                    ),
+                    min: 240,
+                    max: 3840,
+                    value: SliderValue.single(
+                      (horizontal ? size.width : size.height).clamp(240, 3840),
+                    ),
+                    onChanged: (value) => onChanged(
+                      horizontal
+                          ? Size(value.value.roundToDouble(), size.height)
+                          : Size(size.width, value.value.roundToDouble()),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 class _StudioStageGrid extends CustomPainter {
