@@ -27,7 +27,7 @@ fvm dart run packages/akari_cli/bin/akari.dart run studio --theme /path/to/theme
 
 ## Workspace & panels
 
-- **Document header**: The project/scene breadcrumb opens the scene menu, including **New scene** and **Create theme**. The panel icon at the top left toggles the project panel; undo, redo, settings, save, and workspace controls stay on the right.
+- **Document header**: The project/scene breadcrumb opens the scene menu, including **New scene** and **Create theme**. The left side groups the project panel toggle, breadcrumb, undo, and redo. Workspace layout, presentation, settings, save status, and save stay on the right, with open space between the two groups.
 - **Workspace modes**: Switch between **Design**, **Motion** (opens motion inspector tabs and the timeline), and **Focus** (hides side panels).
 - **Collapsible & floating panels**: Toggle the left sidebar (`Ctrl+B`), right inspector (`Ctrl+Shift+B`), or fullscreen presentation mode (`Ctrl+Shift+P`, `Escape` to exit). Double-click a panel header to collapse it, click its float button to detach it into a movable/resizable window, or drag/dock panels onto either edge to form tab groups.
 - **Persistent layout**: Dock positions, panel widths, floating bounds, and workspace mode are saved as user preferences without polluting scene undo history.
@@ -35,7 +35,7 @@ fvm dart run packages/akari_cli/bin/akari.dart run studio --theme /path/to/theme
 
 ## Editing workflow
 
-1. **Choose a theme and scene**: Select a compiled theme in the project panel's **Theme** selector and a scene in **Scenes** or the header's scene menu. Choose **New scene** from the header menu to create a fresh artboard in the current theme, or click **Load JSON** to open any `*.scene.json` file from disk.
+1. **Choose a theme and scene**: Select a compiled theme in the project panel's **Theme** selector and a scene in the header's scene menu. Choose **New scene** from the header menu to create a fresh artboard in the current theme, or choose **Load JSON** from the same menu to open any `*.scene.json` file from disk.
 2. **Assemble & select layers**: Use **Compose** to toggle layout slots, apply presets, or drag basic primitives onto the canvas. Use **Layers** to inspect the front-to-back hierarchy (including hidden nodes) and **Assets** to browse or import package resources.
 3. **Customize in the inspector**: Edit component properties, visual style tokens, geometry, frame auto-layout, and motion settings in the right-hand inspector.
 4. **Apply & preview**: Choices and sliders preview immediately (committing a single undo step on release); text and numeric fields apply on `Enter`, blur, or **Apply to preview**. The apply button appears when there is a pending draft or validation error; otherwise the inspector shows **Synced**. Invalid drafts display an inline error while keeping the last valid scene on canvas.
