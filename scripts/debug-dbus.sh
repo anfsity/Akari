@@ -47,20 +47,34 @@ command_pid=''
 bus_pid=''
 bus_directory=''
 
+is_pid_running() {
+  local pid="$1" line
+  kill -0 "$pid" >/dev/null 2>&1 || return 1
+  if [[ -e "/proc/$pid/status" ]]; then
+    while IFS= read -r line; do
+      if [[ "$line" == State:* ]]; then
+        [[ "$line" != $'State:\tZ'* && "$line" != $'State:\tX'* && "$line" != $'State:\tx'* ]]
+        return
+      fi
+    done < "/proc/$pid/status" 2>/dev/null || return 1
+  fi
+  return 0
+}
+
 terminate_pid() {
   local pid="$1"
   if [[ -z "$pid" ]]; then
     return 0
   fi
-  if kill -0 "$pid" >/dev/null 2>&1; then
+  if is_pid_running "$pid"; then
     kill "$pid" >/dev/null 2>&1 || true
     for _ in {1..30}; do
-      if ! kill -0 "$pid" >/dev/null 2>&1; then
+      if ! is_pid_running "$pid"; then
         break
       fi
       sleep 0.1
     done
-    if kill -0 "$pid" >/dev/null 2>&1; then
+    if is_pid_running "$pid"; then
       kill -KILL "$pid" >/dev/null 2>&1 || true
     fi
   fi
@@ -112,7 +126,7 @@ if [[ "$inside_private_bus" -eq 0 ]]; then
   bus_pid=$!
   bus_ready=0
   for _ in {1..100}; do
-    if ! kill -0 "$bus_pid" >/dev/null 2>&1; then
+    if ! is_pid_running "$bus_pid"; then
       printf '%s\n' 'Private D-Bus exited during startup.' >&2
       exit 1
     fi
@@ -158,7 +172,7 @@ if [[ "$start_backend" -eq 1 ]]; then
 
   backend_ready=0
   for _ in {1..100}; do
-    if ! kill -0 "$backend_pid" >/dev/null 2>&1; then
+    if ! is_pid_running "$backend_pid"; then
       printf '%s\n' 'Backend exited before registering on the private D-Bus.' >&2
       tail -n 40 "$log_dir/backend.log" >&2 || true
       exit 1

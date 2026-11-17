@@ -31,8 +31,8 @@ if sys.argv[1:] == ['clear']:
 assert sys.argv[1:] == ['kms', '--snapshot', str(root / 'splash.png')]
 assert int(os.environ['AKARI_SPLASH_PARENT_PID']) == os.getppid()
 (root / 'splash.png').touch()
-(root / 'renderer.pid').write_text(str(os.getpid()))
 signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+(root / 'renderer.pid').write_text(str(os.getpid()))
 try:
     time.sleep(float(os.environ.get('HOLD', '0.05')))
 finally:
@@ -120,8 +120,9 @@ if not (root / 'backend-started').exists():
                                            env={**self.environment, 'HOLD': '30'},
                                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 try:
-                    deadline = time.monotonic() + 3
-                    while not (self.root / 'renderer.pid').exists() and time.monotonic() < deadline:
+                    deadline = time.monotonic() + 10
+                    while (not (self.root / 'renderer.pid').exists()
+                           or not (self.root / 'renderer.pid').read_text().strip()) and time.monotonic() < deadline:
                         time.sleep(0.01)
                     self.assertTrue((self.root / 'renderer.pid').exists())
                     pid = int((self.root / 'renderer.pid').read_text())
@@ -152,8 +153,9 @@ finally:
             ['bash', str(REPOSITORY / 'system/splash.sh'), sys.executable, str(compositor)],
             env=self.environment, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
-            deadline = time.monotonic() + 3
-            while not (self.root / 'compositor.pid').exists() and time.monotonic() < deadline:
+            deadline = time.monotonic() + 10
+            while (not (self.root / 'compositor.pid').exists()
+                   or not (self.root / 'compositor.pid').read_text().strip()) and time.monotonic() < deadline:
                 time.sleep(.01)
             pid = int((self.root / 'compositor.pid').read_text())
             process.terminate()
@@ -191,8 +193,9 @@ if os.environ['HOLD'] == '1':
                          'HOLD': '0' if termination is None else '1'},
                     start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 try:
-                    deadline = time.monotonic() + 5
-                    while not (root / 'bus.json').exists() and time.monotonic() < deadline:
+                    deadline = time.monotonic() + 10
+                    while (not (root / 'bus.json').exists()
+                           or not (root / 'bus.json').read_text().strip()) and time.monotonic() < deadline:
                         time.sleep(.01)
                     bus = json.loads((root / 'bus.json').read_text())
                     if termination == signal.SIGKILL:

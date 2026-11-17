@@ -6,20 +6,34 @@ set -euo pipefail
 splash_pid=''
 compositor_pid=''
 splash_status=0
+is_pid_running() {
+  local pid="$1" line
+  kill -0 "$pid" 2>/dev/null || return 1
+  if [[ -e "/proc/$pid/status" ]]; then
+    while IFS= read -r line; do
+      if [[ "$line" == State:* ]]; then
+        [[ "$line" != $'State:\tZ'* && "$line" != $'State:\tX'* && "$line" != $'State:\tx'* ]]
+        return
+      fi
+    done < "/proc/$pid/status" 2>/dev/null || return 1
+  fi
+  return 0
+}
+
 terminate_child() {
   local pid="$1"
   if [[ -z "$pid" ]]; then
     return 0
   fi
-  if kill -0 "$pid" 2>/dev/null; then
+  if is_pid_running "$pid"; then
     kill "$pid" 2>/dev/null || true
     for _ in {1..30}; do
-      if ! kill -0 "$pid" 2>/dev/null; then
+      if ! is_pid_running "$pid"; then
         break
       fi
       sleep 0.1
     done
-    if kill -0 "$pid" 2>/dev/null; then
+    if is_pid_running "$pid"; then
       kill -KILL "$pid" 2>/dev/null || true
     fi
   fi
