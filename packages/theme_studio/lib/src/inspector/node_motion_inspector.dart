@@ -3,90 +3,11 @@ import 'package:theme_sdk/theme_sdk.dart';
 
 import '../authoring/scene_editor.dart';
 import 'studio_form.dart';
-import 'studio_form_values.dart';
 
-class NodeMotionInspector extends StatefulWidget {
+class NodeMotionInspector extends StatelessWidget {
   const NodeMotionInspector({required this.editor, super.key});
+
   final SceneEditor editor;
-  @override
-  State<NodeMotionInspector> createState() => _NodeMotionInspectorState();
-}
-
-class _NodeMotionInspectorState extends State<NodeMotionInspector> {
-  final _fields = <String, TextEditingController>{};
-  String? _syncedNodeId;
-  SceneMotionTiming? _syncedTiming;
-  @override
-  void initState() {
-    super.initState();
-    _updateFields();
-  }
-
-  @override
-  void didUpdateWidget(NodeMotionInspector old) {
-    super.didUpdateWidget(old);
-    final node = widget.editor.selectedNode;
-    if (node.id != _syncedNodeId || node.motionTiming != _syncedTiming) {
-      _updateFields();
-    }
-  }
-
-  void _updateFields() {
-    final node = widget.editor.selectedNode;
-    final timing = node.motionTiming;
-    _syncedNodeId = node.id;
-    _syncedTiming = timing;
-    final curve = timing.curve ?? const SceneCubicBezier(.2, 0, .2, 1);
-    for (final entry in {
-      'Duration ms': timing.durationMs?.toString() ?? '',
-      'Delay ms': '${timing.delayMs}',
-      'Bezier X1': '${curve.x1}',
-      'Bezier Y1': '${curve.y1}',
-      'Bezier X2': '${curve.x2}',
-      'Bezier Y2': '${curve.y2}',
-    }.entries) {
-      _fields.putIfAbsent(entry.key, TextEditingController.new).text =
-          entry.value;
-    }
-  }
-
-  void _apply({bool? customCurve}) {
-    if (!widget.editor.tryApplyDraft()) return;
-    try {
-      double number(String label) =>
-          getFiniteNumberInput(label, _fields[label]!.text);
-      widget.editor.updateNode(
-        widget.editor.selectedNode.copyWith(
-          motionTiming: SceneMotionTiming(
-            durationMs: _fields['Duration ms']!.text.isEmpty
-                ? null
-                : getIntegerInput('Duration ms', _fields['Duration ms']!.text),
-            delayMs: getIntegerInput('Delay ms', _fields['Delay ms']!.text),
-            curve:
-                (customCurve ??
-                    widget.editor.selectedNode.motionTiming.curve != null)
-                ? SceneCubicBezier(
-                    number('Bezier X1'),
-                    number('Bezier Y1'),
-                    number('Bezier X2'),
-                    number('Bezier Y2'),
-                  )
-                : null,
-          ),
-        ),
-      );
-    } on FormatException catch (error) {
-      widget.editor.inspector.showError(error.message);
-    }
-  }
-
-  @override
-  void dispose() {
-    for (final field in _fields.values) {
-      field.dispose();
-    }
-    super.dispose();
-  }
 
   static const _prefixes = <String, String>{
     'Duration ms': 'Dur',
@@ -100,36 +21,57 @@ class _NodeMotionInspectorState extends State<NodeMotionInspector> {
   Widget _field(String label) => StudioFormField(
     label: label,
     prefix: _prefixes[label],
-    controller: _fields[label]!,
+    controller: editor.inspector.getField(label),
     inputKey: ValueKey('motion-$label'),
-    onSubmitted: () =>
-        _apply(customCurve: label.startsWith('Bezier') ? true : null),
-    onFocusLost: () =>
-        _apply(customCurve: label.startsWith('Bezier') ? true : null),
+    onSubmitted: editor.tryApplyDraft,
+    onFocusLost: editor.tryApplyDraft,
   );
+
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    spacing: 8,
-    children: [
-      StudioFieldRow(left: _field('Duration ms'), right: _field('Delay ms')),
-      StudioSwitchRow(
-        label: 'Custom Bezier',
-        value: widget.editor.selectedNode.motionTiming.curve != null,
-        onChanged: (value) => _apply(customCurve: value),
+  Widget build(BuildContext context) {
+    final controller = editor.inspector;
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 8,
+        children: [
+          StudioFieldRow(
+            left: _field('Duration ms'),
+            right: _field('Delay ms'),
+          ),
+          StudioSwitchRow(
+            label: 'Custom Bezier',
+            value: controller.hasCustomMotionCurve,
+            onChanged: (value) {
+              controller.updateCustomMotionCurve(value);
+              editor.tryApplyDraft();
+            },
+          ),
+          if (controller.hasCustomMotionCurve)
+            ListenableBuilder(
+              listenable: Listenable.merge([
+                controller.getField('Bezier X1'),
+                controller.getField('Bezier Y1'),
+                controller.getField('Bezier X2'),
+                controller.getField('Bezier Y2'),
+              ]),
+              builder: (context, _) => SizedBox(
+                height: 80,
+                child: CustomPaint(
+                  painter: _BezierPainter(controller.motionCurvePreview!),
+                ),
+              ),
+            ),
+          StudioFieldRow(left: _field('Bezier X1'), right: _field('Bezier Y1')),
+          StudioFieldRow(left: _field('Bezier X2'), right: _field('Bezier Y2')),
+          const Text(
+            'Blank duration inherits theme timing. Curve controls use 0..1.',
+          ).xSmall().muted(),
+        ],
       ),
-      if (widget.editor.selectedNode.motionTiming.curve case final curve?)
-        SizedBox(
-          height: 80,
-          child: CustomPaint(painter: _BezierPainter(curve)),
-        ),
-      StudioFieldRow(left: _field('Bezier X1'), right: _field('Bezier Y1')),
-      StudioFieldRow(left: _field('Bezier X2'), right: _field('Bezier Y2')),
-      const Text(
-        'Blank duration inherits theme timing. Curve controls use 0..1.',
-      ).xSmall().muted(),
-    ],
-  );
+    );
+  }
 }
 
 class _BezierPainter extends CustomPainter {

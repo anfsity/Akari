@@ -213,10 +213,12 @@ class SceneEditor extends ChangeNotifier {
   /// surfacing validation errors in [inspector] and returning whether the caller
   /// may proceed cleanly.
   bool tryApplyDraft() {
-    if (!inspector.hasDraft) return true;
+    if (!inspector.hasDraft && inspector.error == null) return true;
     try {
       updateNode(inspector.getUpdatedNode());
-      if (inspector.hasDraft) inspector.resetNode(selectedNode);
+      if (inspector.hasDraft || inspector.error != null) {
+        inspector.resetNode(selectedNode, canvas: getInspectorCanvas());
+      }
       return true;
     } on FormatException catch (error) {
       inspector.showError(error.message);

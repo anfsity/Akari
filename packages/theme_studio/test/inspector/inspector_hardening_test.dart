@@ -111,6 +111,13 @@ void main() {
         contains('Duration ms must be an integer'),
       );
       expect(tester.widget<TextField>(durationFinder).controller?.text, 'bad');
+      expect(editor.save(), isFalse);
+
+      // Discard restores valid committed values when drafts are invalid.
+      await tester.tap(find.byKey(const ValueKey('discard-inspector-draft')));
+      await tester.pumpAndSettle();
+      expect(editor.inspector.hasDraft, isFalse);
+      expect(editor.inspector.error, isNull);
 
       // Now select a breakpoint in NodeLayoutInspector and verify Remove breakpoint
       // applies pending valid inspector drafts instead of dropping them.

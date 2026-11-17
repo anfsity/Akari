@@ -51,6 +51,10 @@ class NodeInspector extends StatelessWidget {
               _InspectorActions(
                 hasDraft: controller.hasDraft,
                 error: controller.error,
+                onDiscard: () {
+                  editor?.cancelPreview();
+                  controller.discardDraft();
+                },
                 onApply: onApply,
               ),
             ],
@@ -435,11 +439,13 @@ class _InspectorActions extends StatelessWidget {
   const _InspectorActions({
     required this.hasDraft,
     required this.error,
+    required this.onDiscard,
     required this.onApply,
   });
 
   final bool hasDraft;
   final String? error;
+  final VoidCallback onDiscard;
   final VoidCallback onApply;
 
   @override
@@ -465,6 +471,7 @@ class _InspectorActions extends StatelessWidget {
           ConstrainedBox(
             constraints: BoxConstraints(minHeight: gap * 4),
             child: Row(
+              spacing: gap * .5,
               children: [
                 Expanded(
                   child: Text(
@@ -477,6 +484,13 @@ class _InspectorActions extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ).xSmall().muted(),
                 ),
+                if (active)
+                  GhostButton(
+                    key: const ValueKey('discard-inspector-draft'),
+                    density: ButtonDensity.dense,
+                    onPressed: onDiscard,
+                    child: const Text('Discard').xSmall(),
+                  ),
                 if (active)
                   PrimaryButton(
                     density: ButtonDensity.dense,
