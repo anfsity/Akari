@@ -1,6 +1,20 @@
 name: Documentation
 
 on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'packages/theme_sdk/**'
+      - 'packages/scene/**'
+      - 'packages/scene_schema/**'
+      - 'packages/greeter_components/**'
+      - 'scripts/build-api-docs.sh'
+      - 'scripts/verify-docs.py'
+      - 'dartdoc_options.yaml'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.fvmrc'
+      - '.github/workflows/docs.yml'
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -10,7 +24,7 @@ on:
         type: string
 
 concurrency:
-  group: documentation-pages
+  group: documentation-${{ github.event_name == 'pull_request' && github.ref || 'pages' }}
   cancel-in-progress: true
 
 permissions:
@@ -28,9 +42,14 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: docs/site/package-lock.json
+      - name: Read pinned Flutter SDK version
+        id: fvm
+        run: |
+          version="$(python3 -c 'import json; print(json.load(open(".fvmrc"))["flutter"])')"
+          echo "flutter=$version" >> "$GITHUB_OUTPUT"
       - uses: subosito/flutter-action@v2.23.0
         with:
-          flutter-version: '3.47.2'
+          flutter-version: ${{ steps.fvm.outputs.flutter }}
           channel: stable
           cache: true
       - name: Install website dependencies
@@ -41,13 +60,14 @@ jobs:
       - name: Check and build the handbook
         run: npm run check && npm run build && npm run verify
         working-directory: docs/site
-      - uses: actions/upload-pages-artifact@v5.0.0
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: docs/site/dist
           include-hidden-files: true
 
   publish:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/gh-pages'
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/gh-pages')
     needs: build
     runs-on: ubuntu-latest
     permissions:

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Install Linux build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            cmake \
+            dbus \
+            libdrm-dev \
+            libepoxy-dev \
+            libgtk-3-dev \
+            liblzma-dev \
+            libseat-dev \
+            ninja-build \
+            pkg-config \
+            python3 \
+            systemd \
+            util-linux
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates
+
+      - name: Read pinned Flutter SDK version
+        id: fvm
+        run: |
+          version="$(python3 -c 'import json; print(json.load(open(".fvmrc"))["flutter"])')"
+          echo "flutter=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: ${{ steps.fvm.outputs.flutter }}
+          channel: stable
+          cache: true
+
+      - name: Resolve Dart Pub Workspace dependencies
+        run: flutter pub get
+
+      - name: Verify Rust, Python, Dart, Flutter, and D-Bus targets
+        run: AKARI_FLUTTER_BIN="$(command -v flutter)" AKARI_DART_BIN="$(command -v dart)" dart run packages/akari_cli/bin/akari.dart verify
+
+      - name: Build Linux debug bundle
+        run: AKARI_FLUTTER_BIN="$(command -v flutter)" AKARI_DART_BIN="$(command -v dart)" dart run packages/akari_cli/bin/akari.dart build --debug
