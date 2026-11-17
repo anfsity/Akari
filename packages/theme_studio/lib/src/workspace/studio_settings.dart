@@ -194,6 +194,25 @@ class _StudioSettingsState extends State<StudioSettings> {
     }
   }
 
+  void _swapCanvasDimensions() {
+    final width = _fields['Canvas width']!.text;
+    _fields['Canvas width']!.text = _fields['Canvas height']!.text;
+    _fields['Canvas height']!.text = width;
+  }
+
+  void _resetAppearance() => setState(() {
+    const defaults = StudioPreferences();
+    _themeMode = defaults.themeMode;
+    _palette = defaults.palette;
+  });
+
+  void _resetGrid() => setState(() {
+    const defaults = StudioPreferences();
+    _showGrid = defaults.showGrid;
+    _snapToGrid = defaults.snapToGrid;
+    _fields['Grid size (pixels)']!.text = '${defaults.gridSize}';
+  });
+
   @override
   void dispose() {
     for (final controller in _fields.values) {
@@ -201,6 +220,59 @@ class _StudioSettingsState extends State<StudioSettings> {
     }
     super.dispose();
   }
+
+  Widget _buildSectionContent() => switch (_section) {
+    _SettingsSection.canvas => _CanvasSettingsSection(
+      widthController: _fields['Canvas width']!,
+      heightController: _fields['Canvas height']!,
+      findPreset: _findPreset,
+      fit: _fit,
+      safeArea: _safeArea,
+      onSelectPreset: (preset) {
+        _fields['Canvas width']!.text = '${preset.width}';
+        _fields['Canvas height']!.text = '${preset.height}';
+      },
+      onSwapDimensions: _swapCanvasDimensions,
+      onFitChanged: (value) => setState(() => _fit = value),
+      onSafeAreaChanged: (value) => setState(() => _safeArea = value),
+    ),
+    _SettingsSection.background => _BackgroundSettingsSection(
+      backgroundKind: _background,
+      availableKinds: {
+        SceneBackgroundKind.solid,
+        if (widget.supportsImageBackground) SceneBackgroundKind.image,
+        widget.document.background.kind,
+      },
+      shader: widget.document.background.shader,
+      assetPaths: widget.assetPaths,
+      assetController: _fields['Background asset']!,
+      colorController: _fields['Background color']!,
+      blurController: _fields['Background blur']!,
+      scrimController: _fields['Scrim opacity']!,
+      resolveAssetImage: widget.resolveAssetImage,
+      getBackgroundColor: _getBackgroundColor,
+      onBackgroundChanged: (value) => setState(() => _background = value),
+    ),
+    _SettingsSection.appearance => _AppearanceSettingsSection(
+      themeMode: _themeMode,
+      palette: _palette,
+      onThemeModeChanged: (value) => setState(() => _themeMode = value),
+      onPaletteChanged: (value) => setState(() => _palette = value),
+      onReset: _resetAppearance,
+    ),
+    _SettingsSection.grid => _GridSettingsSection(
+      showGrid: _showGrid,
+      snapToGrid: _snapToGrid,
+      gridSizeController: _fields['Grid size (pixels)']!,
+      onShowGridChanged: (value) => setState(() => _showGrid = value),
+      onSnapToGridChanged: (value) => setState(() => _snapToGrid = value),
+      onReset: _resetGrid,
+    ),
+    _SettingsSection.input => StudioInputSettings(
+      value: _input,
+      onChanged: (value) => setState(() => _input = value),
+    ),
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -228,31 +300,30 @@ class _StudioSettingsState extends State<StudioSettings> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 18,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(LucideIcons.settings2, size: 20),
-                    const Gap(12),
-                    const Text('Studio settings').large().semiBold(),
-                  ],
-                ),
-              ),
+              const _SettingsHeader(),
               const Divider(),
-              if (compact) _buildNavigation(horizontal: true),
+              if (compact)
+                _SettingsNavigation(
+                  horizontal: true,
+                  selected: _section,
+                  onSelect: (section) => setState(() => _section = section),
+                ),
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (!compact)
+                    if (!compact) ...[
                       SizedBox(
                         width: 184,
-                        child: _buildNavigation(horizontal: false),
+                        child: _SettingsNavigation(
+                          horizontal: false,
+                          selected: _section,
+                          onSelect: (section) =>
+                              setState(() => _section = section),
+                        ),
                       ),
-                    if (!compact) const VerticalDivider(),
+                      const VerticalDivider(),
+                    ],
                     Expanded(
                       child: SingleChildScrollView(
                         key: ValueKey('settings-page-${_section.name}'),
@@ -266,31 +337,10 @@ class _StudioSettingsState extends State<StudioSettings> {
                             const Gap(20),
                             if (_errorSection == _section &&
                                 _error != null) ...[
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: colors.destructive.withValues(
-                                    alpha: 0.08,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: StudioFormError(_error!),
-                              ),
+                              _SettingsErrorBanner(error: _error!),
                               const Gap(16),
                             ],
-                            switch (_section) {
-                              _SettingsSection.canvas => _buildCanvasSection(),
-                              _SettingsSection.background =>
-                                _buildBackgroundSection(),
-                              _SettingsSection.appearance =>
-                                _buildAppearanceSection(),
-                              _SettingsSection.grid => _buildGridSection(),
-                              _SettingsSection.input => StudioInputSettings(
-                                value: _input,
-                                onChanged: (value) =>
-                                    setState(() => _input = value),
-                              ),
-                            },
+                            _buildSectionContent(),
                           ],
                         ),
                       ),
@@ -299,35 +349,11 @@ class _StudioSettingsState extends State<StudioSettings> {
                 ),
               ),
               const Divider(),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
-                child: Row(
-                  children: [
-                    if (!compact) ...[
-                      Expanded(
-                        child: Text(
-                          _section.isSceneSetting
-                              ? 'Scene changes can be undone.\nSave scene to write them to disk.'
-                              : 'Editor preferences are saved when applied.\nYour theme appearance stays the same.',
-                        ).small().muted(),
-                      ),
-                      const Gap(16),
-                    ] else
-                      const Spacer(),
-                    OutlineButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                    const Gap(8),
-                    PrimaryButton(
-                      onPressed: _apply,
-                      child: const Text('Apply settings'),
-                    ),
-                  ],
-                ),
+              _SettingsFooter(
+                compact: compact,
+                isSceneSetting: _section.isSceneSetting,
+                onCancel: () => Navigator.of(context).pop(),
+                onApply: _apply,
               ),
             ],
           ),
@@ -335,62 +361,184 @@ class _StudioSettingsState extends State<StudioSettings> {
       ),
     );
   }
+}
 
-  Widget _buildNavigation({required bool horizontal}) {
-    Widget buildButton(_SettingsSection section) => Button(
-      key: ValueKey('settings-nav-${section.name}'),
-      style: _section == section
-          ? const ButtonStyle.secondary()
-          : const ButtonStyle.ghost(),
-      onPressed: () => setState(() => _section = section),
-      child: Row(
-        mainAxisSize: horizontal ? MainAxisSize.min : MainAxisSize.max,
-        children: [
-          Icon(section.icon, size: 16),
-          const Gap(10),
-          Text(section.label).small(),
-        ],
-      ),
-    );
+class _SettingsHeader extends StatelessWidget {
+  const _SettingsHeader();
 
-    return ColoredBox(
-      color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.25),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: horizontal
-            ? SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _SettingsSection.values.map(buildButton).toList(),
-                ),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(12, 8, 0, 8),
-                    child: Text('SCENE'),
-                  ).small().muted(),
-                  for (final section in _SettingsSection.values.where(
-                    (s) => s.isSceneSetting,
-                  ))
-                    buildButton(section),
-                  const Gap(24),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(12, 0, 0, 8),
-                    child: Text('EDITOR'),
-                  ).small().muted(),
-                  for (final section in _SettingsSection.values.where(
-                    (s) => !s.isSceneSetting,
-                  ))
-                    buildButton(section),
-                ],
-              ),
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+    child: Row(
+      children: [
+        const Icon(LucideIcons.settings2, size: 20),
+        const Gap(12),
+        const Text('Studio settings').large().semiBold(),
+      ],
+    ),
+  );
+}
+
+class _SettingsErrorBanner extends StatelessWidget {
+  const _SettingsErrorBanner({required this.error});
+
+  final String error;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.destructive.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(6),
       ),
+      child: StudioFormError(error),
     );
   }
+}
 
-  Widget _buildCanvasSection() => Column(
+class _SettingsFooter extends StatelessWidget {
+  const _SettingsFooter({
+    required this.compact,
+    required this.isSceneSetting,
+    required this.onCancel,
+    required this.onApply,
+  });
+
+  final bool compact;
+  final bool isSceneSetting;
+  final VoidCallback onCancel;
+  final VoidCallback onApply;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    child: Row(
+      children: [
+        if (!compact) ...[
+          Expanded(
+            child: Text(
+              isSceneSetting
+                  ? 'Scene changes can be undone.\nSave scene to write them to disk.'
+                  : 'Editor preferences are saved when applied.\nYour theme appearance stays the same.',
+            ).small().muted(),
+          ),
+          const Gap(16),
+        ] else
+          const Spacer(),
+        OutlineButton(onPressed: onCancel, child: const Text('Cancel')),
+        const Gap(8),
+        PrimaryButton(onPressed: onApply, child: const Text('Apply settings')),
+      ],
+    ),
+  );
+}
+
+class _SettingsNavigation extends StatelessWidget {
+  const _SettingsNavigation({
+    required this.horizontal,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final bool horizontal;
+  final _SettingsSection selected;
+  final ValueChanged<_SettingsSection> onSelect;
+
+  Widget _buildItem(_SettingsSection section) => Button(
+    key: ValueKey('settings-nav-${section.name}'),
+    style: selected == section
+        ? const ButtonStyle.secondary()
+        : const ButtonStyle.ghost(),
+    onPressed: () => onSelect(section),
+    child: Row(
+      mainAxisSize: horizontal ? MainAxisSize.min : MainAxisSize.max,
+      children: [
+        Icon(section.icon, size: 16),
+        const Gap(10),
+        Text(section.label).small(),
+      ],
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.25),
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: horizontal
+          ? SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _SettingsSection.values.map(_buildItem).toList(),
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(12, 8, 0, 8),
+                  child: Text('SCENE'),
+                ).small().muted(),
+                for (final section in _SettingsSection.values.where(
+                  (s) => s.isSceneSetting,
+                ))
+                  _buildItem(section),
+                const Gap(24),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(12, 0, 0, 8),
+                  child: Text('EDITOR'),
+                ).small().muted(),
+                for (final section in _SettingsSection.values.where(
+                  (s) => !s.isSceneSetting,
+                ))
+                  _buildItem(section),
+              ],
+            ),
+    ),
+  );
+}
+
+class _SettingsTextField extends StatelessWidget {
+  const _SettingsTextField({required this.label, required this.controller});
+
+  final String label;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) => StudioFormField(
+    label: label,
+    inputKey: ValueKey('setting-$label'),
+    controller: controller,
+  );
+}
+
+class _CanvasSettingsSection extends StatelessWidget {
+  const _CanvasSettingsSection({
+    required this.widthController,
+    required this.heightController,
+    required this.findPreset,
+    required this.fit,
+    required this.safeArea,
+    required this.onSelectPreset,
+    required this.onSwapDimensions,
+    required this.onFitChanged,
+    required this.onSafeAreaChanged,
+  });
+
+  final TextEditingController widthController;
+  final TextEditingController heightController;
+  final StudioCanvasPreset? Function() findPreset;
+  final SceneCanvasFit fit;
+  final bool safeArea;
+  final ValueChanged<StudioCanvasPreset> onSelectPreset;
+  final VoidCallback onSwapDimensions;
+  final ValueChanged<SceneCanvasFit> onFitChanged;
+  final ValueChanged<bool> onSafeAreaChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       const Text('Reference resolution').semiBold(),
@@ -400,18 +548,12 @@ class _StudioSettingsState extends State<StudioSettings> {
       ).small().muted(),
       const Gap(16),
       ListenableBuilder(
-        listenable: Listenable.merge([
-          _fields['Canvas width']!,
-          _fields['Canvas height']!,
-        ]),
+        listenable: Listenable.merge([widthController, heightController]),
         builder: (context, _) => StudioSelect<StudioCanvasPreset>(
           key: const ValueKey('canvas-resolution-preset'),
-          value: _findPreset(),
+          value: findPreset(),
           placeholder: const Text('Custom resolution'),
-          onChanged: (preset) {
-            _fields['Canvas width']!.text = '${preset.width}';
-            _fields['Canvas height']!.text = '${preset.height}';
-          },
+          onChanged: onSelectPreset,
           values: StudioCanvasPreset.values,
           formatValue: (preset) =>
               '${preset.label} · ${preset.width} × ${preset.height}',
@@ -419,8 +561,14 @@ class _StudioSettingsState extends State<StudioSettings> {
       ),
       const Gap(16),
       StudioFieldRow(
-        left: _buildField('Canvas width'),
-        right: _buildField('Canvas height'),
+        left: _SettingsTextField(
+          label: 'Canvas width',
+          controller: widthController,
+        ),
+        right: _SettingsTextField(
+          label: 'Canvas height',
+          controller: heightController,
+        ),
       ),
       const Gap(10),
       Align(
@@ -428,11 +576,7 @@ class _StudioSettingsState extends State<StudioSettings> {
         child: OutlineButton(
           key: const ValueKey('swap-canvas-dimensions'),
           leading: const Icon(LucideIcons.arrowLeftRight, size: 14),
-          onPressed: () => setState(() {
-            final width = _fields['Canvas width']!.text;
-            _fields['Canvas width']!.text = _fields['Canvas height']!.text;
-            _fields['Canvas height']!.text = width;
-          }),
+          onPressed: onSwapDimensions,
           child: const Text('Swap dimensions').small(),
         ),
       ),
@@ -441,12 +585,12 @@ class _StudioSettingsState extends State<StudioSettings> {
       const Gap(20),
       StudioEnumSelect(
         label: 'Canvas fit',
-        value: _fit,
+        value: fit,
         values: SceneCanvasFit.values,
-        onChanged: (value) => setState(() => _fit = value),
+        onChanged: onFitChanged,
       ),
       const Gap(8),
-      Text(switch (_fit) {
+      Text(switch (fit) {
         SceneCanvasFit.cover => 'Fill the display while preserving the reference aspect ratio. Edges may be cropped.',
         SceneCanvasFit.contain => 'Keep the entire scene visible. Extra space may appear around its edges.',
         SceneCanvasFit.reflow =>
@@ -454,8 +598,8 @@ class _StudioSettingsState extends State<StudioSettings> {
       }).small().muted(),
       const Gap(20),
       Switch(
-        value: _safeArea,
-        onChanged: (value) => setState(() => _safeArea = value),
+        value: safeArea,
+        onChanged: onSafeAreaChanged,
         trailing: const Text('Respect safe area'),
       ),
       const Gap(8),
@@ -464,31 +608,52 @@ class _StudioSettingsState extends State<StudioSettings> {
           .muted(),
     ],
   );
+}
 
-  Widget _buildBackgroundSection() => Column(
+class _BackgroundSettingsSection extends StatelessWidget {
+  const _BackgroundSettingsSection({
+    required this.backgroundKind,
+    required this.availableKinds,
+    required this.shader,
+    required this.assetPaths,
+    required this.assetController,
+    required this.colorController,
+    required this.blurController,
+    required this.scrimController,
+    required this.resolveAssetImage,
+    required this.getBackgroundColor,
+    required this.onBackgroundChanged,
+  });
+
+  final SceneBackgroundKind backgroundKind;
+  final Iterable<SceneBackgroundKind> availableKinds;
+  final SceneShader? shader;
+  final List<String> assetPaths;
+  final TextEditingController assetController;
+  final TextEditingController colorController;
+  final TextEditingController blurController;
+  final TextEditingController scrimController;
+  final ImageProvider Function(String) resolveAssetImage;
+  final Color? Function() getBackgroundColor;
+  final ValueChanged<SceneBackgroundKind> onBackgroundChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       StudioEnumSelect(
         label: 'Background',
-        value: _background,
+        value: backgroundKind,
         // Preserve a custom renderer already selected by the scene.
-        values: {
-          SceneBackgroundKind.solid,
-          if (widget.supportsImageBackground) SceneBackgroundKind.image,
-          widget.document.background.kind,
-        },
-        onChanged: (value) => setState(() => _background = value),
+        values: availableKinds,
+        onChanged: onBackgroundChanged,
       ),
       const Gap(16),
       ListenableBuilder(
-        listenable: Listenable.merge([
-          _fields['Background color']!,
-          _fields['Background asset']!,
-        ]),
+        listenable: Listenable.merge([colorController, assetController]),
         builder: (context, _) {
-          final asset = _fields['Background asset']!.text.trim();
-          final color = _getBackgroundColor();
-          final shader = widget.document.background.shader;
+          final asset = assetController.text.trim();
+          final color = getBackgroundColor();
           return Container(
             height: 132,
             clipBehavior: Clip.antiAlias,
@@ -497,12 +662,13 @@ class _StudioSettingsState extends State<StudioSettings> {
               border: Border.all(color: Theme.of(context).colorScheme.border),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: _background == SceneBackgroundKind.image && asset.isNotEmpty
+            child:
+                backgroundKind == SceneBackgroundKind.image && asset.isNotEmpty
                 ? Image(
                     image: ResizeImage.resizeIfNeeded(
                       960,
                       null,
-                      widget.resolveAssetImage(asset),
+                      resolveAssetImage(asset),
                     ),
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Center(
@@ -513,11 +679,11 @@ class _StudioSettingsState extends State<StudioSettings> {
                   )
                 : Center(
                     child: Text(
-                      _background == SceneBackgroundKind.solid
+                      backgroundKind == SceneBackgroundKind.solid
                           ? 'Solid color'
-                          : _background == SceneBackgroundKind.custom &&
+                          : backgroundKind == SceneBackgroundKind.custom &&
                                 shader != null
-                          ? 'Custom shader: ${shader.asset.split('/').last}'
+                          ? 'Custom shader: ${shader!.asset.split('/').last}'
                           : 'Theme background',
                       style: TextStyle(
                         color: color != null && color.computeLuminance() < 0.4
@@ -530,47 +696,56 @@ class _StudioSettingsState extends State<StudioSettings> {
         },
       ),
       const Gap(16),
-      if (_background == SceneBackgroundKind.custom &&
-          widget.document.background.shader != null) ...[
-        Text('Shader: ${widget.document.background.shader!.asset}')
-            .small()
-            .muted(),
+      if (backgroundKind == SceneBackgroundKind.custom && shader != null) ...[
+        Text('Shader: ${shader!.asset}').small().muted(),
         const Gap(16),
       ],
-      if (_background == SceneBackgroundKind.image) ...[
-        if (widget.assetPaths.isNotEmpty) ...[
-          ListenableBuilder(
-            listenable: _fields['Background asset']!,
-            builder: (context, _) {
-              final asset = _fields['Background asset']!.text.trim();
+      if (backgroundKind == SceneBackgroundKind.image) ...[
+        if (assetPaths.isNotEmpty) ...[
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: assetController,
+            builder: (context, value, _) {
+              final asset = value.text.trim();
               return StudioSelect<String>(
                 key: const ValueKey('background-asset-select'),
                 value: asset.isEmpty ? null : asset,
                 placeholder: const Text('Choose a theme asset'),
-                onChanged: (value) => _fields['Background asset']!.text = value,
-                values: {...widget.assetPaths, if (asset.isNotEmpty) asset},
-                formatValue: (value) => value.split('/').last,
+                onChanged: (selected) => assetController.text = selected,
+                values: {...assetPaths, if (asset.isNotEmpty) asset},
+                formatValue: (path) => path.split('/').last,
               );
             },
           ),
           const Gap(12),
         ],
-        _buildField('Background asset'),
+        _SettingsTextField(
+          label: 'Background asset',
+          controller: assetController,
+        ),
         const Gap(6),
         const Text(
           'Use a registered theme asset, or import an image from the Assets tab.',
         ).small().muted(),
         const Gap(16),
       ],
-      _buildField('Background color'),
+      _SettingsTextField(
+        label: 'Background color',
+        controller: colorController,
+      ),
       const Gap(6),
       const Text('Hex color: #RRGGBB or #AARRGGBB.').small().muted(),
       const Gap(20),
       const Divider(),
       const Gap(20),
       StudioFieldRow(
-        left: _buildField('Background blur'),
-        right: _buildField('Scrim opacity'),
+        left: _SettingsTextField(
+          label: 'Background blur',
+          controller: blurController,
+        ),
+        right: _SettingsTextField(
+          label: 'Scrim opacity',
+          controller: scrimController,
+        ),
       ),
       const Gap(8),
       const Text(
@@ -578,27 +753,44 @@ class _StudioSettingsState extends State<StudioSettings> {
       ).small().muted(),
     ],
   );
+}
 
-  Widget _buildAppearanceSection() {
-    final brightness = switch (_themeMode) {
+class _AppearanceSettingsSection extends StatelessWidget {
+  const _AppearanceSettingsSection({
+    required this.themeMode,
+    required this.palette,
+    required this.onThemeModeChanged,
+    required this.onPaletteChanged,
+    required this.onReset,
+  });
+
+  final ThemeMode themeMode;
+  final StudioPalette palette;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
+  final ValueChanged<StudioPalette> onPaletteChanged;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = switch (themeMode) {
       ThemeMode.light => Brightness.light,
       ThemeMode.dark => Brightness.dark,
       ThemeMode.system => MediaQuery.platformBrightnessOf(context),
     };
-    final scheme = _palette.getColorScheme(brightness);
+    final scheme = palette.getColorScheme(brightness);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         StudioEnumSelect(
           label: 'Appearance',
-          value: _themeMode,
+          value: themeMode,
           values: ThemeMode.values,
           formatValue: (mode) => switch (mode) {
             ThemeMode.system => 'Follow system',
             ThemeMode.light => 'Light',
             ThemeMode.dark => 'Dark',
           },
-          onChanged: (value) => setState(() => _themeMode = value),
+          onChanged: onThemeModeChanged,
         ),
         const Gap(20),
         const Text('Color theme').semiBold(),
@@ -607,13 +799,13 @@ class _StudioSettingsState extends State<StudioSettings> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final palette in StudioPalette.values)
+            for (final candidate in StudioPalette.values)
               Button(
-                key: ValueKey('palette-${palette.name}'),
-                style: palette == _palette
+                key: ValueKey('palette-${candidate.name}'),
+                style: candidate == palette
                     ? const ButtonStyle.secondary()
                     : const ButtonStyle.outline(),
-                onPressed: () => setState(() => _palette = palette),
+                onPressed: () => onPaletteChanged(candidate),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -621,13 +813,15 @@ class _StudioSettingsState extends State<StudioSettings> {
                       width: 12,
                       height: 12,
                       decoration: BoxDecoration(
-                        color: palette.getColorScheme(Brightness.light).primary,
+                        color: candidate
+                            .getColorScheme(Brightness.light)
+                            .primary,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const Gap(8),
-                    Text(palette.label).small(),
-                    if (palette == _palette) ...[
+                    Text(candidate.label).small(),
+                    if (candidate == palette) ...[
                       const Gap(6),
                       const Icon(LucideIcons.check, size: 12),
                     ],
@@ -637,83 +831,104 @@ class _StudioSettingsState extends State<StudioSettings> {
           ],
         ),
         const Gap(24),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: scheme.background,
-            border: Border.all(color: scheme.border),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Editor preview',
-                style: TextStyle(color: scheme.foreground),
-              ).semiBold(),
-              const Gap(6),
-              Text(
-                'Panels, controls, and selection colors',
-                style: TextStyle(color: scheme.mutedForeground),
-              ).small(),
-              const Gap(20),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: scheme.secondary,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Selected layer',
-                        style: TextStyle(color: scheme.secondaryForeground),
-                      ).small(),
-                    ),
-                  ),
-                  const Gap(12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scheme.primary,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'Save',
-                      style: TextStyle(color: scheme.primaryForeground),
-                    ).small(),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+        _AppearancePreviewCard(scheme: scheme),
         const Gap(20),
         Align(
           alignment: Alignment.centerLeft,
           child: GhostButton(
-            onPressed: () => setState(() {
-              const defaults = StudioPreferences();
-              _themeMode = defaults.themeMode;
-              _palette = defaults.palette;
-            }),
+            onPressed: onReset,
             child: const Text('Reset appearance'),
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildGridSection() => Column(
+class _AppearancePreviewCard extends StatelessWidget {
+  const _AppearancePreviewCard({required this.scheme});
+
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: scheme.background,
+      border: Border.all(color: scheme.border),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Editor preview',
+          style: TextStyle(color: scheme.foreground),
+        ).semiBold(),
+        const Gap(6),
+        Text(
+          'Panels, controls, and selection colors',
+          style: TextStyle(color: scheme.mutedForeground),
+        ).small(),
+        const Gap(20),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: scheme.secondary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Selected layer',
+                  style: TextStyle(color: scheme.secondaryForeground),
+                ).small(),
+              ),
+            ),
+            const Gap(12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'Save',
+                style: TextStyle(color: scheme.primaryForeground),
+              ).small(),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+class _GridSettingsSection extends StatelessWidget {
+  const _GridSettingsSection({
+    required this.showGrid,
+    required this.snapToGrid,
+    required this.gridSizeController,
+    required this.onShowGridChanged,
+    required this.onSnapToGridChanged,
+    required this.onReset,
+  });
+
+  final bool showGrid;
+  final bool snapToGrid;
+  final TextEditingController gridSizeController;
+  final ValueChanged<bool> onShowGridChanged;
+  final ValueChanged<bool> onSnapToGridChanged;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Switch(
-        value: _showGrid,
-        onChanged: (value) => setState(() => _showGrid = value),
+        value: showGrid,
+        onChanged: onShowGridChanged,
         trailing: const Text('Show grid'),
       ),
       const Gap(8),
@@ -722,8 +937,8 @@ class _StudioSettingsState extends State<StudioSettings> {
           .muted(),
       const Gap(24),
       Switch(
-        value: _snapToGrid,
-        onChanged: (value) => setState(() => _snapToGrid = value),
+        value: snapToGrid,
+        onChanged: onSnapToGridChanged,
         trailing: const Text('Snap to grid'),
       ),
       const Gap(8),
@@ -731,21 +946,24 @@ class _StudioSettingsState extends State<StudioSettings> {
         'Align moved nodes and resize handles to the grid. Snapping works even when grid lines are hidden.',
       ).small().muted(),
       const Gap(24),
-      _buildField('Grid size (pixels)'),
+      _SettingsTextField(
+        label: 'Grid size (pixels)',
+        controller: gridSizeController,
+      ),
       const Gap(10),
-      ListenableBuilder(
-        listenable: _fields['Grid size (pixels)']!,
-        builder: (context, _) => Wrap(
+      ValueListenableBuilder<TextEditingValue>(
+        valueListenable: gridSizeController,
+        builder: (context, value, _) => Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             for (final size in [8, 16, 24, 32, 48, 64])
               Button(
                 key: ValueKey('grid-preset-$size'),
-                style: _fields['Grid size (pixels)']!.text == '$size'
+                style: value.text == '$size'
                     ? const ButtonStyle.secondary()
                     : const ButtonStyle.outline(),
-                onPressed: () => _fields['Grid size (pixels)']!.text = '$size',
+                onPressed: () => gridSizeController.text = '$size',
                 child: Text('$size').small(),
               ),
           ],
@@ -760,22 +978,8 @@ class _StudioSettingsState extends State<StudioSettings> {
       const Gap(12),
       Align(
         alignment: Alignment.centerLeft,
-        child: GhostButton(
-          onPressed: () => setState(() {
-            const defaults = StudioPreferences();
-            _showGrid = defaults.showGrid;
-            _snapToGrid = defaults.snapToGrid;
-            _fields['Grid size (pixels)']!.text = '${defaults.gridSize}';
-          }),
-          child: const Text('Reset grid'),
-        ),
+        child: GhostButton(onPressed: onReset, child: const Text('Reset grid')),
       ),
     ],
-  );
-
-  Widget _buildField(String label) => StudioFormField(
-    label: label,
-    inputKey: ValueKey('setting-$label'),
-    controller: _fields[label]!,
   );
 }
