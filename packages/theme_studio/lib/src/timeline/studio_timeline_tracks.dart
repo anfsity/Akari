@@ -174,12 +174,410 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
     editor.updateNode(latest.copyWith(tracks: tracks));
   }
 
-  Widget _row(
-    String label,
-    Widget child, {
-    bool selected = false,
-    VoidCallback? onSelect,
-  }) => SizedBox(
+  void _removeTrack() {
+    final editor = widget.editor;
+    if (editor.selectedIds.isEmpty || !editor.tryApplyDraft()) return;
+    final current = editor.selectedNode;
+    editor.updateNode(
+      current.copyWith(
+        tracks: current.tracks
+            .where((track) => track.property != _property)
+            .toList(),
+      ),
+    );
+  }
+
+  void _selectTrack(String nodeId, SceneMotionProperty property) {
+    widget.editor.selectNode(nodeId);
+    setState(() => _property = property);
+  }
+
+  void _dragDelay(DragUpdateDetails details) {
+    final source = _source;
+    if (source == null) return;
+    _preview(_shiftNodeDelay(source, _delta(details)));
+  }
+
+  void _dragDuration(DragUpdateDetails details) {
+    final source = _source;
+    if (source == null) return;
+    _preview(
+      _resizeNodeDuration(source, widget.fallbackDuration, _delta(details)),
+    );
+  }
+
+  void _dragKeyframe(
+    DragUpdateDetails details,
+    int trackIndex,
+    int frameIndex,
+  ) {
+    final source = _source;
+    if (source == null) return;
+    _preview(_retimeKeyframe(source, trackIndex, frameIndex, _delta(details)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final editor = widget.editor;
+    final hasSelection = editor.selectedIds.isNotEmpty;
+    final node = hasSelection ? editor.selectedNode : null;
+    final hasTrack =
+        node != null && node.tracks.any((track) => track.property == _property);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    // Match Slider's internal inset, with room for endpoint keyframe targets.
+    final trackInset =
+        studioTimelineTrackPadding + theme.density.baseGap * theme.scaling / 2;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Gap(6),
+        _TrackToolbar(
+          property: _property,
+          hasSelection: hasSelection,
+          hasTrack: hasTrack,
+          onPropertyChanged: (value) => setState(() => _property = value),
+          onAddTrack: _addTrack,
+          onAddKeyframe: _addKeyframe,
+          onRemoveTrack: _removeTrack,
+        ),
+        const Gap(6),
+        SizedBox(
+          height: 152,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = math.max(
+                1.0,
+                constraints.maxWidth -
+                    studioTimelineLabelWidth -
+                    2 * trackInset,
+              );
+              final total = math.max(1, widget.duration.inMilliseconds);
+              final progress =
+                  (widget.elapsed.inMicroseconds /
+                          math.max(1, widget.duration.inMicroseconds))
+                      .clamp(0.0, 1.0);
+              return Stack(
+                children: [
+                  Column(
+                    children: [
+                      _TimelineScaleHeader(
+                        trackInset: trackInset,
+                        totalMs: total,
+                      ),
+                      Expanded(
+                        child: ListView(
+                          children: [
+                            for (final item
+                                in editor.previewDocument.layerOrder) ...[
+                              _TimelineRow(
+                                label: item.id,
+                                selected: editor.selectedIds.contains(item.id),
+                                trackInset: trackInset,
+                                laneColor: colors.muted.withValues(alpha: .35),
+                                onSelect: () => editor.selectNode(item.id),
+                                overlays: [
+                                  _LayerDurationBlock(
+                                    node: item,
+                                    totalMs: total,
+                                    width: width,
+                                    trackInset: trackInset,
+                                    fallbackDuration: widget.fallbackDuration,
+                                    color: colors.primary.withValues(
+                                      alpha: .55,
+                                    ),
+                                    onSelect: () => editor.selectNode(item.id),
+                                    onStartDrag: (details) =>
+                                        _start(item, details, width),
+                                    onDragDelay: _dragDelay,
+                                    onDragDuration: _dragDuration,
+                                    onEndDrag: _commit,
+                                    onCancelDrag: _cancel,
+                                  ),
+                                ],
+                              ),
+                              for (
+                                var trackIndex = 0;
+                                trackIndex < item.tracks.length;
+                                trackIndex++
+                              )
+                                _TimelineRow(
+                                  label:
+                                      '  ${item.tracks[trackIndex].property.name}',
+                                  selected: false,
+                                  trackInset: trackInset,
+                                  laneColor: colors.muted.withValues(
+                                    alpha: .18,
+                                  ),
+                                  onSelect: () => _selectTrack(
+                                    item.id,
+                                    item.tracks[trackIndex].property,
+                                  ),
+                                  overlays: [
+                                    for (
+                                      var frameIndex = 0;
+                                      frameIndex <
+                                          item
+                                              .tracks[trackIndex]
+                                              .keyframes
+                                              .length;
+                                      frameIndex++
+                                    )
+                                      _KeyframeMarker(
+                                        nodeId: item.id,
+                                        trackIndex: trackIndex,
+                                        frameIndex: frameIndex,
+                                        timeMs:
+                                            item.motionTiming.delayMs +
+                                            item
+                                                .tracks[trackIndex]
+                                                .keyframes[frameIndex]
+                                                .timeMs,
+                                        totalMs: total,
+                                        width: width,
+                                        trackInset: trackInset,
+                                        onTap: () => _selectTrack(
+                                          item.id,
+                                          item.tracks[trackIndex].property,
+                                        ),
+                                        onDoubleTap: () => _editFrame(
+                                          item.id,
+                                          item.tracks[trackIndex].property,
+                                          frameIndex,
+                                        ),
+                                        onStartDrag: (details) =>
+                                            _start(item, details, width),
+                                        onUpdateDrag: (details) =>
+                                            _dragKeyframe(
+                                              details,
+                                              trackIndex,
+                                              frameIndex,
+                                            ),
+                                        onEndDrag: _commit,
+                                        onCancelDrag: _cancel,
+                                      ),
+                                  ],
+                                ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  _TimelinePlayhead(
+                    left:
+                        studioTimelineLabelWidth +
+                        trackInset +
+                        progress * width -
+                        3,
+                    color: colors.primary,
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+SceneNode _shiftNodeDelay(SceneNode source, int deltaMs) => source.copyWith(
+  motionTiming: SceneMotionTiming(
+    delayMs: (source.motionTiming.delayMs + deltaMs).clamp(0, 60000),
+    durationMs: source.motionTiming.durationMs,
+    curve: source.motionTiming.curve,
+  ),
+);
+
+SceneNode _resizeNodeDuration(
+  SceneNode source,
+  Duration fallbackDuration,
+  int deltaMs,
+) {
+  final span =
+      getSceneMotionDuration(source, fallbackDuration).inMilliseconds -
+      source.motionTiming.delayMs;
+  final minimum = source.tracks.fold<int>(
+    1,
+    (value, track) => math.max(value, track.keyframes.length - 1),
+  );
+  final duration = (span + deltaMs).clamp(minimum, 60000);
+  return source.copyWith(
+    tracks: [
+      for (final track in source.tracks)
+        _scaleTrackKeyframes(track, span, duration),
+    ],
+    motionTiming: SceneMotionTiming(
+      durationMs: duration,
+      delayMs: source.motionTiming.delayMs,
+      curve: source.motionTiming.curve,
+    ),
+  );
+}
+
+SceneMotionTrack _scaleTrackKeyframes(
+  SceneMotionTrack track,
+  int sourceSpan,
+  int targetDuration,
+) {
+  var previous = -1;
+  final frames = <SceneKeyframe>[];
+  for (var i = 0; i < track.keyframes.length; i++) {
+    final frame = track.keyframes[i];
+    final scaled = sourceSpan == 0
+        ? 0
+        : (frame.timeMs * targetDuration / sourceSpan).round();
+    final time = scaled.clamp(
+      previous + 1,
+      targetDuration - (track.keyframes.length - 1 - i),
+    );
+    frames.add(
+      SceneKeyframe(timeMs: time, value: frame.value, curve: frame.curve),
+    );
+    previous = time;
+  }
+  return SceneMotionTrack(property: track.property, keyframes: frames);
+}
+
+SceneNode _retimeKeyframe(
+  SceneNode source,
+  int trackIndex,
+  int frameIndex,
+  int deltaMs,
+) {
+  final track = source.tracks[trackIndex];
+  final frame = track.keyframes[frameIndex];
+  final min = frameIndex == 0 ? 0 : track.keyframes[frameIndex - 1].timeMs + 1;
+  final max = frameIndex == track.keyframes.length - 1
+      ? 60000
+      : track.keyframes[frameIndex + 1].timeMs - 1;
+  final frames = [...track.keyframes]
+    ..[frameIndex] = SceneKeyframe(
+      timeMs: (frame.timeMs + deltaMs).clamp(min, max),
+      value: frame.value,
+      curve: frame.curve,
+    );
+  return source.copyWith(
+    tracks: [...source.tracks]
+      ..[trackIndex] = SceneMotionTrack(
+        property: track.property,
+        keyframes: frames,
+      ),
+  );
+}
+
+class _TrackToolbar extends StatelessWidget {
+  const _TrackToolbar({
+    required this.property,
+    required this.hasSelection,
+    required this.hasTrack,
+    required this.onPropertyChanged,
+    required this.onAddTrack,
+    required this.onAddKeyframe,
+    required this.onRemoveTrack,
+  });
+
+  final SceneMotionProperty property;
+  final bool hasSelection;
+  final bool hasTrack;
+  final ValueChanged<SceneMotionProperty> onPropertyChanged;
+  final VoidCallback onAddTrack;
+  final VoidCallback onAddKeyframe;
+  final VoidCallback onRemoveTrack;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 6,
+    runSpacing: 6,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      SizedBox(
+        width: 136,
+        child: StudioEnumSelect(
+          value: property,
+          values: SceneMotionProperty.values,
+          onChanged: onPropertyChanged,
+        ),
+      ),
+      OutlineButton(
+        key: const ValueKey('timeline-add-track'),
+        density: ButtonDensity.dense,
+        onPressed: !hasSelection || hasTrack ? null : onAddTrack,
+        child: const Text('Add track').small(),
+      ),
+      OutlineButton(
+        key: const ValueKey('timeline-add-keyframe'),
+        density: ButtonDensity.dense,
+        onPressed: hasTrack ? onAddKeyframe : null,
+        child: const Text('+ Keyframe').small(),
+      ),
+      if (hasTrack)
+        GhostButton(
+          density: ButtonDensity.dense,
+          onPressed: onRemoveTrack,
+          child: const Text('Remove track').small(),
+        ),
+    ],
+  );
+}
+
+class _TimelineScaleHeader extends StatelessWidget {
+  const _TimelineScaleHeader({required this.trackInset, required this.totalMs});
+
+  final double trackInset;
+  final int totalMs;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 18,
+    child: Row(
+      children: [
+        SizedBox(
+          width: studioTimelineLabelWidth,
+          child: const Text('Layer').xSmall().muted(),
+        ),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: trackInset),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('0s').xSmall().muted(),
+                Text('${(totalMs / 2000).toStringAsFixed(2)}s')
+                    .xSmall()
+                    .muted(),
+                Text('${(totalMs / 1000).toStringAsFixed(2)}s')
+                    .xSmall()
+                    .muted(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _TimelineRow extends StatelessWidget {
+  const _TimelineRow({
+    required this.label,
+    required this.selected,
+    required this.trackInset,
+    required this.laneColor,
+    required this.onSelect,
+    required this.overlays,
+  });
+
+  final String label;
+  final bool selected;
+  final double trackInset;
+  final Color laneColor;
+  final VoidCallback onSelect;
+  final List<Widget> overlays;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
     height: 28,
     child: Row(
       children: [
@@ -204,473 +602,194 @@ class _StudioTimelineTracksState extends State<StudioTimelineTracks> {
             ),
           ),
         ),
-        Expanded(child: child),
+        Expanded(
+          child: Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              Positioned.fill(
+                left: trackInset,
+                right: trackInset,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: laneColor,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              ...overlays,
+            ],
+          ),
+        ),
       ],
     ),
   );
+}
+
+class _LayerDurationBlock extends StatelessWidget {
+  const _LayerDurationBlock({
+    required this.node,
+    required this.totalMs,
+    required this.width,
+    required this.trackInset,
+    required this.fallbackDuration,
+    required this.color,
+    required this.onSelect,
+    required this.onStartDrag,
+    required this.onDragDelay,
+    required this.onDragDuration,
+    required this.onEndDrag,
+    required this.onCancelDrag,
+  });
+
+  final SceneNode node;
+  final int totalMs;
+  final double width;
+  final double trackInset;
+  final Duration fallbackDuration;
+  final Color color;
+  final VoidCallback onSelect;
+  final GestureDragStartCallback onStartDrag;
+  final GestureDragUpdateCallback onDragDelay;
+  final GestureDragUpdateCallback onDragDuration;
+  final VoidCallback onEndDrag;
+  final VoidCallback onCancelDrag;
+
   @override
   Widget build(BuildContext context) {
-    final editor = widget.editor;
-    final hasSelection = editor.selectedIds.isNotEmpty;
-    final node = hasSelection ? editor.selectedNode : null;
-    final hasTrack =
-        node != null && node.tracks.any((track) => track.property == _property);
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    // Match Slider's internal inset, with room for endpoint keyframe targets.
-    final trackInset =
-        studioTimelineTrackPadding + theme.density.baseGap * theme.scaling / 2;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Gap(6),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: 136,
-              child: StudioEnumSelect(
-                value: _property,
-                values: SceneMotionProperty.values,
-                onChanged: (value) => setState(() => _property = value),
-              ),
+    final spanMs =
+        getSceneMotionDuration(node, fallbackDuration).inMilliseconds -
+        node.motionTiming.delayMs;
+    return Positioned(
+      left: trackInset + node.motionTiming.delayMs / totalMs * width,
+      width: math.max(8, spanMs / totalMs * width),
+      top: 4,
+      bottom: 4,
+      child: Listener(
+        onPointerCancel: (_) => onCancelDrag(),
+        child: GestureDetector(
+          key: ValueKey('timeline-block-${node.id}'),
+          behavior: HitTestBehavior.opaque,
+          onTap: onSelect,
+          dragStartBehavior: DragStartBehavior.down,
+          onHorizontalDragStart: onStartDrag,
+          onHorizontalDragUpdate: onDragDelay,
+          onHorizontalDragEnd: (_) => onEndDrag(),
+          onHorizontalDragCancel: onCancelDrag,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(3),
             ),
-            OutlineButton(
-              key: const ValueKey('timeline-add-track'),
-              density: ButtonDensity.dense,
-              onPressed: !hasSelection || hasTrack ? null : _addTrack,
-              child: const Text('Add track').small(),
-            ),
-            OutlineButton(
-              key: const ValueKey('timeline-add-keyframe'),
-              density: ButtonDensity.dense,
-              onPressed: hasTrack ? _addKeyframe : null,
-              child: const Text('+ Keyframe').small(),
-            ),
-            if (hasTrack)
-              GhostButton(
-                density: ButtonDensity.dense,
-                onPressed: () {
-                  if (editor.selectedIds.isEmpty || !editor.tryApplyDraft()) {
-                    return;
-                  }
-                  final current = editor.selectedNode;
-                  editor.updateNode(
-                    current.copyWith(
-                      tracks: current.tracks
-                          .where((track) => track.property != _property)
-                          .toList(),
-                    ),
-                  );
-                },
-                child: const Text('Remove track').small(),
-              ),
-          ],
-        ),
-        const Gap(6),
-        SizedBox(
-          height: 152,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final width = math.max(
-                1.0,
-                constraints.maxWidth - studioTimelineLabelWidth - 2 * trackInset,
-              );
-              final total = math.max(1, widget.duration.inMilliseconds);
-              final progress =
-                  (widget.elapsed.inMicroseconds /
-                          math.max(1, widget.duration.inMicroseconds))
-                      .clamp(0.0, 1.0);
-              return Stack(
-                children: [
-                  Column(
-                    children: [
-                      SizedBox(
-                        height: 18,
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: studioTimelineLabelWidth,
-                              child: const Text('Layer').xSmall().muted(),
-                            ),
-                            Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: trackInset,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text('0s').xSmall().muted(),
-                                    Text(
-                                      '${(total / 2000).toStringAsFixed(2)}s',
-                                    ).xSmall().muted(),
-                                    Text(
-                                      '${(total / 1000).toStringAsFixed(2)}s',
-                                    ).xSmall().muted(),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: ListView(
-                          children: [
-                            for (final item
-                                in editor.previewDocument.layerOrder) ...[
-                              _row(
-                                item.id,
-                                selected: editor.selectedIds.contains(item.id),
-                                Stack(
-                                  clipBehavior: Clip.hardEdge,
-                                  children: [
-                                    Positioned.fill(
-                                      left: trackInset,
-                                      right: trackInset,
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          color: colors.muted.withValues(
-                                            alpha: .35,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            3,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      left:
-                                          trackInset +
-                                          item.motionTiming.delayMs /
-                                          total *
-                                          width,
-                                      width: math.max(
-                                        8,
-                                        (getSceneMotionDuration(
-                                                  item,
-                                                  widget.fallbackDuration,
-                                                ).inMilliseconds -
-                                                item.motionTiming.delayMs) /
-                                            total *
-                                            width,
-                                      ),
-                                      top: 4,
-                                      bottom: 4,
-                                      child: Listener(
-                                        onPointerCancel: (_) => _cancel(),
-                                        child: GestureDetector(
-                                          key: ValueKey(
-                                            'timeline-block-${item.id}',
-                                          ),
-                                        behavior: HitTestBehavior.opaque,
-                                        onTap: () => editor.selectNode(item.id),
-                                        dragStartBehavior:
-                                            DragStartBehavior.down,
-                                        onHorizontalDragStart: (details) =>
-                                            _start(item, details, width),
-                              onHorizontalDragUpdate: (details) {
-                                final source = _source;
-                                if (source == null) return;
-                                _preview(
-                                  source.copyWith(
-                                    motionTiming: SceneMotionTiming(
-                                      delayMs:
-                                          (source.motionTiming.delayMs +
-                                                  _delta(details))
-                                              .clamp(0, 60000),
-                                      durationMs:
-                                          source.motionTiming.durationMs,
-                                      curve: source.motionTiming.curve,
-                                    ),
-                                  ),
-                                );
-                              },
-                              onHorizontalDragEnd: (_) => _commit(),
-                              onHorizontalDragCancel: _cancel,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: colors.primary.withValues(
-                                      alpha: .55,
-                                    ),
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                  child: Align(
-                                    alignment: Alignment.centerRight,
-                                    child: GestureDetector(
-                                      key: ValueKey(
-                                        'timeline-resize-${item.id}',
-                                      ),
-                                      behavior: HitTestBehavior.opaque,
-                                      dragStartBehavior: DragStartBehavior.down,
-                                      onHorizontalDragStart: (details) =>
-                                          _start(item, details, width),
-                                      onHorizontalDragUpdate: (details) {
-                                        final source = _source;
-                                        if (source == null) return;
-                                        final span =
-                                            getSceneMotionDuration(
-                                              source,
-                                              widget.fallbackDuration,
-                                            ).inMilliseconds -
-                                            source.motionTiming.delayMs;
-                                        final minimum = source.tracks.fold<int>(
-                                          1,
-                                          (value, track) => math.max(
-                                            value,
-                                            track.keyframes.length - 1,
-                                          ),
-                                        );
-                                        final duration =
-                                            (span + _delta(details)).clamp(
-                                              minimum,
-                                              60000,
-                                            );
-                                        _preview(
-                                          source.copyWith(
-                                            tracks: [
-                                              for (final track in source.tracks)
-                                                (() {
-                                                  var previous = -1;
-                                                  final frames =
-                                                      <SceneKeyframe>[];
-                                                  for (
-                                                    var i = 0;
-                                                    i < track.keyframes.length;
-                                                    i++
-                                                  ) {
-                                                    final frame =
-                                                        track.keyframes[i];
-                                                    final time =
-                                                        (span == 0
-                                                                ? 0
-                                                                : (frame.timeMs *
-                                                                          duration /
-                                                                          span)
-                                                                      .round())
-                                                            .clamp(
-                                                              previous + 1,
-                                                              duration -
-                                                                  (track
-                                                                          .keyframes
-                                                                          .length -
-                                                                      1 -
-                                                                      i),
-                                                            );
-                                                    frames.add(
-                                                      SceneKeyframe(
-                                                        timeMs: time,
-                                                        value: frame.value,
-                                                        curve: frame.curve,
-                                                      ),
-                                                    );
-                                                    previous = time;
-                                                  }
-                                                  return SceneMotionTrack(
-                                                    property: track.property,
-                                                    keyframes: frames,
-                                                  );
-                                                })(),
-                                            ],
-                                            motionTiming: SceneMotionTiming(
-                                              durationMs: duration,
-                                              delayMs:
-                                                  source.motionTiming.delayMs,
-                                              curve: source.motionTiming.curve,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                            onHorizontalDragEnd: (_) =>
-                                                _commit(),
-                                            onHorizontalDragCancel: _cancel,
-                                            child: const SizedBox(
-                                              width: 12,
-                                              child: Center(
-                                                child: Icon(
-                                                  LucideIcons.gripVertical,
-                                                  size: 12,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          onSelect: () => editor.selectNode(item.id),
-                        ),
-                      for (
-                        var trackIndex = 0;
-                        trackIndex < item.tracks.length;
-                        trackIndex++
-                      )
-                        _row(
-                          '  ${item.tracks[trackIndex].property.name}',
-                          Stack(
-                            clipBehavior: Clip.hardEdge,
-                            children: [
-                              Positioned.fill(
-                                left: trackInset,
-                                right: trackInset,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: colors.muted.withValues(alpha: .18),
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                ),
-                              ),
-                              for (
-                                var frameIndex = 0;
-                                frameIndex <
-                                    item.tracks[trackIndex].keyframes.length;
-                                frameIndex++
-                              )
-                                Positioned(
-                                  left:
-                                      trackInset +
-                                      (item.motionTiming.delayMs +
-                                          item
-                                              .tracks[trackIndex]
-                                              .keyframes[frameIndex]
-                                              .timeMs) /
-                                      total *
-                                      width -
-                                      studioTimelineTrackPadding,
-                                  top: 2,
-                                  child: Listener(
-                                    onPointerCancel: (_) => _cancel(),
-                                    child: GestureDetector(
-                                      key: ValueKey(
-                                        'keyframe-${item.id}-$trackIndex-$frameIndex',
-                                      ),
-                                      onTap: () {
-                                        editor.selectNode(item.id);
-                                        setState(
-                                          () => _property =
-                                              item.tracks[trackIndex].property,
-                                        );
-                                      },
-                                      onDoubleTap: () => _editFrame(
-                                        item.id,
-                                        item.tracks[trackIndex].property,
-                                        frameIndex,
-                                      ),
-                                    dragStartBehavior: DragStartBehavior.down,
-                                    onHorizontalDragStart: (details) =>
-                                        _start(item, details, width),
-                                    onHorizontalDragUpdate: (details) {
-                                      final source = _source;
-                                      if (source == null) return;
-                                      final track = source.tracks[trackIndex];
-                                      final frame = track.keyframes[frameIndex];
-                                      final min = frameIndex == 0
-                                          ? 0
-                                          : track
-                                                    .keyframes[frameIndex - 1]
-                                                    .timeMs +
-                                                1;
-                                      final max =
-                                          frameIndex ==
-                                              track.keyframes.length - 1
-                                          ? 60000
-                                          : track
-                                                    .keyframes[frameIndex + 1]
-                                                    .timeMs -
-                                                1;
-                                      final frames = [...track.keyframes]
-                                        ..[frameIndex] = SceneKeyframe(
-                                          timeMs:
-                                              (frame.timeMs + _delta(details))
-                                                  .clamp(min, max),
-                                          value: frame.value,
-                                          curve: frame.curve,
-                                        );
-                                      _preview(
-                                        source.copyWith(
-                                          tracks: [...source.tracks]
-                                            ..[trackIndex] = SceneMotionTrack(
-                                              property: track.property,
-                                              keyframes: frames,
-                                            ),
-                                        ),
-                                      );
-                                    },
-                                      onHorizontalDragEnd: (_) => _commit(),
-                                      onHorizontalDragCancel: _cancel,
-                                      child: Tooltip(
-                                        tooltip: (_) => const Text(
-                                          'Drag time · Double-click to edit',
-                                        ),
-                                        child: const SizedBox(
-                                          width: 2 * studioTimelineTrackPadding,
-                                          height: 24,
-                                          child: Icon(
-                                            LucideIcons.diamond,
-                                            size: 13,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          onSelect: () {
-                            editor.selectNode(item.id);
-                            setState(
-                              () =>
-                                  _property = item.tracks[trackIndex].property,
-                            );
-                          },
-                        ),
-                    ],
-                  ],
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                key: ValueKey('timeline-resize-${node.id}'),
+                behavior: HitTestBehavior.opaque,
+                dragStartBehavior: DragStartBehavior.down,
+                onHorizontalDragStart: onStartDrag,
+                onHorizontalDragUpdate: onDragDuration,
+                onHorizontalDragEnd: (_) => onEndDrag(),
+                onHorizontalDragCancel: onCancelDrag,
+                child: const SizedBox(
+                  width: 12,
+                  child: Center(
+                    child: Icon(LucideIcons.gripVertical, size: 12),
+                  ),
                 ),
               ),
-            ],
-          ),
-          Positioned(
-            left:
-                studioTimelineLabelWidth + trackInset + progress * width - 3,
-            top: 15,
-            bottom: 0,
-            child: IgnorePointer(
-              child: Column(
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: colors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(
-                      width: 1.5,
-                      color: colors.primary.withValues(alpha: 0.8),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
-        ],
-      );
-    },
-  ),
-),
-      ],
+        ),
+      ),
     );
   }
+}
+
+class _KeyframeMarker extends StatelessWidget {
+  const _KeyframeMarker({
+    required this.nodeId,
+    required this.trackIndex,
+    required this.frameIndex,
+    required this.timeMs,
+    required this.totalMs,
+    required this.width,
+    required this.trackInset,
+    required this.onTap,
+    required this.onDoubleTap,
+    required this.onStartDrag,
+    required this.onUpdateDrag,
+    required this.onEndDrag,
+    required this.onCancelDrag,
+  });
+
+  final String nodeId;
+  final int trackIndex;
+  final int frameIndex;
+  final int timeMs;
+  final int totalMs;
+  final double width;
+  final double trackInset;
+  final VoidCallback onTap;
+  final VoidCallback onDoubleTap;
+  final GestureDragStartCallback onStartDrag;
+  final GestureDragUpdateCallback onUpdateDrag;
+  final VoidCallback onEndDrag;
+  final VoidCallback onCancelDrag;
+
+  @override
+  Widget build(BuildContext context) => Positioned(
+    left: trackInset + timeMs / totalMs * width - studioTimelineTrackPadding,
+    top: 2,
+    child: Listener(
+      onPointerCancel: (_) => onCancelDrag(),
+      child: GestureDetector(
+        key: ValueKey('keyframe-$nodeId-$trackIndex-$frameIndex'),
+        onTap: onTap,
+        onDoubleTap: onDoubleTap,
+        dragStartBehavior: DragStartBehavior.down,
+        onHorizontalDragStart: onStartDrag,
+        onHorizontalDragUpdate: onUpdateDrag,
+        onHorizontalDragEnd: (_) => onEndDrag(),
+        onHorizontalDragCancel: onCancelDrag,
+        child: Tooltip(
+          tooltip: (_) => const Text('Drag time · Double-click to edit'),
+          child: const SizedBox(
+            width: 2 * studioTimelineTrackPadding,
+            height: 24,
+            child: Icon(LucideIcons.diamond, size: 13),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _TimelinePlayhead extends StatelessWidget {
+  const _TimelinePlayhead({required this.left, required this.color});
+
+  final double left;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Positioned(
+    left: left,
+    top: 15,
+    bottom: 0,
+    child: IgnorePointer(
+      child: Column(
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          Expanded(
+            child: Container(width: 1.5, color: color.withValues(alpha: 0.8)),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _KeyframeDialog extends StatefulWidget {
