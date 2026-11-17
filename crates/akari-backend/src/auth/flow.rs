@@ -19,6 +19,8 @@ use crate::{
     state::{AuthState, StateEvent},
 };
 
+const MAX_AUTO_ACKNOWLEDGE_MESSAGES: usize = 64;
+
 #[derive(Clone, Copy)]
 enum PromptDisposition {
     NeedsInput,
@@ -271,6 +273,7 @@ async fn consume_response(
     // One greetd response can require several follow-up frames: visible and
     // secret prompts wait for the UI, while informational messages are
     // acknowledged automatically and continue the same transaction.
+    let mut auto_acknowledged = 0_usize;
     loop {
         if cancellation.is_cancelled() {
             return Err(finish_cancellation(actor, attempt_id, Some(&emitter)).await);
@@ -308,6 +311,7 @@ async fn consume_response(
                         transport = next_transport;
                         response = next_response;
                         user_response_submitted = false;
+                        auto_acknowledged = 0;
                     }
                     ErrorOutcome::Abort(error) => return Err(error),
                 }
@@ -318,7 +322,22 @@ async fn consume_response(
             } => {
                 let disposition = match auth_message_type.as_str() {
                     "visible" | "secret" => PromptDisposition::NeedsInput,
-                    "info" | "error" => PromptDisposition::AutoAcknowledge,
+                    "info" | "error" => {
+                        if auto_acknowledged >= MAX_AUTO_ACKNOWLEDGE_MESSAGES {
+                            return Err(fail_transaction(
+                                actor,
+                                attempt_id,
+                                GreetdError::UnexpectedResponse(
+                                    "authentication emitted too many informational messages"
+                                        .to_owned(),
+                                ),
+                                &emitter,
+                            )
+                            .await);
+                        }
+                        auto_acknowledged += 1;
+                        PromptDisposition::AutoAcknowledge
+                    }
                     _ => {
                         return Err(fail_transaction(
                             actor,
