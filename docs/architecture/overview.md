@@ -33,7 +33,7 @@ flowchart TD
     UI --> Harness[greeter_harness: preview and metrics]
 ```
 
-Theme packages and generated hosts resolve path dependencies independently without a root Pub workspace. `theme_sdk` re-exports the scene runtime and authoring contracts so theme packages only need to depend on the SDK and scene libraries.
+In-repository apps, shared packages, and built-in themes share a root Dart Pub Workspace (`pubspec.yaml` and `pubspec.lock`), while external theme packages and generated `build/tool/hosts/*` resolve path dependencies independently without workspace membership. `theme_sdk` re-exports the scene runtime and authoring contracts so theme packages only need to depend on the SDK and scene libraries.
 
 ## Ownership boundaries
 

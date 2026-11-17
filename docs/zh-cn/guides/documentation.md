@@ -42,7 +42,7 @@ npm run preview
 ```
 
 - `npm run check`：校验 Astro 配置与组件类型。
-- `npm run verify`：检查生成站点中的所有本地链接、静态资源、锚点片段（`#fragment`）与四个公开包的 API 入口，并确认 `internal/` 和 `proposals/` 未被错误发布。
+- `npm run verify`：检查生成站点中的所有本地链接、静态资源、锚点片段（`#fragment`）与四个公开包的 API 入口，并确认 `internal/` 和 `proposals/`（含 `zh-cn/internal/` 与 `zh-cn/proposals/`）未被错误发布。
 
 :::note
 生成的构建目录（`docs/site/dist/`、`docs/site/public/api/` 和 `docs/site/node_modules/`）均已配置 Git 忽略，请勿提交到仓库。

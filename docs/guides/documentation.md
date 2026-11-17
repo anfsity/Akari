@@ -42,7 +42,7 @@ npm run preview
 ```
 
 - `npm run check`: Validates Astro configuration and component types.
-- `npm run verify`: Checks all local links, assets, anchor fragments, API entrypoints, and ensures `internal/` and `proposals/` are excluded from the published bundle.
+- `npm run verify`: Checks all local links, assets, anchor fragments, API entrypoints, and ensures `internal/` and `proposals/` (including `zh-cn/internal/` and `zh-cn/proposals/`) are excluded from the published bundle.
 
 :::note
 Generated directories (`docs/site/dist/`, `docs/site/public/api/`, and `docs/site/node_modules/`) are git-ignored and must never be committed.

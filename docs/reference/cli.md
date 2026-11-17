@@ -29,8 +29,8 @@ Run commands from the repository root with `fvm dart run packages/akari_cli/bin/
 | `login status` | Inspect deployment and systemd service state | `--format` |
 | `login logs` | Read the service journal or latest greeter session logs | `--component`, `--lines` (`-n`), `--follow` (`-f`) |
 | `greetd-test install` | Build, back up, and install the standalone TTY test harness | `--theme`, `--dry-run` |
-| `greetd-test start` | Arm recovery timers and start the standalone test service | `--scale`, `--log-dir`, `--dry-run` |
-| `greetd-test restore` | Restore the prior display manager using the installed recovery script | `--dry-run` |
+| `greetd-test start` | Arm recovery timers and start the standalone test service (`sddm.service` hosts) | `--scale`, `--log-dir`, `--dry-run` |
+| `greetd-test restore` | Restore `sddm.service` using the installed recovery script | `--dry-run` |
 | `greetd-test status` | Inspect test installation, service, recovery timer, and log paths | `--format` |
 | `greetd-test logs` | Read test startup, greeter, screenshot, or recovery logs without `sudo` | `--run`, `--file`, `--lines` (`-n`), `--follow` (`-f`) |
 | `toolchain check` / `setup` | Verify or initialize development dependencies | `--dry-run` |
@@ -47,7 +47,7 @@ Run commands from the repository root with `fvm dart run packages/akari_cli/bin/
 
 ## Production login installation
 
-Deploy Akari as a systemd display manager on Linux hosts with `systemd`, `/usr/bin/greetd`, `/usr/bin/sway`, `python3`, `swaymsg`, `swaybg`, `dbus-daemon`, `busctl`, `setpriv`, and `accountsservice`:
+Deploy Akari as a systemd display manager on Linux hosts with `systemd`, `greetd`, `sway`, `python3`, `swaymsg`, `swaybg`, `dbus-daemon`, `busctl`, `setpriv`, `setsid`, and `accountsservice`:
 
 ```sh
 akari install --theme themes/default --jobs 4
@@ -60,11 +60,11 @@ akari login status
 | Path / Resource | Purpose |
 | --- | --- |
 | `akari-greeter` | Dedicated unprivileged system account running the greeter |
-| `/opt/akari/releases/` | Versioned release bundles with `current` and `previous` symlinks |
+| `/opt/akari/releases/` | Versioned release bundles with `current` and `previous` symlinks (older unreferenced releases are pruned automatically) |
 | `/etc/akari/greetd.toml` & `sway.conf` | Isolated Akari configuration (leaves `/etc/greetd/config.toml` untouched) |
 | `/etc/akari/display-layout.json` | Monitor order captured from your active Sway/Hyprland desktop on first install |
 | `/var/lib/akari/greeter/` | Persistent account/session preferences |
-| `/var/log/akari/greeter/session-*/` | Per-launch `backend.log`, `flutter.log`, and `sway.log` (readable without `sudo`) |
+| `/var/log/akari/greeter/session-*/` | Per-launch `backend.log`, `flutter.log`, `sway.log`, `lifecycle.log`, and `bus.log` (retains recent sessions) |
 
 ### Keyring & PAM configuration
 
@@ -82,7 +82,7 @@ akari login status
 ### Service management, logs, and uninstall
 
 ```sh
-# Read service journal or component logs (backend, flutter, sway)
+# Read service journal or component logs (service, backend, flutter, sway, lifecycle, bus)
 akari login logs
 akari login logs --component backend --lines 200
 akari login logs --component flutter --follow
@@ -123,13 +123,12 @@ fvm dart run packages/akari_cli/bin/akari.dart install cli --shell bash
 Because `packages/akari_cli` is a pure Dart package, you can also compile a native CLI binary:
 
 ```sh
-cd packages/akari_cli
-fvm dart pub get
-mkdir -p ../../build
-fvm dart compile exe bin/akari.dart -o ../../build/akari
+fvm flutter pub get
+mkdir -p build
+fvm dart compile exe packages/akari_cli/bin/akari.dart -o build/akari
 ```
 
-Run `build/akari` inside the checkout, or set `AKARI_REPO_ROOT` when invoking it from another directory.
+Run `build/akari` inside the checkout, or set `AKARI_REPO_ROOT` when invoking repository-oriented commands from another directory (`akari login enable|disable|rollback|status|logs` work directly against `/opt/akari/manage.py` without a checkout).
 
 ## Repository scripts
 

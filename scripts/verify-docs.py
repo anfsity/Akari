@@ -52,7 +52,7 @@ def validate_site(root):
             errors.append(f"missing API entrypoint: {package}")
         elif "/Akari/reference/api/" not in pages[entrypoint].links:
             errors.append(f"missing handbook navigation in API reference: {package}")
-    for directory in ("internal", "proposals"):
+    for directory in ("internal", "proposals", "zh-cn/internal", "zh-cn/proposals"):
         if (root / directory).exists():
             errors.append(f"repository-only documents were published: {directory}")
     if not handbook:

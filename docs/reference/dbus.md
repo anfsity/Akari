@@ -97,7 +97,7 @@ sequenceDiagram
 | --- | --- | --- |
 | `GetState()` | `() -> (s state, s detail)` | Returns the current `AuthState` phase and display-safe status/error text. |
 | `ListUsers()` | `() -> a(sss)` | Returns interactive system accounts as `(username, display_name, icon_path)`. |
-| `ListSessions()` | `() -> a(ssas)` | Parses `/usr/share/wayland-sessions` and `/usr/share/xsessions` into `(session_id, name, desktop_names)`. |
+| `ListSessions()` | `() -> a(ssas)` | Scans `wayland-sessions` and `xsessions` across `XDG_DATA_DIRS` (defaulting to `/usr/local/share:/usr/share`) into `(session_id, name, desktop_names)`. |
 | `BeginAuthentication(username)` | `(s) -> s attempt_id` | Starts a PAM transaction for `username` and returns a unique `attempt_id` before waiting for PAM I/O. |
 | `Respond(attempt_id, response)` | `(ss) -> ()` | Submits user input for an active `WaitingForInput` prompt; zeroes out plaintext memory after socket write. |
 | `Cancel(attempt_id)` | `(s) -> ()` | Sends `cancel_session` to `greetd` and resets the state machine to `Idle`. |
@@ -234,5 +234,5 @@ stateDiagram-v2
 
 ## 6. Mock backend & diagnostics
 
-- **Mock backend**: Built with `cargo run --manifest-path crates/akari-backend/Cargo.toml --features mock` (used automatically by `akari run`). Implements `io.akari.Greeter1` on a private bus (`dbus-run-session`) without PAM or `greetd`, accepting `"password"` for authentication.
+- **Mock backend**: Built with `cargo run --manifest-path crates/akari-backend/Cargo.toml --features mock` (used automatically by `akari run`). Implements `io.akari.Greeter1` on an isolated private `dbus-daemon` session (`scripts/debug-dbus.sh`) without PAM or `greetd`, accepting `"password"` for authentication.
 - **Structured logging**: Default log level is `info`. Logs correlate `attempt_id`, operation, caller, and state while redacting all PAM prompt bodies and credential responses.

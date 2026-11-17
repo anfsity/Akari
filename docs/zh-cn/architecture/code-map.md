@@ -17,7 +17,7 @@ description: 了解 Akari 各部分代码的位置和职责。
 | `packages/greeter_components/` | 可选的通用登录组件集（`StandardGreeterComponents`） |
 | `packages/theme_project/` | 纯 Dart 项目校验、场景发现与独立主题合成 |
 | `packages/greeter_harness/` | 共享预览旅程、帧归属采集、报告聚合与 Timeline 汇总 |
-| `packages/theme_studio/` | 包内按 `authoring/`、`canvas/`、`inspector/`、`timeline/`、`preview/`、`resources/`、`workspace/` 分层 |
+| `packages/theme_studio/` | 包内按单向无环的 `model/`、`ui/`、`resources/`、`authoring/`、`preview/`、`timeline/`、`canvas/`、`inspector/`、`workspace/` 子域分层 |
 | `themes/` | 独立编译的主题包（`default`、`fallback`、`preset1`）及性能测试脚本 |
 | `crates/akari-backend/src/` | Rust D-Bus 服务、认证 Actor、`greetd` 传输层与用户/桌面会话目录 |
 | `apps/greeter/linux/` | 原生 GTK/Flutter 运行器与多显示器全屏窗口管理 |

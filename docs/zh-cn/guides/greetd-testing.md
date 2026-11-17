@@ -18,7 +18,7 @@ description: 构建与安装真实登录测试工具、捕获显示器布局、�
 正式环境与测试工具的 greetd 配置均默认启用 `source_profile`：
 
 1. `greetd` 先加载 `/etc/profile` 和 `~/.profile`。
-2. Akari 将已认证用户的会话命令以非交互 login 模式转发给 `$SHELL`（支持 `bash`、`sh`、`zsh` 和 `fish`）。
+2. Akari 将已认证用户的会话命令以非交互 login 模式转发给 `$SHELL`（`bash`、`sh`、`zsh`、`ksh`、`dash`、`ash` 与 `fish` 走 `-l -c`；`nu`、`tcsh`/`csh` 等非 POSIX Shell 自动回退至 `/bin/sh -l` 或直接启动桌面）。
 3. 用户的登录 Shell 自行加载原生登录配置（如 `.zprofile` 或 `status is-interactive` 之外的 fish 配置；不会加载交互式的 `.zshrc`）。
 4. 用户侧执行器保留完整 `argv`，仅在 `LANG` 为空时补充 `LANG=C.UTF-8`，随后启动所选桌面。
 
@@ -146,7 +146,7 @@ akari greetd-test install --theme themes/fallback
    - `--log-dir /var/tmp/my-akari-test`：指定自定义的全局可遍历日志根目录。
    - `--dry-run`：仅输出执行计划，不停止现有显示管理器。
 
-`start` 会在停止当前显示管理器前挂载多重恢复保护。遇到以下任一情况时都会自动恢复原有显示管理器：
+`start` 会在停止当前 `sddm.service` 显示管理器前挂载多重恢复保护（注：独立 `greetd-test` 测试套件当前针对使用 `sddm.service` 的主机环境，而正式部署命令 `akari install` / `akari login` 支持任意 `display-manager.service`）。遇到以下任一情况时都会自动恢复 `sddm.service`：
 - 前置检查或启动阶段失败；
 - `akari-test.service` 退出（通过 `ExecStopPost` 触发）；
 - 服务运行满 10 分钟（触发独立兜底计时器）。

@@ -11,14 +11,14 @@ Akari builds and runs on Linux. Complete the steps below before running previews
 
 | Component | Required packages / tools | Purpose |
 | --- | --- | --- |
-| Source & SDK | `git`, [FVM](https://fvm.app/) | Manage the pinned Flutter SDK in `.fvmrc` |
+| Source & SDK | `git`, `python3`, [FVM](https://fvm.app/) | Manage the pinned Flutter SDK (`3.47.3`) in `.fvmrc` and run workflow scripts |
 | Rust & seat | `rustc`, `cargo`, `libseat` headers (`libseat-dev` on Debian/Ubuntu, `seatd` on Arch) | Build the D-Bus backend and native splash |
-| Flutter Linux | `clang`, `cmake`, `ninja`, `pkg-config`, GTK 3 development files | Compile the Linux Flutter host |
-| D-Bus | `dbus-run-session`, `busctl` | Run isolated backend sessions |
+| Flutter Linux | `clang`, `cmake`, `ninja`, `pkg-config`, GTK 3 & `libepoxy` development files | Compile the Linux Flutter host |
+| D-Bus & process tools | `dbus-daemon`, `busctl`, `setpriv`, `setsid` | Launch isolated private D-Bus sessions and unprivileged greeter processes |
 
 ### Optional workflow tools
 
-- **Nested or headless compositor tests**: `sway`, `swaymsg`, `swaybg`, `python3`, `grim`
+- **Nested or headless compositor tests**: `sway`, `swaymsg`, `swaybg`, `grim`
 - **Native input regression tests**: `wtype`
 - **Real login testing**: `greetd` (see [Standalone greetd testing](../guides/greetd-testing.md))
 
@@ -32,16 +32,18 @@ Akari builds and runs on Linux. Complete the steps below before running previews
    bash scripts/bootstrap-toolchain.sh
    ```
 
-   `bootstrap-toolchain.sh` installs the Flutter version from `.fvmrc`, enables Flutter Linux desktop support, resolves `packages/akari_cli` and `apps/greeter` dependencies, and fetches locked Cargo workspace dependencies.
+   `bootstrap-toolchain.sh` installs the pinned Flutter version from `.fvmrc`, enables Flutter Linux desktop support, resolves the root Dart Pub Workspace dependencies, generates built-in theme scene code, and fetches locked Cargo workspace dependencies.
 
 2. Verify your environment:
 
    ```sh
    bash scripts/check-toolchain.sh
+   # Or also require Sway/greetd runtime binaries:
+   bash scripts/check-toolchain.sh --runtime
    ```
 
 :::note
-`bootstrap-toolchain.sh` does not install system packages. When running `check-toolchain.sh` outside a live Wayland session, a missing `WAYLAND_DISPLAY` warning only affects nested compositor windows—headless tests still work.
+`bootstrap-toolchain.sh` does not install system packages. Without `--runtime`, `check-toolchain.sh` reports missing `sway`/`greetd` binaries and unset `WAYLAND_DISPLAY` as warnings so headless builds and unit tests still succeed.
 :::
 
 ## Install the `akari` launcher

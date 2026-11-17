@@ -90,13 +90,12 @@ fvm dart run packages/akari_cli/bin/akari.dart install cli --shell zsh   # or ba
 You can also compile the CLI into a standalone native executable:
 
 ```sh
-cd packages/akari_cli
-fvm dart pub get
-mkdir -p ../../build
-fvm dart compile exe bin/akari.dart -o ../../build/akari
+fvm flutter pub get
+mkdir -p build
+fvm dart compile exe packages/akari_cli/bin/akari.dart -o build/akari
 ```
 
-Run `build/akari` from within the checkout, or set `AKARI_REPO_ROOT` when invoking it from another directory.
+Run `build/akari` from within the checkout, or set `AKARI_REPO_ROOT` when invoking repository-oriented commands from another directory (`akari login enable|disable|rollback|status|logs` work directly against an installed `/opt/akari` deployment without a checkout).
 
 Once installed, use `akari <command>` directly from anywhere in the repository:
 
@@ -114,7 +113,7 @@ Once installed, use `akari <command>` directly from anywhere in the repository:
 | **`akari login enable`** | Configure systemd to use Akari on next boot |
 | **`akari login disable`** | Restore the previous system display manager |
 | **`akari login status`** | Check current deployment and systemd service state |
-| **`akari login logs`** | View service journal or component logs (`backend`, `flutter`, `sway`) |
+| **`akari login logs`** | View service journal or component logs (`service`, `backend`, `flutter`, `sway`, `lifecycle`, `bus`) |
 
 For shared flags (`--theme`, `--mode`, `--jobs`, `--format`), see the [CLI reference](docs/reference/cli.md).
 

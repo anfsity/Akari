@@ -31,8 +31,8 @@ description: 查命令、选项、显示配置和运行报告。
 | `login status` | 查看部署状态与 systemd 服务状态 | `--format` |
 | `login logs` | 查看服务 journal 或最新登录界面会话日志 | `--component`、`--lines`（`-n`）、`--follow`（`-f`） |
 | `greetd-test install` | 构建、备份并安装独立 TTY 登录测试环境 | `--theme`、`--dry-run` |
-| `greetd-test start` | 挂载自动恢复计时器并启动独立测试服务 | `--scale`、`--log-dir`、`--dry-run` |
-| `greetd-test restore` | 调用独立恢复脚本立即切回原显示管理器 | `--dry-run` |
+| `greetd-test start` | 挂载自动恢复计时器并启动独立测试服务（针对 `sddm.service` 主机） | `--scale`、`--log-dir`、`--dry-run` |
+| `greetd-test restore` | 调用独立恢复脚本立即切回 `sddm.service` | `--dry-run` |
 | `greetd-test status` | 查看测试安装状态、服务、恢复计时器与日志路径 | `--format` |
 | `greetd-test logs` | 无需 `sudo` 查看测试启动、会话、截图或恢复日志 | `--run`、`--file`、`--lines`（`-n`）、`--follow`（`-f`） |
 | `toolchain check` / `setup` | 检查或初始化开发环境依赖 | `--dry-run` |
@@ -64,11 +64,11 @@ akari login status
 | 路径 / 资源 | 说明 |
 | --- | --- |
 | `akari-greeter` | 运行登录界面的专用无特权系统账户 |
-| `/opt/akari/releases/` | 按版本存放的发布程序包，通过 `current` 和 `previous` 符号链接切换 |
+| `/opt/akari/releases/` | 按版本存放的发布程序包，通过 `current` 和 `previous` 符号链接切换（自动清理更早的未引用旧版本） |
 | `/etc/akari/greetd.toml` 与 `sway.conf` | Akari 专用配置文件（不修改系统原有的 `/etc/greetd/config.toml`） |
 | `/etc/akari/display-layout.json` | 首次安装时从当前 Sway/Hyprland 桌面捕获的显示器排列顺序 |
 | `/var/lib/akari/greeter/` | 持久化的登录账户与桌面会话偏好 |
-| `/var/log/akari/greeter/session-*/` | 每次启动生成的 `backend.log`、`flutter.log` 与 `sway.log`（无需 `sudo` 即可读取） |
+| `/var/log/akari/greeter/session-*/` | 每次启动生成的 `backend.log`、`flutter.log`、`sway.log`、`lifecycle.log` 与 `bus.log`（保留最近会话记录） |
 
 ### 密钥环（Keyring）与 PAM 配置
 
@@ -86,7 +86,7 @@ akari login status
 ### 服务管理、日志与卸载
 
 ```sh
-# 查看服务 journal 或组件日志（backend、flutter、sway）
+# 查看服务 journal 或组件日志（service、backend、flutter、sway、lifecycle、bus）
 akari login logs
 akari login logs --component backend --lines 200
 akari login logs --component flutter --follow
@@ -129,13 +129,12 @@ fvm dart run packages/akari_cli/bin/akari.dart install cli --shell bash
 `packages/akari_cli` 是纯 Dart 包，也可以直接编译为原生二进制文件：
 
 ```sh
-cd packages/akari_cli
-fvm dart pub get
-mkdir -p ../../build
-fvm dart compile exe bin/akari.dart -o ../../build/akari
+fvm flutter pub get
+mkdir -p build
+fvm dart compile exe packages/akari_cli/bin/akari.dart -o build/akari
 ```
 
-在仓库目录内可直接运行 `build/akari`；若在其他工作目录下调用，请通过 `AKARI_REPO_ROOT` 指定仓库根目录。
+在仓库目录内可直接运行 `build/akari`；若在其他工作目录下调用仓库相关命令，请通过 `AKARI_REPO_ROOT` 指定仓库根目录（`akari login enable|disable|rollback|status|logs` 可脱离源码仓库直接调用 `/opt/akari/manage.py`）。
 
 ## 仓库脚本
 

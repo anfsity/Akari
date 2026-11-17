@@ -17,7 +17,7 @@ description: Where to read and change each part of Akari.
 | `packages/greeter_components/` | Optional reusable widget set (`StandardGreeterComponents`) |
 | `packages/theme_project/` | Pure Dart project validation, scene discovery, and independent theme synthesis |
 | `packages/greeter_harness/` | Shared preview journeys, frame attribution, report aggregation, and Timeline summaries |
-| `packages/theme_studio/` | Internal `authoring/`, `canvas/`, `inspector/`, `timeline/`, `preview/`, `resources/`, and `workspace/` domains |
+| `packages/theme_studio/` | Internal `model/`, `ui/`, `resources/`, `authoring/`, `preview/`, `timeline/`, `canvas/`, `inspector/`, and `workspace/` domains |
 | `themes/` | Independent compiled theme packages (`default`, `fallback`, `preset1`) and perf suites |
 | `crates/akari-backend/src/` | Rust D-Bus service, authentication actor, `greetd` transport, and session/user catalogs |
 | `apps/greeter/linux/` | Native GTK/Flutter runner and multi-monitor window management |

@@ -11,14 +11,14 @@ Akari 目前支持在 Linux 上构建与运行。开始开发或预览前，请�
 
 | 类别 | 所需工具 / 软件包 | 用途 |
 | --- | --- | --- |
-| 源码与 SDK | `git`、[FVM](https://fvm.app/) | 管理 `.fvmrc` 中固定的 Flutter SDK |
+| 源码与 SDK | `git`、`python3`、[FVM](https://fvm.app/) | 管理 `.fvmrc` 中锁定的 Flutter SDK（`3.47.3`）并执行工作流脚本 |
 | Rust 与会话底座 | `rustc`、`cargo`、`libseat` 开发文件（Debian/Ubuntu 为 `libseat-dev`，Arch 由 `seatd` 提供） | 构建 D-Bus 后端与原生启动画面 |
-| Flutter Linux | `clang`、`cmake`、`ninja`、`pkg-config`、GTK 3 开发文件 | 编译 Linux 端 Flutter 宿主程序 |
-| D-Bus 工具 | `dbus-run-session`、`busctl` | 启动隔离的后端调试会话 |
+| Flutter Linux | `clang`、`cmake`、`ninja`、`pkg-config`、GTK 3 与 `libepoxy` 开发文件 | 编译 Linux 端 Flutter 宿主程序 |
+| D-Bus 与进程隔离 | `dbus-daemon`、`busctl`、`setpriv`、`setsid` | 启动隔离的私有 D-Bus 会话与降权登录界面进程 |
 
 ### 可选测试工具
 
-- **嵌套或无头合成器测试**：`sway`、`swaymsg`、`swaybg`、`python3`、`grim`
+- **嵌套或无头合成器测试**：`sway`、`swaymsg`、`swaybg`、`grim`
 - **原生键盘输入回归测试**：`wtype`
 - **真实登录测试**：`greetd`（详见[独立 greetd 测试](../guides/greetd-testing.md)）
 
@@ -32,16 +32,18 @@ Akari 目前支持在 Linux 上构建与运行。开始开发或预览前，请�
    bash scripts/bootstrap-toolchain.sh
    ```
 
-   该脚本会安装 `.fvmrc` 指定的 Flutter SDK、启用 Linux 桌面支持，并拉取 `packages/akari_cli`、`apps/greeter` 及 `crates/` Cargo Workspace 的锁定依赖。
+   该脚本会安装 `.fvmrc` 锁定的 Flutter SDK、启用 Linux 桌面支持、拉取根级 Dart Pub Workspace 依赖、生成内置主题场景代码，并拉取 `crates/` Cargo Workspace 的锁定依赖。
 
 2. 检查工具链状态：
 
    ```sh
    bash scripts/check-toolchain.sh
+   # 如需同时强制检查 Sway/greetd 运行时二进制：
+   bash scripts/check-toolchain.sh --runtime
    ```
 
 :::note
-`bootstrap-toolchain.sh` 不会自动安装系统软件包。如果当前不在 Wayland 桌面下，`check-toolchain.sh` 提示缺少 `WAYLAND_DISPLAY` 仅影响嵌套窗口预览，不影响无头（headless）测试。
+`bootstrap-toolchain.sh` 不会自动安装系统软件包。未传入 `--runtime` 时，`check-toolchain.sh` 会将缺失的 `sway`/`greetd` 与未设置的 `WAYLAND_DISPLAY` 作为警告输出，以便在无头（headless）或纯构建环境中正常通过检查。
 :::
 
 ## 安装 `akari` 命令行启动器

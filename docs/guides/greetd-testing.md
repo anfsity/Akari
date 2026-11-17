@@ -16,7 +16,7 @@ Because the harness uses the production backend, power actions (`Suspend`, `Rebo
 Production and test greetd configurations enable `source_profile`:
 
 1. `greetd` loads `/etc/profile` and `~/.profile`.
-2. Akari forwards the authenticated user's session command to `$SHELL` in non-interactive login mode (`bash`, `sh`, `zsh`, and `fish` are supported).
+2. Akari forwards the authenticated user's session command to `$SHELL` in non-interactive login mode (`bash`, `sh`, `zsh`, `ksh`, `dash`, `ash`, and `fish` run via `-l -c`; non-POSIX shells such as `nu` or `tcsh`/`csh` fall back cleanly through `/bin/sh -l` or direct desktop execution).
 3. Your login shell loads its native login files (such as `.zprofile` or fish config outside `status is-interactive`; interactive `.zshrc` is not read).
 4. The user-side executor preserves `argv`, sets `LANG=C.UTF-8` only when `LANG` is unset/empty, and launches the desktop.
 
@@ -140,7 +140,7 @@ akari greetd-test install --theme themes/fallback
    - `--log-dir /var/tmp/my-akari-test`: Custom world-traversable log root.
    - `--dry-run`: Print the execution plan without stopping the active display manager.
 
-`start` arms recovery before stopping the active display manager. Your prior display manager is restored automatically when:
+`start` arms recovery before stopping the active `sddm.service` display manager (note: the standalone `greetd-test` harness currently expects `sddm.service` as the active host display manager, whereas production `akari install` / `akari login` supports any systemd `display-manager.service`). Your prior `sddm.service` session is restored automatically when:
 - Setup fails during preflight,
 - `akari-test.service` exits (`ExecStopPost`), or
 - The 10-minute fallback recovery timer fires.

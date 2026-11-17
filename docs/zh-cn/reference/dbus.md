@@ -97,7 +97,7 @@ sequenceDiagram
 | --- | --- | --- |
 | `GetState()` | `() -> (s state, s detail)` | 返回当前 `AuthState` 阶段及适合界面展示的状态/错误说明。 |
 | `ListUsers()` | `() -> a(sss)` | 返回可登录的系统用户列表：`(username, display_name, icon_path)`。 |
-| `ListSessions()` | `() -> a(ssas)` | 解析 `/usr/share/wayland-sessions` 与 `/usr/share/xsessions`，返回 `(session_id, name, desktop_names)`。 |
+| `ListSessions()` | `() -> a(ssas)` | 按 `XDG_DATA_DIRS`（默认 `/usr/local/share:/usr/share`）扫描 `wayland-sessions` 与 `xsessions`，返回 `(session_id, name, desktop_names)`。 |
 | `BeginAuthentication(username)` | `(s) -> s attempt_id` | 为 `username` 发起 PAM 认证，并在等待 PAM I/O 前立即返回唯一 `attempt_id`。 |
 | `Respond(attempt_id, response)` | `(ss) -> ()` | 为当前 `WaitingForInput` 提示提交凭据，写入 socket 后立即清零内存明文。 |
 | `Cancel(attempt_id)` | `(s) -> ()` | 向 `greetd` 发送 `cancel_session`，并将状态机重置为 `Idle`。 |
@@ -234,5 +234,5 @@ stateDiagram-v2
 
 ## 6. 模拟后端与日志诊断
 
-- **模拟后端（Mock Backend）**：使用 `cargo run --manifest-path crates/akari-backend/Cargo.toml --features mock` 构建（`akari run` 默认使用）。在隔离的 `dbus-run-session` 中实现完整的 `io.akari.Greeter1` 接口，输入密码 `"password"` 即可模拟认证通过。
+- **模拟后端（Mock Backend）**：使用 `cargo run --manifest-path crates/akari-backend/Cargo.toml --features mock` 构建（`akari run` 默认使用）。通过 `scripts/debug-dbus.sh` 启动隔离的私有 `dbus-daemon` 会话实现完整的 `io.akari.Greeter1` 接口，输入密码 `"password"` 即可模拟认证通过。
 - **结构化诊断日志**：默认日志级别为 `info`，通过 `attempt_id`、操作名、调用方与状态串联完整认证链路，同时严格过滤所有 PAM 提示正文与用户输入内容。

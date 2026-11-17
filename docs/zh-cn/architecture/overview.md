@@ -33,7 +33,7 @@ flowchart TD
     UI --> Harness["greeter_harness：预览旅程与性能采集"]
 ```
 
-主题包与生成的 Flutter 宿主均通过独立路径依赖解析，不依赖根级 Pub Workspace。`theme_sdk` 重新导出了场景运行时与声明契约，使主题包只需依赖核心 SDK 与场景库。
+仓内应用、共享包与内置主题通过根级 Dart Pub Workspace（`pubspec.yaml` 与 `pubspec.lock`）统一锁定依赖版本；仓外独立主题包与生成的 `build/tool/hosts/*` 宿主则保持无 Workspace 成员身份的独立路径依赖解析。`theme_sdk` 重新导出了场景运行时与声明契约，使主题包只需依赖核心 SDK 与场景库。
 
 ## 职责边界划分
 
