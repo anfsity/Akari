@@ -35,6 +35,7 @@ class PresetComponents implements GreeterThemeComponents {
           text: account.selected?.displayName ?? 'Choose account',
           color: presetInk,
           enabled: account.canSelect,
+          showArrow: account.canSelect,
           entries: [
             for (final user in account.users)
               PopupMenuItem(value: user, child: Text(user.displayName)),
@@ -58,6 +59,7 @@ class PresetComponents implements GreeterThemeComponents {
             caption: 'DESTINATION',
             text: session.selected?.name ?? 'Choose desktop',
             color: presetPaper,
+            showArrow: session.sessions.length > 1,
             entries: [
               for (final item in session.sessions)
                 PopupMenuItem(value: item, child: Text(item.name)),
@@ -140,6 +142,7 @@ class _SceneChoice<T> extends StatelessWidget {
     required this.entries,
     required this.onSelected,
     this.enabled = true,
+    this.showArrow = true,
   });
 
   final String label;
@@ -149,6 +152,7 @@ class _SceneChoice<T> extends StatelessWidget {
   final List<PopupMenuEntry<T>> entries;
   final ValueChanged<T> onSelected;
   final bool enabled;
+  final bool showArrow;
 
   @override
   Widget build(BuildContext context) => Center(
@@ -186,8 +190,10 @@ class _SceneChoice<T> extends StatelessWidget {
                       color: color,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Icon(Icons.expand_more, size: 18, color: color),
+                  if (showArrow) ...[
+                    const SizedBox(width: 8),
+                    Icon(Icons.expand_more, size: 18, color: color),
+                  ],
                 ],
               ),
             ],
@@ -310,7 +316,7 @@ class _PresetClock extends StatelessWidget {
   Widget build(BuildContext context) => MinuteClockBuilder(
     builder: (context, now) {
       final color = reflected ? presetPaper : presetInk;
-      final time = formatClockTime(now);
+      final time = getFormattedClockTime(now);
       final day = WeekdayLettering(
         weekday: now.weekday,
         color: color,

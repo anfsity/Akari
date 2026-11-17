@@ -16,4 +16,4 @@ export 'src/components/system_components.dart'
         PowerActions,
         clockVariant,
         dateTimeComponent,
-        formatClockTime;
+        getFormattedClockTime;

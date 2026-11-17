@@ -17,20 +17,20 @@ const _accentValue = 0.95;
 const _lightNeutralAccent = Color(0xffd0d0d0);
 const _darkNeutralAccent = Color(0xff404040);
 
-/// Extracts a palette seed from a wallpaper asset.
+/// Loads a palette seed from a wallpaper asset.
 ///
 /// The dominant vibrant hue is normalized before [ColorScheme.fromSeed]
 /// builds the theme's tonal palette.
-Future<Color> extractSeed(String asset) async {
+Future<Color> loadSeedColor(String asset) async {
   final data = await rootBundle.load(asset);
-  return extractSeedFromBytes(
+  return decodeSeedColor(
     data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
   );
 }
 
-/// Extracts the dominant accent from image bytes, including editor imports
+/// Decodes the dominant accent from image bytes, including editor imports
 /// that have not been added to Flutter's asset bundle.
-Future<Color> extractSeedFromBytes(Uint8List bytes) async {
+Future<Color> decodeSeedColor(Uint8List bytes) async {
   final codec = await ui.instantiateImageCodec(
     bytes,
     targetWidth: _sampleSize,

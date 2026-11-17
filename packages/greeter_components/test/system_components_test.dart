@@ -41,11 +41,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: MinuteClockBuilder(
-          builder: (_, now) => Text(formatClockTime(now)),
+          builder: (_, now) => Text(getFormattedClockTime(now)),
         ),
       ),
     );
-    expect(find.text(formatClockTime(DateTime.now())), findsOneWidget);
+    expect(find.text(getFormattedClockTime(DateTime.now())), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(minutes: 1));
     expect(tester.takeException(), isNull);

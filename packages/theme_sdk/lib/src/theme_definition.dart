@@ -39,12 +39,15 @@ class ThemeDefinition {
   ThemeData get materialTheme => bundle.materialTheme;
 
   Future<Color?> findBackgroundSeed() async {
+    if (document.background.kind != SceneBackgroundKind.image) {
+      return null;
+    }
     final asset = document.background.asset;
     if (asset == null) {
       return null;
     }
     try {
-      return await extractSeed(asset);
+      return await loadSeedColor(asset);
     } on Object {
       // Palette extraction is optional decoration. Missing or undecodable
       // wallpaper must leave the theme's authored default palette usable.

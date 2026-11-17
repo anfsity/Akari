@@ -152,7 +152,7 @@ void main() {
 
     expect(
       generated,
-      contains('SceneDocument get testSceneDocument => SceneDocument('),
+      contains('SceneDocument get testSceneDocument => const SceneDocument('),
     );
     expect(generated, contains('referenceWidth: 2560'));
     expect(generated, contains('referenceHeight: 1440'));
@@ -161,7 +161,7 @@ void main() {
     expect(
       generated,
       contains(
-        'visibleWhen: const SceneAny(<SceneCondition>['
+        'visibleWhen: SceneAny(<SceneCondition>['
         'ScenePredicateCondition(ScenePredicate.isAuthPrompting), '
         'ScenePredicateCondition(ScenePredicate.isAuthError)])',
       ),
@@ -189,7 +189,7 @@ void main() {
     expect(
       generated,
       contains(
-        'visibleWhen: const SceneNot('
+        'visibleWhen: SceneNot('
         'ScenePredicateCondition(ScenePredicate.isDormant))',
       ),
     );

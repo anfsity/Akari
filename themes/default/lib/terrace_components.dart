@@ -137,8 +137,8 @@ class _TerraceClock extends StatelessWidget {
         alignment: Alignment.centerLeft,
         child: Text(
           variant == TerraceClockVariant.stacked
-              ? formatClockTime(now).replaceFirst(':', '\n')
-              : formatClockTime(now),
+              ? getFormattedClockTime(now).replaceFirst(':', '\n')
+              : getFormattedClockTime(now),
           style: getSceneTextStyle(
             context,
             TextStyle(

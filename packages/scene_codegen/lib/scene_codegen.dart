@@ -6,13 +6,13 @@ String generateScene(String input) {
 
 String generateSceneFromDocument(SceneDocument document) {
   final commentId = document.id.replaceAll(RegExp(r'[\r\n]+'), ' ');
-  // A getter creates a fresh document after hot reload. A cached top-level
-  // final would keep the old scene even after regenerated code is loaded.
+  // A getter returns the latest const document after hot reload; a cached
+  // top-level final would keep the old scene even after regenerated code loads.
   return '''// GENERATED CODE - DO NOT MODIFY BY HAND
 // Generated from $commentId.scene.json.
 import 'package:scene/scene.dart';
 
-SceneDocument get ${getSceneDocumentVariableName(document.id)} => SceneDocument(
+SceneDocument get ${getSceneDocumentVariableName(document.id)} => const SceneDocument(
   id: ${encodeDartString(document.id)},
   version: ${document.version},
   guides: <SceneGuide>[
@@ -21,7 +21,7 @@ ${document.guides.map((guide) => '    SceneGuide(axis: SceneGuideAxis.${guide.ax
 ${document.styleTokens.entries.map((entry) => '    ${encodeDartString(entry.key)}: ${_encodeStyle(entry.value)},\n').join()}  },
   themeProperties: <String, String>{
 ${document.themeProperties.entries.map((entry) => '    ${encodeDartString(entry.key)}: ${encodeDartString(entry.value)},\n').join()}  },
-  canvas: const SceneCanvas(
+  canvas: SceneCanvas(
     fit: SceneCanvasFit.${document.canvas.fit.name},
     useSafeArea: ${document.canvas.useSafeArea},
     referenceWidth: ${document.canvas.referenceWidth},
@@ -50,26 +50,31 @@ String generateSceneNode(SceneNode node) {
     for (final entry in node.properties.entries)
       '        ${encodeDartString(entry.key)}: ${encodeDartString(entry.value)},\n',
   ].join();
+  final assetLine = node.asset == null
+      ? ''
+      : '''      asset: SceneAsset(path: ${encodeDartString(node.asset!.path)},
+        kind: SceneAssetKind.${node.asset!.kind.name}, fit: SceneAssetFit.${node.asset!.fit.name},
+        tint: ${node.asset!.tint == null ? 'null' : _encodeColorLiteral(node.asset!.tint!)}),
+''';
+  final layoutLine = node.layout == null
+      ? ''
+      : '      layout: ${_encodeLayout(node.layout!)},\n';
   return '''    SceneNode(
       id: ${encodeDartString(node.id)},
       componentId: ${encodeDartString(node.componentId)},
       parentId: ${_encodeDartNullableString(node.parentId)},
       styleToken: ${_encodeDartNullableString(node.styleToken)},
       primitive: ${node.primitive == null ? 'null' : 'ScenePrimitive.${node.primitive!.name}'},
-      ${node.asset == null ? '' : '''asset: const SceneAsset(path: ${encodeDartString(node.asset!.path)},
-        kind: SceneAssetKind.${node.asset!.kind.name}, fit: SceneAssetFit.${node.asset!.fit.name},
-        tint: ${node.asset!.tint == null ? 'null' : _encodeColorLiteral(node.asset!.tint!)}),'''}
-      ${node.layout == null ? '' : 'layout: ${_encodeLayout(node.layout!)},'}
-      sizing: ${_encodeSizing(node.sizing)},
+$assetLine${layoutLine}      sizing: ${_encodeSizing(node.sizing)},
       breakpoints: <SceneBreakpoint>[
 ${node.breakpoints.map((rule) => '        SceneBreakpoint(minWidth: ${rule.minWidth}, layout: ${rule.layout == null ? 'null' : _encodeLayout(rule.layout!)}, sizing: ${rule.sizing == null ? 'null' : _encodeSizing(rule.sizing!)}),\n').join()}      ],
-      rect: const SceneRect(
+      rect: SceneRect(
         x: ${node.rect.x},
         y: ${node.rect.y},
         width: ${node.rect.width},
         height: ${node.rect.height},
       ),
-      transform: const SceneTransform(
+      transform: SceneTransform(
         translateX: ${node.transform.translateX},
         translateY: ${node.transform.translateY},
         scaleX: ${node.transform.scaleX},
@@ -86,14 +91,14 @@ ${node.breakpoints.map((rule) => '        SceneBreakpoint(minWidth: ${rule.minWi
       focusOrder: ${node.focusOrder},
       motion: SceneMotionPreset.${node.motion.name},
       transitions: <SceneStateTransition>[
-${node.transitions.map((rule) => '        SceneStateTransition(from: ${_encodeConditionLiteral(rule.from)}, to: ${_encodeConditionLiteral(rule.to)}, effect: SceneStateEffect.${rule.effect.name}, timing: ${_encodeMotionTiming(rule.timing)}),\n').join()}      ],
+${node.transitions.map((rule) => '        SceneStateTransition(source: ${_encodeConditionLiteral(rule.source)}, target: ${_encodeConditionLiteral(rule.target)}, effect: SceneStateEffect.${rule.effect.name}, timing: ${_encodeMotionTiming(rule.timing)}),\n').join()}      ],
       stateEffects: <ScenePredicate, SceneStateEffect>{
 ${node.stateEffects.entries.map((entry) => '        ScenePredicate.${entry.key.name}: SceneStateEffect.${entry.value.name},\n').join()}      },
       tracks: <SceneMotionTrack>[
 ${node.tracks.map((track) => '        SceneMotionTrack(property: SceneMotionProperty.${track.property.name}, keyframes: <SceneKeyframe>[${track.keyframes.map((frame) => 'SceneKeyframe(timeMs: ${frame.timeMs}, value: ${frame.value}, curve: SceneKeyframeCurve.${frame.curve.name})').join(', ')}]),\n').join()}      ],
-      motionTiming: const SceneMotionTiming(durationMs: ${node.motionTiming.durationMs}, delayMs: ${node.motionTiming.delayMs},
+      motionTiming: SceneMotionTiming(durationMs: ${node.motionTiming.durationMs}, delayMs: ${node.motionTiming.delayMs},
         curve: ${node.motionTiming.curve == null ? 'null' : 'SceneCubicBezier(${node.motionTiming.curve!.x1}, ${node.motionTiming.curve!.y1}, ${node.motionTiming.curve!.x2}, ${node.motionTiming.curve!.y2})'}),
-      visibleWhen: ${node.visibleWhen == null ? 'null' : 'const ${_encodeConditionLiteral(node.visibleWhen!)}'},
+      visibleWhen: ${node.visibleWhen == null ? 'null' : _encodeConditionLiteral(node.visibleWhen!)},
       interactive: ${node.interactive},
       properties: <String, String>{
 $properties      },
@@ -105,12 +110,12 @@ String _encodeShader(SceneShader shader) =>
     'SceneShader(asset: ${encodeDartString(shader.asset)}, uniforms: <SceneShaderUniform>[${shader.uniforms.map((uniform) => 'SceneShaderUniform(name: ${encodeDartString(uniform.name)},source: SceneUniformSource.${uniform.source.name},value: ${uniform.value},scale: ${uniform.scale})').join(', ')}], textures: <SceneShaderTexture>[${shader.textures.map((texture) => 'SceneShaderTexture(name: ${encodeDartString(texture.name)},asset: ${encodeDartString(texture.asset)})').join(', ')}])';
 
 String _encodeLayout(SceneLayout layout) =>
-    'const SceneLayout(direction: SceneLayoutDirection.${layout.direction.name}, padding: ${layout.padding}, gap: ${layout.gap}, mainAlignment: SceneMainAlignment.${layout.mainAlignment.name}, crossAlignment: SceneCrossAlignment.${layout.crossAlignment.name}, clip: ${layout.clip}, wrap: ${layout.wrap})';
+    'SceneLayout(direction: SceneLayoutDirection.${layout.direction.name}, padding: ${layout.padding}, gap: ${layout.gap}, mainAlignment: SceneMainAlignment.${layout.mainAlignment.name}, crossAlignment: SceneCrossAlignment.${layout.crossAlignment.name}, clip: ${layout.clip}, wrap: ${layout.wrap})';
 String _encodeSizing(SceneSizing size) =>
-    'const SceneSizing(width: ${size.width}, height: ${size.height}, flex: ${size.flex}, widthMode: SceneSizeMode.${size.widthMode.name}, heightMode: SceneSizeMode.${size.heightMode.name}, minWidth: ${size.minWidth}, minHeight: ${size.minHeight}, maxWidth: ${size.maxWidth}, maxHeight: ${size.maxHeight})';
+    'SceneSizing(width: ${size.width}, height: ${size.height}, flex: ${size.flex}, widthMode: SceneSizeMode.${size.widthMode.name}, heightMode: SceneSizeMode.${size.heightMode.name}, minWidth: ${size.minWidth}, minHeight: ${size.minHeight}, maxWidth: ${size.maxWidth}, maxHeight: ${size.maxHeight})';
 
 String _encodeMotionTiming(SceneMotionTiming timing) =>
-    'const SceneMotionTiming(durationMs: ${timing.durationMs},delayMs: ${timing.delayMs},curve: ${timing.curve == null ? 'null' : 'SceneCubicBezier(${timing.curve!.x1},${timing.curve!.y1},${timing.curve!.x2},${timing.curve!.y2})'})';
+    'SceneMotionTiming(durationMs: ${timing.durationMs},delayMs: ${timing.delayMs},curve: ${timing.curve == null ? 'null' : 'SceneCubicBezier(${timing.curve!.x1},${timing.curve!.y1},${timing.curve!.x2},${timing.curve!.y2})'})';
 
 String _encodeConditionLiteral(SceneCondition condition) {
   return switch (condition) {
@@ -126,7 +131,7 @@ String _encodeConditionLiteral(SceneCondition condition) {
 }
 
 String _encodeStyle(SceneStyle style) =>
-    '''const SceneStyle(
+    '''SceneStyle(
     fill: ${_encodeColorLiteral(style.fill)}, gradientEnd: ${style.gradientEnd == null ? 'null' : _encodeColorLiteral(style.gradientEnd!)},
     gradientAngle: ${style.gradientAngle}, border: ${_encodeColorLiteral(style.border)}, borderWidth: ${style.borderWidth},
     radius: ${style.radius}, shadow: ${_encodeColorLiteral(style.shadow)}, shadowBlur: ${style.shadowBlur}, shadowY: ${style.shadowY},

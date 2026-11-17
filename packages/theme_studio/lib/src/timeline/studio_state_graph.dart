@@ -197,7 +197,7 @@ class _TransitionEdgeRow extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    getSceneConditionLabel(transition.from),
+                    getSceneConditionLabel(transition.source),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ).small(),
@@ -208,7 +208,7 @@ class _TransitionEdgeRow extends StatelessWidget {
                 ),
                 Expanded(
                   child: Text(
-                    getSceneConditionLabel(transition.to),
+                    getSceneConditionLabel(transition.target),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ).small(),
@@ -236,11 +236,11 @@ class _TransitionDialog extends StatefulWidget {
 }
 
 class _TransitionDialogState extends State<_TransitionDialog> {
-  late SceneCondition _from =
-      widget.initial?.from ??
+  late SceneCondition _source =
+      widget.initial?.source ??
       const ScenePredicateCondition(ScenePredicate.isAuthSubmitting);
-  late SceneCondition _to =
-      widget.initial?.to ??
+  late SceneCondition _target =
+      widget.initial?.target ??
       const ScenePredicateCondition(ScenePredicate.isAuthError);
   late SceneStateEffect _effect =
       widget.initial?.effect ?? SceneStateEffect.shake;
@@ -264,15 +264,16 @@ class _TransitionDialogState extends State<_TransitionDialog> {
           ? null
           : getIntegerInput('Duration', _duration.text);
       final delay = getIntegerInput('Delay', _delay.text);
-      if ((duration != null && (duration < 0 || duration > 60000)) ||
+      if ((duration != null &&
+              (duration < 0 || duration > maxSceneMotionTimeMs)) ||
           delay < 0 ||
-          delay > 60000) {
+          delay > maxSceneMotionTimeMs) {
         throw const FormatException('Timing must be in 0..60000 ms.');
       }
       Navigator.of(context).pop(
         SceneStateTransition(
-          from: _from,
-          to: _to,
+          source: _source,
+          target: _target,
           effect: _effect,
           timing: SceneMotionTiming(
             durationMs: duration,
@@ -301,15 +302,15 @@ class _TransitionDialogState extends State<_TransitionDialog> {
               const Text('From').small().semiBold(),
               const Gap(6),
               StudioConditionEditor(
-                value: _from,
-                onChanged: (value) => setState(() => _from = value),
+                value: _source,
+                onChanged: (value) => setState(() => _source = value),
               ),
               const Gap(16),
               const Text('To').small().semiBold(),
               const Gap(6),
               StudioConditionEditor(
-                value: _to,
-                onChanged: (value) => setState(() => _to = value),
+                value: _target,
+                onChanged: (value) => setState(() => _target = value),
               ),
               const Gap(16),
               StudioEnumSelect(

@@ -46,30 +46,16 @@ class PresetBackgroundRenderer extends BackgroundRenderer {
   ];
 
   @override
-  Widget build(BuildContext context, SceneBackground background) => ClipRect(
-    child: ImageFiltered(
-      enabled: background.blurSigma > 0,
-      imageFilter: ui.ImageFilter.blur(
-        sigmaX: background.blurSigma,
-        sigmaY: background.blurSigma,
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          PresetEnvironment(
-            refraction: refraction.getValue(background),
-            density: density.getValue(background),
-            speed: speed.getValue(background),
-            dispersion: dispersion.getValue(background),
-          ),
-          ColoredBox(
-            color: Color(background.color)
-                .withValues(alpha: background.scrimOpacity),
-          ),
-        ],
-      ),
-    ),
-  );
+  Widget build(BuildContext context, SceneBackground background) =>
+      SceneBackgroundEffects(
+        background: background,
+        child: PresetEnvironment(
+          refraction: refraction.getValue(background),
+          density: density.getValue(background),
+          speed: speed.getValue(background),
+          dispersion: dispersion.getValue(background),
+        ),
+      );
 }
 
 /// One bounded raster supplies both the artwork and the water's texture, so
@@ -107,8 +93,8 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
   bool _visible = true;
 
   Duration _getWeatherDuration() {
-    final safeSpeed = widget.speed > 0 ? widget.speed : 1.0;
-    return Duration(milliseconds: (120000 / safeSpeed).round());
+    assert(widget.speed > 0, 'PresetEnvironment speed must be positive.');
+    return Duration(milliseconds: (120000 / widget.speed).round());
   }
 
   @override

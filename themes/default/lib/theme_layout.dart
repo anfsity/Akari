@@ -201,16 +201,7 @@ const terraceLayout = ThemeLayoutDefinition(
         renderOrder: 40,
         focusOrder: 40,
         motion: SceneMotionPreset.hoverLift,
-        visibleWhen: SceneAll([
-          _awake,
-          SceneAny([
-            ScenePredicateCondition(ScenePredicate.isAuthPrompting),
-            ScenePredicateCondition(ScenePredicate.isAuthSubmitting),
-            ScenePredicateCondition(ScenePredicate.isSessionSelection),
-            ScenePredicateCondition(ScenePredicate.isAuthError),
-            ScenePredicateCondition(ScenePredicate.isServiceUnavailable),
-          ]),
-        ]),
+        visibleWhen: primaryActionVisibilityCondition,
         interactive: true,
       ),
     ),

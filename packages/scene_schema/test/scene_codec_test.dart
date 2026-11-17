@@ -90,8 +90,8 @@ void main() {
     () {
       final base = decodeSceneDocument(_scene);
       const rule = SceneStateTransition(
-        from: ScenePredicateCondition(ScenePredicate.isAuthSubmitting),
-        to: SceneAll([
+        source: ScenePredicateCondition(ScenePredicate.isAuthSubmitting),
+        target: SceneAll([
           ScenePredicateCondition(ScenePredicate.isAuthError),
           ScenePredicateCondition(ScenePredicate.hasSelectedUser),
         ]),

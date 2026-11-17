@@ -193,8 +193,8 @@ void main() {
       original.copyWith(
         transitions: const [
           SceneStateTransition(
-            from: ScenePredicateCondition(ScenePredicate.isDormant),
-            to: ScenePredicateCondition(ScenePredicate.isAuthError),
+            source: ScenePredicateCondition(ScenePredicate.isDormant),
+            target: ScenePredicateCondition(ScenePredicate.isAuthError),
             effect: SceneStateEffect.shake,
           ),
         ],

@@ -354,15 +354,22 @@ SceneNode _decodeNode(
               : _getList(json, 'transitions'))
         (() {
           final rule = _getMapValue(raw, 'transitions[]');
-          final from = _decodeCondition(rule['from'], 'transition.from');
-          final to = _decodeCondition(rule['to'], 'transition.to');
-          if (from == null || to == null)
+          final source = _decodeCondition(
+            rule['source'] ?? rule['from'],
+            'transition.source',
+          );
+          final target = _decodeCondition(
+            rule['target'] ?? rule['to'],
+            'transition.target',
+          );
+          if (source == null || target == null) {
             throw const FormatException(
               'Transitions require source and target conditions.',
             );
+          }
           return SceneStateTransition(
-            from: from,
-            to: to,
+            source: source,
+            target: target,
             effect: _getEnumValue(
               SceneStateEffect.values,
               _getString(rule, 'effect'),
@@ -553,8 +560,8 @@ Map<String, dynamic> _encodeNode(SceneNode node) {
       'transitions': [
         for (final rule in node.transitions)
           {
-            'from': _encodeCondition(rule.from),
-            'to': _encodeCondition(rule.to),
+            'source': _encodeCondition(rule.source),
+            'target': _encodeCondition(rule.target),
             'effect': rule.effect.name,
             if (!rule.timing.isDefault)
               'timing': _encodeMotionTiming(rule.timing),
@@ -592,13 +599,14 @@ List<SceneMotionTrack> _decodeTracks(Map<String, dynamic> json) {
           final time = _getInt(frame, 'timeMs');
           final value = _getDouble(frame, 'value');
           if (time <= previous ||
-              time > 60000 ||
-              value.abs() > 100000 ||
+              time > maxSceneMotionTimeMs ||
+              value.abs() > maxSceneKeyframeMagnitude ||
               (property == SceneMotionProperty.opacity &&
-                  (value < 0 || value > 1)))
+                  (value < 0 || value > 1))) {
             throw const FormatException(
               'Keyframes require increasing times in 0..60000 and valid property values.',
             );
+          }
           previous = time;
           frames.add(
             SceneKeyframe(
@@ -641,10 +649,7 @@ SceneAsset _decodeAsset(Map<String, dynamic> json) {
 }
 
 void _validateAssetPath(String path) {
-  if (path.contains('..') ||
-      path.contains(r'\') ||
-      path.endsWith('/') ||
-      (!path.startsWith('assets/') && !path.startsWith('packages/'))) {
+  if (!isSceneAssetPath(path)) {
     throw FormatException('Invalid scene asset path: $path');
   }
 }
@@ -676,9 +681,10 @@ SceneMotionTiming _decodeMotionTiming(Map<String, dynamic> json) {
       ? null
       : _getInt(json, 'durationMs');
   final delay = _getInt(json, 'delayMs', fallback: 0);
-  if ((duration != null && (duration < 0 || duration > 60000)) ||
+  if ((duration != null &&
+          (duration < 0 || duration > maxSceneMotionTimeMs)) ||
       delay < 0 ||
-      delay > 60000) {
+      delay > maxSceneMotionTimeMs) {
     throw const FormatException(
       'Motion duration and delay must be in 0..60000 ms.',
     );

@@ -233,7 +233,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       if (file != null && file.existsSync()) {
         try {
           final bytes = await file.readAsBytes();
-          seed = await extractSeedFromBytes(bytes);
+          seed = await decodeSeedColor(bytes);
         } on Object {
           seed = null;
         }

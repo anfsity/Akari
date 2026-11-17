@@ -1,3 +1,5 @@
+import 'collections.dart';
+
 /// A float's source is explicit; vectors occupy consecutive float slots in
 /// compiler reflection order. Scale/offset also apply to dynamic bindings.
 enum SceneUniformSource {
@@ -81,8 +83,8 @@ class SceneShader {
   bool operator ==(Object other) =>
       other is SceneShader &&
       other.asset == asset &&
-      _shaderListEquals(other.uniforms, uniforms) &&
-      _shaderListEquals(other.textures, textures);
+      listEquals(other.uniforms, uniforms) &&
+      listEquals(other.textures, textures);
 
   @override
   int get hashCode => Object.hash(
@@ -90,13 +92,4 @@ class SceneShader {
     Object.hashAll(uniforms),
     Object.hashAll(textures),
   );
-}
-
-bool _shaderListEquals<T>(List<T> a, List<T> b) {
-  if (identical(a, b)) return true;
-  if (a.length != b.length) return false;
-  for (var index = 0; index < a.length; index++) {
-    if (a[index] != b[index]) return false;
-  }
-  return true;
 }

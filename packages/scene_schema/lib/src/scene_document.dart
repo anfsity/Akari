@@ -1,8 +1,11 @@
+import 'collections.dart';
 import 'scene_shader.dart';
 
 enum SceneCanvasFit { cover, contain, reflow }
 
 const currentSceneVersion = 3;
+const maxSceneMotionTimeMs = 60000;
+const maxSceneKeyframeMagnitude = 100000.0;
 
 enum SceneSizeMode { proportional, hug, fill }
 
@@ -399,7 +402,7 @@ final class SceneAll extends SceneCondition {
 
   @override
   bool operator ==(Object other) =>
-      other is SceneAll && _listEquals(other.conditions, conditions);
+      other is SceneAll && listEquals(other.conditions, conditions);
 
   @override
   int get hashCode => Object.hash(SceneAll, Object.hashAll(conditions));
@@ -412,7 +415,7 @@ final class SceneAny extends SceneCondition {
 
   @override
   bool operator ==(Object other) =>
-      other is SceneAny && _listEquals(other.conditions, conditions);
+      other is SceneAny && listEquals(other.conditions, conditions);
 
   @override
   int get hashCode => Object.hash(SceneAny, Object.hashAll(conditions));
@@ -464,28 +467,40 @@ enum SceneMotionPreset {
 
 enum SceneStateEffect { shake, pulse }
 
+/// Shared sign-in/recovery visibility rule used by the primary action slot.
+const SceneCondition primaryActionVisibilityCondition = SceneAll([
+  SceneNot(ScenePredicateCondition(ScenePredicate.isDormant)),
+  SceneAny([
+    ScenePredicateCondition(ScenePredicate.isAuthPrompting),
+    ScenePredicateCondition(ScenePredicate.isAuthSubmitting),
+    ScenePredicateCondition(ScenePredicate.isSessionSelection),
+    ScenePredicateCondition(ScenePredicate.isAuthError),
+    ScenePredicateCondition(ScenePredicate.isServiceUnavailable),
+  ]),
+]);
+
 class SceneStateTransition {
   const SceneStateTransition({
-    required this.from,
-    required this.to,
+    required this.source,
+    required this.target,
     required this.effect,
     this.timing = const SceneMotionTiming(),
   });
-  final SceneCondition from;
-  final SceneCondition to;
+  final SceneCondition source;
+  final SceneCondition target;
   final SceneStateEffect effect;
   final SceneMotionTiming timing;
 
   @override
   bool operator ==(Object other) =>
       other is SceneStateTransition &&
-      other.from == from &&
-      other.to == to &&
+      other.source == source &&
+      other.target == target &&
       other.effect == effect &&
       other.timing == timing;
 
   @override
-  int get hashCode => Object.hash(from, to, effect, timing);
+  int get hashCode => Object.hash(source, target, effect, timing);
 }
 
 /// State-entry responses and authored edges use one crossing evaluator.
@@ -499,16 +514,17 @@ SceneStateTransition? findSceneStateTransition(
   for (final rule in [
     for (final entry in node.stateEffects.entries)
       SceneStateTransition(
-        from: SceneNot(ScenePredicateCondition(entry.key)),
-        to: ScenePredicateCondition(entry.key),
+        source: SceneNot(ScenePredicateCondition(entry.key)),
+        target: ScenePredicateCondition(entry.key),
         effect: entry.value,
       ),
     ...node.transitions,
   ]) {
-    if (evaluateSceneCondition(rule.from, previous) &&
-        !evaluateSceneCondition(rule.to, previous) &&
-        evaluateSceneCondition(rule.to, current))
+    if (evaluateSceneCondition(rule.source, previous) &&
+        !evaluateSceneCondition(rule.target, previous) &&
+        evaluateSceneCondition(rule.target, current)) {
       match = rule;
+    }
   }
   return match;
 }
@@ -586,7 +602,7 @@ class SceneMotionTrack {
   bool operator ==(Object other) =>
       other is SceneMotionTrack &&
       other.property == property &&
-      _listEquals(other.keyframes, keyframes);
+      listEquals(other.keyframes, keyframes);
 
   @override
   int get hashCode => Object.hash(property, Object.hashAll(keyframes));
@@ -975,7 +991,7 @@ class SceneNode {
       other.parentId == parentId &&
       other.layout == layout &&
       other.sizing == sizing &&
-      _listEquals(other.breakpoints, breakpoints) &&
+      listEquals(other.breakpoints, breakpoints) &&
       other.styleToken == styleToken &&
       other.asset == asset &&
       other.primitive == primitive &&
@@ -985,9 +1001,9 @@ class SceneNode {
       other.focusOrder == focusOrder &&
       other.motion == motion &&
       other.motionTiming == motionTiming &&
-      _listEquals(other.tracks, tracks) &&
+      listEquals(other.tracks, tracks) &&
       _mapEquals(other.stateEffects, stateEffects) &&
-      _listEquals(other.transitions, transitions) &&
+      listEquals(other.transitions, transitions) &&
       other.visibleWhen == visibleWhen &&
       other.interactive == interactive &&
       _mapEquals(other.properties, properties);
@@ -1101,10 +1117,10 @@ class SceneDocument {
       other.version == version &&
       other.canvas == canvas &&
       other.background == background &&
-      _listEquals(other.nodes, nodes) &&
+      listEquals(other.nodes, nodes) &&
       _mapEquals(other.themeProperties, themeProperties) &&
       _mapEquals(other.styleTokens, styleTokens) &&
-      _listEquals(other.guides, guides);
+      listEquals(other.guides, guides);
 
   @override
   int get hashCode => Object.hash(
@@ -1119,29 +1135,33 @@ class SceneDocument {
   );
 }
 
+bool isSceneAssetPath(String path) =>
+    !path.contains('..') &&
+    !path.contains(r'\') &&
+    !path.endsWith('/') &&
+    (path.startsWith('assets/') || path.startsWith('packages/'));
+
+double clampSceneKeyframeValue(SceneMotionProperty property, double value) =>
+    property == SceneMotionProperty.opacity
+    ? value.clamp(0.0, 1.0)
+    : value.clamp(-maxSceneKeyframeMagnitude, maxSceneKeyframeMagnitude);
+
 Set<String> getReferencedSceneAssets(SceneDocument document) => {
   if (document.background.asset != null) document.background.asset!,
   if (document.background.shader case final shader?) ...[
     shader.asset,
     for (final texture in shader.textures) texture.asset,
   ],
-  ...document.themeProperties.values,
+  for (final value in document.themeProperties.values)
+    if (isSceneAssetPath(value)) value,
   for (final style in document.styleTokens.values)
     if (style.fontAsset != null) style.fontAsset!,
   for (final node in document.nodes) ...[
-    ...node.properties.values,
+    for (final value in node.properties.values)
+      if (isSceneAssetPath(value)) value,
     if (node.asset != null) node.asset!.path,
   ],
 };
-
-bool _listEquals<T>(List<T> a, List<T> b) {
-  if (identical(a, b)) return true;
-  if (a.length != b.length) return false;
-  for (var index = 0; index < a.length; index++) {
-    if (a[index] != b[index]) return false;
-  }
-  return true;
-}
 
 bool _mapEquals<K, V>(Map<K, V> a, Map<K, V> b) {
   if (identical(a, b)) return true;

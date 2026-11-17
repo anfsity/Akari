@@ -17,7 +17,7 @@ const dateTimeComponent = ThemeComponentDefinition(
   properties: [clockVariant],
 );
 
-String formatClockTime(DateTime time) {
+String getFormattedClockTime(DateTime time) {
   return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
 }
 
@@ -78,7 +78,7 @@ class ThemeClock extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
-                formatClockTime(now),
+                getFormattedClockTime(now),
                 maxLines: 1,
                 style: _getClockStyle(context, 120, FontWeight.w300),
               ),
