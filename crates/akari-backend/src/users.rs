@@ -15,27 +15,6 @@ trait AccountsService {
     fn list_cached_users(&self) -> zbus::Result<Vec<OwnedObjectPath>>;
 }
 
-#[proxy(
-    default_service = "org.freedesktop.Accounts",
-    interface = "org.freedesktop.Accounts.User"
-)]
-trait AccountsServiceUser {
-    #[zbus(property)]
-    fn user_name(&self) -> zbus::Result<String>;
-
-    #[zbus(property)]
-    fn real_name(&self) -> zbus::Result<String>;
-
-    #[zbus(property)]
-    fn icon_file(&self) -> zbus::Result<String>;
-
-    #[zbus(property)]
-    fn shell(&self) -> zbus::Result<String>;
-
-    #[zbus(property)]
-    fn system_account(&self) -> zbus::Result<bool>;
-}
-
 #[derive(Debug, Error)]
 pub enum UserCatalogError {
     #[error("could not connect to the system D-Bus")]
@@ -60,7 +39,7 @@ pub(crate) struct SystemBus {
 }
 
 impl SystemBus {
-    pub(crate) async fn get_connection(&self) -> zbus::Result<zbus::Connection> {
+    pub(crate) async fn connect(&self) -> zbus::Result<zbus::Connection> {
         // Serialize only connection initialization/replacement. The returned
         // clone lets callers perform D-Bus I/O without holding this mutex.
         let mut cached = self.connection.lock().await;
@@ -78,22 +57,21 @@ impl SystemBus {
 
 /// Reads login users from AccountsService without parsing NSS or passwd files.
 ///
-/// User properties are fetched once asynchronously without property caching.
-#[derive(Clone, Debug, Default)]
+/// User properties are fetched in a single `Properties.GetAll` call per user.
+#[derive(Clone, Debug)]
 pub struct UserCatalog {
     system_bus: SystemBus,
 }
 
 impl UserCatalog {
-    #[cfg(not(feature = "mock-power"))]
-    pub(crate) fn system_bus(&self) -> &SystemBus {
-        &self.system_bus
+    pub(crate) fn new(system_bus: SystemBus) -> Self {
+        Self { system_bus }
     }
 
     pub async fn list(&self) -> Result<Vec<UserEntry>, UserCatalogError> {
         let connection = self
             .system_bus
-            .get_connection()
+            .connect()
             .await
             .map_err(UserCatalogError::Connect)?;
         let accounts = AccountsServiceProxy::new(&connection)
@@ -131,7 +109,9 @@ async fn read_user(
         source: Box::new(source),
     };
 
-    let proxy = AccountsServiceUserProxy::builder(connection)
+    let proxy = zbus::fdo::PropertiesProxy::builder(connection)
+        .destination("org.freedesktop.Accounts")
+        .map_err(map_err)?
         .path(path.as_ref())
         .map_err(map_err)?
         .cache_properties(CacheProperties::No)
@@ -139,18 +119,36 @@ async fn read_user(
         .await
         .map_err(map_err)?;
 
-    let username = proxy.user_name().await.map_err(map_err)?;
-    let real_name = proxy.real_name().await.map_err(map_err)?;
-    let icon_file = proxy.icon_file().await.map_err(map_err)?;
-    let shell = proxy.shell().await.map_err(map_err)?;
-    let system_account = proxy.system_account().await.map_err(map_err)?;
+    let properties = proxy
+        .get_all(zbus::names::InterfaceName::from_static_str_unchecked(
+            "org.freedesktop.Accounts.User",
+        ))
+        .await
+        .map_err(|error| map_err(error.into()))?;
+
+    let system_account = properties
+        .get("SystemAccount")
+        .ok_or_else(|| map_err(zbus::Error::MissingField))
+        .and_then(|value| bool::try_from(value).map_err(|error| map_err(error.into())))?;
+    if system_account {
+        return Ok(None);
+    }
+
+    let read_str = |name: &str| -> Result<String, UserObjectError> {
+        let value = properties
+            .get(name)
+            .ok_or_else(|| map_err(zbus::Error::MissingField))?;
+        <&str>::try_from(value)
+            .map(str::to_owned)
+            .map_err(|error| map_err(error.into()))
+    };
 
     Ok(find_user_entry(
-        username,
-        real_name,
-        icon_file,
-        shell,
-        system_account,
+        read_str("UserName")?,
+        read_str("RealName")?,
+        read_str("IconFile")?,
+        read_str("Shell")?,
+        false,
     ))
 }
 

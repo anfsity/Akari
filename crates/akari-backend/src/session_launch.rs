@@ -32,7 +32,7 @@ struct SessionInvocation {
     command: Vec<String>,
 }
 
-pub fn get_session_launch(session: &SessionEntry) -> io::Result<(Vec<String>, Vec<String>)> {
+pub fn create_session_launch(session: &SessionEntry) -> io::Result<(Vec<String>, Vec<String>)> {
     let executable = env::current_exe()?
         .into_os_string()
         .into_string()

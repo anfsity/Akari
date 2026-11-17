@@ -15,7 +15,7 @@ use super::{
 use crate::{
     greetd::{GreetdError, GreetdResponse, GreetdTransport},
     session_catalog::SessionEntry,
-    session_launch::get_session_launch,
+    session_launch::create_session_launch,
     state::{AuthState, StateEvent},
 };
 
@@ -181,7 +181,7 @@ pub(super) async fn handle_start_session(
 ) -> fdo::Result<()> {
     let cancellation =
         actor.validate_owned_stage(attempt_id, caller, AuthState::ResolvingSession)?;
-    let (command, environment) = match get_session_launch(&session) {
+    let (command, environment) = match create_session_launch(&session) {
         Ok(launch) => launch,
         Err(error) => {
             let detail =

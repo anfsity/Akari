@@ -12,7 +12,7 @@ use zbus::{
 use crate::{
     auth::{AuthActorHandle, AuthActorTask},
     session_catalog::{SessionCatalog, SessionCatalogError},
-    users::UserCatalog,
+    users::{SystemBus, UserCatalog},
 };
 
 pub const BUS_NAME: &str = "io.akari.Greeter";
@@ -24,19 +24,25 @@ pub struct GreeterService {
     auth: AuthActorHandle,
     handoff: Arc<Notify>,
     sessions: SessionCatalog,
+    #[cfg(not(feature = "mock-power"))]
+    system_bus: SystemBus,
     users: UserCatalog,
 }
 
 impl GreeterService {
     /// Creates a service whose successful session handoff notifies the backend runtime.
     pub fn new(handoff: Arc<Notify>) -> (Self, AuthActorTask) {
-        let (auth, task) = AuthActorHandle::spawn();
+        let (auth, task) = AuthActorHandle::start();
+        let system_bus = SystemBus::default();
+        let users = UserCatalog::new(system_bus.clone());
         (
             Self {
                 auth,
                 handoff,
                 sessions: SessionCatalog::default(),
-                users: UserCatalog::default(),
+                #[cfg(not(feature = "mock-power"))]
+                system_bus,
+                users,
             },
             task,
         )
@@ -45,10 +51,12 @@ impl GreeterService {
 
 #[interface(name = "io.akari.Greeter1")]
 impl GreeterService {
+    #[zbus(out_args("state", "detail"))]
     async fn get_state(&self) -> fdo::Result<(String, String)> {
         self.auth.get_state()
     }
 
+    #[zbus(out_args("users"))]
     async fn list_users(&self) -> fdo::Result<Vec<(String, String, String)>> {
         let users = self.users.list().await.map_err(|error| {
             tracing::warn!(operation = "ListUsers", error = ?error, "user catalog query failed");
@@ -60,6 +68,7 @@ impl GreeterService {
             .collect())
     }
 
+    #[zbus(out_args("sessions"))]
     async fn list_sessions(&self) -> fdo::Result<Vec<(String, String, Vec<String>)>> {
         let sessions = self.sessions.clone();
         // Filesystem scans and executable checks are synchronous. Keep them
@@ -78,6 +87,7 @@ impl GreeterService {
             .collect())
     }
 
+    #[zbus(out_args("attempt_id"))]
     async fn begin_authentication(
         &self,
         #[zbus(header)] header: Header<'_>,
@@ -200,14 +210,9 @@ impl GreeterService {
         }
         #[cfg(not(feature = "mock-power"))]
         {
-            let connection = self
-                .users
-                .system_bus()
-                .get_connection()
-                .await
-                .map_err(|error| {
-                    fdo::Error::Failed(format!("could not connect to system D-Bus: {error}"))
-                })?;
+            let connection = self.system_bus.connect().await.map_err(|error| {
+                fdo::Error::Failed(format!("could not connect to system D-Bus: {error}"))
+            })?;
             let proxy = zbus::Proxy::new(
                 &connection,
                 "org.freedesktop.login1",

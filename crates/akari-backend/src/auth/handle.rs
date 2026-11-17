@@ -33,7 +33,7 @@ pub(crate) struct AuthActorHandle {
 
 impl AuthActorHandle {
     /// Starts the actor and returns the D-Bus-facing command and snapshot handle.
-    pub(crate) fn spawn() -> (Self, AuthActorTask) {
+    pub(crate) fn start() -> (Self, AuthActorTask) {
         let (commands, receiver) = mpsc::channel(COMMAND_BUFFER);
         let (snapshot_sender, snapshot) = watch::channel(AuthSnapshot::idle());
         let (control_sender, control) = watch::channel(None);
@@ -374,7 +374,7 @@ mod tests {
 
     #[tokio::test]
     async fn actor_panic_is_observable_and_queries_fail() {
-        let (actor, mut runtime) = AuthActorHandle::spawn();
+        let (actor, mut runtime) = AuthActorHandle::start();
         actor
             .commands
             .send(super::AuthCommand::Panic)
@@ -386,7 +386,7 @@ mod tests {
 
     #[tokio::test]
     async fn dropping_handles_stops_actor() {
-        let (actor, mut runtime) = AuthActorHandle::spawn();
+        let (actor, mut runtime) = AuthActorHandle::start();
         drop(actor);
         tokio::time::timeout(std::time::Duration::from_secs(1), &mut runtime.task)
             .await
@@ -396,7 +396,7 @@ mod tests {
 
     #[tokio::test]
     async fn stopping_actor_closes_queries_and_commands() {
-        let (actor, mut runtime) = AuthActorHandle::spawn();
+        let (actor, mut runtime) = AuthActorHandle::start();
         runtime.stop();
         (&mut runtime.task).await.unwrap();
         assert!(actor.get_state().is_err());
