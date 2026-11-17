@@ -20,15 +20,6 @@ class StudioStateGraph extends StatelessWidget {
   final StudioPreviewScenario scenario;
   final void Function(bool, StudioPreviewScenario) onSelect;
 
-  Widget _state(String label, bool dormant, StudioPreviewScenario scenario) =>
-      Button(
-        key: ValueKey('graph-$label'),
-        style: this.dormant == dormant && (dormant || this.scenario == scenario)
-            ? const ButtonStyle.primary()
-            : const ButtonStyle.outline(),
-        onPressed: () => onSelect(dormant, scenario),
-        child: Text(label),
-      );
   Future<void> _editTransition(BuildContext context, int? index) async {
     if (editor.selectedIds.isEmpty || !editor.tryApplyDraft()) return;
     final node = editor.selectedNode;
@@ -57,6 +48,17 @@ class StudioStateGraph extends StatelessWidget {
     editor.updateNode(current.copyWith(transitions: rules));
   }
 
+  void _removeTransition(String nodeId, int index) {
+    if (!editor.tryApplyDraft()) return;
+    final current = editor.document.nodes
+        .where((entry) => entry.id == nodeId)
+        .firstOrNull;
+    if (current == null || index >= current.transitions.length) return;
+    editor.updateNode(
+      current.copyWith(transitions: [...current.transitions]..removeAt(index)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasSelection = editor.selectedIds.isNotEmpty;
@@ -71,21 +73,10 @@ class StudioStateGraph extends StatelessWidget {
               .small()
               .semiBold(),
           const Gap(8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _state('Dormant', true, StudioPreviewScenario.password),
-                const Gap(6),
-                _state('Login', false, StudioPreviewScenario.password),
-                const Gap(6),
-                _state('Submitting', false, StudioPreviewScenario.submitting),
-                const Gap(6),
-                _state('Success', false, StudioPreviewScenario.success),
-                const Gap(6),
-                _state('Error', false, StudioPreviewScenario.error),
-              ],
-            ),
+          _StatePreviewBar(
+            dormant: dormant,
+            scenario: scenario,
+            onSelect: onSelect,
           ),
           const Gap(8),
           Row(
@@ -120,70 +111,11 @@ class StudioStateGraph extends StatelessWidget {
                 : ListView(
                     children: [
                       for (var i = 0; i < transitions.length; i++)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: OutlineButton(
-                                  key: ValueKey('graph-edge-$i'),
-                                  onPressed: () => _editTransition(context, i),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          getSceneConditionLabel(
-                                            transitions[i].from,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ).small(),
-                                      ),
-                                      const Padding(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                        ),
-                                        child: Icon(
-                                          LucideIcons.arrowRight,
-                                          size: 16,
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: Text(
-                                          getSceneConditionLabel(
-                                            transitions[i].to,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ).small(),
-                                      ),
-                                      const Gap(8),
-                                      Text(transitions[i].effect.name).small(),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              GhostButton(
-                                onPressed: () {
-                                  if (!editor.tryApplyDraft()) return;
-                                  final current = editor.document.nodes
-                                      .where((entry) => entry.id == node.id)
-                                      .firstOrNull;
-                                  if (current == null ||
-                                      i >= current.transitions.length) {
-                                    return;
-                                  }
-                                  editor.updateNode(
-                                    current.copyWith(
-                                      transitions: [...current.transitions]
-                                        ..removeAt(i),
-                                    ),
-                                  );
-                                },
-                                child: const Icon(LucideIcons.x, size: 14),
-                              ),
-                            ],
-                          ),
+                        _TransitionEdgeRow(
+                          index: i,
+                          transition: transitions[i],
+                          onEdit: () => _editTransition(context, i),
+                          onRemove: () => _removeTransition(node.id, i),
                         ),
                     ],
                   ),
@@ -195,6 +127,105 @@ class StudioStateGraph extends StatelessWidget {
       ),
     );
   }
+}
+
+class _StatePreviewBar extends StatelessWidget {
+  const _StatePreviewBar({
+    required this.dormant,
+    required this.scenario,
+    required this.onSelect,
+  });
+
+  final bool dormant;
+  final StudioPreviewScenario scenario;
+  final void Function(bool, StudioPreviewScenario) onSelect;
+
+  static const _states = [
+    ('Dormant', true, StudioPreviewScenario.password),
+    ('Login', false, StudioPreviewScenario.password),
+    ('Submitting', false, StudioPreviewScenario.submitting),
+    ('Success', false, StudioPreviewScenario.success),
+    ('Error', false, StudioPreviewScenario.error),
+  ];
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: [
+        for (var i = 0; i < _states.length; i++) ...[
+          if (i > 0) const Gap(6),
+          Button(
+            key: ValueKey('graph-${_states[i].$1}'),
+            style:
+                dormant == _states[i].$2 &&
+                    (dormant || scenario == _states[i].$3)
+                ? const ButtonStyle.primary()
+                : const ButtonStyle.outline(),
+            onPressed: () => onSelect(_states[i].$2, _states[i].$3),
+            child: Text(_states[i].$1),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _TransitionEdgeRow extends StatelessWidget {
+  const _TransitionEdgeRow({
+    required this.index,
+    required this.transition,
+    required this.onEdit,
+    required this.onRemove,
+  });
+
+  final int index;
+  final SceneStateTransition transition;
+  final VoidCallback onEdit;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Row(
+      children: [
+        Expanded(
+          child: OutlineButton(
+            key: ValueKey('graph-edge-$index'),
+            onPressed: onEdit,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    getSceneConditionLabel(transition.from),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ).small(),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Icon(LucideIcons.arrowRight, size: 16),
+                ),
+                Expanded(
+                  child: Text(
+                    getSceneConditionLabel(transition.to),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ).small(),
+                ),
+                const Gap(8),
+                Text(transition.effect.name).small(),
+              ],
+            ),
+          ),
+        ),
+        GhostButton(
+          onPressed: onRemove,
+          child: const Icon(LucideIcons.x, size: 14),
+        ),
+      ],
+    ),
+  );
 }
 
 class _TransitionDialog extends StatefulWidget {
@@ -300,10 +331,7 @@ class _TransitionDialogState extends State<_TransitionDialog> {
                   inputKey: const ValueKey('transition-delay'),
                 ),
               ),
-              if (_error != null) ...[
-                const Gap(8),
-                StudioFormError(_error!),
-              ],
+              if (_error != null) ...[const Gap(8), StudioFormError(_error!)],
             ],
           ),
         ),
