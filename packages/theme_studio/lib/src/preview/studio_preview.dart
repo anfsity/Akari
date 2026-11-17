@@ -128,7 +128,7 @@ class _StudioPreviewState extends State<StudioPreview>
   _NodeDrag? _drag;
   final _otherDrags = <_NodeDrag>[];
   Offset? _marqueeStart;
-  Offset? _marqueeEnd;
+  final _marqueeRect = ValueNotifier<Rect?>(null);
   Set<String> _marqueeSelection = {};
   List<double> _verticalGuides = [];
   List<double> _horizontalGuides = [];
@@ -289,13 +289,14 @@ class _StudioPreviewState extends State<StudioPreview>
       final moving = nodes
           .map((node) => geometry[node.id]!.bounds)
           .reduce((a, b) => a.expandToInclude(b));
+      final predicates = _getActivePredicates();
       final guides = calculateSmartGuides(
         moving: moving,
         targets: [
           for (final node in widget.document.nodes)
             if (!ids.contains(node.id) &&
                 node.id != drag.source.parentId &&
-                _isVisible(node))
+                _isVisible(node, predicates))
               geometry[node.id]!.bounds,
         ],
         canvasSize: drag.canvas.size,
@@ -427,6 +428,8 @@ class _StudioPreviewState extends State<StudioPreview>
     }
     if (widget.readOnly || widget.interactive) {
       _editingText = null;
+      _marqueeStart = null;
+      _marqueeRect.value = null;
       _clearDragState();
     } else if (_editingText case final editing?) {
       if (!widget.document.nodes.any((node) => node.id == editing.id)) {
@@ -456,6 +459,7 @@ class _StudioPreviewState extends State<StudioPreview>
   @override
   void dispose() {
     sceneFontFamilies.removeListener(_refreshFontGeometry);
+    _marqueeRect.dispose();
     _text.dispose();
     _textFocus.dispose();
     _wake.dispose();
@@ -477,15 +481,17 @@ class _StudioPreviewState extends State<StudioPreview>
     );
   }
 
-  bool _isVisible(SceneNode node) {
-    final predicates = _getPreviewPredicates(
-      _simulation,
-      widget.playbackElapsed == null
-          ? widget.dormant
-          : widget.transition.toDormant,
-    );
+  Set<ScenePredicate> _getActivePredicates() => _getPreviewPredicates(
+    _simulation,
+    widget.playbackElapsed == null
+        ? widget.dormant
+        : widget.transition.toDormant,
+  );
+
+  bool _isVisible(SceneNode node, [Set<ScenePredicate>? predicates]) {
+    final active = predicates ?? _getActivePredicates();
     if (node.visibleWhen != null &&
-        !evaluateSceneCondition(node.visibleWhen!, predicates)) {
+        !evaluateSceneCondition(node.visibleWhen!, active)) {
       return false;
     }
     return node.parentId == null ||
@@ -493,6 +499,7 @@ class _StudioPreviewState extends State<StudioPreview>
           widget.document.nodes.firstWhere(
             (parent) => parent.id == node.parentId,
           ),
+          active,
         );
   }
 
@@ -580,6 +587,87 @@ class _StudioPreviewState extends State<StudioPreview>
           if (_guideIndex == null) _guideDraft!,
         ];
 
+  Offset _normalizeCanvasPoint(Offset globalOffset, Size referenceSize) {
+    final canvas = _canvas.currentContext!.findRenderObject()! as RenderBox;
+    final position = canvas.globalToLocal(globalOffset);
+    return Offset(
+      position.dx / referenceSize.width,
+      position.dy / referenceSize.height,
+    );
+  }
+
+  ({ScenePlayback? playback, Animation<double> wake}) _resolvePlayback(
+    Set<ScenePredicate> predicates,
+  ) {
+    final elapsed = widget.playbackElapsed;
+    if (elapsed == null) {
+      return (playback: null, wake: _wake);
+    }
+    final playback = ScenePlayback(
+      elapsed: elapsed,
+      from: _getPreviewPredicates(
+        _sourceSimulation ??= StudioPreviewHost(
+          scenario: widget.transition.fromScenario,
+        ),
+        widget.transition.fromDormant,
+      ),
+      enterAll: widget.transition == StudioTransition.entrance,
+    );
+    final duration = widget.theme.tokens.mediumMotion.inMicroseconds;
+    final time = duration == 0
+        ? 1.0
+        : (elapsed.inMicroseconds / duration).clamp(0.0, 1.0);
+    final wake = AlwaysStoppedAnimation<double>(
+      widget.transition.fromDormant == widget.transition.toDormant
+          ? (widget.transition.toDormant ? 0 : 1)
+          : widget.transition.toDormant
+          ? 1 - time
+          : time,
+    );
+    return (playback: playback, wake: wake);
+  }
+
+  void _startMarquee(DragStartDetails details) {
+    _marqueeStart = details.localPosition;
+    _marqueeSelection = HardwareKeyboard.instance.isShiftPressed
+        ? {..._selectedIds}
+        : {};
+    _marqueeRect.value = Rect.fromPoints(
+      details.localPosition,
+      details.localPosition,
+    );
+  }
+
+  void _updateMarquee(DragUpdateDetails details) {
+    final start = _marqueeStart;
+    if (start == null) return;
+    _marqueeRect.value = Rect.fromPoints(start, details.localPosition);
+  }
+
+  void _commitMarquee(
+    SceneDocument document,
+    Map<String, SceneNodeGeometry> geometry,
+    Set<ScenePredicate> predicates,
+  ) {
+    final rect = _marqueeRect.value;
+    _marqueeStart = null;
+    _marqueeRect.value = null;
+    if (rect == null) return;
+    final ids = {
+      ..._marqueeSelection,
+      for (final node in document.nodes)
+        if (_isVisible(node, predicates) &&
+            rect.overlaps(geometry[node.id]!.bounds))
+          node.id,
+    };
+    widget.onSelectNodes?.call(ids);
+  }
+
+  void _cancelMarquee() {
+    _marqueeStart = null;
+    _marqueeRect.value = null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final document = _getPreviewDocument();
@@ -590,40 +678,8 @@ class _StudioPreviewState extends State<StudioPreview>
           document.canvas.referenceHeight.toDouble(),
         );
     final geometry = _getGeometry(document);
-    final predicates = _getPreviewPredicates(
-      _simulation,
-      widget.playbackElapsed == null
-          ? widget.dormant
-          : widget.transition.toDormant,
-    );
-    final elapsed = widget.playbackElapsed;
-    final playback = elapsed == null
-        ? null
-        : ScenePlayback(
-            elapsed: elapsed,
-            from: _getPreviewPredicates(
-              _sourceSimulation ??= StudioPreviewHost(
-                scenario: widget.transition.fromScenario,
-              ),
-              widget.transition.fromDormant,
-            ),
-            enterAll: widget.transition == StudioTransition.entrance,
-          );
-    final duration = widget.theme.tokens.mediumMotion.inMicroseconds;
-    final time = elapsed == null
-        ? 0.0
-        : duration == 0
-        ? 1.0
-        : (elapsed.inMicroseconds / duration).clamp(0.0, 1.0);
-    final wake = elapsed == null
-        ? _wake
-        : AlwaysStoppedAnimation<double>(
-            widget.transition.fromDormant == widget.transition.toDormant
-                ? (widget.transition.toDormant ? 0 : 1)
-                : widget.transition.toDormant
-                ? 1 - time
-                : time,
-          );
+    final predicates = _getActivePredicates();
+    final playback = _resolvePlayback(predicates);
     return StudioViewport(
       presenting: widget.presenting,
       input: widget.preferences.input,
@@ -635,220 +691,120 @@ class _StudioPreviewState extends State<StudioPreview>
       onZoom: widget.onZoom ?? (_) {},
       childBuilder: (viewportScale) {
         _viewportScale = viewportScale;
-        return DragTarget<StudioComponent>(
-          onWillAcceptWithDetails: (_) =>
-              !widget.readOnly && !widget.interactive,
-          onAcceptWithDetails: (details) {
-            final canvas =
-                _canvas.currentContext!.findRenderObject()! as RenderBox;
-            final position = canvas.globalToLocal(details.offset);
-            widget.onCreateComponent?.call(
-              details.data,
-              Offset(
-                position.dx / referenceSize.width,
-                position.dy / referenceSize.height,
-              ),
-            );
-          },
-          builder: (context, _, _) => DragTarget<SceneNode>(
-            onWillAcceptWithDetails: (_) =>
-                !widget.readOnly && !widget.interactive,
-            onAcceptWithDetails: (details) {
-              final canvas =
-                  _canvas.currentContext!.findRenderObject()! as RenderBox;
-              final position = canvas.globalToLocal(details.offset);
-              widget.onPlaceNode?.call(
-                details.data,
-                Offset(
-                  position.dx / referenceSize.width,
-                  position.dy / referenceSize.height,
-                ),
-              );
-            },
-            builder: (context, candidates, rejected) => CustomPaint(
-              foregroundPainter: widget.preferences.showGrid
-                  ? _GridPainter(widget.preferences.gridSize)
-                  : null,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  GestureDetector(
-                    key: const ValueKey('canvas-marquee'),
-                    behavior: HitTestBehavior.opaque,
-                    dragStartBehavior: DragStartBehavior.down,
-                    onTap: widget.interactive
-                        ? null
-                        : () => widget.onSelectNodes?.call({}),
-                    onPanStart: widget.readOnly || widget.interactive
-                        ? null
-                        : (details) => setState(() {
-                            _marqueeStart = details.localPosition;
-                            _marqueeEnd = details.localPosition;
-                            _marqueeSelection =
-                                HardwareKeyboard.instance.isShiftPressed
-                                ? {..._selectedIds}
-                                : {};
-                          }),
-                    onPanUpdate: widget.readOnly || widget.interactive
-                        ? null
-                        : (details) => setState(
-                            () => _marqueeEnd = details.localPosition,
-                          ),
-                    onPanEnd: widget.readOnly || widget.interactive
-                        ? null
-                        : (_) {
-                            final rect = Rect.fromPoints(
-                              _marqueeStart!,
-                              _marqueeEnd!,
-                            );
-                            final ids = {
-                              ..._marqueeSelection,
-                              for (final node in document.nodes)
-                                if (_isVisible(node) &&
-                                    rect.overlaps(geometry[node.id]!.bounds))
-                                  node.id,
-                            };
-                            setState(() {
-                              _marqueeStart = null;
-                              _marqueeEnd = null;
-                            });
-                            widget.onSelectNodes?.call(ids);
-                          },
-                    onPanCancel: widget.readOnly || widget.interactive
-                        ? null
-                        : () => setState(() {
-                            _marqueeStart = null;
-                            _marqueeEnd = null;
-                          }),
-                    child: _PreviewScene(
-                      theme: widget.theme,
-                      document: document,
-                      referenceSize: referenceSize,
-                      interactive: widget.interactive,
-                      wakeProgress: wake,
-                      playback: playback,
-                      activePredicates: predicates,
-                      nodeBuilder: (context, node) => _buildSelectableNode(
-                        node,
-                        _components.build(context, node),
-                      ),
-                      frameBuilder: (context, node, child) =>
-                          _buildInteractiveFrame(node, child),
-                      contentDecorator: (context, node, child) =>
-                          _buildSelectableNode(node, child),
-                      assetImageResolver: widget.assetImageResolver,
-                      assetSvgLoader: widget.assetSvgLoader,
-                      assetFontLoader: widget.assetFontLoader,
-                      shaderLoader: widget.shaderLoader,
+        return _CanvasDropTargets(
+          canAccept: !widget.readOnly && !widget.interactive,
+          onAcceptComponent: (component, offset) => widget.onCreateComponent
+              ?.call(component, _normalizeCanvasPoint(offset, referenceSize)),
+          onAcceptNode: (node, offset) => widget.onPlaceNode?.call(
+            node,
+            _normalizeCanvasPoint(offset, referenceSize),
+          ),
+          child: CustomPaint(
+            foregroundPainter: widget.preferences.showGrid
+                ? _GridPainter(widget.preferences.gridSize)
+                : null,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                GestureDetector(
+                  key: const ValueKey('canvas-marquee'),
+                  behavior: HitTestBehavior.opaque,
+                  dragStartBehavior: DragStartBehavior.down,
+                  onTap: widget.interactive
+                      ? null
+                      : () => widget.onSelectNodes?.call({}),
+                  onPanStart: widget.readOnly || widget.interactive
+                      ? null
+                      : _startMarquee,
+                  onPanUpdate: widget.readOnly || widget.interactive
+                      ? null
+                      : _updateMarquee,
+                  onPanEnd: widget.readOnly || widget.interactive
+                      ? null
+                      : (_) => _commitMarquee(document, geometry, predicates),
+                  onPanCancel: widget.readOnly || widget.interactive
+                      ? null
+                      : _cancelMarquee,
+                  child: _PreviewScene(
+                    theme: widget.theme,
+                    document: document,
+                    referenceSize: referenceSize,
+                    interactive: widget.interactive,
+                    wakeProgress: playback.wake,
+                    playback: playback.playback,
+                    activePredicates: predicates,
+                    nodeBuilder: (context, node) => _buildSelectableNode(
+                      node,
+                      _components.build(context, node),
                     ),
+                    frameBuilder: (context, node, child) =>
+                        _buildInteractiveFrame(node, child),
+                    contentDecorator: (context, node, child) =>
+                        _buildSelectableNode(node, child),
+                    assetImageResolver: widget.assetImageResolver,
+                    assetSvgLoader: widget.assetSvgLoader,
+                    assetFontLoader: widget.assetFontLoader,
+                    shaderLoader: widget.shaderLoader,
                   ),
+                ),
+                if (!widget.interactive)
                   for (final selected in document.nodes.where(
                     (node) => _selectedIds.contains(node.id),
                   ))
-                    if (_isVisible(selected) && !widget.interactive)
+                    if (_isVisible(selected, predicates))
                       _NodeSelectionOverlay(
                         viewportScale: viewportScale,
                         geometry: geometry[selected.id]!,
-                        showHandles:
-                            !widget.readOnly &&
-                            _selectedIds.length == 1 &&
-                            widget.tool == StudioCanvasTool.move &&
-                            (selected.parentId == null ||
-                                document.nodes
-                                        .firstWhere(
-                                          (node) =>
-                                              node.id == selected.parentId,
-                                        )
-                                        .layout!
-                                        .direction ==
-                                    SceneLayoutDirection.absolute),
+                        showHandles: _canShowResizeHandles(
+                          document,
+                          selected,
+                          _selectedIds,
+                          widget.tool,
+                          widget.readOnly,
+                        ),
                         onStart: (handle, details) =>
                             _startDrag(selected.id, details, handle: handle),
                         onUpdate: _updateDrag,
                         onStop: (_) => _stopDrag(commit: true),
                         onCancel: () => _stopDrag(commit: false),
                       ),
-                  if (_marqueeStart != null)
-                    Positioned.fromRect(
-                      rect: Rect.fromPoints(_marqueeStart!, _marqueeEnd!),
-                      child: IgnorePointer(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: const Color(0x208b5cf6),
-                            border: Border.all(color: const Color(0xff8b5cf6)),
-                          ),
-                        ),
-                      ),
-                    ),
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: CustomPaint(
-                        painter: SmartGuidePainter(
-                          vertical: _verticalGuides,
-                          horizontal: _horizontalGuides,
-                          measurements: _measurements,
-                          scale: viewportScale,
-                        ),
+                _MarqueeBoxOverlay(marqueeRect: _marqueeRect),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: SmartGuidePainter(
+                        vertical: _verticalGuides,
+                        horizontal: _horizontalGuides,
+                        measurements: _measurements,
+                        scale: viewportScale,
                       ),
                     ),
                   ),
-                  if (widget.showRulers && !widget.interactive)
-                    Positioned.fill(
-                      child: StudioRulers(
-                        size: referenceSize,
-                        scale: viewportScale,
-                        guides: _getRulerGuides(),
-                        readOnly: widget.readOnly,
-                        onStart: _startGuide,
-                        onUpdate: _updateGuide,
-                        onStop: () => _stopGuide(commit: true),
-                        onCancel: () => _stopGuide(commit: false),
-                        onDelete: (index) => widget.onDeleteGuide?.call(index),
-                      ),
+                ),
+                if (widget.showRulers && !widget.interactive)
+                  Positioned.fill(
+                    child: StudioRulers(
+                      size: referenceSize,
+                      scale: viewportScale,
+                      guides: _getRulerGuides(),
+                      readOnly: widget.readOnly,
+                      onStart: _startGuide,
+                      onUpdate: _updateGuide,
+                      onStop: () => _stopGuide(commit: true),
+                      onCancel: () => _stopGuide(commit: false),
+                      onDelete: (index) => widget.onDeleteGuide?.call(index),
                     ),
-                  if (_editingText case final node?)
-                    if (geometry[node.id] case final nodeGeometry?)
-                      Positioned.fromRect(
-                        rect: nodeGeometry.bounds,
-                        child: Localizations.override(
-                        context: context,
-                        delegates: const [
-                          DefaultMaterialLocalizations.delegate,
-                        ],
-                        child: Material(
-                          color: Colors.transparent,
-                          child: Focus(
-                            onKeyEvent: (_, event) {
-                              if (event is KeyDownEvent &&
-                                  event.logicalKey ==
-                                      LogicalKeyboardKey.escape) {
-                                setState(() => _editingText = null);
-                                return KeyEventResult.handled;
-                              }
-                              return KeyEventResult.ignored;
-                            },
-                            child: TextField(
-                              key: const ValueKey('canvas-text-editor'),
-                              controller: _text,
-                              focusNode: _textFocus,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                              ),
-                              onSubmitted: (_) => _commitText(),
-                              onTapOutside: (_) => _commitText(),
-                              decoration: const InputDecoration(
-                                filled: true,
-                                fillColor: Color(0xee18181b),
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                  ),
+                if (_editingText case final node?)
+                  if (geometry[node.id] case final nodeGeometry?)
+                    _InlineTextEditorOverlay(
+                      bounds: nodeGeometry.bounds,
+                      controller: _text,
+                      focusNode: _textFocus,
+                      onCommit: _commitText,
+                      onCancel: () => setState(() => _editingText = null),
                     ),
-                ],
-              ),
+              ],
             ),
           ),
         );
@@ -1274,4 +1230,124 @@ class _GridPainter extends CustomPainter {
   @override
   bool shouldRepaint(_GridPainter oldDelegate) =>
       spacing != oldDelegate.spacing;
+}
+
+bool _canShowResizeHandles(
+  SceneDocument document,
+  SceneNode selected,
+  Set<String> selectedIds,
+  StudioCanvasTool tool,
+  bool readOnly,
+) {
+  if (readOnly || selectedIds.length != 1 || tool != StudioCanvasTool.move) {
+    return false;
+  }
+  if (selected.parentId == null) return true;
+  final parent = document.nodes.firstWhere(
+    (node) => node.id == selected.parentId,
+  );
+  return parent.layout!.direction == SceneLayoutDirection.absolute;
+}
+
+class _CanvasDropTargets extends StatelessWidget {
+  const _CanvasDropTargets({
+    required this.canAccept,
+    required this.onAcceptComponent,
+    required this.onAcceptNode,
+    required this.child,
+  });
+
+  final bool canAccept;
+  final void Function(StudioComponent, Offset) onAcceptComponent;
+  final void Function(SceneNode, Offset) onAcceptNode;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DragTarget<StudioComponent>(
+    onWillAcceptWithDetails: (_) => canAccept,
+    onAcceptWithDetails: (details) =>
+        onAcceptComponent(details.data, details.offset),
+    builder: (context, _, _) => DragTarget<SceneNode>(
+      onWillAcceptWithDetails: (_) => canAccept,
+      onAcceptWithDetails: (details) =>
+          onAcceptNode(details.data, details.offset),
+      builder: (context, _, _) => child,
+    ),
+  );
+}
+
+class _MarqueeBoxOverlay extends StatelessWidget {
+  const _MarqueeBoxOverlay({required this.marqueeRect});
+
+  final ValueNotifier<Rect?> marqueeRect;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<Rect?>(
+    valueListenable: marqueeRect,
+    builder: (context, rect, _) {
+      if (rect == null) return const SizedBox.shrink();
+      return Positioned.fromRect(
+        rect: rect,
+        child: IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0x208b5cf6),
+              border: Border.all(color: const Color(0xff8b5cf6)),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _InlineTextEditorOverlay extends StatelessWidget {
+  const _InlineTextEditorOverlay({
+    required this.bounds,
+    required this.controller,
+    required this.focusNode,
+    required this.onCommit,
+    required this.onCancel,
+  });
+
+  final Rect bounds;
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final VoidCallback onCommit;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) => Positioned.fromRect(
+    rect: bounds,
+    child: Localizations.override(
+      context: context,
+      delegates: const [DefaultMaterialLocalizations.delegate],
+      child: Material(
+        color: Colors.transparent,
+        child: Focus(
+          onKeyEvent: (_, event) {
+            if (event is KeyDownEvent &&
+                event.logicalKey == LogicalKeyboardKey.escape) {
+              onCancel();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
+          child: TextField(
+            key: const ValueKey('canvas-text-editor'),
+            controller: controller,
+            focusNode: focusNode,
+            style: const TextStyle(color: Colors.white, fontSize: 24),
+            onSubmitted: (_) => onCommit(),
+            onTapOutside: (_) => onCommit(),
+            decoration: const InputDecoration(
+              filled: true,
+              fillColor: Color(0xee18181b),
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
