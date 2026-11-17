@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -38,7 +37,6 @@ enum _SidebarTab {
 
 class StudioSidebar extends StatefulWidget {
   const StudioSidebar({
-    required this.scenePaths,
     required this.assetPaths,
     required this.resolveAssetImage,
     required this.loadAssetText,
@@ -47,8 +45,6 @@ class StudioSidebar extends StatefulWidget {
     required this.onApplyFont,
     required this.editor,
     required this.loadingFile,
-    required this.onLoadJson,
-    required this.onSwitchScene,
     required this.onImportAsset,
     required this.onApplyBackground,
     this.readOnly = false,
@@ -56,7 +52,6 @@ class StudioSidebar extends StatefulWidget {
   });
 
   final bool readOnly;
-  final List<String> scenePaths;
   final List<String> assetPaths;
   final ImageProvider Function(String) resolveAssetImage;
   final SceneSvgLoader loadAssetText;
@@ -65,8 +60,6 @@ class StudioSidebar extends StatefulWidget {
   final ValueChanged<String>? onApplyFont;
   final SceneEditor? editor;
   final bool loadingFile;
-  final VoidCallback onLoadJson;
-  final ValueChanged<String> onSwitchScene;
   final VoidCallback onImportAsset;
   final ValueChanged<String>? onApplyBackground;
 
@@ -97,14 +90,6 @@ class _StudioSidebarState extends State<StudioSidebar> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ScenesSection(
-          scenePaths: widget.scenePaths,
-          activeScenePath: editor?.file.path,
-          loadingFile: widget.loadingFile,
-          onLoadJson: widget.onLoadJson,
-          onSwitchScene: widget.onSwitchScene,
-        ),
-        const Divider(),
         if (editor != null)
           StudioLayoutCompleteness(editor: editor, readOnly: widget.readOnly),
         Padding(
@@ -167,88 +152,6 @@ class _StudioSidebarState extends State<StudioSidebar> {
       ],
     );
   }
-}
-
-class _ScenesSection extends StatelessWidget {
-  const _ScenesSection({
-    required this.scenePaths,
-    required this.activeScenePath,
-    required this.loadingFile,
-    required this.onLoadJson,
-    required this.onSwitchScene,
-  });
-
-  final List<String> scenePaths;
-  final String? activeScenePath;
-  final bool loadingFile;
-  final VoidCallback onLoadJson;
-  final ValueChanged<String> onSwitchScene;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-        child: Row(
-          children: [
-            const Text('Scenes').xSmall().muted(),
-            const Spacer(),
-            GhostButton(
-              onPressed: loadingFile ? null : onLoadJson,
-              density: ButtonDensity.compact,
-              child: const Text('Load JSON').xSmall(),
-            ),
-          ],
-        ),
-      ),
-      ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 96),
-        child: ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          children: [
-            for (var i = 0; i < scenePaths.length; i++) ...[
-              if (i > 0) const Gap(2),
-              Builder(
-                builder: (context) {
-                  final colors = Theme.of(context).colorScheme;
-                  final selected = activeScenePath == scenePaths[i];
-                  return Button(
-                    key: ValueKey('scene-${scenePaths[i]}'),
-                    style: _getSelectableRowStyle(
-                      colors,
-                      selected: selected,
-                      density: ButtonDensity.dense,
-                    ),
-                    onPressed: () => onSwitchScene(scenePaths[i]),
-                    child: Row(
-                      children: [
-                        Icon(
-                          LucideIcons.fileJson,
-                          size: 13,
-                          color: selected
-                              ? colors.primary
-                              : colors.mutedForeground,
-                        ),
-                        const Gap(6),
-                        Expanded(
-                          child: Text(
-                            File(scenePaths[i]).uri.pathSegments.last,
-                            overflow: TextOverflow.ellipsis,
-                          ).small(),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          ],
-        ),
-      ),
-    ],
-  );
 }
 
 class _AssetList extends StatefulWidget {

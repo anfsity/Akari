@@ -207,7 +207,6 @@ void main() {
             width: 280,
             height: 600,
             child: StudioSidebar(
-              scenePaths: [file.path],
               assetPaths: const [],
               resolveAssetImage: (path) => FileImage(File(path)),
               loadAssetText: (path) async => '',
@@ -216,8 +215,6 @@ void main() {
               onApplyFont: null,
               editor: editor,
               loadingFile: false,
-              onLoadJson: () {},
-              onSwitchScene: (_) {},
               onImportAsset: () {},
               onApplyBackground: null,
             ),

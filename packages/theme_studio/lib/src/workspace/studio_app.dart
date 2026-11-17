@@ -679,7 +679,6 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         projects: _projects,
         selectedProject: _project,
         onSwitchTheme: (project) => unawaited(_switchTheme(project, context)),
-        scenePaths: _scenePaths,
         assetPaths: _assetPaths,
         assets: _assets,
         editor: editor,
@@ -690,8 +689,6 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         ),
         onPlaceAsset: _placeAsset,
         onApplyFont: _applyFont,
-        onLoadJson: () => _loadJson(context),
-        onSwitchScene: (path) => _switchScene(path, context),
         onImportAsset: _importAsset,
         onApplyBackground: _applyBackground,
       ),
@@ -742,7 +739,6 @@ class _StudioProjectSidebar extends StatelessWidget {
     required this.projects,
     required this.selectedProject,
     required this.onSwitchTheme,
-    required this.scenePaths,
     required this.assetPaths,
     required this.assets,
     required this.editor,
@@ -751,8 +747,6 @@ class _StudioProjectSidebar extends StatelessWidget {
     required this.supportsImageBackground,
     required this.onPlaceAsset,
     required this.onApplyFont,
-    required this.onLoadJson,
-    required this.onSwitchScene,
     required this.onImportAsset,
     required this.onApplyBackground,
   });
@@ -760,7 +754,6 @@ class _StudioProjectSidebar extends StatelessWidget {
   final List<StudioThemeProject> projects;
   final StudioThemeProject selectedProject;
   final ValueChanged<StudioThemeProject> onSwitchTheme;
-  final List<String> scenePaths;
   final List<String> assetPaths;
   final StudioAssets assets;
   final SceneEditor? editor;
@@ -769,8 +762,6 @@ class _StudioProjectSidebar extends StatelessWidget {
   final bool supportsImageBackground;
   final ValueChanged<SceneAsset> onPlaceAsset;
   final ValueChanged<String> onApplyFont;
-  final VoidCallback onLoadJson;
-  final ValueChanged<String> onSwitchScene;
   final VoidCallback onImportAsset;
   final ValueChanged<String> onApplyBackground;
 
@@ -786,7 +777,6 @@ class _StudioProjectSidebar extends StatelessWidget {
       const Divider(),
       Expanded(
         child: StudioSidebar(
-          scenePaths: scenePaths,
           assetPaths: assetPaths,
           resolveAssetImage: assets.getImageProvider,
           loadAssetText: assets.loadTextAsset,
@@ -796,8 +786,6 @@ class _StudioProjectSidebar extends StatelessWidget {
           editor: editor,
           loadingFile: loadingFile,
           readOnly: readOnly,
-          onLoadJson: onLoadJson,
-          onSwitchScene: onSwitchScene,
           onImportAsset: onImportAsset,
           onApplyBackground: supportsImageBackground ? onApplyBackground : null,
         ),
