@@ -623,10 +623,14 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
           _canvasKey.currentState?.handleKeyEvent(event) ??
           KeyEventResult.ignored,
       toolbar: StudioToolbar(
+        projects: _projects,
+        selectedProject: _project,
+        onSwitchTheme: (project) => unawaited(_switchTheme(project, context)),
         themeId: _theme.id,
         scenePath: _path,
         scenePaths: _scenePaths,
         onSwitchScene: (path) => _switchScene(path, context),
+        loadingFile: _loadingFile,
         readOnly: _inspect,
         editor: editor,
         preferencesReady: _preferencesReady,
@@ -634,6 +638,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         onSave: _save,
         onCreateTheme: () => _openCreateTheme(context),
         onCreateScene: () => _createScene(context),
+        onReload: _reload,
+        onLoadJson: () => _loadJson(context),
       ),
       sidebar: _StudioProjectSidebar(
         projects: _projects,

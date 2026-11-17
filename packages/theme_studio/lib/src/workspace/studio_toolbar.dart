@@ -1,9 +1,14 @@
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../authoring/scene_editor.dart';
+import '../authoring/studio_theme_project.dart';
+import '../inspector/studio_form.dart';
 
 class StudioToolbar extends StatelessWidget {
   const StudioToolbar({
+    required this.projects,
+    required this.selectedProject,
+    required this.onSwitchTheme,
     required this.themeId,
     required this.scenePath,
     required this.scenePaths,
@@ -14,11 +19,18 @@ class StudioToolbar extends StatelessWidget {
     required this.onSave,
     required this.onCreateTheme,
     required this.onCreateScene,
+    required this.onReload,
+    required this.onLoadJson,
+    this.loadingFile = false,
     this.readOnly = false,
     super.key,
   });
 
   final bool readOnly;
+  final bool loadingFile;
+  final List<StudioThemeProject> projects;
+  final StudioThemeProject selectedProject;
+  final ValueChanged<StudioThemeProject> onSwitchTheme;
   final String themeId;
   final String scenePath;
   final List<String> scenePaths;
@@ -29,41 +41,189 @@ class StudioToolbar extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onCreateTheme;
   final VoidCallback onCreateScene;
+  final VoidCallback onReload;
+  final VoidCallback onLoadJson;
 
   void _openSceneMenu(BuildContext context) {
-    showDropdown<void>(
-      context: context,
-      alignment: Alignment.topLeft,
-      anchorAlignment: Alignment.bottomLeft,
-      builder: (_) => DropdownMenu(
-        children: [
-          const MenuLabel(child: Text('Scenes')),
-          for (final path in scenePaths)
-            MenuButton(
-              leading: Icon(
-                path == scenePath ? LucideIcons.check : LucideIcons.fileJson,
-                size: 16,
-              ),
-              onPressed: (_) => onSwitchScene(path),
-              child: Text(path.split('/').last),
-            ),
-          const MenuDivider(),
-          MenuButton(
-            key: const ValueKey('new-scene'),
-            leading: const Icon(LucideIcons.filePlus2, size: 16),
-            enabled: !readOnly && editor != null,
-            onPressed: (_) => onCreateScene(),
-            child: const Text('New scene'),
-          ),
-          MenuButton(
-            key: const ValueKey('create-theme'),
-            leading: const Icon(LucideIcons.folderPlus, size: 16),
-            enabled: !readOnly && editor != null,
-            onPressed: (_) => onCreateTheme(),
-            child: const Text('Create theme'),
-          ),
-        ],
+    final themesIndex = scenePath.indexOf('/themes/');
+    final displayPath = themesIndex >= 0
+        ? scenePath.substring(themesIndex + 1)
+        : scenePath;
+    final groupId = Object();
+    showOverlay<void>(
+      context,
+      PopoverConfiguration(
+        alignment: Alignment.topLeft,
+        anchorAlignment: Alignment.bottomLeft,
+        offset: const Offset(0, 6),
+        regionGroupId: groupId,
       ),
+      builder: (popoverContext) {
+        final theme = Theme.of(popoverContext);
+        final colors = theme.colorScheme;
+        return SurfaceCard(
+          padding: const EdgeInsets.all(14),
+          child: SizedBox(
+            width: 312,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('File path').xSmall().muted(),
+                const Gap(6),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.muted.withValues(alpha: 0.3),
+                    border: Border.all(color: colors.border),
+                    borderRadius: BorderRadius.circular(theme.radiusMd),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    child: SelectableText(
+                      displayPath,
+                      style: theme.typography.mono.copyWith(fontSize: 12),
+                    ),
+                  ),
+                ),
+                const Gap(12),
+                Row(
+                  children: [
+                    const Text('Current theme').small().muted(),
+                    const Gap(12),
+                    Expanded(
+                      child: StudioSelect<StudioThemeProject>(
+                        key: const ValueKey('toolbar-theme-select'),
+                        value: selectedProject,
+                        values: projects,
+                        formatValue: (project) => project.packageName,
+                        regionGroupId: groupId,
+                        onChanged: (project) {
+                          if (!identical(project, selectedProject)) {
+                            closeOverlay(popoverContext);
+                            onSwitchTheme(project);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const Gap(12),
+                const Text('Scenes').xSmall().muted(),
+                const Gap(6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 132),
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    children: [
+                      for (var i = 0; i < scenePaths.length; i++) ...[
+                        if (i > 0) const Gap(2),
+                        Button(
+                          style: scenePaths[i] == scenePath
+                              ? const ButtonStyle.secondary(
+                                  density: ButtonDensity.dense,
+                                )
+                              : const ButtonStyle.ghost(
+                                  density: ButtonDensity.dense,
+                                ),
+                          onPressed: () {
+                            closeOverlay(popoverContext);
+                            onSwitchScene(scenePaths[i]);
+                          },
+                          child: Row(
+                            children: [
+                              Icon(
+                                scenePaths[i] == scenePath
+                                    ? LucideIcons.check
+                                    : LucideIcons.fileJson,
+                                size: 14,
+                              ),
+                              const Gap(8),
+                              Expanded(
+                                child: Text(
+                                  scenePaths[i].split('/').last,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ).small(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Gap(12),
+                const Divider(),
+                const Gap(12),
+                Row(
+                  spacing: 8,
+                  children: [
+                    Expanded(
+                      child: OutlineButton(
+                        key: const ValueKey('new-scene'),
+                        density: ButtonDensity.dense,
+                        enabled: !readOnly && editor != null,
+                        leading: const Icon(LucideIcons.filePlus2, size: 14),
+                        onPressed: () {
+                          closeOverlay(popoverContext);
+                          onCreateScene();
+                        },
+                        child: const Text('New scene').small(),
+                      ),
+                    ),
+                    Expanded(
+                      child: OutlineButton(
+                        key: const ValueKey('create-theme'),
+                        density: ButtonDensity.dense,
+                        enabled: !readOnly && editor != null,
+                        leading: const Icon(LucideIcons.folderPlus, size: 14),
+                        onPressed: () {
+                          closeOverlay(popoverContext);
+                          onCreateTheme();
+                        },
+                        child: const Text('Create theme').small(),
+                      ),
+                    ),
+                  ],
+                ),
+                const Gap(8),
+                Row(
+                  spacing: 8,
+                  children: [
+                    Expanded(
+                      child: OutlineButton(
+                        key: const ValueKey('toolbar-reload-disk'),
+                        density: ButtonDensity.dense,
+                        onPressed: () {
+                          closeOverlay(popoverContext);
+                          onReload();
+                        },
+                        child: const Text('Reload from disk').small(),
+                      ),
+                    ),
+                    Expanded(
+                      child: OutlineButton(
+                        key: const ValueKey('toolbar-load-json'),
+                        density: ButtonDensity.dense,
+                        enabled: !loadingFile,
+                        onPressed: () {
+                          closeOverlay(popoverContext);
+                          onLoadJson();
+                        },
+                        child: const Text('Load JSON').small(),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -106,63 +266,58 @@ class StudioToolbar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Row(
           children: [
-            Container(
-              width: 24,
-              height: 24,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: colors.primary.withValues(alpha: 0.06),
-                border: Border.all(
-                  color: colors.primary.withValues(alpha: .15),
-                ),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text('T', style: TextStyle(color: colors.primary)).small(),
-            ),
-            const Gap(8),
-            Expanded(
+            Flexible(
               child: LayoutBuilder(
                 builder: (context, constraints) => Tooltip(
                   tooltip: (_) =>
                       Text('$themeId / ${scenePath.split('/').last}'),
-                  child: GhostButton(
+                  child: Button(
                     key: const ValueKey('studio-scene-menu'),
-                    density: ButtonDensity.compact,
+                    style: const ButtonStyle.secondary(
+                      density: ButtonDensity.compact,
+                    ),
                     onPressed: () => _openSceneMenu(context),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            themeId,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ).small().semiBold(),
-                        ),
-                        if (constraints.maxWidth >= 260) ...[
-                          const Gap(10),
-                          const Text('/').small().muted(),
-                          const Gap(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           Flexible(
                             child: Text(
-                              scenePath.split('/').last,
+                              themeId,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                            ).small().muted(),
+                            ).small().semiBold(),
+                          ),
+                          if (constraints.maxWidth >= 240) ...[
+                            const Gap(6),
+                            const Text('/').small().muted(),
+                            const Gap(6),
+                            Flexible(
+                              child: Text(
+                                scenePath.split('/').last,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ).small().muted(),
+                            ),
+                          ],
+                          const Gap(6),
+                          Icon(
+                            LucideIcons.chevronDown,
+                            size: 14,
+                            color: colors.mutedForeground,
                           ),
                         ],
-                        const Gap(8),
-                        Icon(
-                          LucideIcons.chevronDown,
-                          size: 14,
-                          color: colors.mutedForeground,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
+            const Spacer(),
             const Gap(12),
             // Undo clears an uncommitted inspector draft before it consumes
             // a scene history entry.

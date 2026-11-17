@@ -526,6 +526,7 @@ class StudioSelect<T> extends StatefulWidget {
     this.placeholder,
     this.enabled = true,
     this.theme,
+    this.regionGroupId,
     super.key,
   });
 
@@ -537,6 +538,7 @@ class StudioSelect<T> extends StatefulWidget {
   final Widget? placeholder;
   final bool enabled;
   final SelectTheme? theme;
+  final Object? regionGroupId;
 
   @override
   State<StudioSelect<T>> createState() => _StudioSelectState<T>();
@@ -557,6 +559,7 @@ class _StudioSelectState<T> extends State<StudioSelect<T>> {
         alignment: Alignment.topCenter,
         widthConstraint: PopoverConstraint.anchorFixedSize,
         offset: const Offset(0, 4),
+        regionGroupId: widget.regionGroupId,
       ),
       value: widget.value,
       enabled: widget.enabled,
