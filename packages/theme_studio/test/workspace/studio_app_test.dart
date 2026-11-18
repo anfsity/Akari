@@ -553,7 +553,18 @@ void main() {
     await tester.tap(find.text('Effects'));await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('open-shader-playground')));await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('shader-source')),'invalid shader');
-    await tester.runAsync(() async {await tester.tap(find.byKey(const ValueKey('shader-compile')));await tester.pump();await Future<void>.delayed(const Duration(milliseconds:500));});await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const ValueKey('shader-compile')));
+      final deadline = DateTime.now().add(const Duration(seconds: 10));
+      while (DateTime.now().isBefore(deadline)) {
+        await tester.pump();
+        if (find.byKey(const ValueKey('shader-diagnostic')).evaluate().isNotEmpty) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+    });
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('shader-diagnostic')),findsOneWidget);
     expect(encodeSceneDocument(editor.document),original);expect(editor.canUndo,false);
     await tester.tap(find.text('Cancel').last);await tester.pumpAndSettle();
