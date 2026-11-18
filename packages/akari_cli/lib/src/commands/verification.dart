@@ -13,11 +13,11 @@ import 'plan.dart';
 import 'theme.dart' show createBackendBuildStep;
 
 const _standaloneWorkflowSuites = [
-  'test/workflows/greetd_test_workflow_test.py',
-  'test/workflows/greetd_screenshot_test.py',
-  'test/workflows/display_profile_test.py',
-  'test/workflows/display_layout_test.py',
-  'test/workflows/sway_session_test.py',
+  'greetd_test_workflow_test.py',
+  'greetd_screenshot_test.py',
+  'display_profile_test.py',
+  'display_layout_test.py',
+  'sway_session_test.py',
 ];
 
 RunPlan createVerificationPlan(
@@ -54,6 +54,13 @@ RunPlan createVerificationPlan(
     for (final theme in externalThemes)
       theme.packageName: '${theme.packageName}.pub_get',
   };
+  final workflowSuites = [
+    for (final suite in _standaloneWorkflowSuites)
+      if (File(
+        getJoinedPath(repoRoot.path, 'test/workflows/$suite'),
+      ).existsSync())
+        suite,
+  ];
 
   return RunPlan(
     command: 'verify',
@@ -130,25 +137,18 @@ RunPlan createVerificationPlan(
         workingDirectory: 'crates/akari-splash',
         dependencies: ['backend.test_mock'],
       ),
-      if (_standaloneWorkflowSuites.any(
-        (suite) => File(getJoinedPath(repoRoot.path, suite)).existsSync(),
-      ))
+      if (workflowSuites.isNotEmpty)
         RunStep(
           id: 'workflows.test',
-          command: [
-            'python3',
-            '-m',
-            'unittest',
-            for (final suite in _standaloneWorkflowSuites)
-              if (File(getJoinedPath(repoRoot.path, suite)).existsSync()) suite,
-          ],
+          command: ['python3', '-m', 'unittest', ...workflowSuites],
+          workingDirectory: 'test/workflows',
           dependencies: const [],
         ),
       RunStep(
         id: 'workspace.pub_get',
         command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
         workingDirectory: '.',
-        dependencies: const [],
+        dependencies: const ['toolchain.check'],
       ),
       for (final theme in externalThemes)
         RunStep(
