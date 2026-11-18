@@ -60,3 +60,7 @@ These rules apply to all changes in this repository.
 - Keep commits atomic and split changes at the finest reasonable granularity.
 - Commit immediately after each discrete addition or modification rather than batching multiple changes together.
 - Each commit must represent a single, focused logical change that is self-contained and straightforward to review, revert, or bisect.
+- Maintain a linear commit history without redundant merge commits.
+- Format commit subjects as `<type>(<scope>): <summary>` in lowercase imperative mood without a trailing period (`feat`, `fix`, `refactor`, `perf`, `style`, `test`, `docs`, `build`, `ci`, `chore`). Omit `(<scope>)` only when `<type>` and `<scope>` would be identical (`docs: <summary>` for cross-cutting documentation).
+- Use one canonical, single-word domain scope per architectural boundary (`studio`, `greeter`, `scene`, `theme`, `backend`, `splash`, `system`, `cli`, `docs`, `workspace`). Never mix package names, directory paths, historical aliases, or multi-word variants for the same concept (for example, always use `studio` rather than alternating with `theme_studio`, `Theme Studio`, or `editor`), and never use comma-separated scope lists.
+- Do not repeat the scope name or its aliases in the commit summary when the scope already establishes the domain; when referencing another domain in the summary or body, use its canonical lowercase domain name consistently.
