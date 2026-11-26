@@ -122,10 +122,7 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
       );
       if (!mounted) return;
       final recorder = ui.PictureRecorder();
-      const PresetArtworkPainter().paint(
-        Canvas(recorder),
-        _surfaceTextureSize,
-      );
+      const PresetArtworkPainter().paint(Canvas(recorder), _surfaceTextureSize);
       final picture = recorder.endRecording();
       try {
         image = await picture.toImage(
@@ -248,6 +245,13 @@ class _PresetEnvironmentState extends State<PresetEnvironment>
   );
 }
 
+void _scaleToPresetCanvas(Canvas canvas, Size size) {
+  canvas.scale(
+    size.width / presetCanvasSize.width,
+    size.height / presetCanvasSize.height,
+  );
+}
+
 /// The same cached light streaks provide the water texture and its still frame.
 /// Refraction and flow displace that texture without another blur pass.
 class PresetArtworkPainter extends CustomPainter {
@@ -256,10 +260,7 @@ class PresetArtworkPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.scale(
-      size.width / presetCanvasSize.width,
-      size.height / presetCanvasSize.height,
-    );
+    _scaleToPresetCanvas(canvas, size);
     canvas.drawColor(presetPaper, BlendMode.src);
     canvas.save();
     canvas.clipPath(getPresetNightPath());
@@ -272,250 +273,277 @@ class PresetArtworkPainter extends CustomPainter {
           [const Color(0xff161520), const Color(0xff282733)],
         ),
     );
+    _paintLightStreaks(canvas);
+    canvas.restore();
+    canvas.restore();
+  }
+
+  void _paintLightStreaks(Canvas canvas) {
     final random = math.Random(19);
+    final paint = Paint();
     for (var i = 0; i < 48; i++) {
       final y = 510 + random.nextDouble() * 1200;
       final x = -600 + random.nextDouble() * 1000;
       final length = 900 + random.nextDouble() * 1500;
       final width = 3 + random.nextDouble() * 36;
+      paint
+        ..color = Color.fromRGBO(
+          203,
+          210,
+          224,
+          .025 + random.nextDouble() * .065,
+        )
+        ..strokeWidth = width
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, width * .7);
       canvas.drawLine(
         Offset(x, y),
         Offset(x + length, y - length * .37),
-        Paint()
-          ..color = Color.fromRGBO(
-            203,
-            210,
-            224,
-            .025 + random.nextDouble() * .065,
-          )
-          ..strokeWidth = width
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, width * .7),
+        paint,
       );
     }
-    canvas.restore();
-    canvas.restore();
   }
 
   @override
   bool shouldRepaint(PresetArtworkPainter oldDelegate) => false;
 }
 
+typedef _BranchStem = ({Path path, Path highlight, double width});
+typedef _BlossomSpec = ({double x, double y, double radius, double rotation});
+
 class _PresetBranchPainter extends CustomPainter {
   const _PresetBranchPainter();
+
+  static _BranchStem _createStem(Path path, double width) =>
+      (path: path, highlight: path.shift(const Offset(-.8, -.4)), width: width);
+
+  static final List<_BranchStem> _stems = [
+    _createStem(
+      Path()
+        ..moveTo(899, 604)
+        ..cubicTo(846, 580, 836, 556, 825, 510)
+        ..cubicTo(815, 483, 823, 464, 808, 443),
+      4.0,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(835, 546)
+        ..cubicTo(818, 539, 802, 526, 798, 508)
+        ..lineTo(788, 501),
+      2.0,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(819, 488)
+        ..lineTo(835, 466)
+        ..lineTo(848, 458),
+      1.8,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(820, 477)
+        ..lineTo(802, 463)
+        ..lineTo(795, 444),
+      1.4,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(813, 455)
+        ..lineTo(822, 433),
+      1.1,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(855, 574)
+        ..lineTo(872, 563)
+        ..lineTo(877, 547),
+      1.6,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(902, 591)
+        ..cubicTo(935, 567, 954, 539, 992, 511)
+        ..lineTo(1009, 495),
+      3.0,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(953, 548)
+        ..lineTo(944, 516)
+        ..lineTo(940, 493),
+      2.0,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(946, 529)
+        ..lineTo(931, 519),
+      1.3,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(979, 522)
+        ..lineTo(986, 500),
+      1.1,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(1010, 561)
+        ..cubicTo(1034, 549, 1058, 548, 1075, 570)
+        ..cubicTo(1090, 596, 1082, 628, 1100, 655)
+        ..lineTo(1118, 675),
+      2.8,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(1087, 620)
+        ..lineTo(1064, 632)
+        ..lineTo(1052, 651),
+      1.4,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(1098, 651)
+        ..lineTo(1080, 671),
+      1.1,
+    ),
+    _createStem(
+      Path()
+        ..moveTo(964, 580)
+        ..lineTo(977, 603)
+        ..lineTo(998, 618),
+      1.5,
+    ),
+  ];
+
+  static const List<_BlossomSpec> _blossoms = [
+    (x: 807, y: 447, radius: 8, rotation: .2),
+    (x: 820, y: 514, radius: 18, rotation: 1.1),
+    (x: 829, y: 532, radius: 11, rotation: .4),
+    (x: 872, y: 568, radius: 9, rotation: 2),
+    (x: 898, y: 590, radius: 10, rotation: .8),
+    (x: 951, y: 594, radius: 17, rotation: .6),
+    (x: 975, y: 583, radius: 7, rotation: 1.8),
+    (x: 1068, y: 564, radius: 14, rotation: 1.4),
+    (x: 1091, y: 606, radius: 27, rotation: .2),
+    (x: 1073, y: 626, radius: 10, rotation: 2.5),
+  ];
+
+  static const List<Offset> _budPoints = [
+    Offset(822, 433),
+    Offset(848, 458),
+    Offset(940, 493),
+    Offset(1009, 495),
+    Offset(986, 500),
+    Offset(931, 519),
+    Offset(1118, 675),
+    Offset(1080, 671),
+  ];
+
+  static final Path _budPath = Path()
+    ..moveTo(0, 4)
+    ..lineTo(-5, -7)
+    ..quadraticBezierTo(0, -3, 5, -6)
+    ..lineTo(1, 4)
+    ..close();
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.scale(
-      size.width / presetCanvasSize.width,
-      size.height / presetCanvasSize.height,
-    );
-    final stems = <(Path, double)>[
-      (
-        Path()
-          ..moveTo(899, 604)
-          ..cubicTo(846, 580, 836, 556, 825, 510)
-          ..cubicTo(815, 483, 823, 464, 808, 443),
-        4.0,
-      ),
-      (
-        Path()
-          ..moveTo(835, 546)
-          ..cubicTo(818, 539, 802, 526, 798, 508)
-          ..lineTo(788, 501),
-        2.0,
-      ),
-      (
-        Path()
-          ..moveTo(819, 488)
-          ..lineTo(835, 466)
-          ..lineTo(848, 458),
-        1.8,
-      ),
-      (
-        Path()
-          ..moveTo(820, 477)
-          ..lineTo(802, 463)
-          ..lineTo(795, 444),
-        1.4,
-      ),
-      (
-        Path()
-          ..moveTo(813, 455)
-          ..lineTo(822, 433),
-        1.1,
-      ),
-      (
-        Path()
-          ..moveTo(855, 574)
-          ..lineTo(872, 563)
-          ..lineTo(877, 547),
-        1.6,
-      ),
-      (
-        Path()
-          ..moveTo(902, 591)
-          ..cubicTo(935, 567, 954, 539, 992, 511)
-          ..lineTo(1009, 495),
-        3.0,
-      ),
-      (
-        Path()
-          ..moveTo(953, 548)
-          ..lineTo(944, 516)
-          ..lineTo(940, 493),
-        2.0,
-      ),
-      (
-        Path()
-          ..moveTo(946, 529)
-          ..lineTo(931, 519),
-        1.3,
-      ),
-      (
-        Path()
-          ..moveTo(979, 522)
-          ..lineTo(986, 500),
-        1.1,
-      ),
-      (
-        Path()
-          ..moveTo(1010, 561)
-          ..cubicTo(1034, 549, 1058, 548, 1075, 570)
-          ..cubicTo(1090, 596, 1082, 628, 1100, 655)
-          ..lineTo(1118, 675),
-        2.8,
-      ),
-      (
-        Path()
-          ..moveTo(1087, 620)
-          ..lineTo(1064, 632)
-          ..lineTo(1052, 651),
-        1.4,
-      ),
-      (
-        Path()
-          ..moveTo(1098, 651)
-          ..lineTo(1080, 671),
-        1.1,
-      ),
-      (
-        Path()
-          ..moveTo(964, 580)
-          ..lineTo(977, 603)
-          ..lineTo(998, 618),
-        1.5,
-      ),
-    ];
-    for (final (path, width) in stems) {
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round
-          ..strokeWidth = width
-          ..color = const Color(0xff393342),
-      );
-      canvas.drawPath(
-        path.shift(const Offset(-.8, -.4)),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = width * .24
-          ..color = const Color(0x998c8294),
-      );
-    }
+    _scaleToPresetCanvas(canvas, size);
+    _paintStems(canvas);
     final random = math.Random(82);
-    for (final (x, y, radius, rotation) in <(double, double, double, double)>[
-      (807, 447, 8, .2),
-      (820, 514, 18, 1.1),
-      (829, 532, 11, .4),
-      (872, 568, 9, 2),
-      (898, 590, 10, .8),
-      (951, 594, 17, .6),
-      (975, 583, 7, 1.8),
-      (1068, 564, 14, 1.4),
-      (1091, 606, 27, .2),
-      (1073, 626, 10, 2.5),
-    ]) {
+    _paintBlossoms(canvas, random);
+    _paintBuds(canvas, random);
+    canvas.restore();
+  }
+
+  void _paintStems(Canvas canvas) {
+    final stemPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..color = const Color(0xff393342);
+    final highlightPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = const Color(0x998c8294);
+    for (final stem in _stems) {
+      stemPaint.strokeWidth = stem.width;
+      canvas.drawPath(stem.path, stemPaint);
+      highlightPaint.strokeWidth = stem.width * .24;
+      canvas.drawPath(stem.highlight, highlightPaint);
+    }
+  }
+
+  void _paintBlossoms(Canvas canvas, math.Random random) {
+    for (final spec in _blossoms) {
       canvas.save();
-      canvas.translate(x, y);
-      canvas.rotate(rotation);
-      for (var petal = 0; petal < 5; petal++) {
-        canvas.save();
-        canvas.rotate(petal * math.pi * .4);
-        final r = radius * (.8 + random.nextDouble() * .35);
-        final shape = Path()
-          ..moveTo(0, 2)
-          ..cubicTo(-r * .85, -r * .25, -r * .8, -r, -r * .17, -r)
-          ..lineTo(0, -r * .86)
-          ..cubicTo(r * .8, -r * 1.25, r * .7, -r * .25, 0, 2)
-          ..close();
-        canvas.drawPath(
-          shape,
-          Paint()
-            ..shader = ui.Gradient.linear(Offset.zero, Offset(0, -r), [
-              const Color(0xffb5aaba),
-              const Color(0xffeff1f6),
-            ]),
-        );
-        canvas.drawPath(
-          shape,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = .55
-            ..color = const Color(0xff9e94a9),
-        );
-        for (var vein = -1; vein <= 1; vein++) {
-          canvas.drawLine(
-            const Offset(0, -2),
-            Offset(vein * r * .18, -r * .78),
-            Paint()
-              ..strokeWidth = .45
-              ..color = const Color(0x559387a4),
-          );
-        }
-        canvas.restore();
-      }
-      for (var i = 0; i < 12; i++) {
-        final angle = i * math.pi / 6;
-        final end = Offset(math.cos(angle), math.sin(angle)) * radius * .35;
+      canvas.translate(spec.x, spec.y);
+      canvas.rotate(spec.rotation);
+      _paintBlossomPetals(canvas, spec.radius, random);
+      _paintBlossomStamens(canvas, spec.radius);
+      canvas.restore();
+    }
+  }
+
+  void _paintBlossomPetals(Canvas canvas, double radius, math.Random random) {
+    final fillPaint = Paint();
+    final outlinePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .55
+      ..color = const Color(0xff9e94a9);
+    final veinPaint = Paint()
+      ..strokeWidth = .45
+      ..color = const Color(0x559387a4);
+    for (var petal = 0; petal < 5; petal++) {
+      canvas.save();
+      canvas.rotate(petal * math.pi * .4);
+      final r = radius * (.8 + random.nextDouble() * .35);
+      final shape = _createPetalPath(r);
+      fillPaint.shader = ui.Gradient.linear(Offset.zero, Offset(0, -r), [
+        const Color(0xffb5aaba),
+        const Color(0xffeff1f6),
+      ]);
+      canvas.drawPath(shape, fillPaint);
+      canvas.drawPath(shape, outlinePaint);
+      for (var vein = -1; vein <= 1; vein++) {
         canvas.drawLine(
-          Offset.zero,
-          end,
-          Paint()
-            ..strokeWidth = .55
-            ..color = const Color(0xff8e748c),
+          const Offset(0, -2),
+          Offset(vein * r * .18, -r * .78),
+          veinPaint,
         );
-        canvas.drawCircle(end, .85, Paint()..color = const Color(0xff786076));
       }
       canvas.restore();
     }
-    for (final point in const [
-      Offset(822, 433),
-      Offset(848, 458),
-      Offset(940, 493),
-      Offset(1009, 495),
-      Offset(986, 500),
-      Offset(931, 519),
-      Offset(1118, 675),
-      Offset(1080, 671),
-    ]) {
+  }
+
+  static Path _createPetalPath(double r) => Path()
+    ..moveTo(0, 2)
+    ..cubicTo(-r * .85, -r * .25, -r * .8, -r, -r * .17, -r)
+    ..lineTo(0, -r * .86)
+    ..cubicTo(r * .8, -r * 1.25, r * .7, -r * .25, 0, 2)
+    ..close();
+
+  void _paintBlossomStamens(Canvas canvas, double radius) {
+    final filamentPaint = Paint()
+      ..strokeWidth = .55
+      ..color = const Color(0xff8e748c);
+    final antherPaint = Paint()..color = const Color(0xff786076);
+    for (var i = 0; i < 12; i++) {
+      final angle = i * math.pi / 6;
+      final end = Offset(math.cos(angle), math.sin(angle)) * radius * .35;
+      canvas.drawLine(Offset.zero, end, filamentPaint);
+      canvas.drawCircle(end, .85, antherPaint);
+    }
+  }
+
+  void _paintBuds(Canvas canvas, math.Random random) {
+    final budPaint = Paint()..color = const Color(0xff897889);
+    for (final point in _budPoints) {
       canvas.save();
       canvas.translate(point.dx, point.dy);
       canvas.rotate(random.nextDouble() * 2 - 1);
-      canvas.drawPath(
-        Path()
-          ..moveTo(0, 4)
-          ..lineTo(-5, -7)
-          ..quadraticBezierTo(0, -3, 5, -6)
-          ..lineTo(1, 4)
-          ..close(),
-        Paint()..color = const Color(0xff897889),
-      );
+      canvas.drawPath(_budPath, budPaint);
       canvas.restore();
     }
-    canvas.restore();
   }
 
   @override
@@ -546,10 +574,7 @@ class PresetSurfacePainter extends CustomPainter {
       ..setFloat(2, density)
       ..setFloat(3, dispersion);
     canvas.save();
-    canvas.scale(
-      size.width / presetCanvasSize.width,
-      size.height / presetCanvasSize.height,
-    );
+    _scaleToPresetCanvas(canvas, size);
     canvas.clipPath(_night);
     canvas.drawRect(Offset.zero & presetCanvasSize, Paint()..shader = shader);
     canvas.restore();
@@ -600,14 +625,18 @@ class PresetWeatherPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.scale(
-      size.width / presetCanvasSize.width,
-      size.height / presetCanvasSize.height,
-    );
+    _scaleToPresetCanvas(canvas, size);
     // Integer cycles make every position and flutter phase continuous when
     // the controller wraps, including the rain's faster independent motion.
     final progress = time.value;
     final angle = progress * math.pi * 2;
+    _paintPetals(canvas, progress, angle);
+    canvas.clipPath(_night);
+    _paintRain(canvas, progress);
+    canvas.restore();
+  }
+
+  void _paintPetals(Canvas canvas, double progress, double angle) {
     final petalPaint = Paint();
     for (final p in _particles) {
       final x =
@@ -628,7 +657,9 @@ class PresetWeatherPainter extends CustomPainter {
       canvas.drawPath(_petal, petalPaint);
       canvas.restore();
     }
-    canvas.clipPath(_night);
+  }
+
+  void _paintRain(Canvas canvas, double progress) {
     final rain = Paint()..strokeCap = StrokeCap.round;
     // Wrap beyond the canvas, including the longest streak's tail, so drops
     // re-enter from above instead of visibly teleporting across the dark field.
@@ -644,7 +675,6 @@ class PresetWeatherPainter extends CustomPainter {
         rain,
       );
     }
-    canvas.restore();
   }
 
   @override
