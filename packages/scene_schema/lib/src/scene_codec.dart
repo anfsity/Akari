@@ -684,8 +684,7 @@ SceneMotionTiming _decodeMotionTiming(Map<String, dynamic> json) {
       ? null
       : _getInt(json, 'durationMs');
   final delay = _getInt(json, 'delayMs', fallback: 0);
-  if ((duration != null &&
-          (duration < 0 || duration > maxSceneMotionTimeMs)) ||
+  if ((duration != null && (duration < 0 || duration > maxSceneMotionTimeMs)) ||
       delay < 0 ||
       delay > maxSceneMotionTimeMs) {
     throw const FormatException(
@@ -1013,7 +1012,7 @@ int decodeSceneColor(String value) {
 
 /// Formats a 32-bit ARGB value as a `#RRGGBB` or `#AARRGGBB` scene color.
 String encodeSceneColor(int value) {
-  final hex = value.toRadixString(16).padLeft(8, '0');
+  final hex = value.toUnsigned(32).toRadixString(16).padLeft(8, '0');
   if (hex.startsWith('ff')) {
     return '#${hex.substring(2)}';
   }
