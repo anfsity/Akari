@@ -108,10 +108,13 @@ def run_greeter(layout, command):
 
         def receive_event():
             header = stream.read(14)
-            if not header:
+            if len(header) < 14:
                 return None
             size, _ = struct.unpack('<II', header[6:])
-            return json.loads(stream.read(size))
+            payload = stream.read(size)
+            if len(payload) < size:
+                return None
+            return json.loads(payload)
 
         response = receive_event()
         if not response['success']:

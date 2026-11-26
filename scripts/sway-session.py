@@ -156,7 +156,7 @@ def start_session(directory, backend, command):
     runtime.chmod(0o700)
     screenshots = directory / 'screenshots'
     directory.mkdir(parents=True, exist_ok=True)
-    screenshots.mkdir()
+    screenshots.mkdir(exist_ok=True)
     config = directory / 'sway.conf'
     base = Path(__file__).resolve().parents[1] / 'scripts/sway/debug.conf'
     config.write_text(base.read_text() + '\n' + '\n'.join(
@@ -238,12 +238,19 @@ def start_session(directory, backend, command):
         app = subprocess.Popen(command, env=environment, stdin=sys.stdin,
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                start_new_session=True)
+        stdout_open = True
+
         def copy_app_output():
+            nonlocal stdout_open
             for chunk in iter(lambda: app.stdout.read1(65536), b''):
                 app_log.write(chunk)
                 app_log.flush()
-                sys.stdout.buffer.write(chunk)
-                sys.stdout.buffer.flush()
+                if stdout_open:
+                    try:
+                        sys.stdout.buffer.write(chunk)
+                        sys.stdout.buffer.flush()
+                    except BrokenPipeError:
+                        stdout_open = False
         output_thread = threading.Thread(target=copy_app_output)
         output_thread.start()
         ready_at = None
