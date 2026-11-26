@@ -20,20 +20,32 @@ class GreeterStatusLine extends StatelessWidget {
     // Service failure takes precedence because authentication cannot recover
     // without it. During a usable prompt, keep rejection text ahead of catalog
     // errors so the user sees why the previous credential was rejected.
-    final message = switch (service.mode) {
-      ServiceMode.starting => 'Starting greeter service...',
-      ServiceMode.unavailable =>
+    final (message, isError) = switch (service.mode) {
+      ServiceMode.starting => ('Starting greeter service...', false),
+      ServiceMode.unavailable => (
         service.error?.message ?? 'Greeter service unavailable.',
+        true,
+      ),
       ServiceMode.ready => switch (auth.mode) {
-        AuthMode.error => auth.error?.message ?? 'Authentication failed.',
-        AuthMode.prompting => auth.promptError ?? session.error?.message ?? '',
+        AuthMode.error => (
+          auth.error?.message ?? 'Authentication failed.',
+          true,
+        ),
+        AuthMode.prompting => (
+          auth.promptError ?? session.error?.message ?? '',
+          auth.promptError != null || session.error != null,
+        ),
         AuthMode.submitting =>
-          auth.promptError ??
-              (auth.prompt?.kind == PromptKind.info
-                  ? auth.prompt!.text
-                  : 'Signing in...'),
-        AuthMode.handingOff => 'Starting session...',
-        _ => session.error?.message ?? '',
+          auth.promptError != null
+              ? (auth.promptError!, true)
+              : (
+                  auth.prompt?.kind == PromptKind.info
+                      ? auth.prompt!.text
+                      : 'Signing in...',
+                  false,
+                ),
+        AuthMode.handingOff => ('Starting session...', false),
+        _ => (session.error?.message ?? '', session.error != null),
       },
     };
 
@@ -53,13 +65,7 @@ class GreeterStatusLine extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color:
-                  service.mode == ServiceMode.unavailable ||
-                      auth.mode == AuthMode.error ||
-                      auth.promptError != null ||
-                      session.error != null
-                  ? scheme.error
-                  : scheme.primary,
+              color: isError ? scheme.error : scheme.primary,
               fontSize: 14,
             ),
           ),

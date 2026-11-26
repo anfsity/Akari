@@ -128,7 +128,9 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       _resetCredentialInput();
       _wakeController.value = widget.feature.dormantSlots.value ? 0 : 1;
     }
-    if (controllerChanged || featureChanged || widget.theme != oldWidget.theme) {
+    if (controllerChanged ||
+        featureChanged ||
+        widget.theme != oldWidget.theme) {
       _updateWakeDuration();
       _activeScenePredicates.value = _getActivePredicates();
       _scene = _createScene();
@@ -264,7 +266,9 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
         return KeyEventResult.ignored;
       }
       _dispatch(const WakeGreeterCommand());
-      _bufferKey(event);
+      if (widget.feature.serviceSlots.value.mode == ServiceMode.ready) {
+        _bufferKey(event);
+      }
       return KeyEventResult.handled;
     }
     if (event.logicalKey == LogicalKeyboardKey.escape) {

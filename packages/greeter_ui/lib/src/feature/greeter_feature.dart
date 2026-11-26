@@ -355,7 +355,8 @@ class GreeterFeature {
         _handleEvent(event);
       }
     } on Object catch (error) {
-      if (generation != _serviceGeneration || authGeneration != _authGeneration) {
+      if (generation != _serviceGeneration ||
+          authGeneration != _authGeneration) {
         return;
       }
       _eventsDuringBegin.clear();
@@ -383,7 +384,10 @@ class GreeterFeature {
     if (attemptId == null || _state.authMode != AuthMode.prompting) {
       return;
     }
-    if (response.trim().isEmpty) {
+    final isEmptyResponse = _state.prompt?.kind == PromptKind.secret
+        ? response.isEmpty
+        : response.trim().isEmpty;
+    if (isEmptyResponse) {
       _setAuthError(const (
         kind: GreeterErrorKind.input,
         message: 'A response is required.',
@@ -627,6 +631,7 @@ class GreeterFeature {
             ),
           ),
         );
+        _effects.add(const ClearCredentialEffect());
       case BackendStateChanged(:final state, :final detail):
         _applyBackendState(state, detail);
       case BackendPromptReceived(:final kind, :final text):
@@ -674,6 +679,7 @@ class GreeterFeature {
         state == BackendAuthState.unknown;
     if (failed) {
       _attemptId = null;
+      _effects.add(const ClearCredentialEffect());
     }
     // Prompt carries the input kind and text; WaitingForInput only confirms
     // protocol progress. Keeping the current mode avoids undoing that prompt
