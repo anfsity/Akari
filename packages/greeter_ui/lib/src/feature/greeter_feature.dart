@@ -4,17 +4,12 @@ import 'package:flutter/foundation.dart';
 
 import 'greeter_commands.dart';
 import 'greeter_effect.dart';
+import 'greeter_slot_store.dart';
 import 'greeter_slots.dart';
 import 'greeter_state.dart';
+import 'greeter_transitions.dart';
 import 'ports/greeter_gateway.dart';
 import 'ports/session_store.dart';
-
-/// Session id or name fragments preferred when the user has no stored choice.
-const _preferredSessionNames = ['hyprland', 'sway'];
-
-class _SlotChangeNotifier extends ChangeNotifier {
-  void notify() => notifyListeners();
-}
 
 /// Application-facing state owner for the greeter flow.
 ///
@@ -34,36 +29,9 @@ class GreeterFeature {
   final SessionStore sessionStore;
   final StreamController<FeatureEffect> _effects =
       StreamController<FeatureEffect>.broadcast();
-  final _SlotChangeNotifier _slotChanges = _SlotChangeNotifier();
+  final GreeterSlotStore _slots = GreeterSlotStore();
   StreamSubscription<GreeterEvent>? _eventSubscription;
   final List<GreeterEvent> _eventsDuringBegin = <GreeterEvent>[];
-  final ValueNotifier<ServiceSlots> _serviceSlots = ValueNotifier(const (
-    mode: ServiceMode.starting,
-    error: null,
-  ));
-  final ValueNotifier<AuthPromptSlots> _authPromptSlots = ValueNotifier((
-    mode: AuthMode.userSelection,
-    selectedUser: null,
-    prompt: null,
-    error: null,
-    promptError: null,
-  ));
-  final ValueNotifier<AccountPickerSlots> _accountPickerSlots = ValueNotifier(
-    AccountPickerSlots(users: const [], selected: null, canSelect: false),
-  );
-  final ValueNotifier<SessionPickerSlots> _sessionPickerSlots = ValueNotifier(
-    SessionPickerSlots(
-      mode: CatalogMode.empty,
-      sessions: const [],
-      selected: null,
-      error: null,
-    ),
-  );
-  final ValueNotifier<PowerSlots> _powerSlots = ValueNotifier(const (
-    mode: PowerMode.idle,
-    error: null,
-  ));
-  final ValueNotifier<bool> _dormantSlots = ValueNotifier(true);
   GreeterState _state = GreeterState.initial();
   String? _attemptId;
   bool _initialized = false;
@@ -78,21 +46,22 @@ class GreeterFeature {
 
   /// Composite notification triggered once per atomic feature update after all
   /// display slots have settled.
-  Listenable get slotChanges => _slotChanges;
+  Listenable get slotChanges => _slots.slotChanges;
 
-  ValueListenable<ServiceSlots> get serviceSlots => _serviceSlots;
+  ValueListenable<ServiceSlots> get serviceSlots => _slots.serviceSlots;
 
-  ValueListenable<AuthPromptSlots> get authPromptSlots => _authPromptSlots;
+  ValueListenable<AuthPromptSlots> get authPromptSlots =>
+      _slots.authPromptSlots;
 
   ValueListenable<AccountPickerSlots> get accountPickerSlots =>
-      _accountPickerSlots;
+      _slots.accountPickerSlots;
 
   ValueListenable<SessionPickerSlots> get sessionPickerSlots =>
-      _sessionPickerSlots;
+      _slots.sessionPickerSlots;
 
-  ValueListenable<PowerSlots> get powerSlots => _powerSlots;
+  ValueListenable<PowerSlots> get powerSlots => _slots.powerSlots;
 
-  ValueListenable<bool> get dormantSlots => _dormantSlots;
+  ValueListenable<bool> get dormantSlots => _slots.dormantSlots;
 
   Stream<FeatureEffect> get effects => _effects.stream;
 
@@ -198,7 +167,7 @@ class GreeterFeature {
           serviceMode: ServiceMode.unavailable,
           authMode: AuthMode.error,
           dormant: false,
-          serviceError: _getGreeterError(
+          serviceError: createGreeterError(
             error,
             fallbackKind: GreeterErrorKind.transport,
             recovery: GreeterRecovery.reconnectService,
@@ -266,23 +235,11 @@ class GreeterFeature {
     _updateState(_state.copyWith(dormant: true));
   }
 
-  bool get _canSelectUser {
-    if (_state.serviceMode != ServiceMode.ready ||
-        _state.dormant ||
-        _beginInFlight ||
-        _sessionStartInFlight) {
-      return false;
-    }
-    if (_state.authMode == AuthMode.userSelection ||
-        _state.authMode == AuthMode.prompting ||
-        (_state.authMode == AuthMode.submitting &&
-            _state.prompt?.kind == PromptKind.info)) {
-      return true;
-    }
-    return _state.authMode == AuthMode.error &&
-        (_state.authError?.recovery == GreeterRecovery.retryAuthentication ||
-            _state.authError?.recovery == GreeterRecovery.retryPrompt);
-  }
+  bool get _canSelectUser => canSelectGreeterUser(
+    _state,
+    beginInFlight: _beginInFlight,
+    sessionStartInFlight: _sessionStartInFlight,
+  );
 
   Future<void> _selectUser(UserSummary user) async {
     if (!_canSelectUser ||
@@ -362,7 +319,7 @@ class GreeterFeature {
       _eventsDuringBegin.clear();
       _beginInFlight = false;
       _setAuthError(
-        _getGreeterError(
+        createGreeterError(
           error,
           fallbackKind: GreeterErrorKind.authentication,
           recovery: GreeterRecovery.retryAuthentication,
@@ -408,7 +365,7 @@ class GreeterFeature {
     } on Object catch (error) {
       if (attemptId == _attemptId) {
         _setAuthError(
-          _getGreeterError(
+          createGreeterError(
             error,
             fallbackKind: GreeterErrorKind.authentication,
             recovery: GreeterRecovery.retryAuthentication,
@@ -459,7 +416,7 @@ class GreeterFeature {
           serviceMode: ServiceMode.unavailable,
           authMode: AuthMode.error,
           dormant: false,
-          serviceError: _getGreeterError(
+          serviceError: createGreeterError(
             error,
             fallbackKind: GreeterErrorKind.transport,
             recovery: GreeterRecovery.reconnectService,
@@ -525,7 +482,7 @@ class GreeterFeature {
           catalogError: null,
         ),
       );
-      _effects.add(ShowErrorNoticeEffect(_getErrorMessage(error)));
+      _effects.add(ShowErrorNoticeEffect(getGreeterErrorMessage(error)));
     } finally {
       if (generation == _serviceGeneration) {
         _sessionStartInFlight = false;
@@ -551,7 +508,7 @@ class GreeterFeature {
       if (generation != _serviceGeneration) {
         return;
       }
-      final powerError = _getGreeterError(
+      final powerError = createGreeterError(
         error,
         fallbackKind: GreeterErrorKind.power,
         recovery: GreeterRecovery.selectUser,
@@ -633,97 +590,23 @@ class GreeterFeature {
         );
         _effects.add(const ClearCredentialEffect());
       case BackendStateChanged(:final state, :final detail):
-        _applyBackendState(state, detail);
-      case BackendPromptReceived(:final kind, :final text):
-        _applyPrompt(kind, text);
-    }
-  }
-
-  void _applyPrompt(PromptKind kind, String text) {
-    switch (kind) {
-      case PromptKind.visible:
-      case PromptKind.secret:
-        _updateState(
-          _state.copyWith(
-            authMode: AuthMode.prompting,
-            prompt: (kind: kind, text: text),
-            backendAuthState: BackendAuthState.waitingForInput,
-            authError: null,
-          ),
-        );
-        if (!_state.dormant) {
-          _effects.add(const FocusCredentialEffect());
+        final outcome = applyBackendAuthStateTransition(_state, state, detail);
+        if (outcome.clearAttempt) {
+          _attemptId = null;
         }
-      case PromptKind.error:
-        _updateState(_state.copyWith(promptError: text));
-      case PromptKind.info:
-        // PAM acknowledges passive authentication in the backend. Keep its
-        // instructions visible for the scan without requesting credentials.
-        _updateState(
-          _state.copyWith(
-            authMode: AuthMode.submitting,
-            prompt: (kind: kind, text: text),
-            authError: null,
-            promptError: null,
-          ),
-        );
-        _effects.add(const ClearCredentialEffect());
-    }
-  }
-
-  void _applyBackendState(BackendAuthState state, String detail) {
-    final failed = state == BackendAuthState.failed;
-    final clearPrompt = failed || state == BackendAuthState.authenticated;
-    final preserveAuthMode =
-        state == BackendAuthState.waitingForInput ||
-        state == BackendAuthState.unknown;
-    if (failed) {
-      _attemptId = null;
-      _effects.add(const ClearCredentialEffect());
-    }
-    // Prompt carries the input kind and text; WaitingForInput only confirms
-    // protocol progress. Keeping the current mode avoids undoing that prompt
-    // or a local input error when the following state signal arrives.
-    final nextMode = switch (state) {
-      BackendAuthState.creatingSession ||
-      BackendAuthState.promptPending ||
-      BackendAuthState.submittingResponse ||
-      BackendAuthState.resolvingSession ||
-      BackendAuthState.startingSession ||
-      BackendAuthState.cancelling => AuthMode.submitting,
-      BackendAuthState.authenticated =>
-        _state.selectedSession == null
-            ? AuthMode.sessionSelection
-            : AuthMode.submitting,
-      BackendAuthState.handingOff => AuthMode.handingOff,
-      BackendAuthState.failed => AuthMode.error,
-      BackendAuthState.idle => AuthMode.userSelection,
-      BackendAuthState.waitingForInput ||
-      BackendAuthState.unknown => _state.authMode,
-    };
-
-    final authError = failed
-        ? (
-            kind: GreeterErrorKind.authentication,
-            message: detail,
-            recovery: GreeterRecovery.retryAuthentication,
-          )
-        : preserveAuthMode
-        ? _state.authError
-        : null;
-
-    _updateState(
-      _state.copyWith(
-        authMode: nextMode,
-        backendAuthState: state,
-        authError: authError,
-        promptError: clearPrompt ? null : _state.promptError,
-        prompt: clearPrompt ? null : _state.prompt,
-      ),
-    );
-    if (state == BackendAuthState.authenticated &&
-        _state.selectedSession != null) {
-      unawaited(_startSelectedSession());
+        if (outcome.effect case final effect?) {
+          _effects.add(effect);
+        }
+        _updateState(outcome.state);
+        if (outcome.shouldStartSession) {
+          unawaited(_startSelectedSession());
+        }
+      case BackendPromptReceived(:final kind, :final text):
+        final outcome = applyPromptTransition(_state, kind, text);
+        _updateState(outcome.state);
+        if (outcome.effect case final effect?) {
+          _effects.add(effect);
+        }
     }
   }
 
@@ -743,7 +626,11 @@ class GreeterFeature {
       if (generation != _sessionLoadGeneration) {
         return;
       }
-      final selectedSession = _getSelectedSession(sessions, storedSessionId);
+      final selectedSession = findPreferredSession(
+        sessions,
+        current: _state.selectedSession,
+        storedSessionId: storedSessionId,
+      );
       _updateState(
         _state.copyWith(
           catalogMode: sessions.isEmpty ? CatalogMode.empty : CatalogMode.ready,
@@ -760,7 +647,7 @@ class GreeterFeature {
       _updateState(
         _state.copyWith(
           catalogMode: CatalogMode.failed,
-          catalogError: _getGreeterError(
+          catalogError: createGreeterError(
             error,
             fallbackKind: GreeterErrorKind.session,
             recovery: GreeterRecovery.retrySessionCatalog,
@@ -770,53 +657,15 @@ class GreeterFeature {
     }
   }
 
-  SessionSummary? _getSelectedSession(
-    List<SessionSummary> sessions,
-    String? storedSessionId,
-  ) {
-    // A refresh preserves the current choice before consulting persistence.
-    // Only IDs present in this catalog may be restored; preferences are hints,
-    // not authority to launch a session that the backend no longer exposes.
-    final current = _state.selectedSession;
-    if (current != null &&
-        sessions.any((candidate) => candidate.id == current.id)) {
-      return current;
-    }
-    if (storedSessionId != null) {
-      for (final session in sessions) {
-        if (session.id == storedSessionId) {
-          return session;
-        }
-      }
-    }
-    for (final preferred in _preferredSessionNames) {
-      for (final session in sessions) {
-        if (session.id.toLowerCase().contains(preferred) ||
-            session.name.toLowerCase().contains(preferred)) {
-          return session;
-        }
-      }
-    }
-    return sessions.isEmpty ? null : sessions.first;
-  }
-
   void _resetToUserSelection({
     bool clearSelectedUser = false,
     ServiceMode? serviceMode,
   }) {
     _updateState(
-      _state.copyWith(
+      resetGreeterStateToUserSelection(
+        _state,
+        clearSelectedUser: clearSelectedUser,
         serviceMode: serviceMode,
-        authMode: AuthMode.userSelection,
-        selectedUser: clearSelectedUser ? null : _state.selectedUser,
-        prompt: null,
-        authError: null,
-        promptError: null,
-        catalogError: _state.sessions.isNotEmpty ? null : _state.catalogError,
-        catalogMode: _state.sessions.isNotEmpty
-            ? CatalogMode.ready
-            : _state.catalogMode,
-        backendAuthState: BackendAuthState.idle,
       ),
     );
   }
@@ -836,75 +685,7 @@ class GreeterFeature {
       return;
     }
     _state = next;
-    // ValueNotifier compares semantic slot equality before notifying, so
-    // unrelated transitions do not rebuild every region of the scene.
-    var slotsChanged = false;
-    slotsChanged |= _setSlot(_serviceSlots, (
-      mode: next.serviceMode,
-      error: next.serviceError,
-    ));
-    slotsChanged |= _setSlot(_authPromptSlots, (
-      mode: next.authMode,
-      // Account selection belongs to its picker until authentication starts;
-      // hiding it here keeps the prompt region from presenting a partial flow.
-      selectedUser: next.authMode == AuthMode.userSelection
-          ? null
-          : next.selectedUser,
-      prompt: next.prompt,
-      error: next.authError,
-      promptError: next.promptError,
-    ));
-    slotsChanged |= _setSlot(
-      _accountPickerSlots,
-      AccountPickerSlots(
-        users: next.users,
-        selected: next.selectedUser,
-        canSelect: _canSelectUser,
-      ),
-    );
-    slotsChanged |= _setSlot(
-      _sessionPickerSlots,
-      SessionPickerSlots(
-        mode: next.catalogMode,
-        sessions: next.sessions,
-        selected: next.selectedSession,
-        error: next.catalogError,
-      ),
-    );
-    slotsChanged |= _setSlot(_powerSlots, (
-      mode: next.powerMode,
-      error: next.powerError,
-    ));
-    slotsChanged |= _setSlot(_dormantSlots, next.dormant);
-    if (slotsChanged) {
-      _slotChanges.notify();
-    }
-  }
-
-  static bool _setSlot<T>(ValueNotifier<T> slot, T next) {
-    if (slot.value == next) {
-      return false;
-    }
-    slot.value = next;
-    return true;
-  }
-
-  String _getErrorMessage(Object error) {
-    return error is GreeterGatewayException
-        ? error.message
-        : serviceUnavailableMessage;
-  }
-
-  GreeterError _getGreeterError(
-    Object error, {
-    required GreeterErrorKind fallbackKind,
-    required GreeterRecovery recovery,
-  }) {
-    return (
-      kind: error is GreeterGatewayException ? error.kind : fallbackKind,
-      message: _getErrorMessage(error),
-      recovery: recovery,
-    );
+    _slots.sync(next, canSelectUser: _canSelectUser);
   }
 
   void dispose() {
@@ -913,12 +694,6 @@ class GreeterFeature {
     unawaited(_eventSubscription?.cancel());
     unawaited(gateway.close());
     unawaited(_effects.close());
-    _slotChanges.dispose();
-    _serviceSlots.dispose();
-    _authPromptSlots.dispose();
-    _accountPickerSlots.dispose();
-    _sessionPickerSlots.dispose();
-    _powerSlots.dispose();
-    _dormantSlots.dispose();
+    _slots.dispose();
   }
 }
