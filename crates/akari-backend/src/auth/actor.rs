@@ -10,8 +10,8 @@ use super::{
         ActorState, AttemptControl, AuthSnapshot, CancelScope, cancel_current, finish_cancellation,
     },
     flow::{
-        begin_session_resolution, create_attempt, fail_session_resolution, handle_respond,
-        handle_start_session, report_session_unavailable, run_authentication,
+        begin_session_resolution, create_attempt, fail_session_resolution, handle_start_session,
+        report_session_unavailable, run_authentication, run_respond,
     },
     handle::{AuthCommand, BeginSequenceMap},
 };
@@ -124,9 +124,28 @@ pub(super) async fn run_actor(
                     emitter,
                     reply,
                 } => {
-                    let result =
-                        handle_respond(&mut actor, &attempt_id, &caller, response, emitter).await;
-                    send_reply(reply, result);
+                    let (transport, cancellation, username) =
+                        match actor.begin_respond(&attempt_id, &caller, &emitter).await {
+                            Ok(accepted) => accepted,
+                            Err(error) => {
+                                send_reply(reply, Err(error));
+                                return;
+                            }
+                        };
+                    // Acknowledge once SubmittingResponse is committed so slow
+                    // PAM factors or automatic auth_error retries do not time
+                    // out the D-Bus reply; results arrive via signals.
+                    send_reply(reply, Ok(()));
+                    let _ = run_respond(
+                        &mut actor,
+                        &attempt_id,
+                        transport,
+                        response,
+                        &username,
+                        emitter,
+                        &cancellation,
+                    )
+                    .await;
                 }
                 AuthCommand::Cancel {
                     attempt_id,

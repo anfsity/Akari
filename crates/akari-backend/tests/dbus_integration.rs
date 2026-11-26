@@ -48,6 +48,7 @@ async fn auth_roundtrip() {
         .call::<_, _, ()>("Respond", &(attempt_id.clone(), "password"))
         .await
         .expect("password response should succeed");
+    wait_for_state(&proxy, "Authenticated").await;
     let state: (String, String) = proxy
         .call("GetState", &())
         .await
@@ -105,6 +106,7 @@ async fn other_callers_cannot_control_or_replace_an_attempt() {
         .call::<_, _, ()>("Respond", &(attempt.clone(), "password"))
         .await
         .unwrap();
+    wait_for_state(&owner, "Authenticated").await;
     let result = other
         .call::<_, _, ()>("StartSession", &(attempt, "wayland:test"))
         .await;
@@ -259,13 +261,21 @@ async fn cancel_interrupts_io_with_a_full_command_queue() {
     .await
     .expect("Cancel must interrupt I/O before waiting for command capacity")
     .unwrap();
+    let mut accepted = 0_usize;
+    let mut rejected = 0_usize;
     tokio::time::timeout(Duration::from_secs(2), async {
         while let Some(result) = responses.join_next().await {
-            assert!(result.unwrap().is_err());
+            match result.unwrap() {
+                Ok(()) => accepted += 1,
+                Err(_) => rejected += 1,
+            }
         }
     })
     .await
     .unwrap();
+    assert_eq!(accepted, 1);
+    assert_eq!(rejected, 63);
+    wait_for_state(&proxy, "Idle").await;
     server.finish().await;
     wait_for_state(&proxy, "Idle").await;
 }
@@ -505,6 +515,7 @@ async fn begin_authentication_recovers_after_failed_state() {
         .call::<_, _, ()>("Respond", &(second, "password"))
         .await
         .unwrap();
+    wait_for_state(&proxy, "Authenticated").await;
     let state: (String, String) = proxy.call("GetState", &()).await.unwrap();
     assert_eq!(state.0, "Authenticated");
     server.finish().await;
@@ -525,6 +536,7 @@ async fn wrong_password_prompts_again() {
         .await
         .expect("begin authentication should succeed");
     wait_for_state(&proxy, "WaitingForInput").await;
+    let mut prompts = proxy.receive_signal("Prompt").await.unwrap();
     let state: (String, String) = proxy
         .call("GetState", &())
         .await
@@ -535,14 +547,22 @@ async fn wrong_password_prompts_again() {
         proxy
             .call::<_, _, ()>("Respond", &(attempt_id.clone(), "wrong"))
             .await
-            .expect("rejected credential should restart the prompt");
-        let state: (String, String) = proxy.call("GetState", &()).await.unwrap();
-        assert_eq!(state.0, "WaitingForInput");
+            .expect("rejected credential should be accepted for retry");
+        for expected_kind in ["error", "secret"] {
+            let prompt = tokio::time::timeout(Duration::from_secs(2), prompts.next())
+                .await
+                .unwrap()
+                .unwrap();
+            let (_, kind, _): (String, String, String) = prompt.body().deserialize().unwrap();
+            assert_eq!(kind, expected_kind);
+        }
+        wait_for_state(&proxy, "WaitingForInput").await;
     }
     proxy
         .call::<_, _, ()>("Respond", &(attempt_id, "password"))
         .await
         .unwrap();
+    wait_for_state(&proxy, "Authenticated").await;
     let state: (String, String) = proxy.call("GetState", &()).await.unwrap();
     assert_eq!(state.0, "Authenticated");
 
@@ -585,12 +605,10 @@ async fn invalid_rejection_cleanup_does_not_retry() {
             .await
             .unwrap();
         wait_for_state(&proxy, "WaitingForInput").await;
-        assert!(
-            proxy
-                .call::<_, _, ()>("Respond", &(attempt, "wrong"))
-                .await
-                .is_err()
-        );
+        proxy
+            .call::<_, _, ()>("Respond", &(attempt, "wrong"))
+            .await
+            .unwrap();
         wait_for_state(&proxy, "Failed").await;
         server.finish().await;
     }

@@ -95,17 +95,17 @@ pub(super) async fn run_authentication(
     .await
 }
 
-pub(super) async fn handle_respond(
+pub(super) async fn run_respond(
     actor: &mut ActorState,
     attempt_id: &str,
-    caller: &str,
+    mut transport: GreetdTransport,
     response: zeroize::Zeroizing<String>,
+    username: &str,
     emitter: SignalEmitter<'static>,
+    cancellation: &CancellationToken,
 ) -> fdo::Result<()> {
-    let (mut transport, cancellation, username) =
-        actor.begin_respond(attempt_id, caller, &emitter).await?;
     let result = transport
-        .post_auth_message_response(Some(response.as_str()), &cancellation)
+        .post_auth_message_response(Some(response.as_str()), cancellation)
         .await;
     drop(response);
     let next_response = handle_transport_result(actor, attempt_id, result, &emitter).await?;
@@ -116,9 +116,9 @@ pub(super) async fn handle_respond(
         transport,
         next_response,
         true,
-        &username,
+        username,
         emitter,
-        &cancellation,
+        cancellation,
     )
     .await
 }
