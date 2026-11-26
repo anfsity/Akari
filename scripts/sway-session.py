@@ -144,12 +144,7 @@ def get_session_environment(parent_environment, runtime, backend, output_count):
     return environment
 
 
-def start_session(directory, backend, command):
-    profile = json.loads(os.environ['AKARI_DISPLAY_PROFILE_JSON'])
-    target = get_virtual_outputs(profile, backend)
-    parent_environment = dict(os.environ)
-    hyprland = (backend == 'wayland' and not parent_environment.get('SWAYSOCK')
-                and bool(parent_environment.get('HYPRLAND_INSTANCE_SIGNATURE')))
+def _prepare_session_workspace(directory, target, hyprland):
     # Keep Unix domain sockets in a short /tmp directory so deeply nested repo
     # paths never overflow the 108-byte sockaddr_un.sun_path limit.
     runtime = Path(tempfile.mkdtemp(prefix='akari-sway-'))
@@ -161,6 +156,124 @@ def start_session(directory, backend, command):
     base = Path(__file__).resolve().parents[1] / 'scripts/sway/debug.conf'
     config.write_text(base.read_text() + '\n' + '\n'.join(
         get_output_commands(target, configure_mode=not hyprland)) + '\n')
+    return runtime, config, screenshots
+
+
+def _wait_for_sway_sockets(runtime, sway, directory, environment, is_interrupted):
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline and not is_interrupted():
+        sockets = list(runtime.glob('sway-ipc.*.sock'))
+        waylands = [path for path in runtime.glob('wayland-*') if path.is_socket()]
+        if sockets and waylands:
+            environment.update(SWAYSOCK=str(sockets[0]), WAYLAND_DISPLAY=waylands[0].name)
+            return True
+        if sway.poll() is not None:
+            raise RuntimeError(f'Sway exited before startup; see {directory / "sway.log"}.')
+        time.sleep(.1)
+    if is_interrupted():
+        return False
+    raise RuntimeError('Timed out waiting for inner Sway sockets.')
+
+
+def _resolve_expected_outputs(parent_environment, sway, target, hyprland, current):
+    return (get_hyprland_targets(parent_environment, sway.pid, target, current)
+            if hyprland else target)
+
+
+def _wait_for_initial_outputs(environment, parent_environment, sway, target, hyprland, directory, is_interrupted):
+    # Wait for mapping and output configuration before launching the theme.
+    deadline = time.monotonic() + 3
+    while True:
+        raw = get_sway_reply(environment, '-t', 'get_outputs')
+        actual = get_outputs(raw)
+        expected = _resolve_expected_outputs(
+            parent_environment, sway, target, hyprland, actual)
+        if expected is not None and hyprland:
+            update_output_scales(environment, expected, actual)
+        if ((expected is not None and not get_output_differences(expected, actual))
+                or time.monotonic() >= deadline):
+            break
+        if is_interrupted():
+            return None
+        time.sleep(.1)
+    write_json_atomic(directory / 'outputs.json', raw, mode=0o644)
+    if expected is None:
+        raise RuntimeError('Timed out waiting for owned Hyprland output windows.')
+    return expected, actual
+
+
+def _start_output_forwarder(app, app_log):
+    stdout_open = True
+
+    def copy_app_output():
+        nonlocal stdout_open
+        for chunk in iter(lambda: app.stdout.read1(65536), b''):
+            app_log.write(chunk)
+            app_log.flush()
+            if stdout_open:
+                try:
+                    sys.stdout.buffer.write(chunk)
+                    sys.stdout.buffer.flush()
+                except BrokenPipeError:
+                    stdout_open = False
+
+    thread = threading.Thread(target=copy_app_output)
+    thread.start()
+    return thread
+
+
+def _capture_screenshots(environment, current, screenshots, report, report_path):
+    for output in current:
+        screenshot = screenshots / f'{output["name"]}.png'
+        subprocess.run(
+            ['grim', '-s', str(output['scale']), '-o', output['name'], str(screenshot)],
+            env=environment, check=True, timeout=10)
+        report['screenshots'].append(str(screenshot))
+    write_json_atomic(report_path, report, mode=0o644)
+    print(f'Inner screenshots saved: {screenshots}', flush=True)
+
+
+def _monitor_session(app, sway, environment, parent_environment, target, hyprland,
+                     directory, screenshots, report, report_path, update_report, is_interrupted):
+    target_names = {output['name'] for output in target}
+    ready_at = None
+    while app.poll() is None and not is_interrupted():
+        if sway.poll() is not None:
+            raise RuntimeError('Sway exited while the theme was running.')
+        raw = get_sway_reply(environment, '-t', 'get_outputs')
+        current = get_outputs(raw)
+        expected = _resolve_expected_outputs(
+            parent_environment, sway, target, hyprland, current)
+        if expected is None:
+            raise RuntimeError('Owned Hyprland output windows disappeared.')
+        if hyprland and update_output_scales(environment, expected, current):
+            # Output configuration is applied asynchronously. Reconcile on
+            # the next poll, as at startup, before verifying or capturing.
+            time.sleep(.1)
+            continue
+        if (expected != report['effective_target']
+                or get_output_differences(report['actual'], current)):
+            write_json_atomic(directory / 'outputs.json', raw, mode=0o644)
+            update_report(expected, current, 'output-change')
+        if not report['screenshots']:
+            visible = get_greeter_outputs(get_sway_reply(environment, '-t', 'get_tree'))
+            if visible == target_names:
+                if ready_at is None:
+                    ready_at = time.monotonic()
+                if time.monotonic() - ready_at >= 1:
+                    _capture_screenshots(environment, current, screenshots, report, report_path)
+            else:
+                ready_at = None
+        time.sleep(.2)
+
+
+def start_session(directory, backend, command):
+    profile = json.loads(os.environ['AKARI_DISPLAY_PROFILE_JSON'])
+    target = get_virtual_outputs(profile, backend)
+    parent_environment = dict(os.environ)
+    hyprland = (backend == 'wayland' and not parent_environment.get('SWAYSOCK')
+                and bool(parent_environment.get('HYPRLAND_INSTANCE_SIGNATURE')))
+    runtime, config, screenshots = _prepare_session_workspace(directory, target, hyprland)
     report = {'source': profile['source'], 'custom': profile['custom'],
               'selection': profile['selection'], 'backend': backend,
               'geometry': 'compositor' if hyprland else 'fixed',
@@ -176,6 +289,9 @@ def start_session(directory, backend, command):
     def handle_signal(signum, frame):
         nonlocal interrupted
         interrupted = 128 + signum
+
+    def is_interrupted():
+        return bool(interrupted)
 
     handlers = {signum: signal.signal(signum, handle_signal)
                 for signum in [signal.SIGINT, signal.SIGTERM]}
@@ -202,97 +318,26 @@ def start_session(directory, backend, command):
         sway = subprocess.Popen(['sway', '--unsupported-gpu', '-c', str(config)],
                                 env=environment, stdout=sway_log, stderr=subprocess.STDOUT,
                                 start_new_session=True)
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline and not interrupted:
-            sockets = list(runtime.glob('sway-ipc.*.sock'))
-            waylands = [path for path in runtime.glob('wayland-*') if path.is_socket()]
-            if sockets and waylands:
-                environment.update(SWAYSOCK=str(sockets[0]), WAYLAND_DISPLAY=waylands[0].name)
-                break
-            if sway.poll() is not None:
-                raise RuntimeError(f'Sway exited before startup; see {directory / "sway.log"}.')
-            time.sleep(.1)
-        else:
-            if interrupted:
-                return interrupted
-            raise RuntimeError('Timed out waiting for inner Sway sockets.')
-        # Wait for mapping and output configuration before launching the theme.
-        deadline = time.monotonic() + 3
-        while True:
-            raw = get_sway_reply(environment, '-t', 'get_outputs')
-            actual = get_outputs(raw)
-            expected = (get_hyprland_targets(parent_environment, sway.pid, target, actual)
-                        if hyprland else target)
-            if expected is not None and hyprland:
-                update_output_scales(environment, expected, actual)
-            if ((expected is not None and not get_output_differences(expected, actual))
-                    or time.monotonic() >= deadline):
-                break
-            if interrupted:
-                return interrupted
-            time.sleep(.1)
-        write_json_atomic(directory / 'outputs.json', raw, mode=0o644)
-        if expected is None:
-            raise RuntimeError('Timed out waiting for owned Hyprland output windows.')
+        if not _wait_for_sway_sockets(runtime, sway, directory, environment, is_interrupted):
+            return interrupted
+        initial = _wait_for_initial_outputs(
+            environment, parent_environment, sway, target, hyprland, directory, is_interrupted)
+        if initial is None:
+            return interrupted
+        expected, actual = initial
         update_report(expected, actual, 'startup')
         app = subprocess.Popen(command, env=environment, stdin=sys.stdin,
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                start_new_session=True)
-        stdout_open = True
-
-        def copy_app_output():
-            nonlocal stdout_open
-            for chunk in iter(lambda: app.stdout.read1(65536), b''):
-                app_log.write(chunk)
-                app_log.flush()
-                if stdout_open:
-                    try:
-                        sys.stdout.buffer.write(chunk)
-                        sys.stdout.buffer.flush()
-                    except BrokenPipeError:
-                        stdout_open = False
-        output_thread = threading.Thread(target=copy_app_output)
-        output_thread.start()
-        ready_at = None
-        while app.poll() is None and not interrupted:
-            if sway.poll() is not None:
-                raise RuntimeError('Sway exited while the theme was running.')
-            raw = get_sway_reply(environment, '-t', 'get_outputs')
-            current = get_outputs(raw)
-            expected = (get_hyprland_targets(parent_environment, sway.pid, target, current)
-                        if hyprland else target)
-            if expected is None:
-                raise RuntimeError('Owned Hyprland output windows disappeared.')
-            if hyprland and update_output_scales(environment, expected, current):
-                # Output configuration is applied asynchronously. Reconcile on
-                # the next poll, as at startup, before verifying or capturing.
-                time.sleep(.1)
-                continue
-            if (expected != report['effective_target']
-                    or get_output_differences(report['actual'], current)):
-                write_json_atomic(directory / 'outputs.json', raw, mode=0o644)
-                update_report(expected, current, 'output-change')
-            if not report['screenshots']:
-                visible = get_greeter_outputs(get_sway_reply(environment, '-t', 'get_tree'))
-                if visible == {output['name'] for output in target}:
-                    if ready_at is None:
-                        ready_at = time.monotonic()
-                    if time.monotonic() - ready_at >= 1:
-                        for output in current:
-                            screenshot = screenshots / f'{output["name"]}.png'
-                            subprocess.run(['grim', '-s', str(output['scale']), '-o', output['name'], str(screenshot)],
-                                           env=environment, check=True, timeout=10)
-                            report['screenshots'].append(str(screenshot))
-                        write_json_atomic(report_path, report, mode=0o644)
-                        print(f'Inner screenshots saved: {screenshots}', flush=True)
-                else:
-                    ready_at = None
-            time.sleep(.2)
+        output_thread = _start_output_forwarder(app, app_log)
+        _monitor_session(
+            app, sway, environment, parent_environment, target, hyprland,
+            directory, screenshots, report, report_path, update_report, is_interrupted)
         if interrupted:
             return interrupted
         raw, current = record_sway_outputs(directory, environment)
-        expected = (get_hyprland_targets(parent_environment, sway.pid, target, current)
-                    if hyprland else target)
+        expected = _resolve_expected_outputs(
+            parent_environment, sway, target, hyprland, current)
         if expected is None:
             raise RuntimeError('Owned Hyprland output windows disappeared.')
         update_report(expected, current, 'theme-exit')
