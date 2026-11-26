@@ -31,9 +31,11 @@ void main() {
     }
   });
 
-  test('quitting an interactive step restores the terminal and writes its report', () async {
-    final runner = File('${tempRoot.path}/interactive.dart');
-    await runner.writeAsString('''
+  test(
+    'quitting an interactive step restores the terminal and writes its report',
+    () async {
+      final runner = File('${tempRoot.path}/interactive.dart');
+      await runner.writeAsString('''
 import 'dart:io';
 import '${_repoRoot.uri}packages/akari_cli/lib/src/execution/model.dart';
 import '${_repoRoot.uri}packages/akari_cli/lib/src/commands/development.dart';
@@ -53,18 +55,19 @@ runDirectory: 'run',
 );
 }
 ''');
-    final result = await Process.run('python3', [
-      '${_repoRoot.path}/test/probes/interactive_run_probe.py',
-      Platform.resolvedExecutable,
-      '--packages=${Isolate.packageConfigSync!.toFilePath()}',
-      runner.path,
-    ], workingDirectory: tempRoot.path);
-    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final report = jsonDecode(
-      await File('${tempRoot.path}/run/report.json').readAsString(),
-    );
-    expect(report['status'], 'passed');
-  });
+      final result = await Process.run('python3', [
+        '${_repoRoot.path}/test/probes/interactive_run_probe.py',
+        Platform.resolvedExecutable,
+        '--packages=${Isolate.packageConfigSync!.toFilePath()}',
+        runner.path,
+      ], workingDirectory: tempRoot.path);
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+      final report = jsonDecode(
+        await File('${tempRoot.path}/run/report.json').readAsString(),
+      );
+      expect(report['status'], 'passed');
+    },
+  );
 
   test(
     'run studio plans a separate editor host without backend transport',
@@ -95,7 +98,10 @@ runDirectory: 'run',
       final projects = jsonDecode(
         steps.last['environment']['AKARI_THEME_DIRECTORIES_JSON'] as String,
       ) as List;
-      expect(projects, contains(Directory('${_repoRoot.path}/themes/preset1').absolute.path));
+      expect(
+        projects,
+        contains(Directory('${_repoRoot.path}/themes/preset1').absolute.path),
+      );
       expect(
         steps.map((step) => step['id']),
         containsAll([
@@ -153,7 +159,7 @@ runDirectory: 'run',
       final project = await _createThemeProject(
         Directory('${tempRoot.path}/theme with \$dollar'),
       );
-      final theme = getThemePackage(project);
+      final theme = loadThemePackage(project);
       final host = Directory('${tempRoot.path}/studio');
       createThemeHost(
         repoRoot: _repoRoot,
@@ -192,7 +198,7 @@ runDirectory: 'run',
     await manifest.writeAsString(
       '${await manifest.readAsString()}\nakari:\n  scene: lib/ocean.scene.json\n',
     );
-    final theme = getThemePackage(project);
+    final theme = loadThemePackage(project);
     expect(
       findThemeSceneFiles(project).first.path,
       '${project.path}/lib/ocean.scene.json',
@@ -216,7 +222,7 @@ runDirectory: 'run',
         'scene: ../outside.scene.json',
       ),
     );
-    expect(() => getThemePackage(project), throwsFormatException);
+    expect(() => loadThemePackage(project), throwsFormatException);
   });
 
   test(
@@ -280,75 +286,75 @@ runDirectory: 'run',
     }
   });
 
-  test(
-    'host synchronization repairs moved sources and preserves caches and timestamps',
-    () async {
-      final project = await _createThemeProject(tempRoot);
-      final theme = getThemePackage(project);
-      final repository = Directory('${tempRoot.path}/repo');
-      await Directory('${repository.path}/apps/greeter/lib/app').create(recursive: true);
-      await File('${repository.path}/apps/greeter/lib/app/app.dart').writeAsString('first');
-      await Directory('${repository.path}/apps/greeter/linux/flutter')
-          .create(recursive: true);
-      final cmake = File('${repository.path}/apps/greeter/linux/CMakeLists.txt');
-      await cmake.writeAsString('cmake');
-      await File('${repository.path}/apps/greeter/pubspec.yaml').writeAsString(
-        'version: 1.0.0\nenvironment: {sdk: ^3.13.2}\ndependencies: {dbus: ^0.7.11}\n',
-      );
-      final host = Directory('${tempRoot.path}/host');
-      createThemeHost(
-        repoRoot: repository,
-        theme: theme,
-        output: host,
-        kind: ThemeHostKind.preview,
-      );
-      // Cached hosts from before the app move still point at the old source root.
-      await Link('${host.path}/lib/app').update('${repository.path}/lib/app');
-      final manifest = File('${host.path}/pubspec.yaml');
-      final originalModified = DateTime.utc(2020);
-      await manifest.setLastModified(originalModified);
-      await Directory('${host.path}/linux/flutter/ephemeral').create();
-      await File('${host.path}/linux/flutter/ephemeral/cache')
-          .writeAsString('cached');
-      await Directory('${host.path}/build').create();
-      await File('${host.path}/build/cache').writeAsString('cached');
-      await File('${host.path}/linux/obsolete.cc').writeAsString('obsolete');
-      await File('${repository.path}/apps/greeter/lib/app/app.dart').writeAsString('second');
-      createThemeHost(
-        repoRoot: repository,
-        theme: theme,
-        output: host,
-        kind: ThemeHostKind.preview,
-      );
-      expect((await manifest.lastModified()).toUtc(), originalModified);
-      expect(
-        await File('${host.path}/lib/app/app.dart').readAsString(),
-        'second',
-      );
-      expect(File('${host.path}/linux/obsolete.cc').existsSync(), isFalse);
-      expect(await File('${host.path}/build/cache').readAsString(), 'cached');
-      expect(
-        await File('${host.path}/linux/flutter/ephemeral/cache').readAsString(),
-        'cached',
-      );
-      expect(
-        getThemeHostDirectory(theme, ThemeHostKind.preview),
-        getThemeHostDirectory(getThemePackage(project), ThemeHostKind.preview),
-      );
-      final otherProject = await _createThemeProject(
-        Directory('${tempRoot.path}/other'),
-      );
-      expect(
-        getThemeHostDirectory(theme, ThemeHostKind.preview),
-        isNot(
-          getThemeHostDirectory(
-            getThemePackage(otherProject),
-            ThemeHostKind.preview,
-          ),
+  test('host synchronization repairs moved sources and preserves caches and timestamps', () async {
+    final project = await _createThemeProject(tempRoot);
+    final theme = loadThemePackage(project);
+    final repository = Directory('${tempRoot.path}/repo');
+    await Directory('${repository.path}/apps/greeter/lib/app')
+        .create(recursive: true);
+    await File('${repository.path}/apps/greeter/lib/app/app.dart')
+        .writeAsString('first');
+    await Directory('${repository.path}/apps/greeter/linux/flutter')
+        .create(recursive: true);
+    final cmake = File('${repository.path}/apps/greeter/linux/CMakeLists.txt');
+    await cmake.writeAsString('cmake');
+    await File('${repository.path}/apps/greeter/pubspec.yaml').writeAsString(
+      'version: 1.0.0\nenvironment: {sdk: ^3.13.2}\ndependencies: {dbus: ^0.7.11}\n',
+    );
+    final host = Directory('${tempRoot.path}/host');
+    createThemeHost(
+      repoRoot: repository,
+      theme: theme,
+      output: host,
+      kind: ThemeHostKind.preview,
+    );
+    // Cached hosts from before the app move still point at the old source root.
+    await Link('${host.path}/lib/app').update('${repository.path}/lib/app');
+    final manifest = File('${host.path}/pubspec.yaml');
+    final originalModified = DateTime.utc(2020);
+    await manifest.setLastModified(originalModified);
+    await Directory('${host.path}/linux/flutter/ephemeral').create();
+    await File('${host.path}/linux/flutter/ephemeral/cache')
+        .writeAsString('cached');
+    await Directory('${host.path}/build').create();
+    await File('${host.path}/build/cache').writeAsString('cached');
+    await File('${host.path}/linux/obsolete.cc').writeAsString('obsolete');
+    await File('${repository.path}/apps/greeter/lib/app/app.dart')
+        .writeAsString('second');
+    createThemeHost(
+      repoRoot: repository,
+      theme: theme,
+      output: host,
+      kind: ThemeHostKind.preview,
+    );
+    expect((await manifest.lastModified()).toUtc(), originalModified);
+    expect(
+      await File('${host.path}/lib/app/app.dart').readAsString(),
+      'second',
+    );
+    expect(File('${host.path}/linux/obsolete.cc').existsSync(), isFalse);
+    expect(await File('${host.path}/build/cache').readAsString(), 'cached');
+    expect(
+      await File('${host.path}/linux/flutter/ephemeral/cache').readAsString(),
+      'cached',
+    );
+    expect(
+      getThemeHostDirectory(theme, ThemeHostKind.preview),
+      getThemeHostDirectory(loadThemePackage(project), ThemeHostKind.preview),
+    );
+    final otherProject = await _createThemeProject(
+      Directory('${tempRoot.path}/other'),
+    );
+    expect(
+      getThemeHostDirectory(theme, ThemeHostKind.preview),
+      isNot(
+        getThemeHostDirectory(
+          loadThemePackage(otherProject),
+          ThemeHostKind.preview,
         ),
-      );
-    },
-  );
+      ),
+    );
+  });
 
   test(
     'build plans compile production backend and configure native jobs',
@@ -356,7 +362,7 @@ runDirectory: 'run',
       final project = await _createThemeProject(tempRoot);
       final plan = createBuildPlan(
         _repoRoot,
-        getThemePackage(project),
+        loadThemePackage(project),
         mode: BuildMode.release,
         jobs: 4,
       ).steps;
@@ -588,9 +594,15 @@ sys.exit(1)
     final smoke = steps.singleWhere((step) => step.id == 'dbus.smoke');
     expect(
       smoke.environment['AKARI_BACKEND_BIN'],
-      getAbsolutePath(tempRoot, getBackendExecutablePath(BackendMode.mock, BuildMode.debug)),
+      getAbsolutePath(
+        tempRoot,
+        getBackendExecutablePath(BackendMode.mock, BuildMode.debug),
+      ),
     );
-    expect(steps.indexWhere((step) => step.id == 'backend.build'), lessThan(steps.indexOf(smoke)));
+    expect(
+      steps.indexWhere((step) => step.id == 'backend.build'),
+      lessThan(steps.indexOf(smoke)),
+    );
     expect(
       steps
           .where((step) => step.id.startsWith('scenes.generate_'))
@@ -644,8 +656,7 @@ sys.exit(1)
     expect(steps.last['id'], 'theme.preview');
     expect(steps.where((step) => step['id'] == 'backend.build'), isEmpty);
     expect(
-      Directory('${_repoRoot.path}/${plan['run_directory']}')
-          .existsSync(),
+      Directory('${_repoRoot.path}/${plan['run_directory']}').existsSync(),
       isFalse,
     );
   });
@@ -679,7 +690,8 @@ sys.exit(1)
           '--dry-run',
         ]);
         expect(result.exitCode, 0, reason: '${result.stderr}');
-        final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+        final plan =
+            jsonDecode(result.stdout as String) as Map<String, dynamic>;
         final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
         expect(
           steps.map((step) => step['id']),
@@ -702,7 +714,9 @@ sys.exit(1)
 
   test('preview launches an external theme using only its selected theme dependency', () async {
     final project = await _createThemeProject(tempRoot);
-    final platformManifest = File('${_repoRoot.path}/apps/greeter/pubspec.yaml');
+    final platformManifest = File(
+      '${_repoRoot.path}/apps/greeter/pubspec.yaml',
+    );
     final manifestBefore = await platformManifest.readAsString();
     final flutter = File('${tempRoot.path}/flutter');
     final dart = File('${tempRoot.path}/dart');
@@ -790,7 +804,8 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         environment: {'AKARI_DART_BIN': fakeDart.path},
       );
       expect(result.exitCode, 0, reason: '${result.stderr}');
-      final report = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+      final report =
+          jsonDecode(result.stdout as String) as Map<String, dynamic>;
       expect(report['command'], 'generate-scenes');
       expect(report['status'], 'passed');
       final runDirectory =
@@ -805,12 +820,8 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
       final steps = (report['steps'] as List).cast<Map<String, dynamic>>();
       expect(steps, hasLength(1));
       for (final step in steps) {
-        final stdoutLog = File(
-          '${_repoRoot.path}/${step['stdout_log']}',
-        );
-        final stderrLog = File(
-          '${_repoRoot.path}/${step['stderr_log']}',
-        );
+        final stdoutLog = File('${_repoRoot.path}/${step['stdout_log']}');
+        final stderrLog = File('${_repoRoot.path}/${step['stderr_log']}');
         expect(await stdoutLog.readAsString(), 'fake sdk stdout\n');
         expect(await stderrLog.readAsString(), 'fake sdk stderr\n');
       }
@@ -885,8 +896,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         isTrue,
       );
       expect(
-        Directory('${_repoRoot.path}/${plan['run_directory']}')
-            .existsSync(),
+        Directory('${_repoRoot.path}/${plan['run_directory']}').existsSync(),
         isFalse,
       );
 
@@ -895,9 +905,14 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         environment: {'AKARI_FLUTTER_BIN': flutterBin},
         unsetEnvironmentVariables: {'AKARI_DART_BIN'},
       );
-      expect(derivedDartResult.exitCode, 0, reason: '${derivedDartResult.stderr}');
-      final derivedDartPlan =
-          jsonDecode(derivedDartResult.stdout as String) as Map<String, dynamic>;
+      expect(
+        derivedDartResult.exitCode,
+        0,
+        reason: '${derivedDartResult.stderr}',
+      );
+      final derivedDartPlan = jsonDecode(
+        derivedDartResult.stdout as String,
+      ) as Map<String, dynamic>;
       final firstStep =
           ((derivedDartPlan['steps'] as List).first as Map<String, dynamic>);
       expect(
@@ -930,7 +945,8 @@ perf:
           '--help',
         ]);
         expect(result.exitCode, 0, reason: '${result.stderr}');
-        final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+        final plan =
+            jsonDecode(result.stdout as String) as Map<String, dynamic>;
         final steps = (plan['steps'] as List).cast<Map<String, dynamic>>();
         expect(steps.map((step) => step['id']), [
           'theme.pub_get',
@@ -960,8 +976,7 @@ perf:
           '${_repoRoot.path}/$output',
         );
         expect(
-          Directory('${_repoRoot.path}/${plan['run_directory']}')
-              .existsSync(),
+          Directory('${_repoRoot.path}/${plan['run_directory']}').existsSync(),
           isFalse,
         );
       }
@@ -1013,7 +1028,8 @@ sys.exit(int(sys.argv[1]))
             },
           );
           expect(result.exitCode, code, reason: '${result.stderr}');
-          final report = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+          final report =
+              jsonDecode(result.stdout as String) as Map<String, dynamic>;
           final runDirectory = Directory(
             '${_repoRoot.path}/${report['artifacts']['run_directory']}',
           );
@@ -1082,7 +1098,8 @@ perf:
         },
       );
       expect(result.exitCode, code == 0 ? 1 : code, reason: '${result.stderr}');
-      final report = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+      final report =
+          jsonDecode(result.stdout as String) as Map<String, dynamic>;
       final runDirectory = Directory(
         '${_repoRoot.path}/${report['artifacts']['run_directory']}',
       );
@@ -1260,7 +1277,11 @@ Future<ProcessResult> _runTool(
   childEnvironment.addAll(environment);
   return Process.run(
     dartCommand.first,
-    [...dartCommand.skip(1), '${_repoRoot.path}/packages/akari_cli/bin/akari.dart', ...arguments],
+    [
+      ...dartCommand.skip(1),
+      '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
+      ...arguments,
+    ],
     workingDirectory: _repoRoot.path,
     environment: childEnvironment,
     includeParentEnvironment: false,

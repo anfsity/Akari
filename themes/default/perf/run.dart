@@ -6,9 +6,7 @@ import 'package:akari_cli/akari_cli.dart';
 Future<void> main(List<String> arguments) async {
   try {
     final output = Directory(Platform.environment['AKARI_PERF_OUTPUT_DIR']!);
-    if (arguments.any(
-      (argument) => argument == '--help' || argument == '-h',
-    )) {
+    if (arguments.any((argument) => argument == '--help' || argument == '-h')) {
       stdout.writeln(
         'Default theme perf: verify [--cycles COUNT] [--baseline PATH] | trace',
       );
@@ -21,7 +19,7 @@ Future<void> main(List<String> arguments) async {
       Platform.environment['AKARI_REPO_ROOT'] ??
           themeDirectory.parent.parent.path,
     );
-    final theme = getThemePackage(themeDirectory);
+    final theme = loadThemePackage(themeDirectory);
     final host = Directory(
       '${repoRoot.path}/${getThemeHostDirectory(theme, ThemeHostKind.preview)}-perf',
     );

@@ -25,17 +25,17 @@ class ThemePackage {
 /// Resolves the physical project path and checks its authoring contract before
 /// planning a host build. Canonicalization makes symlink aliases share caches
 /// and locks, while separate projects with the same package name stay distinct.
-ThemePackage getThemePackage(Directory projectDirectory) {
+ThemePackage loadThemePackage(Directory projectDirectory) {
   final directory = Directory(projectDirectory.resolveSymbolicLinksSync());
-  final manifest = File(_join(directory.path, 'pubspec.yaml'));
+  final manifest = File(p.join(directory.path, 'pubspec.yaml'));
   final pubspec = loadYaml(manifest.readAsStringSync());
   final packageName = pubspec is YamlMap ? pubspec['name'] : null;
   if (packageName is! String) {
     throw FormatException('Theme package names must start with theme_.');
   }
   final builderName = getThemeBuilderName(packageName);
-  final libDirectory = Directory(_join(directory.path, 'lib'));
-  final entrypoint = File(_join(libDirectory.path, 'theme.dart'));
+  final libDirectory = Directory(p.join(directory.path, 'lib'));
+  final entrypoint = File(p.join(libDirectory.path, 'theme.dart'));
   final sceneFiles = findThemeSceneFiles(directory);
   if (!entrypoint.existsSync() || sceneFiles.isEmpty) {
     throw FormatException(
@@ -55,14 +55,15 @@ ThemePackage getThemePackage(Directory projectDirectory) {
 }
 
 List<ThemePackage> findThemePackages(Directory repoRoot) {
-  final themesDirectory = Directory(_join(repoRoot.path, 'themes'));
+  final themesDirectory = Directory(p.join(repoRoot.path, 'themes'));
   final themes = themesDirectory
       .listSync(followLinks: false)
       .whereType<Directory>()
       .where(
-        (directory) => File(_join(directory.path, 'pubspec.yaml')).existsSync(),
+        (directory) =>
+            File(p.join(directory.path, 'pubspec.yaml')).existsSync(),
       )
-      .map(getThemePackage)
+      .map(loadThemePackage)
       .toList();
   themes.sort((left, right) => left.packageName.compareTo(right.packageName));
   final names = <String>{};
@@ -85,10 +86,6 @@ List<ThemePackage> findStudioThemePackages(
   ...findThemePackages(repoRoot)
       .where((theme) => theme.packageName != selected.packageName),
 ]..sort((left, right) => left.packageName.compareTo(right.packageName));
-
-String _join(String base, String relative) {
-  return '$base${Platform.pathSeparator}${relative.replaceAll('/', Platform.pathSeparator)}';
-}
 
 bool isWorkspaceMember(Directory repoRoot, Directory packageDirectory) {
   final rootPath = p.normalize(repoRoot.absolute.path);

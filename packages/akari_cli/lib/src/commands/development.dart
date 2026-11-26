@@ -23,7 +23,7 @@ Future<int> runDevelopmentCommand(
       ? <ThemePackage>[]
       : options.themePath != null || command.isThemeSelectionRequired
       ? [
-          getThemePackage(
+          loadThemePackage(
             Directory(options.themePath ?? '${repoRoot.path}/themes/default'),
           ),
         ]

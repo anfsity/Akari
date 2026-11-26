@@ -12,7 +12,7 @@ Future<void> main() async {
   final root = Directory(
     Platform.environment['AKARI_REPO_ROOT'] ?? directory.parent.parent.path,
   );
-  final theme = getThemePackage(directory);
+  final theme = loadThemePackage(directory);
   final host = Directory(
     '${root.path}/${getThemeHostDirectory(theme, ThemeHostKind.preview)}-perf',
   );

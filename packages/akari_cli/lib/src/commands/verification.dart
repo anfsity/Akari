@@ -37,7 +37,7 @@ RunPlan createVerificationPlan(
       !generationThemes.any((t) => t.packageName == 'theme_default') &&
       defaultThemeDirectory.existsSync() &&
       !defaultSceneOutput.existsSync()) {
-    generationThemes.add(getThemePackage(defaultThemeDirectory));
+    generationThemes.add(loadThemePackage(defaultThemeDirectory));
   }
   final sceneSteps = [
     for (final theme in generationThemes)
