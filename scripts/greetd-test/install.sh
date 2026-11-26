@@ -12,8 +12,16 @@ if [[ "$EUID" -ne 0 ]]; then
   echo 'Run this installer with sudo to build and install the test artifacts.' >&2
   exit 1
 fi
+lock_file='/run/akari/test.lock'
+lock_dir="${lock_file%/*}"
+if [[ -L "$lock_dir" || -L "$lock_file" ]]; then
+  echo 'Refusing symlink test lock path.' >&2
+  exit 1
+fi
+mkdir -p -m 0700 -- "$lock_dir"
+chmod 0700 -- "$lock_dir"
 umask 077
-exec 9>/run/lock/akari-test.lock
+exec 9>"$lock_file"
 umask 022
 flock -n 9 || { echo 'Another test setup is running.' >&2; exit 1; }
 for unit in akari-test.service akari-restore.timer; do

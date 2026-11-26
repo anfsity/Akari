@@ -28,7 +28,7 @@ LOGS = Path('/var/log/akari/greeter')
 UNIT = Path('/etc/systemd/system/akari.service')
 DISPLAY_MANAGER = UNIT.with_name('display-manager.service')
 LOCK = Path('/run/akari/login.lock')
-TEST_LOCK = Path('/run/lock/akari-test.lock')
+TEST_LOCK = Path('/run/akari/test.lock')
 PAM = Path('/etc/pam.d/greetd')
 GREETER = 'akari-greeter'
 SNAPSHOT = STATE / 'display-manager.json'
@@ -449,8 +449,7 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
             shutil.copy2(layout, target)
             target.chmod(0o644)
             created_configs.append(target)
-        shutil.copy2(source / 'system/akari.service', UNIT)
-        UNIT.chmod(0o644)
+        write_bytes_atomic(UNIT, (source / 'system/akari.service').read_bytes(), mode=0o644)
         run_systemctl('daemon-reload')
         update_pam(keyring_pam)
         write_bytes_atomic(controller_path, (source / 'scripts/login/manage.py').read_bytes())
@@ -473,7 +472,7 @@ def create_installation(source, bundle, backend, splash, layout, keyring='auto')
         else:
             current.unlink(missing_ok=True)
         if previous_unit is not None:
-            UNIT.write_bytes(previous_unit)
+            write_bytes_atomic(UNIT, previous_unit, mode=0o644)
         else:
             UNIT.unlink(missing_ok=True)
         for target in created_configs:

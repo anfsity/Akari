@@ -5,10 +5,18 @@ if [[ "$EUID" -ne 0 ]]; then
   printf 'Run with sudo: sudo %s/restore.sh\n' "$test_root" >&2
   exit 1
 fi
-# Parent start.sh already holds akari-test.lock during synchronous EXIT cleanup.
+# Parent start.sh already holds /run/akari/test.lock during synchronous EXIT cleanup.
 if [[ "${AKARI_TEST_LOCK_PARENT:-}" != "$PPID" ]]; then
+  lock_file='/run/akari/test.lock'
+  lock_dir="${lock_file%/*}"
+  if [[ -L "$lock_dir" || -L "$lock_file" ]]; then
+    echo 'Refusing symlink test lock path.' >&2
+    exit 1
+  fi
+  mkdir -p -m 0700 -- "$lock_dir"
+  chmod 0700 -- "$lock_dir"
   umask 077
-  exec 9>/run/lock/akari-test.lock
+  exec 9>"$lock_file"
   umask 022
   flock 9
 fi

@@ -22,8 +22,16 @@ if [[ "$EUID" -ne 0 ]]; then
   exit 1
 fi
 
+lock_file='/run/akari/test.lock'
+lock_dir="${lock_file%/*}"
+if [[ -L "$lock_dir" || -L "$lock_file" ]]; then
+  echo 'Refusing symlink test lock path.' >&2
+  exit 1
+fi
+mkdir -p -m 0700 -- "$lock_dir"
+chmod 0700 -- "$lock_dir"
 umask 077
-exec 9>/run/lock/akari-test.lock
+exec 9>"$lock_file"
 umask 022
 flock -n 9 || { echo 'Another test setup is running.' >&2; exit 1; }
 IFS=: read -r _ _ log_uid _ _ _ _ < <(getent passwd "${SUDO_USER:-root}")

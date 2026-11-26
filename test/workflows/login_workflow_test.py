@@ -33,8 +33,8 @@ class LoginWorkflowTest(unittest.TestCase):
             'DISPLAY_MANAGER': 'etc/systemd/system/display-manager.service',
             'SNAPSHOT': 'var/lib/akari/display-manager.json',
             'PAM': 'etc/pam.d/greetd',
-            'LOCK': 'run/lock/akari-login.lock',
-            'TEST_LOCK': 'run/lock/akari-test.lock',
+            'LOCK': 'run/akari/login.lock',
+            'TEST_LOCK': 'run/akari/test.lock',
         }.items():
             setattr(self.manager, name, self.root / relative)
         self.manager.LOCK.parent.mkdir(parents=True)

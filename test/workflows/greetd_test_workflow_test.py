@@ -78,7 +78,7 @@ elif name == 'chmod':
         for name in ["start.sh", "restore.sh", "launch.sh"]:
             script = (SOURCE / name).read_text()
             script = script.replace('[[ "$EUID" -ne 0 ]]', 'false')
-            script = script.replace('/run/lock/akari-test.lock', str(self.root / 'lock'))
+            script = script.replace('/run/akari/test.lock', str(self.root / 'lock'))
             script = script.replace('/usr/bin/sway', str(self.bin / 'sway'))
             target = self.root / name
             target.write_text(script)
@@ -254,7 +254,7 @@ class InstallerTest(unittest.TestCase):
         self.installation = self.root / "installed"
         script = (SOURCE / "install.sh").read_text()
         script = script.replace('[[ "$EUID" -ne 0 ]]', 'false')
-        script = script.replace('/run/lock/akari-test.lock', str(self.root / 'lock'))
+        script = script.replace('/run/akari/test.lock', str(self.root / 'lock'))
         (self.source / "install.sh").write_text(script)
         for name in ["start.sh", "restore.sh", "launch.sh", "greetd.toml", "sway.conf", "display-layout.py", "display_profile.py", "screenshot.py"]:
             shutil.copy2(SOURCE / name, self.source / name)
