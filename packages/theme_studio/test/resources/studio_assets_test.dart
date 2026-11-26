@@ -38,7 +38,7 @@ void main() {
         File('${theme.path}/pubspec.yaml').readAsStringSync(),
         contains('shaders:'),
       );
-      expect(assets.getAssets(), contains(path));
+      expect(assets.loadAssets(), contains(path));
       expect(
         () => assets.importFile(source, shader: true, targetDirectory: root),
         throwsFormatException,
@@ -83,7 +83,7 @@ flutter:
       fonts:
         - asset: type/font.otf
 ''');
-    expect(assets.getAssets(), [
+    expect(assets.loadAssets(), [
       'packages/test/assets/icon.svg',
       'packages/test/lib/effects/rain.frag',
       'packages/test/textures/stone.png',
@@ -109,12 +109,12 @@ flutter:
       final file = File('${directory.path}/assets/composed/wallpaper.png');
       file.parent.createSync(recursive: true);
       file.writeAsBytesSync([1, 2]);
-      expect(assets.getAssets(), [
+      expect(assets.loadAssets(), [
         'packages/test/assets/composed/wallpaper.png',
       ]);
       expect(
         (assets.getImageProvider(
-          assets.getAssets().single,
+          assets.loadAssets().single,
         ) as FileImage).file.path,
         file.path,
       );
@@ -162,7 +162,7 @@ flutter:
     final second = assets.importFile(source);
     expect(first, 'packages/test/assets/picture.png');
     expect(second, 'packages/test/assets/picture-2.png');
-    expect(assets.getAssets(), [second, first]);
+    expect(assets.loadAssets(), [second, first]);
     expect(File('${directory.path}/assets/picture.png').readAsBytesSync(), [
       1,
       2,
@@ -194,7 +194,7 @@ flutter:
       () => assets.importFile(File('${directory.path}/missing.png')),
       throwsA(isA<FileSystemException>()),
     );
-    expect(assets.getAssets(), ['packages/test/assets/font.ttf']);
+    expect(assets.loadAssets(), ['packages/test/assets/font.ttf']);
     expect(
       directory.listSync().whereType<Directory>().where(
         (entry) => entry.path.contains('.studio-import-'),
@@ -204,14 +204,17 @@ flutter:
   });
 
   test('findFile and importFile reject traversal, separators, leading dots, and escaping symlinks', () {
-    final outside = Directory.systemTemp.createTempSync('studio-assets-outside-');
+    final outside = Directory.systemTemp.createTempSync(
+      'studio-assets-outside-',
+    );
     addTearDown(() => outside.deleteSync(recursive: true));
     final secret = File('${outside.path}/secret.txt')
       ..writeAsStringSync('top-secret');
     final assetsDir = Directory('${directory.path}/assets')..createSync();
     Link('${assetsDir.path}/escape_link').createSync(outside.path);
     Link('${assetsDir.path}/file_link.txt').createSync(secret.path);
-    Link('${assetsDir.path}/dangling_link.txt').createSync('${outside.path}/none.txt');
+    Link('${assetsDir.path}/dangling_link.txt')
+        .createSync('${outside.path}/none.txt');
 
     expect(assets.findFile('packages/test/../../secret.txt'), isNull);
     expect(assets.findFile(r'assets\..\secret.txt'), isNull);
@@ -232,12 +235,18 @@ flutter:
 
     final escapedParent = Directory('${directory.path}/assets/../..');
     expect(
-      () => assets.importFile(validSource, shader: true, targetDirectory: escapedParent),
+      () => assets.importFile(
+        validSource,
+        shader: true,
+        targetDirectory: escapedParent,
+      ),
       throwsFormatException,
     );
 
-    manifest.writeAsStringSync('name: test\nflutter:\n  assets:\n    - /\n    - assets/\n');
-    expect(assets.getAssets(), isEmpty);
+    manifest.writeAsStringSync(
+      'name: test\nflutter:\n  assets:\n    - /\n    - assets/\n',
+    );
+    expect(assets.loadAssets(), isEmpty);
 
     // Trailing slash on theme directory should not corrupt relative manifest paths.
     final trailingAssets = StudioAssets(

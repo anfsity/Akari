@@ -230,7 +230,7 @@ class StudioAssets {
     }
   }
 
-  List<String> getAssets() {
+  List<String> loadAssets() {
     final files = <String>{};
     final directories = <String>{'assets/'};
     final root = YamlEditor(

@@ -52,7 +52,7 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
   int _loadGeneration = 0;
 
   void _refreshAssetLists() {
-    final assets = widget.assets.getAssets();
+    final assets = widget.assets.loadAssets();
     _shaders = assets.where((asset) => asset.endsWith('.frag')).toList();
     _images = assets
         .where(

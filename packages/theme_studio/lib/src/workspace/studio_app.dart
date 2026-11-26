@@ -74,7 +74,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     return directory.existsSync() ? directory.resolveSymbolicLinksSync() : path;
   }
 
-  List<String> _getProjectScenePaths(StudioThemeProject project) {
+  List<String> _loadProjectScenePaths(StudioThemeProject project) {
     final result = <String>[];
     final seenCanonical = <String>{};
     void addPath(String path) {
@@ -117,7 +117,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     );
     _assets = _compiledAssets;
     _updateTheme(_project.themeBuilder());
-    _scenePaths = _getProjectScenePaths(_project);
+    _scenePaths = _loadProjectScenePaths(_project);
     _path =
         _scenePaths.firstOrNull ??
         '${_project.directory}/lib/default.scene.json';
@@ -300,14 +300,14 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   void _openScene(String path) {
     try {
       final assets = StudioAssets.findForScene(File(path)) ?? _compiledAssets;
-      final assetPaths = assets.getAssets();
+      final assetPaths = assets.loadAssets();
       final session = _project.createSceneSession(path);
       _setEditor(session.editor);
       _assets = assets;
       _assetPaths = assetPaths;
       _path = path;
       _updateTheme(session.theme);
-      _scenePaths = _getProjectScenePaths(_project);
+      _scenePaths = _loadProjectScenePaths(_project);
       if (assets.directory.path ==
               _getCanonicalDirectoryPath(_project.directory) &&
           !_scenePaths.contains(path)) {
@@ -341,8 +341,8 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       directory: Directory(project.directory),
       packageName: project.packageName,
     );
-    final assetPaths = assets.getAssets();
-    final candidatePaths = _getProjectScenePaths(project);
+    final assetPaths = assets.loadAssets();
+    final candidatePaths = _loadProjectScenePaths(project);
     final targetPath = scenePath ?? candidatePaths.firstOrNull;
     if (targetPath == null) {
       throw FormatException('No scene files found in ${project.packageName}.');
@@ -355,7 +355,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       _compiledAssets = assets;
       _assets = assets;
       _assetPaths = assetPaths;
-      _scenePaths = _getProjectScenePaths(project);
+      _scenePaths = _loadProjectScenePaths(project);
       _path = session.editor.file.path;
       if (assets.directory.path ==
               _getCanonicalDirectoryPath(project.directory) &&
@@ -485,7 +485,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       if (!mounted || picked == null) return;
       final path = _assets.importFile(File.fromUri(picked.uri));
       setState(() {
-        _assetPaths = _assets.getAssets();
+        _assetPaths = _assets.loadAssets();
         _error = null;
       });
       await Clipboard.setData(ClipboardData(text: path));
@@ -622,7 +622,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       }
       try {
         editor.reload();
-        _assetPaths = _assets.getAssets();
+        _assetPaths = _assets.loadAssets();
         _error = null;
         _confirmReload = false;
       } on Object catch (error) {
@@ -754,7 +754,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
                 });
               },
               onAssetsChanged: () =>
-                  setState(() => _assetPaths = _assets.getAssets()),
+                  setState(() => _assetPaths = _assets.loadAssets()),
             ),
       statusBar: StudioStatusBar(
         path: _path,
