@@ -155,7 +155,10 @@ RunPlan createThemeRunPlan(
             getJoinedPath(repoRoot.path, 'scripts/debug-dbus.sh'),
           ],
           ...getDartCommand(repoRoot),
-          getJoinedPath(repoRoot.path, 'packages/akari_cli/bin/theme_session.dart'),
+          getJoinedPath(
+            repoRoot.path,
+            'packages/akari_cli/bin/theme_session.dart',
+          ),
           theme.directory.path,
           getAbsolutePath(repoRoot, host),
           mode.name,
@@ -348,24 +351,37 @@ List<RunStep> _createHostPreparationSteps(
   List<ThemePackage>? themes,
 }) {
   final projects = themes ?? [theme];
-  return [
+  final externalProjects = [
     for (final project in projects)
+      if (!isWorkspaceMember(repoRoot, project.directory)) project,
+  ];
+  final hasWorkspaceMember = externalProjects.length < projects.length;
+  String getPubGetStepId(ThemePackage project) =>
+      isWorkspaceMember(repoRoot, project.directory)
+      ? 'workspace.pub_get'
+      : project.packageName == theme.packageName
+      ? 'theme.pub_get'
+      : '${project.packageName}.pub_get';
+
+  return [
+    if (hasWorkspaceMember)
       RunStep(
-        id: project.packageName == theme.packageName
-            ? 'theme.pub_get'
-            : '${project.packageName}.pub_get',
+        id: 'workspace.pub_get',
+        command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+        workingDirectory: '.',
+        dependencies: const [],
+      ),
+    for (final project in externalProjects)
+      RunStep(
+        id: getPubGetStepId(project),
         command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
         workingDirectory: project.directory.path,
-        dependencies: const [],
+        dependencies: [if (hasWorkspaceMember) 'workspace.pub_get'],
       ),
     ...createSceneGenerationSteps(
       repoRoot,
       projects,
-      dependenciesFor: (project) => [
-        project.packageName == theme.packageName
-            ? 'theme.pub_get'
-            : '${project.packageName}.pub_get',
-      ],
+      dependenciesFor: (project) => [getPubGetStepId(project)],
     ),
     RunStep(
       id: 'theme.host.generate',
@@ -380,7 +396,8 @@ List<RunStep> _createHostPreparationSteps(
           '--preview',
       ],
       dependencies: [
-        for (final project in projects) 'scenes.generate_${project.packageName}',
+        for (final project in projects)
+          'scenes.generate_${project.packageName}',
       ],
       action: () => createThemeHost(
         repoRoot: repoRoot,
@@ -409,7 +426,6 @@ bool _conflictsWithBuiltinTheme(Directory repoRoot, ThemePackage theme) {
   if (p.isWithin(normalizedRoot, normalizedTheme)) {
     return false;
   }
-  return findThemePackages(
-    repoRoot,
-  ).any((builtin) => builtin.packageName == theme.packageName);
+  return findThemePackages(repoRoot)
+      .any((builtin) => builtin.packageName == theme.packageName);
 }

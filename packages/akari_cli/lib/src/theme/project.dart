@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:theme_project/theme_project.dart';
 import 'package:yaml/yaml.dart';
 
@@ -87,6 +88,20 @@ List<ThemePackage> findStudioThemePackages(
 
 String _join(String base, String relative) {
   return '$base${Platform.pathSeparator}${relative.replaceAll('/', Platform.pathSeparator)}';
+}
+
+bool isWorkspaceMember(Directory repoRoot, Directory packageDirectory) {
+  final rootPath = p.normalize(repoRoot.absolute.path);
+  final packagePath = p.normalize(packageDirectory.absolute.path);
+  if (!p.isWithin(rootPath, packagePath)) {
+    return false;
+  }
+  final pubspec = File(p.join(packagePath, 'pubspec.yaml'));
+  if (!pubspec.existsSync()) {
+    return false;
+  }
+  final parsed = loadYaml(pubspec.readAsStringSync());
+  return parsed is Map && parsed['resolution'] == 'workspace';
 }
 
 // Encode the canonical path without hashing so same-named external themes

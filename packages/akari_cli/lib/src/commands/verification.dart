@@ -1,8 +1,5 @@
 import 'dart:io';
 
-import 'package:path/path.dart' as p;
-import 'package:yaml/yaml.dart';
-
 import '../execution/model.dart';
 import '../execution/paths.dart';
 import '../sdk_commands.dart';
@@ -51,7 +48,7 @@ RunPlan createVerificationPlan(
       : const <String>[];
   final externalThemes = [
     for (final theme in generationThemes)
-      if (!_isWorkspaceMember(repoRoot, theme.directory)) theme,
+      if (!isWorkspaceMember(repoRoot, theme.directory)) theme,
   ];
   final externalPubGetIds = {
     for (final theme in externalThemes)
@@ -241,20 +238,6 @@ RunPlan createVerificationPlan(
       ),
     ],
   );
-}
-
-bool _isWorkspaceMember(Directory repoRoot, Directory packageDirectory) {
-  final rootPath = p.normalize(repoRoot.absolute.path);
-  final packagePath = p.normalize(packageDirectory.absolute.path);
-  if (!p.isWithin(rootPath, packagePath)) {
-    return false;
-  }
-  final pubspec = File(p.join(packagePath, 'pubspec.yaml'));
-  if (!pubspec.existsSync()) {
-    return false;
-  }
-  final parsed = loadYaml(pubspec.readAsStringSync());
-  return parsed is Map && parsed['resolution'] == 'workspace';
 }
 
 List<RunStep> _getFlutterPackageVerificationSteps(
