@@ -2,19 +2,16 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
-import 'package:flutter/gestures.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../model/studio_input.dart';
 import '../model/studio_workspace_layout.dart';
 import '../ui/studio_form.dart';
-import '../ui/studio_tooltip.dart';
+import 'studio_floating_panel.dart';
 import 'studio_toolbar.dart';
+import 'studio_workspace_dock.dart';
 
 export '../model/studio_workspace_layout.dart' show StudioWorkspaceScope;
-
-String _getPanelLabel(String title) =>
-    title == 'Sidebar' ? 'Project' : 'Properties';
 
 /// Dock regions own widths; global keys carry panel state between regions and
 /// floating windows. Hiding and switching tabs leave their contents mounted.
@@ -31,6 +28,7 @@ class StudioWorkspace extends StatefulWidget {
     this.input = const StudioInputBindings(),
     super.key,
   });
+
   final Widget toolbar;
   final Widget sidebar;
   final Widget canvas;
@@ -40,6 +38,7 @@ class StudioWorkspace extends StatefulWidget {
   final VoidCallback? onOpenSettings;
   final KeyEventResult Function(KeyEvent)? onCanvasKeyEvent;
   final StudioInputBindings input;
+
   @override
   State<StudioWorkspace> createState() => _StudioWorkspaceState();
 }
@@ -78,8 +77,10 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
 
   StudioDock _getDock(String title) =>
       title == 'Sidebar' ? _sidebarDock : _inspectorDock;
+
   bool _isVisible(String title) =>
       title == 'Sidebar' ? _sidebarVisible : _inspectorVisible;
+
   List<String> _getPanels(StudioDock dock) => [
     for (final title in ['Sidebar', 'Inspector'])
       if (_getDock(title) == dock) title,
@@ -260,7 +261,7 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
     final active = visible.contains(preferred)
         ? preferred
         : visible.firstOrNull;
-    return _WorkspaceDockPanel(
+    return WorkspaceDockPanel(
       controller: controller,
       side: side,
       presenting: _presenting,
@@ -281,36 +282,168 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final workspaceControls = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 148,
-          child: StudioEnumSelect(
-            key: const ValueKey('workspace-preset'),
-            value: _mode,
-            values: StudioWorkspaceMode.values,
-            formatValue: (value) =>
-                '${value.name[0].toUpperCase()}${value.name.substring(1)} layout',
-            onChanged: _applyPreset,
+  static bool _hasModifier(StudioKeyBinding binding) =>
+      binding.control || binding.alt || binding.meta;
+
+  Map<StudioCommand, VoidCallback> _buildWorkspaceCommands() => {
+    StudioCommand.save: widget.onSave,
+    StudioCommand.sidebar: () => _togglePanel('Sidebar'),
+    StudioCommand.inspector: () => _togglePanel('Inspector'),
+    StudioCommand.presentation: _togglePresentation,
+    if (widget.onOpenSettings != null)
+      StudioCommand.settings: widget.onOpenSettings!,
+  };
+
+  KeyEventResult _handleWorkspaceKeyEvent(
+    KeyEvent event,
+    Map<StudioCommand, VoidCallback> workspaceCommands,
+  ) {
+    final focused = FocusManager.instance.primaryFocus?.context;
+    if (focused?.findAncestorWidgetOfExactType<EditableText>() != null) {
+      return KeyEventResult.ignored;
+    }
+    for (final entry in workspaceCommands.entries) {
+      if (widget.input.getBinding(entry.key) case final binding?
+          when !_hasModifier(binding) &&
+              binding
+                  .getActivator(repeats: false)
+                  .accepts(event, HardwareKeyboard.instance)) {
+        entry.value();
+        return KeyEventResult.handled;
+      }
+    }
+    return widget.onCanvasKeyEvent?.call(event) ?? KeyEventResult.ignored;
+  }
+
+  Widget _buildDockedPanels(Map<String, Widget> contents) =>
+      ResizablePanel.horizontal(
+        key: const ValueKey('workspace-panels'),
+        draggerThickness: _presenting ? 0 : 6,
+        children: [
+          ResizablePane.controlled(
+            key: const ValueKey('sidebar-pane'),
+            controller: _sidebar,
+            minSize: 216,
+            maxSize: 360,
+            collapsedSize: _sidebar.collapsed
+                ? _getDockExtent(_sidebar, StudioDock.left)
+                : null,
+            child: _buildDockGroup(_sidebar, StudioDock.left, contents),
+          ),
+          ResizablePane.flex(minSize: 360, child: widget.canvas),
+          ResizablePane.controlled(
+            key: const ValueKey('inspector-pane'),
+            controller: _inspector,
+            minSize: 260,
+            maxSize: 420,
+            collapsedSize: _inspector.collapsed
+                ? _getDockExtent(_inspector, StudioDock.right)
+                : null,
+            child: _buildDockGroup(_inspector, StudioDock.right, contents),
+          ),
+        ],
+      );
+
+  Iterable<Widget> _buildFloatingPanels(Map<String, Widget> contents) => [
+    for (final title in ['Sidebar', 'Inspector'])
+      if (_getDock(title) == StudioDock.floating)
+        Visibility(
+          key: ValueKey('floating-host-$title'),
+          visible: !_presenting && _isVisible(title),
+          maintainState: true,
+          child: WorkspaceFloatingPanel(
+            title: title,
+            initialBounds: title == 'Sidebar'
+                ? _sidebarBounds
+                : _inspectorBounds,
+            onDock: () => _setDock(
+              title,
+              title == 'Sidebar' ? StudioDock.left : StudioDock.right,
+            ),
+            onDockTo: (side) => _setDock(title, side),
+            onChanged: (bounds) {
+              if (title == 'Sidebar') {
+                _sidebarBounds = bounds;
+              } else {
+                _inspectorBounds = bounds;
+              }
+              _scheduleSave();
+            },
+            child: contents[title]!,
           ),
         ),
-        const Gap(4),
-        _WorkspaceActionButton(
-          id: 'presentation-mode',
-          label:
-              'Presentation · ${widget.input.getBinding(StudioCommand.presentation)?.getLabel() ?? 'Unbound'}',
-          icon: LucideIcons.maximize,
-          onPressed: _togglePresentation,
+  ];
+
+  Widget _buildWorkspaceShell(
+    Widget topBar,
+    Widget statusBar,
+    Map<String, Widget> contents,
+  ) => ListenableBuilder(
+    listenable: Listenable.merge([_sidebar, _inspector]),
+    builder: (context, _) => LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: math.max(
+              384 +
+                  _getDockExtent(_sidebar, StudioDock.left) +
+                  _getDockExtent(_inspector, StudioDock.right),
+              constraints.maxWidth,
+            ),
+            height: math.max(420, constraints.maxHeight),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Column(
+                  children: [
+                    topBar,
+                    if (!_presenting) const Divider(),
+                    Expanded(
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _buildDockedPanels(contents),
+                          ..._buildFloatingPanels(contents),
+                        ],
+                      ),
+                    ),
+                    statusBar,
+                    if (_workspaceError != null)
+                      StudioFormError(_workspaceError!),
+                  ],
+                ),
+                if (_presenting)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: OutlineButton(
+                      key: const ValueKey('exit-presentation'),
+                      onPressed: _togglePresentation,
+                      child: const Text('Exit · Esc'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
-      ],
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final workspaceControls = WorkspaceModeControls(
+      mode: _mode,
+      presentationLabel:
+          'Presentation · ${widget.input.getBinding(StudioCommand.presentation)?.getLabel() ?? 'Unbound'}',
+      onPresetChanged: _applyPreset,
+      onTogglePresentation: _togglePresentation,
     );
     final topBar = Visibility(
       visible: !_presenting,
       maintainState: true,
-      child: _WorkspaceTopBar(
+      child: WorkspaceTopBar(
         toolbar: widget.toolbar,
         workspaceControls: widget.toolbar is StudioToolbar
             ? null
@@ -327,21 +460,12 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
       'Sidebar': KeyedSubtree(key: _sidebarKey, child: widget.sidebar),
       'Inspector': KeyedSubtree(key: _inspectorKey, child: widget.inspector),
     };
-    final workspaceCommands = <StudioCommand, VoidCallback>{
-      StudioCommand.save: widget.onSave,
-      StudioCommand.sidebar: () => _togglePanel('Sidebar'),
-      StudioCommand.inspector: () => _togglePanel('Inspector'),
-      StudioCommand.presentation: _togglePresentation,
-      if (widget.onOpenSettings != null)
-        StudioCommand.settings: widget.onOpenSettings!,
-    };
-    bool hasModifier(StudioKeyBinding binding) =>
-        binding.control || binding.alt || binding.meta;
+    final workspaceCommands = _buildWorkspaceCommands();
     return CallbackShortcuts(
       bindings: {
         for (final entry in workspaceCommands.entries)
           if (widget.input.getBinding(entry.key) case final binding?
-              when hasModifier(binding))
+              when _hasModifier(binding))
             binding.getActivator(repeats: false): entry.value,
         if (_presenting)
           const SingleActivator(LogicalKeyboardKey.escape): _togglePresentation,
@@ -351,617 +475,13 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
         mode: _mode,
         workspaceControls: workspaceControls,
         child: Focus(
-          onKeyEvent: (_, event) {
-            final focused = FocusManager.instance.primaryFocus?.context;
-            if (focused?.findAncestorWidgetOfExactType<EditableText>() !=
-                null) {
-              return KeyEventResult.ignored;
-            }
-            for (final entry in workspaceCommands.entries) {
-              if (widget.input.getBinding(entry.key) case final binding?
-                  when !hasModifier(binding) &&
-                      binding
-                          .getActivator(repeats: false)
-                          .accepts(event, HardwareKeyboard.instance)) {
-                entry.value();
-                return KeyEventResult.handled;
-              }
-            }
-            return widget.onCanvasKeyEvent?.call(event) ??
-                KeyEventResult.ignored;
-          },
+          onKeyEvent: (_, event) =>
+              _handleWorkspaceKeyEvent(event, workspaceCommands),
           child: Scaffold(
-            child: ListenableBuilder(
-              listenable: Listenable.merge([_sidebar, _inspector]),
-              builder: (context, _) => LayoutBuilder(
-                builder: (context, constraints) => SingleChildScrollView(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SizedBox(
-                      width: math.max(
-                        384 +
-                            _getDockExtent(_sidebar, StudioDock.left) +
-                            _getDockExtent(_inspector, StudioDock.right),
-                        constraints.maxWidth,
-                      ),
-                      height: math.max(420, constraints.maxHeight),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Column(
-                            children: [
-                              topBar,
-                              if (!_presenting) const Divider(),
-                              Expanded(
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    ResizablePanel.horizontal(
-                                      key: const ValueKey('workspace-panels'),
-                                      draggerThickness: _presenting ? 0 : 6,
-                                      children: [
-                                        ResizablePane.controlled(
-                                          key: const ValueKey('sidebar-pane'),
-                                          controller: _sidebar,
-                                          minSize: 216,
-                                          maxSize: 360,
-                                          collapsedSize: _sidebar.collapsed
-                                              ? _getDockExtent(
-                                                  _sidebar,
-                                                  StudioDock.left,
-                                                )
-                                              : null,
-                                          child: _buildDockGroup(
-                                            _sidebar,
-                                            StudioDock.left,
-                                            contents,
-                                          ),
-                                        ),
-                                        ResizablePane.flex(
-                                          minSize: 360,
-                                          child: widget.canvas,
-                                        ),
-                                        ResizablePane.controlled(
-                                          key: const ValueKey('inspector-pane'),
-                                          controller: _inspector,
-                                          minSize: 260,
-                                          maxSize: 420,
-                                          collapsedSize: _inspector.collapsed
-                                              ? _getDockExtent(
-                                                  _inspector,
-                                                  StudioDock.right,
-                                                )
-                                              : null,
-                                          child: _buildDockGroup(
-                                            _inspector,
-                                            StudioDock.right,
-                                            contents,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    for (final title in [
-                                      'Sidebar',
-                                      'Inspector',
-                                    ])
-                                      if (_getDock(title) ==
-                                          StudioDock.floating)
-                                        Visibility(
-                                          key: ValueKey('floating-host-$title'),
-                                          visible:
-                                              !_presenting && _isVisible(title),
-                                          maintainState: true,
-                                          child: _FloatingPanel(
-                                            title: title,
-                                            initialBounds: title == 'Sidebar'
-                                                ? _sidebarBounds
-                                                : _inspectorBounds,
-                                            onDock: () => _setDock(
-                                              title,
-                                              title == 'Sidebar'
-                                                  ? StudioDock.left
-                                                  : StudioDock.right,
-                                            ),
-                                            onDockTo: (side) =>
-                                                _setDock(title, side),
-                                            onChanged: (bounds) {
-                                              if (title == 'Sidebar') {
-                                                _sidebarBounds = bounds;
-                                              } else {
-                                                _inspectorBounds = bounds;
-                                              }
-                                              _scheduleSave();
-                                            },
-                                            child: contents[title]!,
-                                          ),
-                                        ),
-                                  ],
-                                ),
-                              ),
-                              statusBar,
-                              if (_workspaceError != null)
-                                StudioFormError(_workspaceError!),
-                            ],
-                          ),
-                          if (_presenting)
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: OutlineButton(
-                                key: const ValueKey('exit-presentation'),
-                                onPressed: _togglePresentation,
-                                child: const Text('Exit · Esc'),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            child: _buildWorkspaceShell(topBar, statusBar, contents),
           ),
         ),
       ),
     );
   }
-}
-
-class _WorkspaceActionButton extends StatelessWidget {
-  const _WorkspaceActionButton({
-    required this.id,
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final String id;
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) => StudioTooltip(
-    tooltip: (_) => Text(label),
-    child: GhostButton(
-      key: ValueKey(id),
-      onPressed: onPressed,
-      density: ButtonDensity.icon,
-      child: Icon(icon, size: 16),
-    ),
-  );
-}
-
-class _WorkspaceTopBar extends StatelessWidget {
-  const _WorkspaceTopBar({
-    required this.toolbar,
-    required this.onToggleSidebar,
-    this.workspaceControls,
-  });
-
-  final Widget toolbar;
-  final Widget? workspaceControls;
-  final VoidCallback onToggleSidebar;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      const Gap(8),
-      _WorkspaceActionButton(
-        id: 'toggle-sidebar',
-        label: 'Toggle project panel',
-        icon: LucideIcons.panelLeft,
-        onPressed: onToggleSidebar,
-      ),
-      Expanded(child: toolbar),
-      if (workspaceControls case final controls?) ...[controls, const Gap(12)],
-    ],
-  );
-}
-
-class _WorkspaceDockPanel extends StatelessWidget {
-  const _WorkspaceDockPanel({
-    required this.controller,
-    required this.side,
-    required this.presenting,
-    required this.panels,
-    required this.visible,
-    required this.active,
-    required this.railPanels,
-    required this.contents,
-    required this.onSelectTab,
-    required this.onFloat,
-    required this.onTogglePanel,
-  });
-
-  final AbsoluteResizablePaneController controller;
-  final StudioDock side;
-  final bool presenting;
-  final List<String> panels;
-  final List<String> visible;
-  final String? active;
-  final List<String> railPanels;
-  final Map<String, Widget> contents;
-  final ValueChanged<String> onSelectTab;
-  final ValueChanged<String> onFloat;
-  final ValueChanged<String> onTogglePanel;
-
-  @override
-  Widget build(BuildContext context) => Stack(
-    fit: StackFit.expand,
-    children: [
-      OverflowBox(
-        alignment: Alignment.topLeft,
-        minWidth: controller.value,
-        maxWidth: controller.value,
-        child: Visibility(
-          visible: !controller.collapsed,
-          maintainState: true,
-          child: Column(
-            children: [
-              if (active case final current? when !presenting) ...[
-                _DockHeader(
-                  active: current,
-                  visible: visible,
-                  side: side,
-                  onSelectTab: onSelectTab,
-                  onFloat: () => onFloat(current),
-                  onCollapse: () => onTogglePanel(current),
-                ),
-                const Divider(),
-              ],
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    for (final title in panels)
-                      Offstage(
-                        offstage: active != title || presenting,
-                        child: contents[title]!,
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      if (controller.collapsed && !presenting)
-        _CollapsedDockRail(
-          side: side,
-          railPanels: railPanels,
-          onReopen: onTogglePanel,
-        ),
-    ],
-  );
-}
-
-class _DockHeader extends StatelessWidget {
-  const _DockHeader({
-    required this.active,
-    required this.visible,
-    required this.side,
-    required this.onSelectTab,
-    required this.onFloat,
-    required this.onCollapse,
-  });
-
-  final String active;
-  final List<String> visible;
-  final StudioDock side;
-  final ValueChanged<String> onSelectTab;
-  final VoidCallback onFloat;
-  final VoidCallback onCollapse;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 42,
-    child: Row(
-      children: [
-        Expanded(
-          child: visible.length > 1
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Row(
-                    children: [
-                      for (var i = 0; i < visible.length; i++) ...[
-                        if (i > 0) const Gap(2),
-                        Expanded(
-                          child: Button(
-                            key: ValueKey('dock-tab-${visible[i]}'),
-                            style: active == visible[i]
-                                ? const ButtonStyle.secondary(
-                                    density: ButtonDensity.dense,
-                                  )
-                                : const ButtonStyle.ghost(
-                                    density: ButtonDensity.dense,
-                                  ),
-                            onPressed: () => onSelectTab(visible[i]),
-                            child: Text(
-                              _getPanelLabel(visible[i]),
-                              overflow: TextOverflow.ellipsis,
-                            ).small(),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                )
-              : GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onDoubleTap: onCollapse,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 12, right: 8),
-                    child: Text(_getPanelLabel(active)).small().semiBold(),
-                  ),
-                ),
-        ),
-        _WorkspaceActionButton(
-          id: 'float-$active',
-          label: 'Float panel',
-          icon: LucideIcons.externalLink,
-          onPressed: onFloat,
-        ),
-        if (active == 'Inspector')
-          _WorkspaceActionButton(
-            id: 'toggle-inspector',
-            label: 'Collapse panel',
-            icon: side == StudioDock.left
-                ? LucideIcons.panelLeft
-                : LucideIcons.panelRight,
-            onPressed: onCollapse,
-          ),
-      ],
-    ),
-  );
-}
-
-class _CollapsedDockRail extends StatelessWidget {
-  const _CollapsedDockRail({
-    required this.side,
-    required this.railPanels,
-    required this.onReopen,
-  });
-
-  final StudioDock side;
-  final List<String> railPanels;
-  final ValueChanged<String> onReopen;
-
-  @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.topCenter,
-    child: Column(
-      children: [
-        for (final title in railPanels)
-          _WorkspaceActionButton(
-            id: title == 'Sidebar' ? 'reopen-sidebar' : 'toggle-inspector',
-            label: 'Show ${_getPanelLabel(title).toLowerCase()} panel',
-            icon: side == StudioDock.left
-                ? LucideIcons.panelLeft
-                : LucideIcons.panelRight,
-            onPressed: () => onReopen(title),
-          ),
-      ],
-    ),
-  );
-}
-
-class _FloatingPanel extends StatefulWidget {
-  const _FloatingPanel({
-    required this.title,
-    required this.initialBounds,
-    required this.onChanged,
-    required this.onDockTo,
-    required this.onDock,
-    required this.child,
-  });
-  final String title;
-  final Rect initialBounds;
-  final ValueChanged<Rect> onChanged;
-  final ValueChanged<StudioDock> onDockTo;
-  final VoidCallback onDock;
-  final Widget child;
-  @override
-  State<_FloatingPanel> createState() => _FloatingPanelState();
-}
-
-class _FloatingPanelState extends State<_FloatingPanel> {
-  late Offset _offset = widget.initialBounds.topLeft;
-  late Size _size = widget.initialBounds.size;
-  Offset _dragStart = Offset.zero;
-  Offset _dragOrigin = Offset.zero;
-  Size _resizeOrigin = Size.zero;
-
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final width = math.min(_size.width, constraints.maxWidth);
-      final height = math.min(_size.height, constraints.maxHeight);
-      final offset = Offset(
-        _offset.dx.clamp(0, constraints.maxWidth - width),
-        _offset.dy.clamp(0, constraints.maxHeight - height),
-      );
-      return Stack(
-        children: [
-          Positioned(
-            left: offset.dx,
-            top: offset.dy,
-            width: width,
-            height: height,
-            child: Container(
-              key: ValueKey('floating-${widget.title}'),
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.background,
-                border: Border.all(color: Theme.of(context).colorScheme.border),
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x40000000), blurRadius: 16),
-                ],
-              ),
-              child: Column(
-                children: [
-                  _FloatingPanelTitleBar(
-                    title: widget.title,
-                    onPanStart: (details) {
-                      _dragStart = details.globalPosition;
-                      _dragOrigin = offset;
-                    },
-                    onPanUpdate: (details) => setState(() {
-                      final target =
-                          _dragOrigin + details.globalPosition - _dragStart;
-                      _offset = Offset(
-                        target.dx.clamp(0, constraints.maxWidth - width),
-                        target.dy.clamp(0, constraints.maxHeight - height),
-                      );
-                    }),
-                    onPanEnd: (_) {
-                      widget.onChanged(_offset & Size(width, height));
-                      if (_offset.dx <= 8) widget.onDockTo(StudioDock.left);
-                      if (_offset.dx + width >= constraints.maxWidth - 8) {
-                        widget.onDockTo(StudioDock.right);
-                      }
-                    },
-                    onDockTo: widget.onDockTo,
-                    onDock: widget.onDock,
-                  ),
-                  const Divider(),
-                  Expanded(child: widget.child),
-                  _FloatingPanelResizeGrip(
-                    title: widget.title,
-                    onPanStart: (details) {
-                      _dragStart = details.globalPosition;
-                      _resizeOrigin = Size(width, height);
-                    },
-                    onPanUpdate: (details) => setState(() {
-                      final delta = details.globalPosition - _dragStart;
-                      _size = Size(
-                        (_resizeOrigin.width + delta.dx).clamp(
-                          math.min(240, constraints.maxWidth - offset.dx),
-                          math.min(600, constraints.maxWidth - offset.dx),
-                        ),
-                        (_resizeOrigin.height + delta.dy).clamp(
-                          math.min(260, constraints.maxHeight - offset.dy),
-                          math.min(900, constraints.maxHeight - offset.dy),
-                        ),
-                      );
-                    }),
-                    onPanEnd: (_) => widget.onChanged(offset & _size),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-class _FloatingPanelTitleBar extends StatelessWidget {
-  const _FloatingPanelTitleBar({
-    required this.title,
-    required this.onPanStart,
-    required this.onPanUpdate,
-    required this.onPanEnd,
-    required this.onDockTo,
-    required this.onDock,
-  });
-
-  final String title;
-  final GestureDragStartCallback onPanStart;
-  final GestureDragUpdateCallback onPanUpdate;
-  final GestureDragEndCallback onPanEnd;
-  final ValueChanged<StudioDock> onDockTo;
-  final VoidCallback onDock;
-
-  @override
-  Widget build(BuildContext context) => MouseRegion(
-    cursor: SystemMouseCursors.move,
-    child: GestureDetector(
-      key: ValueKey('float-drag-$title'),
-      behavior: HitTestBehavior.opaque,
-      dragStartBehavior: DragStartBehavior.down,
-      onPanStart: onPanStart,
-      onPanUpdate: onPanUpdate,
-      onPanEnd: onPanEnd,
-      child: SizedBox(
-        height: 42,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Row(
-            children: [
-              Icon(
-                LucideIcons.gripVertical,
-                size: 14,
-                color: Theme.of(context).colorScheme.mutedForeground,
-              ),
-              const Gap(6),
-              Expanded(child: Text(_getPanelLabel(title)).small().semiBold()),
-              StudioTooltip(
-                tooltip: (_) => const Text('Dock left'),
-                child: GhostButton(
-                  key: ValueKey('dock-left-$title'),
-                  onPressed: () => onDockTo(StudioDock.left),
-                  density: ButtonDensity.icon,
-                  child: const Icon(LucideIcons.panelLeft, size: 14),
-                ),
-              ),
-              StudioTooltip(
-                tooltip: (_) => const Text('Dock right'),
-                child: GhostButton(
-                  key: ValueKey('dock-right-$title'),
-                  onPressed: () => onDockTo(StudioDock.right),
-                  density: ButtonDensity.icon,
-                  child: const Icon(LucideIcons.panelRight, size: 14),
-                ),
-              ),
-              const Gap(2),
-              OutlineButton(
-                key: ValueKey('dock-$title'),
-                density: ButtonDensity.dense,
-                onPressed: onDock,
-                child: const Text('Dock').xSmall(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _FloatingPanelResizeGrip extends StatelessWidget {
-  const _FloatingPanelResizeGrip({
-    required this.title,
-    required this.onPanStart,
-    required this.onPanUpdate,
-    required this.onPanEnd,
-  });
-
-  final String title;
-  final GestureDragStartCallback onPanStart;
-  final GestureDragUpdateCallback onPanUpdate;
-  final GestureDragEndCallback onPanEnd;
-
-  @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.centerRight,
-    child: MouseRegion(
-      cursor: SystemMouseCursors.resizeUpLeftDownRight,
-      child: GestureDetector(
-        key: ValueKey('float-resize-$title'),
-        behavior: HitTestBehavior.opaque,
-        dragStartBehavior: DragStartBehavior.down,
-        onPanStart: onPanStart,
-        onPanUpdate: onPanUpdate,
-        onPanEnd: onPanEnd,
-        child: const SizedBox(
-          width: 24,
-          height: 16,
-          child: Icon(LucideIcons.grip, size: 12),
-        ),
-      ),
-    ),
-  );
 }
