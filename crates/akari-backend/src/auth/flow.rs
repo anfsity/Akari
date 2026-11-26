@@ -32,6 +32,13 @@ enum ErrorOutcome {
     Abort(fdo::Error),
 }
 
+struct AuthExchange<'a> {
+    attempt_id: &'a str,
+    username: &'a str,
+    emitter: &'a SignalEmitter<'static>,
+    cancellation: &'a CancellationToken,
+}
+
 pub(super) async fn create_attempt(
     actor: &mut ActorState,
     caller: String,
@@ -82,17 +89,13 @@ pub(super) async fn run_authentication(
     let (transport, response) =
         handle_transport_result(actor, attempt_id, result, &emitter).await?;
 
-    consume_response(
-        actor,
+    let exchange = AuthExchange {
         attempt_id,
-        transport,
-        response,
-        false,
         username,
-        emitter,
+        emitter: &emitter,
         cancellation,
-    )
-    .await
+    };
+    consume_response(actor, &exchange, transport, response, false).await
 }
 
 pub(super) async fn run_respond(
@@ -110,17 +113,13 @@ pub(super) async fn run_respond(
     drop(response);
     let next_response = handle_transport_result(actor, attempt_id, result, &emitter).await?;
 
-    consume_response(
-        actor,
+    let exchange = AuthExchange {
         attempt_id,
-        transport,
-        next_response,
-        true,
         username,
-        emitter,
+        emitter: &emitter,
         cancellation,
-    )
-    .await
+    };
+    consume_response(actor, &exchange, transport, next_response, true).await
 }
 
 pub(super) async fn begin_session_resolution(
@@ -259,33 +258,35 @@ async fn connect_and_create_session(
     Ok((transport, response))
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn consume_response(
     actor: &mut ActorState,
-    attempt_id: &str,
+    exchange: &AuthExchange<'_>,
     mut transport: GreetdTransport,
     mut response: GreetdResponse,
     mut user_response_submitted: bool,
-    username: &str,
-    emitter: SignalEmitter<'static>,
-    cancellation: &CancellationToken,
 ) -> fdo::Result<()> {
     // One greetd response can require several follow-up frames: visible and
     // secret prompts wait for the UI, while informational messages are
     // acknowledged automatically and continue the same transaction.
     let mut auto_acknowledged = 0_usize;
     loop {
-        if cancellation.is_cancelled() {
-            return Err(finish_cancellation(actor, attempt_id, Some(&emitter)).await);
+        if exchange.cancellation.is_cancelled() {
+            return Err(
+                finish_cancellation(actor, exchange.attempt_id, Some(exchange.emitter)).await,
+            );
         }
         match response {
             GreetdResponse::Success => {
-                tracing::info!(%attempt_id, state = actor.auth.get_state().as_str(), "authentication succeeded");
+                tracing::info!(
+                    attempt_id = %exchange.attempt_id,
+                    state = actor.auth.get_state().as_str(),
+                    "authentication succeeded"
+                );
                 actor
                     .apply_transition(
-                        attempt_id,
+                        exchange.attempt_id,
                         StateEvent::AuthenticationSucceeded(transport),
-                        Some(&emitter),
+                        Some(exchange.emitter),
                     )
                     .await;
                 return Ok(());
@@ -296,14 +297,11 @@ async fn consume_response(
             } => {
                 match handle_error_response(
                     actor,
-                    attempt_id,
+                    exchange,
                     transport,
                     error_type,
                     description,
                     user_response_submitted,
-                    username,
-                    &emitter,
-                    cancellation,
                 )
                 .await
                 {
@@ -320,117 +318,145 @@ async fn consume_response(
                 auth_message_type,
                 auth_message,
             } => {
-                let disposition = match auth_message_type.as_str() {
-                    "visible" | "secret" => PromptDisposition::NeedsInput,
-                    "info" | "error" => {
-                        if auto_acknowledged >= MAX_AUTO_ACKNOWLEDGE_MESSAGES {
-                            return Err(fail_transaction(
-                                actor,
-                                attempt_id,
-                                GreetdError::UnexpectedResponse(
-                                    "authentication emitted too many informational messages"
-                                        .to_owned(),
-                                ),
-                                &emitter,
-                            )
-                            .await);
-                        }
-                        auto_acknowledged += 1;
-                        PromptDisposition::AutoAcknowledge
-                    }
-                    _ => {
-                        return Err(fail_transaction(
-                            actor,
-                            attempt_id,
-                            GreetdError::UnexpectedResponse(format!(
-                                "unsupported authentication message type: {auth_message_type}"
-                            )),
-                            &emitter,
-                        )
-                        .await);
-                    }
-                };
-                actor
-                    .apply_transition(attempt_id, StateEvent::AuthMessage, Some(&emitter))
-                    .await;
-                if cancellation.is_cancelled() {
-                    return Err(finish_cancellation(actor, attempt_id, Some(&emitter)).await);
-                }
-                emit_prompt_best_effort(
-                    &emitter,
-                    attempt_id,
-                    &auth_message_type,
+                match handle_auth_message(
+                    actor,
+                    exchange,
+                    transport,
+                    auth_message_type,
                     auth_message,
-                    cancellation,
+                    &mut auto_acknowledged,
                 )
-                .await;
-                if cancellation.is_cancelled() {
-                    return Err(finish_cancellation(actor, attempt_id, Some(&emitter)).await);
-                }
-                match disposition {
-                    PromptDisposition::NeedsInput => {
-                        actor
-                            .apply_transition(
-                                attempt_id,
-                                StateEvent::PromptNeedsInput(transport),
-                                Some(&emitter),
-                            )
-                            .await;
-                        return Ok(());
+                .await?
+                {
+                    Some((next_transport, next_response)) => {
+                        transport = next_transport;
+                        response = next_response;
                     }
-                    PromptDisposition::AutoAcknowledge => {
-                        actor
-                            .apply_transition(
-                                attempt_id,
-                                StateEvent::PromptAutoResponse,
-                                Some(&emitter),
-                            )
-                            .await;
-                        let result = transport
-                            .post_auth_message_response(None, cancellation)
-                            .await;
-                        response =
-                            handle_transport_result(actor, attempt_id, result, &emitter).await?;
-                    }
+                    None => return Ok(()),
                 }
             }
         }
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+async fn handle_auth_message(
+    actor: &mut ActorState,
+    exchange: &AuthExchange<'_>,
+    mut transport: GreetdTransport,
+    auth_message_type: String,
+    auth_message: String,
+    auto_acknowledged: &mut usize,
+) -> fdo::Result<Option<(GreetdTransport, GreetdResponse)>> {
+    let disposition = match auth_message_type.as_str() {
+        "visible" | "secret" => PromptDisposition::NeedsInput,
+        "info" | "error" => {
+            if *auto_acknowledged >= MAX_AUTO_ACKNOWLEDGE_MESSAGES {
+                return Err(fail_transaction(
+                    actor,
+                    exchange.attempt_id,
+                    GreetdError::UnexpectedResponse(
+                        "authentication emitted too many informational messages".to_owned(),
+                    ),
+                    exchange.emitter,
+                )
+                .await);
+            }
+            *auto_acknowledged += 1;
+            PromptDisposition::AutoAcknowledge
+        }
+        _ => {
+            return Err(fail_transaction(
+                actor,
+                exchange.attempt_id,
+                GreetdError::UnexpectedResponse(format!(
+                    "unsupported authentication message type: {auth_message_type}"
+                )),
+                exchange.emitter,
+            )
+            .await);
+        }
+    };
+    actor
+        .apply_transition(
+            exchange.attempt_id,
+            StateEvent::AuthMessage,
+            Some(exchange.emitter),
+        )
+        .await;
+    if exchange.cancellation.is_cancelled() {
+        return Err(finish_cancellation(actor, exchange.attempt_id, Some(exchange.emitter)).await);
+    }
+    emit_prompt_best_effort(
+        exchange.emitter,
+        exchange.attempt_id,
+        &auth_message_type,
+        auth_message,
+        exchange.cancellation,
+    )
+    .await;
+    if exchange.cancellation.is_cancelled() {
+        return Err(finish_cancellation(actor, exchange.attempt_id, Some(exchange.emitter)).await);
+    }
+    match disposition {
+        PromptDisposition::NeedsInput => {
+            actor
+                .apply_transition(
+                    exchange.attempt_id,
+                    StateEvent::PromptNeedsInput(transport),
+                    Some(exchange.emitter),
+                )
+                .await;
+            Ok(None)
+        }
+        PromptDisposition::AutoAcknowledge => {
+            actor
+                .apply_transition(
+                    exchange.attempt_id,
+                    StateEvent::PromptAutoResponse,
+                    Some(exchange.emitter),
+                )
+                .await;
+            let result = transport
+                .post_auth_message_response(None, exchange.cancellation)
+                .await;
+            let next_response =
+                handle_transport_result(actor, exchange.attempt_id, result, exchange.emitter)
+                    .await?;
+            Ok(Some((transport, next_response)))
+        }
+    }
+}
+
 async fn handle_error_response(
     actor: &mut ActorState,
-    attempt_id: &str,
+    exchange: &AuthExchange<'_>,
     mut transport: GreetdTransport,
     error_type: String,
     description: String,
     user_response_submitted: bool,
-    username: &str,
-    emitter: &SignalEmitter<'static>,
-    cancellation: &CancellationToken,
 ) -> ErrorOutcome {
     let detail = sanitize_detail(&format!("{error_type}: {description}"));
     // greetd 0.10 retains its configuring slot after PAM failure.
     // Cancel removes that slot before contacting the dead worker, so even its
     // Error response completes server-side cleanup. Transport failures and
     // unexpected prompts remain failures.
-    let result = transport.cancel_session(cancellation).await;
-    let cancel_response = match handle_transport_result(actor, attempt_id, result, emitter).await {
-        Ok(response) => response,
-        Err(error) => return ErrorOutcome::Abort(error),
-    };
+    let result = transport.cancel_session(exchange.cancellation).await;
+    let cancel_response =
+        match handle_transport_result(actor, exchange.attempt_id, result, exchange.emitter).await {
+            Ok(response) => response,
+            Err(error) => return ErrorOutcome::Abort(error),
+        };
     drop(transport);
 
     if matches!(cancel_response, GreetdResponse::AuthMessage { .. }) {
         return ErrorOutcome::Abort(
             fail_transaction(
                 actor,
-                attempt_id,
+                exchange.attempt_id,
                 GreetdError::UnexpectedResponse(
                     "unexpected prompt while cancelling rejected authentication".to_owned(),
                 ),
-                emitter,
+                exchange.emitter,
             )
             .await,
         );
@@ -441,24 +467,33 @@ async fn handle_error_response(
     // failures can loop and consume login attempts without anyone responding.
     if error_type == "auth_error" && user_response_submitted {
         tracing::info!(
-            %attempt_id,
+            attempt_id = %exchange.attempt_id,
             %error_type,
             state = actor.auth.get_state().as_str(),
             "credential rejected; retrying authentication"
         );
         actor
             .apply_transition(
-                attempt_id,
+                exchange.attempt_id,
                 StateEvent::CredentialRejected {
                     detail: detail.clone(),
                 },
-                Some(emitter),
+                Some(exchange.emitter),
             )
             .await;
-        emit_prompt_best_effort(emitter, attempt_id, "error", detail, cancellation).await;
+        emit_prompt_best_effort(
+            exchange.emitter,
+            exchange.attempt_id,
+            "error",
+            detail,
+            exchange.cancellation,
+        )
+        .await;
 
-        let result = connect_and_create_session(username, cancellation).await;
-        return match handle_transport_result(actor, attempt_id, result, emitter).await {
+        let result = connect_and_create_session(exchange.username, exchange.cancellation).await;
+        return match handle_transport_result(actor, exchange.attempt_id, result, exchange.emitter)
+            .await
+        {
             Ok((next_transport, next_response)) => {
                 ErrorOutcome::Retry(next_transport, next_response)
             }
@@ -467,18 +502,18 @@ async fn handle_error_response(
     }
 
     tracing::warn!(
-        %attempt_id,
+        attempt_id = %exchange.attempt_id,
         %error_type,
         state = actor.auth.get_state().as_str(),
         "authentication rejected by greetd"
     );
     actor
         .apply_transition(
-            attempt_id,
+            exchange.attempt_id,
             StateEvent::AuthenticationFailed {
                 detail: detail.clone(),
             },
-            Some(emitter),
+            Some(exchange.emitter),
         )
         .await;
     ErrorOutcome::Abort(fdo::Error::Failed(detail))
