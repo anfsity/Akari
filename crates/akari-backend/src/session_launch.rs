@@ -90,7 +90,11 @@ pub fn start_session() -> io::Result<()> {
             "exec \"$AKARI_SESSION_EXECUTABLE\" --exec-desktop",
         ],
     };
-    let error = Command::new(&shell)
+    let mut command = Command::new(&shell);
+    if let Some(name @ ("csh" | "tcsh")) = shell_name {
+        command.arg0(format!("-{name}"));
+    }
+    let error = command
         .args(shell_args)
         .stdout(Stdio::from(log.try_clone()?))
         .stderr(Stdio::from(log.try_clone()?))
@@ -140,7 +144,7 @@ pub fn exec_desktop() -> io::Result<()> {
         env::var_os("LC_ALL"),
         env::var_os("LC_CTYPE")
     );
-    match Command::new("/usr/bin/locale")
+    match Command::new("locale")
         .arg("charmap")
         .env("LANG", &language)
         .output()
