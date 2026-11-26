@@ -63,6 +63,12 @@ impl SessionType {
     }
 }
 
+enum ParsedSession {
+    Entry(SessionEntry),
+    Shadowed,
+    Ignored,
+}
+
 /// Reads, filters, and resolves available Wayland and X11 session entries.
 #[derive(Clone, Debug)]
 pub struct SessionCatalog {
@@ -158,9 +164,15 @@ impl SessionCatalog {
                 if seen_ids.contains(&session_id) {
                     continue;
                 }
-                if let Some(session) = parse_session_file(&path, *session_type) {
-                    seen_ids.insert(session_id);
-                    sessions.push(session);
+                match parse_session_file(&path, *session_type) {
+                    ParsedSession::Entry(session) => {
+                        seen_ids.insert(session_id);
+                        sessions.push(session);
+                    }
+                    ParsedSession::Shadowed => {
+                        seen_ids.insert(session_id);
+                    }
+                    ParsedSession::Ignored => {}
                 }
             }
         }
@@ -179,37 +191,55 @@ impl SessionCatalog {
 }
 
 /// Parses and validates one desktop entry before it can reach the launch path.
-fn parse_session_file(path: &Path, session_type: SessionType) -> Option<SessionEntry> {
+fn parse_session_file(path: &Path, session_type: SessionType) -> ParsedSession {
     let contents = match fs::read_to_string(path) {
         Ok(contents) => contents,
         Err(error) => {
             tracing::warn!(path = %path.display(), %error, "could not read session desktop entry");
-            return None;
+            return ParsedSession::Ignored;
         }
     };
     let fields = parse_desktop_entry(&contents);
 
-    if fields.get("Type").map(String::as_str) != Some("Application")
-        || is_true(fields.get("Hidden"))
-        || is_true(fields.get("NoDisplay"))
-    {
-        return None;
+    if is_true(fields.get("Hidden")) {
+        return ParsedSession::Shadowed;
+    }
+    if fields.get("Type").map(String::as_str) != Some("Application") {
+        return ParsedSession::Ignored;
+    }
+    if is_true(fields.get("NoDisplay")) {
+        return ParsedSession::Shadowed;
     }
 
-    let name = fields.get("Name")?.to_owned();
-    let mut exec = expand_exec_tokens(tokenize_exec(fields.get("Exec")?).ok()?)?;
+    let Some(name) = fields.get("Name").cloned() else {
+        return ParsedSession::Ignored;
+    };
+    let Some(raw_exec) = fields.get("Exec") else {
+        return ParsedSession::Ignored;
+    };
+    let Ok(tokens) = tokenize_exec(raw_exec) else {
+        return ParsedSession::Ignored;
+    };
+    let Some(mut exec) = expand_exec_tokens(tokens) else {
+        return ParsedSession::Ignored;
+    };
     if exec.is_empty() {
-        return None;
+        return ParsedSession::Ignored;
     }
-    exec[0] = resolve_command(&exec[0])?;
+    let Some(resolved_command) = resolve_command(&exec[0]) else {
+        return ParsedSession::Ignored;
+    };
+    exec[0] = resolved_command;
     if fields
         .get("TryExec")
         .is_some_and(|command| resolve_command(command).is_none())
     {
-        return None;
+        return ParsedSession::Ignored;
     }
 
-    let stem = path.file_stem()?.to_str()?;
+    let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
+        return ParsedSession::Ignored;
+    };
 
     // DesktopNames is metadata supplied to the launched session, so reject
     // values that could break an environment assignment before storing them.
@@ -225,7 +255,7 @@ fn parse_session_file(path: &Path, session_type: SessionType) -> Option<SessionE
         })
         .unwrap_or_default();
 
-    Some(SessionEntry {
+    ParsedSession::Entry(SessionEntry {
         session_id: format!("{}:{stem}", session_type.as_str()),
         session_type,
         name,
@@ -262,14 +292,14 @@ fn parse_desktop_entry(contents: &str) -> std::collections::BTreeMap<String, Str
             continue;
         }
         let value = raw_value.trim_start();
-        fields.insert(key.to_owned(), unescape_desktop_value(value, key == "Exec"));
+        fields.insert(key.to_owned(), unescape_desktop_value(value));
     }
 
     fields
 }
 
 /// Decodes the desktop-entry escapes needed by session metadata and commands.
-fn unescape_desktop_value(value: &str, preserve_exec_escapes: bool) -> String {
+fn unescape_desktop_value(value: &str) -> String {
     let mut result = String::with_capacity(value.len());
     let mut escaped = false;
 
@@ -280,11 +310,9 @@ fn unescape_desktop_value(value: &str, preserve_exec_escapes: bool) -> String {
                 'n' => result.push('\n'),
                 't' => result.push('\t'),
                 'r' => result.push('\r'),
-                '\\' if !preserve_exec_escapes => result.push('\\'),
+                '\\' => result.push('\\'),
                 other => {
-                    if preserve_exec_escapes {
-                        result.push('\\');
-                    }
+                    result.push('\\');
                     result.push(other);
                 }
             }
