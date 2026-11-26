@@ -187,11 +187,13 @@ class SceneRuntime extends StatelessWidget {
           !playback.enterAll &&
           (visibleWhen == null ||
               evaluateSceneCondition(visibleWhen, playback.from));
-      if (before == visible ||
-          reducedMotion ||
-          motion == null ||
-          !motion.animatesPresence ||
-          node.motion == SceneMotionPreset.none) {
+      final animatesPresence =
+          !reducedMotion &&
+          (node.tracks.isNotEmpty ||
+              (motion != null &&
+                  motion.animatesPresence &&
+                  node.motion != SceneMotionPreset.none));
+      if (before == visible || !animatesPresence) {
         previewProgress = visible ? 1 : 0;
       } else {
         final total = getSceneMotionDuration(node, duration).inMicroseconds;
@@ -442,6 +444,10 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
         : widget.visible;
     if (nextVisible != _visible) {
       _setVisible(nextVisible);
+    } else if (widget.spec.reducedMotion &&
+        !oldWidget.spec.reducedMotion &&
+        widget.previewProgress == null) {
+      _controller.value = _visible ? 1 : 0;
     }
   }
 
@@ -509,7 +515,10 @@ class _SceneNodeHostState extends State<_SceneNodeHost>
       final motion = widget.motionBuilder;
       return IgnorePointer(
         child: ExcludeFocus(
-          child: motion != null && _animatesPresence
+          child:
+              motion != null &&
+                  widget.spec.preset != SceneMotionPreset.none &&
+                  _animatesPresence
               ? motion.build(
                   context,
                   widget.spec,
