@@ -1,4 +1,5 @@
 import 'scene_document.dart';
+import 'scene_layout.dart';
 
 /// Composition rules for one authored scene. A stable node ID identifies each
 /// slot; its template supplies insertion defaults, not overrides for live edits.
@@ -28,9 +29,7 @@ class ThemeLayoutDefinition {
     final presetId = getPresetId(document);
     final preset = presets[presetId];
     if (preset == null) {
-      throw FormatException(
-        'Layout "$label": unsupported preset "$presetId".',
-      );
+      throw FormatException('Layout "$label": unsupported preset "$presetId".');
     }
     return [
       for (final slot in slots)

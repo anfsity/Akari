@@ -1,7 +1,11 @@
 import 'dart:convert';
 
+import 'scene_condition.dart';
 import 'scene_document.dart';
+import 'scene_layout.dart';
+import 'scene_motion.dart';
 import 'scene_shader.dart';
+import 'scene_style.dart';
 
 const _legacyComponentIds = <String>{
   'background',

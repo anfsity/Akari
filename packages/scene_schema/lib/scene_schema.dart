@@ -6,8 +6,12 @@
 library;
 
 export 'src/scene_codec.dart';
+export 'src/scene_condition.dart';
 export 'src/scene_document.dart';
+export 'src/scene_layout.dart';
+export 'src/scene_motion.dart';
 export 'src/scene_shader.dart';
+export 'src/scene_style.dart';
 export 'src/theme_customization.dart';
 export 'src/theme_layout.dart';
 export 'src/theme_presets.dart';
