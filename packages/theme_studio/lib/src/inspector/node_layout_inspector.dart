@@ -126,7 +126,10 @@ class NodeLayoutInspector extends StatelessWidget {
                               ? 'Base layout'
                               : 'Viewport ≥ ${node.breakpoints[index].minWidth.round()} px',
                           onChanged: (value) {
-                            if (controller.hasDraft) editor.tryApplyDraft();
+                            if (controller.hasDraft &&
+                                !editor.tryApplyDraft()) {
+                              return;
+                            }
                             controller.selectEditingBreakpoint(value);
                           },
                         ),

@@ -36,7 +36,7 @@ class StudioStateGraph extends StatelessWidget {
         initial: index == null ? null : node.transitions[index],
       ),
     ).future;
-    if (result == null || !context.mounted) return;
+    if (result == null || !context.mounted || editor.isDisposed) return;
     final current = editor.document.nodes
         .where((entry) => entry.id == targetId)
         .firstOrNull;

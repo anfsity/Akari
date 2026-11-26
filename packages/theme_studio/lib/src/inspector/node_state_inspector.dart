@@ -70,10 +70,16 @@ class _NodeStateInspectorState extends State<NodeStateInspector> {
           key: const ValueKey('edit-visibility-condition'),
           density: ButtonDensity.dense,
           onPressed: () async {
-            if (!widget.editor.tryApplyDraft()) return;
+            final editor = widget.editor;
+            if (!editor.tryApplyDraft()) return;
             final targetId = node.id;
             final result = await editStudioCondition(context, condition);
-            if (!mounted || result == null) return;
+            if (!mounted ||
+                result == null ||
+                editor.isDisposed ||
+                !identical(editor, widget.editor)) {
+              return;
+            }
             _updateNode(
               (target) => target.copyWith(visibleWhen: result.condition),
               nodeId: targetId,

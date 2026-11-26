@@ -44,13 +44,29 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
   List<SceneShaderTexture> _textures = [];
   final _values = <String, TextEditingController>{};
   final _scales = <String, TextEditingController>{};
+  late List<String> _shaders;
+  late List<String> _images;
   String? _selectedAsset;
   String? _error;
   bool _busy = false;
   int _loadGeneration = 0;
+
+  void _refreshAssetLists() {
+    final assets = widget.assets.getAssets();
+    _shaders = assets.where((asset) => asset.endsWith('.frag')).toList();
+    _images = assets
+        .where(
+          (asset) =>
+              getStudioAssetKind(asset) == StudioAssetKind.image ||
+              getStudioAssetKind(asset) == StudioAssetKind.material,
+        )
+        .toList();
+  }
+
   @override
   void initState() {
     super.initState();
+    _refreshAssetLists();
     final shader = widget.editor.document.background.shader;
     if (shader != null) {
       _selectedAsset = shader.asset;
@@ -58,6 +74,14 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
       _textures = shader.textures;
       _busy = true;
       _loadSource(shader.asset, initial: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(StudioShaderPlayground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.assets, widget.assets)) {
+      _refreshAssetLists();
     }
   }
 
@@ -107,7 +131,6 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
       final textures = {
         for (final texture in _textures) texture.name: texture.asset,
       };
-      final images = _getImages();
       setState(() {
         _compiled = compiled;
         _program = program;
@@ -119,7 +142,7 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
           for (final name in compiled.textureNames)
             SceneShaderTexture(
               name: name,
-              asset: textures[name] ?? images.firstOrNull ?? '',
+              asset: textures[name] ?? _images.firstOrNull ?? '',
             ),
         ];
         for (final uniform in _uniforms) {
@@ -140,14 +163,6 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
     }
   }
 
-  List<String> _getImages() => widget.assets
-      .getAssets()
-      .where(
-        (asset) =>
-            getStudioAssetKind(asset) == StudioAssetKind.image ||
-            getStudioAssetKind(asset) == StudioAssetKind.material,
-      )
-      .toList();
   void _updateUniform(int index) {
     final uniform = _uniforms[index];
     final value = double.tryParse(_values[uniform.name]!.text);
@@ -170,7 +185,8 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
         compiled.source != _source.text) {
       return;
     }
-    if (!widget.editor.tryApplyDraft()) return;
+    final editor = widget.editor;
+    if (!editor.tryApplyDraft()) return;
     setState(() => _busy = true);
     Directory? staging;
     try {
@@ -189,7 +205,7 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
           'Choose an image for each sampler before applying.',
         );
       }
-      final candidateBackground = widget.editor.document.background.copyWith(
+      final candidateBackground = editor.document.background.copyWith(
         kind: SceneBackgroundKind.custom,
         shader: SceneShader(
           asset: 'packages/${widget.assets.packageName}/assets/playground.frag',
@@ -199,10 +215,12 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
       );
       // Validate before importing files or editing pubspec.yaml so invalid
       // scene updates leave assets and the manifest untouched.
-      widget.editor.validateScene(background: candidateBackground);
+      editor.validateScene(background: candidateBackground);
       staging = await Directory.systemTemp.createTemp('akari-shader-source-');
+      if (!mounted || editor.isDisposed) return;
       final source = File('${staging.path}/playground.frag');
       await source.writeAsString(compiled.source);
+      if (!mounted || editor.isDisposed) return;
       final origin = _selectedAsset == null
           ? null
           : widget.assets.findFile(_selectedAsset!);
@@ -212,13 +230,13 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
         targetDirectory: origin?.parent,
       );
       widget.assets.shaderCompiler.retainProgram(asset, compiled, program);
-      widget.editor.updateScene(
+      editor.updateScene(
         background: candidateBackground.copyWith(
           shader: candidateBackground.shader!.copyWith(asset: asset),
         ),
       );
       widget.onAssetsChanged();
-      if (mounted) Navigator.of(context).pop();
+      Navigator.of(context).pop();
     } on Object catch (error) {
       if (mounted) setState(() => _error = '$error');
     } finally {
@@ -241,14 +259,9 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
 
   @override
   Widget build(BuildContext context) {
-    final shaders = widget.assets
-        .getAssets()
-        .where((asset) => asset.endsWith('.frag'))
-        .toList();
-    final images = _getImages();
     final sourcePanel = _ShaderSourcePanel(
       selectedAsset: _selectedAsset,
-      shaders: shaders,
+      shaders: _shaders,
       sourceController: _source,
       busy: _busy,
       onLoadSource: _loadSource,
@@ -264,116 +277,123 @@ class _StudioShaderPlaygroundState extends State<StudioShaderPlayground> {
         if (mounted) setState(() => _error = error);
       },
     );
-    return AlertDialog(
-      title: const Text('Shader Playground'),
-      content: SizedBox(
-        width: 1000,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: math.max(160, MediaQuery.sizeOf(context).height - 200),
-          ),
-          child: SingleChildScrollView(
-            child: LayoutBuilder(
-              builder: (context, constraints) => Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (constraints.maxWidth >= 780)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: sourcePanel),
-                        const Gap(16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              previewPane,
-                              const Gap(8),
-                              const Text(
-                                'Bind float/vector components to constants, time, viewport, pointer or semantic state.',
+    return PopScope(
+      canPop: !_busy,
+      child: AlertDialog(
+        title: const Text('Shader Playground'),
+        content: SizedBox(
+          width: 1000,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: math.max(160, MediaQuery.sizeOf(context).height - 200),
+            ),
+            child: SingleChildScrollView(
+              child: LayoutBuilder(
+                builder: (context, constraints) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (constraints.maxWidth >= 780)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: sourcePanel),
+                          const Gap(16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                previewPane,
+                                const Gap(8),
+                                const Text(
+                                  'Bind float/vector components to constants, time, viewport, pointer or semantic state.',
+                                ).small().muted(),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      sourcePanel,
+                      const Gap(12),
+                      previewPane,
+                    ],
+                    if (_error != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: SelectableText(
+                          _error!,
+                          key: const ValueKey('shader-diagnostic'),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.destructive,
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    if (_compiled case final compiled?)
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _source,
+                        builder: (context, value, _) =>
+                            compiled.source == value.text
+                            ? const SizedBox.shrink()
+                            : const Text(
+                                'Source changed. Compile again before applying.',
                               ).small().muted(),
-                            ],
-                          ),
+                      ),
+                    if (_program != null) ...[
+                      const Gap(16),
+                      const Text('Uniform bindings').small().semiBold(),
+                      const Gap(8),
+                      _ShaderUniformBindings(
+                        uniforms: _uniforms,
+                        values: _values,
+                        scales: _scales,
+                        onSourceChanged: (index, source) => setState(
+                          () => _uniforms = [..._uniforms]
+                            ..[index] = _uniforms[index].copyWith(
+                              source: source,
+                            ),
                         ),
-                      ],
-                    )
-                  else ...[
-                    sourcePanel,
-                    const Gap(12),
-                    previewPane,
-                  ],
-                  if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: SelectableText(
-                        _error!,
-                        key: const ValueKey('shader-diagnostic'),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.destructive,
-                          fontFamily: 'monospace',
-                          fontSize: 12,
+                        onValueChanged: _updateUniform,
+                      ),
+                      _ShaderSamplerBindings(
+                        textures: _textures,
+                        images: _images,
+                        onChanged: (index, asset) => setState(
+                          () => _textures = [..._textures]
+                            ..[index] = SceneShaderTexture(
+                              name: _textures[index].name,
+                              asset: asset,
+                            ),
                         ),
                       ),
-                    ),
-                  if (_compiled case final compiled?)
-                    ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: _source,
-                      builder: (context, value, _) =>
-                          compiled.source == value.text
-                          ? const SizedBox.shrink()
-                          : const Text(
-                              'Source changed. Compile again before applying.',
-                            ).small().muted(),
-                    ),
-                  if (_program != null) ...[
-                    const Gap(16),
-                    const Text('Uniform bindings').small().semiBold(),
-                    const Gap(8),
-                    _ShaderUniformBindings(
-                      uniforms: _uniforms,
-                      values: _values,
-                      scales: _scales,
-                      onSourceChanged: (index, source) => setState(
-                        () => _uniforms = [..._uniforms]
-                          ..[index] = _uniforms[index].copyWith(source: source),
-                      ),
-                      onValueChanged: _updateUniform,
-                    ),
-                    _ShaderSamplerBindings(
-                      textures: _textures,
-                      images: images,
-                      onChanged: (index, asset) => setState(
-                        () => _textures = [..._textures]
-                          ..[index] = SceneShaderTexture(
-                            name: _textures[index].name,
-                            asset: asset,
-                          ),
-                      ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
         ),
+        actions: [
+          OutlineButton(
+            onPressed: _busy ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _source,
+            builder: (context, value, _) {
+              final current = _compiled?.source == value.text;
+              return PrimaryButton(
+                key: const ValueKey('shader-apply'),
+                onPressed: _busy || !current || _program == null
+                    ? null
+                    : _apply,
+                child: const Text('Apply as new shader'),
+              );
+            },
+          ),
+        ],
       ),
-      actions: [
-        OutlineButton(
-          onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ValueListenableBuilder<TextEditingValue>(
-          valueListenable: _source,
-          builder: (context, value, _) {
-            final current = _compiled?.source == value.text;
-            return PrimaryButton(
-              key: const ValueKey('shader-apply'),
-              onPressed: _busy || !current || _program == null ? null : _apply,
-              child: const Text('Apply as new shader'),
-            );
-          },
-        ),
-      ],
     );
   }
 }

@@ -118,7 +118,9 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     _assets = _compiledAssets;
     _updateTheme(_project.themeBuilder());
     _scenePaths = _getProjectScenePaths(_project);
-    _path = _scenePaths.firstOrNull ?? '${_project.directory}/lib/default.scene.json';
+    _path =
+        _scenePaths.firstOrNull ??
+        '${_project.directory}/lib/default.scene.json';
     if (_scenePaths.isNotEmpty) {
       _openScene(_path);
     } else {
@@ -161,7 +163,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   void _openSettings(BuildContext context) {
     final editor = _editor;
-    if (editor == null || !editor.tryApplyDraft()) return;
+    if (_inspect || editor == null || !editor.tryApplyDraft()) return;
     showOverlay<void>(
       context,
       const DialogConfiguration(),
@@ -255,7 +257,11 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
           seed = null;
         }
       } else {
-        seed = await _theme.findBackgroundSeed();
+        try {
+          seed = await loadSeedColor(asset);
+        } on Object {
+          seed = null;
+        }
       }
     }
     if (!mounted || revision != _seedRevision) return;
@@ -681,7 +687,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     final editor = _editor;
     return StudioWorkspace(
       onSave: _save,
-      onOpenSettings: () => _openSettings(context),
+      onOpenSettings: _inspect ? null : () => _openSettings(context),
       input: _preferences.input,
       onCanvasKeyEvent: (event) =>
           _canvasKey.currentState?.handleKeyEvent(event) ??

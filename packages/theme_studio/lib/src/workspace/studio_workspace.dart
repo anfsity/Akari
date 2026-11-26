@@ -312,8 +312,9 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
       maintainState: true,
       child: _WorkspaceTopBar(
         toolbar: widget.toolbar,
-        workspaceControls:
-            widget.toolbar is StudioToolbar ? null : workspaceControls,
+        workspaceControls: widget.toolbar is StudioToolbar
+            ? null
+            : workspaceControls,
         onToggleSidebar: () => _togglePanel('Sidebar'),
       ),
     );
@@ -326,17 +327,21 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
       'Sidebar': KeyedSubtree(key: _sidebarKey, child: widget.sidebar),
       'Inspector': KeyedSubtree(key: _inspectorKey, child: widget.inspector),
     };
+    final workspaceCommands = <StudioCommand, VoidCallback>{
+      StudioCommand.save: widget.onSave,
+      StudioCommand.sidebar: () => _togglePanel('Sidebar'),
+      StudioCommand.inspector: () => _togglePanel('Inspector'),
+      StudioCommand.presentation: _togglePresentation,
+      if (widget.onOpenSettings != null)
+        StudioCommand.settings: widget.onOpenSettings!,
+    };
+    bool hasModifier(StudioKeyBinding binding) =>
+        binding.control || binding.alt || binding.meta;
     return CallbackShortcuts(
       bindings: {
-        for (final entry in <StudioCommand, VoidCallback>{
-          StudioCommand.save: widget.onSave,
-          StudioCommand.sidebar: () => _togglePanel('Sidebar'),
-          StudioCommand.inspector: () => _togglePanel('Inspector'),
-          StudioCommand.presentation: _togglePresentation,
-          if (widget.onOpenSettings != null)
-            StudioCommand.settings: widget.onOpenSettings!,
-        }.entries)
-          if (widget.input.getBinding(entry.key) case final binding?)
+        for (final entry in workspaceCommands.entries)
+          if (widget.input.getBinding(entry.key) case final binding?
+              when hasModifier(binding))
             binding.getActivator(repeats: false): entry.value,
         if (_presenting)
           const SingleActivator(LogicalKeyboardKey.escape): _togglePresentation,
@@ -351,6 +356,16 @@ class _StudioWorkspaceState extends State<StudioWorkspace> {
             if (focused?.findAncestorWidgetOfExactType<EditableText>() !=
                 null) {
               return KeyEventResult.ignored;
+            }
+            for (final entry in workspaceCommands.entries) {
+              if (widget.input.getBinding(entry.key) case final binding?
+                  when !hasModifier(binding) &&
+                      binding
+                          .getActivator(repeats: false)
+                          .accepts(event, HardwareKeyboard.instance)) {
+                entry.value();
+                return KeyEventResult.handled;
+              }
             }
             return widget.onCanvasKeyEvent?.call(event) ??
                 KeyEventResult.ignored;
@@ -539,10 +554,7 @@ class _WorkspaceTopBar extends StatelessWidget {
         onPressed: onToggleSidebar,
       ),
       Expanded(child: toolbar),
-      if (workspaceControls case final controls?) ...[
-        controls,
-        const Gap(12),
-      ],
+      if (workspaceControls case final controls?) ...[controls, const Gap(12)],
     ],
   );
 }

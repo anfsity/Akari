@@ -101,7 +101,7 @@ class _StudioEffectsInspectorState extends State<StudioEffectsInspector> {
                   density: ButtonDensity.dense,
                   onPressed: () => showOverlay<void>(
                     context,
-                    const DialogConfiguration(),
+                    const DialogConfiguration(barrierDismissible: false),
                     builder: (_) => StudioShaderPlayground(
                       editor: widget.editor,
                       assets: widget.assets,
@@ -120,8 +120,7 @@ class _StudioEffectsInspectorState extends State<StudioEffectsInspector> {
                       ),
                       GhostButton(
                         density: ButtonDensity.dense,
-                        onPressed: () =>
-                            _commit(_draft.copyWith(shader: null)),
+                        onPressed: () => _commit(_draft.copyWith(shader: null)),
                         child: const Text('Remove authored shader').small(),
                       ),
                     ],

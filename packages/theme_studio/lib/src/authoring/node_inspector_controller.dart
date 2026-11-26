@@ -372,7 +372,7 @@ class NodeInspectorController extends ChangeNotifier {
   int _getInteger(String label) => getIntegerInput(label, getField(label).text);
 
   int? _getOptionalInteger(String label) {
-    final raw = getField(label).text;
+    final raw = getField(label).text.trim();
     return raw.isEmpty ? null : getIntegerInput(label, raw);
   }
 
