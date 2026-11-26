@@ -39,7 +39,8 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
   ui.FragmentShader? _shader;
   SceneShader? _loadedDefinition;
   List<ui.Image> _textures = [];
-  final List<(ImageStream, ImageStreamListener)> _pendingStreams = [];
+  final List<(ImageStream, ImageStreamListener, Completer<ui.Image?>)>
+  _pendingStreams = [];
   final _ShaderRepaintNotifier _repaint = _ShaderRepaintNotifier();
   late final Ticker _clock = createTicker((elapsed) {
     _time = elapsed;
@@ -105,6 +106,7 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
     super.reassemble();
     unawaited(_load());
   }
+
   void _updateClock() {
     final running =
         widget.elapsed == null &&
@@ -121,19 +123,22 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
   }
 
   void _cancelPendingStreams() {
-    for (final (stream, listener) in _pendingStreams) {
+    for (final (stream, listener, completer) in _pendingStreams) {
       stream.removeListener(listener);
+      if (!completer.isCompleted) {
+        completer.complete(null);
+      }
     }
     _pendingStreams.clear();
   }
 
-  Future<ui.Image> _loadTexture(
+  Future<ui.Image?> _loadTexture(
     String asset,
     ImageConfiguration configuration,
   ) async {
     final stream = (widget.resolveImage?.call(asset) ?? AssetImage(asset))
         .resolve(configuration);
-    final completer = Completer<ui.Image>();
+    final completer = Completer<ui.Image?>();
     late final ImageStreamListener listener;
     listener = ImageStreamListener(
       (info, _) {
@@ -147,7 +152,7 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
         }
       },
     );
-    final entry = (stream, listener);
+    final entry = (stream, listener, completer);
     _pendingStreams.add(entry);
     stream.addListener(listener);
     try {
@@ -174,7 +179,9 @@ class _SceneShaderBackgroundState extends State<SceneShaderBackground>
       shader = program.fragmentShader();
       for (final texture in definition.textures) {
         if (!mounted || revision != _revision) break;
-        textures.add(await _loadTexture(texture.asset, configuration));
+        final image = await _loadTexture(texture.asset, configuration);
+        if (image == null) break;
+        textures.add(image);
       }
       if (!mounted || revision != _revision) {
         shader.dispose();
