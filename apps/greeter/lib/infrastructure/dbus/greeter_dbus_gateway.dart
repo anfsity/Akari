@@ -9,7 +9,9 @@ const _objectPath = '/io/akari/Greeter';
 const _interfaceName = 'io.akari.Greeter1';
 
 typedef DBusClientFactory = DBusClient Function();
-typedef DBusSignalStreamFactory = Stream<DBusSignal> Function(DBusClient client);
+typedef DBusSignalStreamFactory = Stream<DBusSignal> Function(
+  DBusClient client,
+);
 
 /// D-Bus implementation of the Feature gateway.
 ///
@@ -259,6 +261,7 @@ class DBusGreeterGateway implements GreeterGateway {
   Future<void> _reconnect() => _reconnecting ??= () async {
     try {
       final previous = _connection;
+      _connection = null;
       if (previous != null) {
         previous.disconnected = true;
         await _closeConnection(previous);
@@ -357,6 +360,11 @@ class DBusGreeterGateway implements GreeterGateway {
     }
     _closed = true;
     final connection = _connection;
+    _connection = null;
+    final reconnecting = _reconnecting;
+    if (reconnecting != null) {
+      await reconnecting;
+    }
     if (connection != null) {
       await _closeConnection(connection);
     }
