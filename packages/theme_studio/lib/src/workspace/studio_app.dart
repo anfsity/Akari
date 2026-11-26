@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' as ui;
 
-import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show mapEquals;
+import 'package:flutter/services.dart';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:theme_project/theme_project.dart';
 import 'package:theme_sdk/theme_sdk.dart';
@@ -15,17 +13,13 @@ import '../authoring/scene_editor.dart';
 import '../authoring/studio_create_theme.dart';
 import '../authoring/studio_theme_project.dart';
 import '../canvas/studio_canvas.dart';
-import '../inspector/code_inspector.dart';
-import '../inspector/node_inspector.dart';
-import '../inspector/studio_effects_inspector.dart';
 import '../model/studio_preferences.dart';
-import '../resources/confined_path.dart';
+import '../resources/studio_asset_actions.dart';
 import '../resources/studio_assets.dart';
-import '../ui/studio_form.dart';
+import 'studio_app_dialogs.dart';
+import 'studio_app_panes.dart';
 import 'studio_settings.dart';
-import 'studio_sidebar.dart';
 import 'studio_status_bar.dart';
-import 'studio_theme_selector.dart';
 import 'studio_toolbar.dart';
 import 'studio_workspace.dart';
 
@@ -67,7 +61,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
   final Map<String, List<String>> _createdScenesByProject = {};
   String? _lastBackgroundAsset;
   Map<String, String> _lastThemeProperties = const {};
-  ui.Color? _themeSeed;
+  Color? _themeSeed;
 
   static String _getCanonicalDirectoryPath(String path) {
     final directory = Directory(path);
@@ -101,6 +95,18 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       }
     }
     return result;
+  }
+
+  void _includeScenePath(
+    String path,
+    StudioAssets assets,
+    StudioThemeProject project,
+  ) {
+    if (assets.directory.path ==
+            _getCanonicalDirectoryPath(project.directory) &&
+        !_scenePaths.contains(path)) {
+      _scenePaths.add(path);
+    }
   }
 
   @override
@@ -207,12 +213,6 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     );
   }
 
-  static String? _getEffectiveBackgroundAsset(SceneBackground background) {
-    return background.kind == SceneBackgroundKind.image
-        ? background.asset
-        : null;
-  }
-
   void _onEditorChanged() {
     final editor = _editor;
     if (editor == null) return;
@@ -220,7 +220,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       _lastThemeProperties = editor.document.themeProperties;
       setState(() => _refreshTheme(seed: _themeSeed));
     }
-    final currentAsset = _getEffectiveBackgroundAsset(
+    final currentAsset = getEffectiveBackgroundAsset(
       editor.document.background,
     );
     if (currentAsset != _lastBackgroundAsset) {
@@ -235,35 +235,19 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     _editor = editor..addListener(_onEditorChanged);
     _lastThemeProperties = editor.document.themeProperties;
     _themeSeed = null;
-    _lastBackgroundAsset = _getEffectiveBackgroundAsset(
+    _lastBackgroundAsset = getEffectiveBackgroundAsset(
       editor.document.background,
     );
   }
 
   Future<void> _loadSeed() async {
     final revision = ++_seedRevision;
-    final editor = _editor;
-    final asset = editor != null
-        ? _getEffectiveBackgroundAsset(editor.document.background)
-        : _getEffectiveBackgroundAsset(_theme.document.background);
-    Color? seed;
-    if (asset != null) {
-      final file = _assets.findFile(asset);
-      if (file != null && file.existsSync()) {
-        try {
-          final bytes = await file.readAsBytes();
-          seed = await decodeSeedColor(bytes);
-        } on Object {
-          seed = null;
-        }
-      } else {
-        try {
-          seed = await loadSeedColor(asset);
-        } on Object {
-          seed = null;
-        }
-      }
-    }
+    final asset = getEffectiveBackgroundAsset(
+      _editor?.document.background ?? _theme.document.background,
+    );
+    final seed = asset == null
+        ? null
+        : await resolveBackgroundSeedColor(_assets, asset);
     if (!mounted || revision != _seedRevision) return;
     setState(() {
       _themeSeed = seed;
@@ -308,11 +292,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       _path = path;
       _updateTheme(session.theme);
       _scenePaths = _loadProjectScenePaths(_project);
-      if (assets.directory.path ==
-              _getCanonicalDirectoryPath(_project.directory) &&
-          !_scenePaths.contains(path)) {
-        _scenePaths.add(path);
-      }
+      _includeScenePath(path, assets, _project);
       _error = null;
       _confirmReload = false;
       unawaited(_loadSeed());
@@ -357,11 +337,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       _assetPaths = assetPaths;
       _scenePaths = _loadProjectScenePaths(project);
       _path = session.editor.file.path;
-      if (assets.directory.path ==
-              _getCanonicalDirectoryPath(project.directory) &&
-          !_scenePaths.contains(_path)) {
-        _scenePaths.add(_path);
-      }
+      _includeScenePath(_path, assets, project);
       _updateTheme(session.theme);
       _error = null;
       _confirmReload = false;
@@ -409,30 +385,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     if (editor == null) return true;
     if (!editor.tryApplyDraft()) return false;
     if (!editor.isDirty) return true;
-    final save = await showOverlay<bool>(
-      context,
-      const DialogConfiguration(),
-      builder: (context) => AlertDialog(
-        title: const Text('Unsaved scene changes'),
-        content: const Text(
-          'Save this scene before opening another project or scene?',
-        ),
-        actions: [
-          OutlineButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          OutlineButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Discard and switch'),
-          ),
-          PrimaryButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Save and switch'),
-          ),
-        ],
-      ),
-    ).future;
+    final save = await confirmUnsavedSceneSwitch(context);
     if (!mounted || save == null) return false;
     if (!save) return true;
     _save();
@@ -526,13 +479,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   Future<void> _applyBackground(String asset) =>
       _runAssetAction((editor, isCurrent) async {
-        final file = _assets.findFile(asset);
-        if (file == null) {
-          throw FormatException('Asset "$asset" is not a local theme file.');
-        }
-        final bytes = await file.readAsBytes();
-        final codec = await ui.instantiateImageCodec(bytes);
-        codec.dispose();
+        await validateImageAssetFile(_assets, asset);
         if (!isCurrent()) return;
         editor.updateScene(
           background: editor.document.background.copyWith(
@@ -557,17 +504,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
 
   Future<void> _placeAsset(SceneAsset asset) =>
       _runAssetAction((editor, isCurrent) async {
-        if (asset.kind == SceneAssetKind.svg) {
-          final source = await _assets.loadTextAsset(asset.path);
-          final picture = await vg.loadPicture(SvgStringLoader(source), null);
-          picture.picture.dispose();
-        } else {
-          final bytes = await _assets.loadBytes(asset.path);
-          final codec = await ui.instantiateImageCodec(
-            bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
-          );
-          codec.dispose();
-        }
+        await validatePlaceableAsset(_assets, asset);
         if (!isCurrent()) return;
         editor.createAssetNode(asset);
       }, errorPrefix: 'Cannot place asset');
@@ -591,7 +528,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
     final path = await showOverlay<String>(
       context,
       const DialogConfiguration(),
-      builder: (context) => _NewSceneDialog(
+      builder: (context) => StudioNewSceneDialog(
         directoryPath: _assets.directory.path,
         canvas: _editor?.document.canvas ?? const SceneCanvas(),
       ),
@@ -645,40 +582,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         radius: 0.5,
       ),
       themeMode: _preferences.themeMode,
-      builder: (context, child) {
-        final theme = Theme.of(context);
-        final colors = theme.colorScheme;
-        return ComponentTheme<OutlineButtonTheme>(
-          data: OutlineButtonTheme(
-            decoration: (context, states, decoration) =>
-                (decoration as BoxDecoration).copyWith(
-                  color:
-                      states.contains(WidgetState.hovered) ||
-                          states.contains(WidgetState.pressed)
-                      ? colors.accent
-                      : colors.background,
-                ),
-          ),
-          child: ComponentTheme<SliderTheme>(
-            data: SliderTheme(
-              trackHeight: 4,
-              trackColor: colors.muted,
-              thumbColor: colors.background,
-              thumbBorderColor: colors.primary.withValues(alpha: .5),
-              thumbFocusedBorderColor: colors.primary,
-              thumbSize: 16,
-            ),
-            child: ComponentTheme<ScrollbarTheme>(
-              data: ScrollbarTheme(
-                thickness: 4 * theme.scaling,
-                color: colors.mutedForeground.withValues(alpha: .35),
-                radius: const Radius.circular(8),
-              ),
-              child: child!,
-            ),
-          ),
-        );
-      },
+      builder: (context, child) => StudioAppThemeOverrides(child: child!),
       home: Builder(builder: _buildWorkspace),
     );
   }
@@ -708,7 +612,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
         onReload: _reload,
         onLoadJson: () => _loadJson(context),
       ),
-      sidebar: _StudioProjectSidebar(
+      sidebar: StudioProjectSidebar(
         projects: _projects,
         selectedProject: _project,
         onSwitchTheme: (project) => unawaited(_switchTheme(project, context)),
@@ -740,7 +644,7 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       ),
       inspector: editor == null
           ? const SizedBox()
-          : _StudioInspectorPane(
+          : StudioInspectorPane(
               editor: editor,
               theme: _theme,
               assets: _assets,
@@ -765,230 +669,4 @@ class _ThemeStudioAppState extends State<ThemeStudioApp> {
       ),
     );
   }
-}
-
-class _StudioProjectSidebar extends StatelessWidget {
-  const _StudioProjectSidebar({
-    required this.projects,
-    required this.selectedProject,
-    required this.onSwitchTheme,
-    required this.assetPaths,
-    required this.assets,
-    required this.editor,
-    required this.loadingFile,
-    required this.readOnly,
-    required this.supportsImageBackground,
-    required this.onPlaceAsset,
-    required this.onApplyFont,
-    required this.onImportAsset,
-    required this.onApplyBackground,
-  });
-
-  final List<StudioThemeProject> projects;
-  final StudioThemeProject selectedProject;
-  final ValueChanged<StudioThemeProject> onSwitchTheme;
-  final List<String> assetPaths;
-  final StudioAssets assets;
-  final SceneEditor? editor;
-  final bool loadingFile;
-  final bool readOnly;
-  final bool supportsImageBackground;
-  final ValueChanged<SceneAsset> onPlaceAsset;
-  final ValueChanged<String> onApplyFont;
-  final VoidCallback onImportAsset;
-  final ValueChanged<String> onApplyBackground;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      StudioThemeSelector(
-        projects: projects,
-        selected: selectedProject,
-        onChanged: onSwitchTheme,
-      ),
-      const Divider(),
-      Expanded(
-        child: StudioSidebar(
-          assetPaths: assetPaths,
-          resolveAssetImage: assets.getImageProvider,
-          loadAssetText: assets.loadTextAsset,
-          loadFontPreview: assets.loadFontPreview,
-          onPlaceAsset: onPlaceAsset,
-          onApplyFont: onApplyFont,
-          editor: editor,
-          loadingFile: loadingFile,
-          readOnly: readOnly,
-          onImportAsset: onImportAsset,
-          onApplyBackground: supportsImageBackground ? onApplyBackground : null,
-        ),
-      ),
-    ],
-  );
-}
-
-class _StudioInspectorPane extends StatelessWidget {
-  const _StudioInspectorPane({
-    required this.editor,
-    required this.theme,
-    required this.assets,
-    required this.inspect,
-    required this.effects,
-    required this.onSelectTab,
-    required this.onAssetsChanged,
-  });
-
-  final SceneEditor editor;
-  final ThemeDefinition theme;
-  final StudioAssets assets;
-  final bool inspect;
-  final bool effects;
-  final ValueChanged<int> onSelectTab;
-  final VoidCallback onAssetsChanged;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Tabs(
-          index: inspect
-              ? 2
-              : effects
-              ? 1
-              : 0,
-          expand: true,
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          onChanged: onSelectTab,
-          children: [
-            for (final label in ['Design', 'Effects', 'Inspect code'])
-              TabItem(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                  ).small(),
-                ),
-              ),
-          ],
-        ),
-      ),
-      const Divider(),
-      Expanded(
-        child: inspect
-            ? CodeInspector(key: ObjectKey(editor), editor: editor)
-            : effects
-            ? StudioEffectsInspector(
-                editor: editor,
-                theme: theme,
-                assets: assets,
-                onAssetsChanged: onAssetsChanged,
-              )
-            : NodeInspector(
-                editor: editor,
-                controller: editor.inspector,
-                componentCatalog: editor.componentCatalog,
-                onApply: editor.tryApplyDraft,
-              ),
-      ),
-    ],
-  );
-}
-
-class _NewSceneDialog extends StatefulWidget {
-  const _NewSceneDialog({required this.directoryPath, required this.canvas});
-
-  final String directoryPath;
-  final SceneCanvas canvas;
-
-  @override
-  State<_NewSceneDialog> createState() => _NewSceneDialogState();
-}
-
-class _NewSceneDialogState extends State<_NewSceneDialog> {
-  final _name = TextEditingController(text: 'new-scene');
-  String? _error;
-
-  @override
-  void dispose() {
-    _name.dispose();
-    super.dispose();
-  }
-
-  void _create() {
-    final id = _name.text.trim();
-    if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(id)) {
-      setState(() => _error = 'Use a lower-case scene name.');
-      return;
-    }
-    final file = findConfinedFile(
-      Directory(widget.directoryPath),
-      'lib/$id.scene.json',
-    );
-    if (file == null) {
-      setState(
-        () => _error = 'Scene files must stay inside the current theme.',
-      );
-      return;
-    }
-    if (FileSystemEntity.typeSync(file.path, followLinks: false) !=
-        FileSystemEntityType.notFound) {
-      setState(() => _error = 'This scene already exists.');
-      return;
-    }
-    try {
-      final source = encodeSceneDocument(
-        SceneDocument(
-          id: id,
-          version: currentSceneVersion,
-          canvas: widget.canvas,
-          background: const SceneBackground(kind: SceneBackgroundKind.solid),
-          nodes: const [
-            SceneNode(
-              id: 'artboard',
-              componentId: 'frame',
-              layout: SceneLayout(),
-              rect: SceneRect(x: 0, y: 0, width: 1, height: 1),
-            ),
-          ],
-        ),
-      );
-      writeFileAtomically(file, '$source\n', tempName: '$id.scene.json');
-      Navigator.of(context).pop(file.path);
-    } on FileSystemException catch (failure) {
-      setState(() => _error = failure.message);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('New scene'),
-    content: SizedBox(
-      width: 320,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text('Start with an empty artboard in the current theme.'),
-          const Gap(12),
-          TextField(key: const ValueKey('new-scene-name'), controller: _name),
-          if (_error != null) StudioFormError(_error!),
-        ],
-      ),
-    ),
-    actions: [
-      OutlineButton(
-        onPressed: () => Navigator.of(context).pop(),
-        child: const Text('Cancel'),
-      ),
-      PrimaryButton(
-        key: const ValueKey('confirm-new-scene'),
-        onPressed: _create,
-        child: const Text('Create scene'),
-      ),
-    ],
-  );
 }
