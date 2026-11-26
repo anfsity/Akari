@@ -299,6 +299,49 @@ class SceneEditor extends ChangeNotifier {
     document.canvas.referenceHeight.toDouble(),
   );
 
+  EdgeInsets get _effectiveSafeArea =>
+      document.canvas.useSafeArea ? _safeArea : EdgeInsets.zero;
+
+  Size get _rootContentSize => Size(
+    math.max(1, _referenceSize.width - _effectiveSafeArea.horizontal),
+    math.max(1, _referenceSize.height - _effectiveSafeArea.vertical),
+  );
+
+  Offset _getParentContentOrigin(SceneNode node) => node.parentId == null
+      ? Offset(_effectiveSafeArea.left, _effectiveSafeArea.top)
+      : Offset(getParentLayout(node).padding, getParentLayout(node).padding);
+
+  static Matrix4? _tryInvertMatrix(Matrix4 matrix) {
+    final inverse = Matrix4.zero();
+    final determinant = inverse.copyInverse(matrix);
+    if (determinant == 0 || !determinant.isFinite) return null;
+    return inverse;
+  }
+
+  static SceneRect _clampNormalizedRect({
+    required double x,
+    required double y,
+    required double width,
+    required double height,
+  }) {
+    final safeWidth = width.clamp(1e-6, 1.0);
+    final safeHeight = height.clamp(1e-6, 1.0);
+    var safeX = x.clamp(0.0, 1.0 - safeWidth);
+    var safeY = y.clamp(0.0, 1.0 - safeHeight);
+    if (safeX + safeWidth > 1.0) {
+      safeX = math.max(0.0, 1.0 - safeWidth);
+    }
+    if (safeY + safeHeight > 1.0) {
+      safeY = math.max(0.0, 1.0 - safeHeight);
+    }
+    return SceneRect(
+      x: safeX,
+      y: safeY,
+      width: safeX + safeWidth > 1.0 ? 1.0 - safeX : safeWidth,
+      height: safeY + safeHeight > 1.0 ? 1.0 - safeY : safeHeight,
+    );
+  }
+
   Map<String, SceneNodeGeometry> _calculateReferenceGeometry() =>
       calculateSceneLayout(
         document: document,
@@ -347,7 +390,7 @@ class SceneEditor extends ChangeNotifier {
     SceneNode node,
     Map<String, SceneNodeGeometry> geometry,
   ) {
-    if (node.parentId == null) return _referenceSize;
+    if (node.parentId == null) return _rootContentSize;
     return _getContainerContentSize(
       geometry[node.parentId]!.rect.size,
       getParentLayout(node),
@@ -441,17 +484,21 @@ class SceneEditor extends ChangeNotifier {
     final geometry = _calculateReferenceGeometry();
     final frameRect = geometry[frame.id]!.rect;
     final parentSize = getParentContentSize(frame, geometry);
-    final padding = getParentLayout(frame).padding;
+    final parentOrigin = _getParentContentOrigin(frame);
     final replacements = {
       for (final node in children)
         node.id: node.copyWith(
           parentId: frame.parentId,
-          rect: SceneRect(
+          rect: _clampNormalizedRect(
             x:
-                (frameRect.left - padding + geometry[node.id]!.rect.left) /
+                (frameRect.left -
+                    parentOrigin.dx +
+                    geometry[node.id]!.rect.left) /
                 parentSize.width,
             y:
-                (frameRect.top - padding + geometry[node.id]!.rect.top) /
+                (frameRect.top -
+                    parentOrigin.dy +
+                    geometry[node.id]!.rect.top) /
                 parentSize.height,
             width: geometry[node.id]!.rect.width / parentSize.width,
             height: geometry[node.id]!.rect.height / parentSize.height,
@@ -639,28 +686,37 @@ class SceneEditor extends ChangeNotifier {
           ? null
           : document.nodes.firstWhere((node) => node.id == parentId);
       final content = parent == null
-          ? _referenceSize
-          : _getContainerContentSize(geometry[parent.id]!.rect.size, parent.layout!);
+          ? _rootContentSize
+          : _getContainerContentSize(
+              geometry[parent.id]!.rect.size,
+              parent.layout!,
+            );
       final oldParent = node.parentId == null
           ? Matrix4.identity()
           : geometry[node.parentId]!.worldTransform;
       final newParent = parent == null
           ? Matrix4.identity()
           : geometry[parent.id]!.worldTransform;
-      final origin = MatrixUtils.transformPoint(
-        Matrix4.inverted(newParent),
-        MatrixUtils.transformPoint(oldParent, geometry[id]!.rect.topLeft),
-      );
-      final width = math.min(geometry[id]!.rect.width / content.width, 1.0);
-      final height = math.min(geometry[id]!.rect.height / content.height, 1.0);
-      final padding = parent?.layout?.padding ?? 0;
+      final inverse = _tryInvertMatrix(newParent);
+      final origin = inverse != null
+          ? MatrixUtils.transformPoint(
+              inverse,
+              MatrixUtils.transformPoint(oldParent, geometry[id]!.rect.topLeft),
+            )
+          : geometry[id]!.bounds.topLeft -
+                (parent == null
+                    ? Offset.zero
+                    : geometry[parent.id]!.bounds.topLeft);
+      final originOffset = parent == null
+          ? Offset(_effectiveSafeArea.left, _effectiveSafeArea.top)
+          : Offset(parent.layout!.padding, parent.layout!.padding);
       node = node.copyWith(
         parentId: parentId,
-        rect: SceneRect(
-          x: ((origin.dx - padding) / content.width).clamp(0, 1 - width),
-          y: ((origin.dy - padding) / content.height).clamp(0, 1 - height),
-          width: width,
-          height: height,
+        rect: _clampNormalizedRect(
+          x: (origin.dx - originOffset.dx) / content.width,
+          y: (origin.dy - originOffset.dy) / content.height,
+          width: geometry[id]!.rect.width / content.width,
+          height: geometry[id]!.rect.height / content.height,
         ),
       );
     }
@@ -669,9 +725,10 @@ class SceneEditor extends ChangeNotifier {
         .reversed
         .where((node) => node.id != id)
         .toList();
-    final index = beforeId == null
-        ? siblings.length
+    final rawIndex = beforeId == null
+        ? -1
         : siblings.indexWhere((node) => node.id == beforeId);
+    final index = rawIndex < 0 ? siblings.length : rawIndex;
     siblings.insert(index, node);
     final ranks = {
       for (final (index, node) in siblings.reversed.indexed) node.id: index,
@@ -902,12 +959,12 @@ class SceneEditor extends ChangeNotifier {
     for (final node in selectedNodes) {
       final rect = geometry[node.id]!.rect;
       final size = getParentContentSize(node, geometry);
-      final padding = getParentLayout(node).padding;
+      final origin = _getParentContentOrigin(node);
       result.add(
         node.copyWith(
           rect: SceneRect(
-            x: (rect.left - padding) / size.width,
-            y: (rect.top - padding) / size.height,
+            x: (rect.left - origin.dx) / size.width,
+            y: (rect.top - origin.dy) / size.height,
             width: rect.width / size.width,
             height: rect.height / size.height,
           ),

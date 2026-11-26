@@ -127,7 +127,7 @@ class _StudioViewportState extends State<StudioViewport> {
             }
           },
           onPointerSignal: (event) {
-            if (event is! PointerScrollEvent) return;
+            if (widget.presenting || event is! PointerScrollEvent) return;
             GestureBinding.instance.pointerSignalResolver.register(event, (_) {
               if (widget.input.isZoomGesture()) {
                 _zoomAnchor = event.localPosition;

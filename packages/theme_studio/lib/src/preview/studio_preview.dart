@@ -151,7 +151,11 @@ class _StudioPreviewState extends State<StudioPreview>
         : widget.document.nodes.firstWhere(
             (entry) => entry.id == node.parentId,
           );
-    final padding = parent?.layout!.padding ?? 0;
+    final padding = parent == null
+        ? (widget.document.canvas.useSafeArea
+              ? MediaQuery.paddingOf(context)
+              : EdgeInsets.zero)
+        : EdgeInsets.all(parent.layout!.padding);
     final parentSize = parent == null
         ? canvas.size
         : geometry[parent.id]!.rect.size;
@@ -159,7 +163,9 @@ class _StudioPreviewState extends State<StudioPreview>
         (parent == null
               ? Matrix4.identity()
               : geometry[parent.id]!.worldTransform.clone())
-          ..translateByDouble(padding, padding, 0, 1);
+          ..translateByDouble(padding.left, padding.top, 0, 1);
+    final parentInverse = Matrix4.zero();
+    final determinant = parentInverse.copyInverse(parentMatrix);
     return _NodeDrag(
       source: node,
       canvas: canvas,
@@ -167,10 +173,12 @@ class _StudioPreviewState extends State<StudioPreview>
       tool: widget.tool,
       handle: handle,
       parentSize: Size(
-        (parentSize.width - padding * 2).clamp(1, double.infinity),
-        (parentSize.height - padding * 2).clamp(1, double.infinity),
+        (parentSize.width - padding.horizontal).clamp(1, double.infinity),
+        (parentSize.height - padding.vertical).clamp(1, double.infinity),
       ),
-      parentInverse: Matrix4.inverted(parentMatrix),
+      parentInverse: determinant == 0 || !determinant.isFinite
+          ? Matrix4.identity()
+          : parentInverse,
     );
   }
 
@@ -214,11 +222,15 @@ class _StudioPreviewState extends State<StudioPreview>
         final bounds = drags
             .map((drag) => geometry[drag.source.id]!.rect)
             .reduce((a, b) => a.expandToInclude(b));
-        final padding = parent?.layout!.padding ?? 0;
+        final insets = parent == null
+            ? (widget.document.canvas.useSafeArea
+                  ? MediaQuery.paddingOf(context)
+                  : EdgeInsets.zero)
+            : EdgeInsets.all(parent.layout!.padding);
         final size = _drag!.parentSize;
         final rect = SceneRect(
-          x: (bounds.left - padding) / size.width,
-          y: (bounds.top - padding) / size.height,
+          x: (bounds.left - insets.left) / size.width,
+          y: (bounds.top - insets.top) / size.height,
           width: bounds.width / size.width,
           height: bounds.height / size.height,
         );
@@ -412,6 +424,11 @@ class _StudioPreviewState extends State<StudioPreview>
       _editingText = null;
       _marqueeStart = null;
       _marqueeRect.value = null;
+      if (_drag case final drag?) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) widget.onDragNodeChanged(drag.source);
+        });
+      }
       _clearDragState();
     } else if (_editingText case final editing?) {
       if (!widget.document.nodes.any((node) => node.id == editing.id)) {
