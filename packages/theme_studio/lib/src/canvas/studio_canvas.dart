@@ -13,6 +13,7 @@ import '../model/studio_theme.dart';
 import '../model/studio_workspace_layout.dart';
 import '../preview/studio_preview.dart';
 import 'studio_canvas_controls.dart';
+import 'studio_canvas_dock.dart';
 import 'studio_comparison.dart';
 
 class StudioCanvas extends StatefulWidget {
