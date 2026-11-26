@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -8,6 +7,7 @@ import 'package:theme_sdk/theme_sdk.dart';
 import '../model/node_geometry.dart';
 import '../resources/confined_path.dart';
 import 'node_inspector_controller.dart';
+import 'scene_tree_operations.dart';
 import 'studio_components.dart';
 
 // Store canonical JSON with history so status queries and undo/redo do not
@@ -276,94 +276,20 @@ class SceneEditor extends ChangeNotifier {
     );
   }
 
-  SceneLayout getParentLayout(SceneNode node) => node.parentId == null
-      ? const SceneLayout()
-      : document.nodes
-            .firstWhere((parent) => parent.id == node.parentId)
-            .layout!;
+  SceneLayout getParentLayout(SceneNode node) =>
+      getParentSceneLayout(document, node);
 
-  List<SceneNode> getSelectionRoots() {
-    final byId = {for (final node in document.nodes) node.id: node};
-    return selectedNodes.where((node) {
-      var parent = node.parentId;
-      while (parent != null) {
-        if (selectedIds.contains(parent)) return false;
-        parent = byId[parent]!.parentId;
-      }
-      return true;
-    }).toList();
-  }
-
-  Size get _referenceSize => Size(
-    document.canvas.referenceWidth.toDouble(),
-    document.canvas.referenceHeight.toDouble(),
-  );
-
-  EdgeInsets get _effectiveSafeArea =>
-      document.canvas.useSafeArea ? _safeArea : EdgeInsets.zero;
-
-  Size get _rootContentSize => Size(
-    math.max(1, _referenceSize.width - _effectiveSafeArea.horizontal),
-    math.max(1, _referenceSize.height - _effectiveSafeArea.vertical),
-  );
-
-  Offset _getParentContentOrigin(SceneNode node) => node.parentId == null
-      ? Offset(_effectiveSafeArea.left, _effectiveSafeArea.top)
-      : Offset(getParentLayout(node).padding, getParentLayout(node).padding);
-
-  static Matrix4? _tryInvertMatrix(Matrix4 matrix) {
-    final inverse = Matrix4.zero();
-    final determinant = inverse.copyInverse(matrix);
-    if (determinant == 0 || !determinant.isFinite) return null;
-    return inverse;
-  }
-
-  static SceneRect _clampNormalizedRect({
-    required double x,
-    required double y,
-    required double width,
-    required double height,
-  }) {
-    final safeWidth = width.clamp(1e-6, 1.0);
-    final safeHeight = height.clamp(1e-6, 1.0);
-    var safeX = x.clamp(0.0, 1.0 - safeWidth);
-    var safeY = y.clamp(0.0, 1.0 - safeHeight);
-    if (safeX + safeWidth > 1.0) {
-      safeX = math.max(0.0, 1.0 - safeWidth);
-    }
-    if (safeY + safeHeight > 1.0) {
-      safeY = math.max(0.0, 1.0 - safeHeight);
-    }
-    return SceneRect(
-      x: safeX,
-      y: safeY,
-      width: safeX + safeWidth > 1.0 ? 1.0 - safeX : safeWidth,
-      height: safeY + safeHeight > 1.0 ? 1.0 - safeY : safeHeight,
-    );
-  }
+  List<SceneNode> getSelectionRoots() =>
+      getSceneSelectionRoots(document, selectedNodes, selectedIds);
 
   Map<String, SceneNodeGeometry> _calculateReferenceGeometry() =>
       calculateSceneLayout(
         document: document,
-        size: _referenceSize,
+        size: getSceneReferenceSize(document),
         safeArea: _safeArea,
         fontFamilies: _fontFamilies,
         minHitTarget: _minHitTarget,
       );
-
-  Size _getContainerContentSize(Size containerSize, SceneLayout layout) {
-    final padding = layout.padding * 2;
-    return Size(
-      math.max(1, containerSize.width - padding),
-      math.max(1, containerSize.height - padding),
-    );
-  }
-
-  Set<String> _getReservedIds() => {
-    for (final node in document.nodes) node.id,
-    for (final slot in layout?.slots ?? const <ThemeLayoutSlot>[])
-      slot.defaultNode.id,
-  };
 
   List<SceneNode> getSelectionSubtree() {
     final ids = getDescendantIds(document, selectedIds);
@@ -389,13 +315,7 @@ class SceneEditor extends ChangeNotifier {
   Size getParentContentSize(
     SceneNode node,
     Map<String, SceneNodeGeometry> geometry,
-  ) {
-    if (node.parentId == null) return _rootContentSize;
-    return _getContainerContentSize(
-      geometry[node.parentId]!.rect.size,
-      getParentLayout(node),
-    );
-  }
+  ) => getSceneParentContentSize(document, node, geometry, _safeArea);
 
   void alignSelection(NodeAlignment alignment) {
     if (!tryApplyDraft() || !canArrange) return;
@@ -428,48 +348,24 @@ class SceneEditor extends ChangeNotifier {
     ]);
   }
 
+  void _applyMutation(SceneMutationResult result) {
+    _updateDocument(
+      result.document,
+      selectedId: result.selectedId,
+      selectedIds: result.selectedIds,
+    );
+  }
+
   void groupSelection() {
     if (!tryApplyDraft() || !canGroup) return;
-    final nodes = getSelectionLayoutNodes();
-    final byId = {for (final node in nodes) node.id: node};
-    final left = nodes.map((node) => node.rect.x).reduce(math.min);
-    final top = nodes.map((node) => node.rect.y).reduce(math.min);
-    final right = nodes
-        .map((node) => node.rect.x + node.rect.width)
-        .reduce(math.max);
-    final bottom = nodes
-        .map((node) => node.rect.y + node.rect.height)
-        .reduce(math.max);
-    final id = _allocateId('frame', _getReservedIds());
-    final frame = SceneNode(
-      id: id,
-      componentId: 'frame',
-      parentId: selectedNode.parentId,
-      rect: SceneRect(
-        x: left,
-        y: top,
-        width: right - left,
-        height: bottom - top,
+    _applyMutation(
+      buildGroupedDocument(
+        document: document,
+        parentId: selectedNode.parentId,
+        layoutNodes: getSelectionLayoutNodes(),
+        selectedIds: selectedIds,
+        reservedIds: getReservedSceneIds(document, layout),
       ),
-      layout: const SceneLayout(),
-      renderOrder: nodes.map((node) => node.renderOrder).reduce(math.max),
-    );
-    _updateDocument(
-      document.copyWith(
-        nodes: [
-          for (final node in document.nodes)
-            if (selectedIds.contains(node.id))
-              node.copyWith(
-                parentId: id,
-                rect: getRelativeRect(byId[node.id]!.rect, frame.rect),
-              )
-            else
-              node,
-          frame,
-        ],
-      ),
-      selectedId: id,
-      selectedIds: {id},
     );
   }
 
@@ -481,50 +377,15 @@ class SceneEditor extends ChangeNotifier {
       deleteSelectedNode();
       return;
     }
-    final geometry = _calculateReferenceGeometry();
-    final frameRect = geometry[frame.id]!.rect;
-    final parentSize = getParentContentSize(frame, geometry);
-    final parentOrigin = _getParentContentOrigin(frame);
-    final replacements = {
-      for (final node in children)
-        node.id: node.copyWith(
-          parentId: frame.parentId,
-          rect: _clampNormalizedRect(
-            x:
-                (frameRect.left -
-                    parentOrigin.dx +
-                    geometry[node.id]!.rect.left) /
-                parentSize.width,
-            y:
-                (frameRect.top -
-                    parentOrigin.dy +
-                    geometry[node.id]!.rect.top) /
-                parentSize.height,
-            width: geometry[node.id]!.rect.width / parentSize.width,
-            height: geometry[node.id]!.rect.height / parentSize.height,
-          ),
-        ),
-    };
-    _updateDocument(
-      document.copyWith(
-        nodes: [
-          for (final node in document.nodes)
-            if (node.id != frame.id) replacements[node.id] ?? node,
-        ],
+    _applyMutation(
+      buildUngroupedDocument(
+        document: document,
+        frame: frame,
+        children: children,
+        geometry: _calculateReferenceGeometry(),
+        safeArea: _safeArea,
       ),
-      selectedId: children.last.id,
-      selectedIds: children.map((node) => node.id).toSet(),
     );
-  }
-
-  String _allocateId(String base, Set<String> ids) {
-    var id = base;
-    var suffix = 2;
-    while (ids.contains(id)) {
-      id = '$base-${suffix++}';
-    }
-    ids.add(id);
-    return id;
   }
 
   static void _validateWith(
@@ -565,25 +426,12 @@ class SceneEditor extends ChangeNotifier {
 
   void placeNode(SceneNode template, Offset position) {
     if (!tryApplyDraft()) return;
-    final existing = document.nodes
-        .where((node) => node.id == template.id)
-        .firstOrNull;
-    final node = existing ?? template;
-    final rect = node.rect.copyWith(
-      x: position.dx.clamp(0.0, 1 - node.rect.width),
-      y: position.dy.clamp(0.0, 1 - node.rect.height),
-    );
-    final placed = node.copyWith(parentId: null, rect: rect);
-    _updateDocument(
-      document.copyWith(
-        nodes: [
-          for (final current in document.nodes)
-            if (current.id == node.id) placed else current,
-          if (existing == null) placed,
-        ],
+    _applyMutation(
+      buildPlacedNodeDocument(
+        document: document,
+        template: template,
+        position: position,
       ),
-      selectedId: node.id,
-      selectedIds: {node.id},
     );
   }
 
@@ -602,75 +450,30 @@ class SceneEditor extends ChangeNotifier {
     StudioComponent component, {
     Offset position = const Offset(.3, .3),
   }) {
-    final primitive = component.primitive;
     if (!tryApplyDraft()) return;
-    final base = primitive?.name ?? 'frame';
-    final id = _allocateId(base, _getReservedIds());
-    final token = _allocateId('$id-style', document.styleTokens.keys.toSet());
-    final node = SceneNode(
-      id: id,
-      componentId: primitive == null ? 'frame' : 'scenePrimitive',
-      primitive: primitive,
-      layout: primitive == null ? const SceneLayout() : null,
-      styleToken: token,
-      rect: SceneRect(
-        x: position.dx.clamp(0, .7),
-        y: position.dy.clamp(0, .7),
-        width: .3,
-        height: primitive == ScenePrimitive.text ? .08 : .3,
+    _applyMutation(
+      buildCreatedComponentDocument(
+        document: document,
+        component: component,
+        position: position,
+        reservedIds: getReservedSceneIds(document, layout),
       ),
-      properties: primitive == ScenePrimitive.text
-          ? const {'text': 'New text'}
-          : const {},
-    );
-    _updateDocument(
-      document.copyWith(
-        nodes: [...document.nodes, node],
-        styleTokens: {
-          ...document.styleTokens,
-          token: primitive == ScenePrimitive.text
-              ? const SceneStyle(textColor: 0xffffffff, fontSize: 32)
-              : SceneStyle(fill: primitive == null ? 0x00000000 : 0xffa1a1aa),
-        },
-      ),
-      selectedId: id,
-      selectedIds: {id},
     );
   }
 
   void createAssetNode(SceneAsset asset) {
     if (!tryApplyDraft()) return;
-    final name = asset.path.split('/').last;
-    final dot = name.lastIndexOf('.');
-    final id = _allocateId(
-      dot > 0 ? name.substring(0, dot) : name,
-      _getReservedIds(),
-    );
-    final node = SceneNode(
-      id: id,
-      componentId: 'sceneAsset',
-      asset: asset,
-      rect: const SceneRect(x: .35, y: .35, width: .3, height: .3),
-    );
-    _updateDocument(
-      document.copyWith(nodes: [...document.nodes, node]),
-      selectedId: id,
-      selectedIds: {id},
+    _applyMutation(
+      buildCreatedAssetDocument(
+        document: document,
+        asset: asset,
+        reservedIds: getReservedSceneIds(document, layout),
+      ),
     );
   }
 
-  String? getLayerMoveBlockReason(String id, String? parentId) {
-    var ancestor = parentId;
-    while (ancestor != null) {
-      if (ancestor == id) {
-        return 'A frame cannot contain itself or its ancestors.';
-      }
-      final parent = document.nodes.firstWhere((node) => node.id == ancestor);
-      if (parent.layout == null) return 'Drop inside a frame to nest a layer.';
-      ancestor = parent.parentId;
-    }
-    return null;
-  }
+  String? getLayerMoveBlockReason(String id, String? parentId) =>
+      getSceneLayerMoveBlockReason(document, id, parentId);
 
   void moveLayer(String id, {required String? parentId, String? beforeId}) {
     if (!tryApplyDraft()) return;
@@ -679,74 +482,15 @@ class SceneEditor extends ChangeNotifier {
       inspector.showError(reason);
       return;
     }
-    var node = document.nodes.firstWhere((node) => node.id == id);
-    if (node.parentId != parentId) {
-      final geometry = _calculateReferenceGeometry();
-      final parent = parentId == null
-          ? null
-          : document.nodes.firstWhere((node) => node.id == parentId);
-      final content = parent == null
-          ? _rootContentSize
-          : _getContainerContentSize(
-              geometry[parent.id]!.rect.size,
-              parent.layout!,
-            );
-      final oldParent = node.parentId == null
-          ? Matrix4.identity()
-          : geometry[node.parentId]!.worldTransform;
-      final newParent = parent == null
-          ? Matrix4.identity()
-          : geometry[parent.id]!.worldTransform;
-      final inverse = _tryInvertMatrix(newParent);
-      final origin = inverse != null
-          ? MatrixUtils.transformPoint(
-              inverse,
-              MatrixUtils.transformPoint(oldParent, geometry[id]!.rect.topLeft),
-            )
-          : geometry[id]!.bounds.topLeft -
-                (parent == null
-                    ? Offset.zero
-                    : geometry[parent.id]!.bounds.topLeft);
-      final originOffset = parent == null
-          ? Offset(_effectiveSafeArea.left, _effectiveSafeArea.top)
-          : Offset(parent.layout!.padding, parent.layout!.padding);
-      node = node.copyWith(
+    _applyMutation(
+      buildMovedLayerDocument(
+        document: document,
+        id: id,
         parentId: parentId,
-        rect: _clampNormalizedRect(
-          x: (origin.dx - originOffset.dx) / content.width,
-          y: (origin.dy - originOffset.dy) / content.height,
-          width: geometry[id]!.rect.width / content.width,
-          height: geometry[id]!.rect.height / content.height,
-        ),
-      );
-    }
-    final siblings = document
-        .getChildren(parentId)
-        .reversed
-        .where((node) => node.id != id)
-        .toList();
-    final rawIndex = beforeId == null
-        ? -1
-        : siblings.indexWhere((node) => node.id == beforeId);
-    final index = rawIndex < 0 ? siblings.length : rawIndex;
-    siblings.insert(index, node);
-    final ranks = {
-      for (final (index, node) in siblings.reversed.indexed) node.id: index,
-    };
-    _updateDocument(
-      document.copyWith(
-        nodes: [
-          for (final current in document.nodes)
-            if (ranks.containsKey(current.id))
-              (current.id == id ? node : current).copyWith(
-                renderOrder: ranks[current.id],
-              )
-            else
-              current,
-        ],
+        beforeId: beforeId,
+        calculateGeometry: _calculateReferenceGeometry,
+        safeArea: _safeArea,
       ),
-      selectedId: id,
-      selectedIds: {id},
     );
   }
 
@@ -754,7 +498,7 @@ class SceneEditor extends ChangeNotifier {
     if (!tryApplyDraft() || selectedIds.isEmpty) return;
     final token =
         selectedNode.styleToken ??
-        _allocateId('$selectedId-style', document.styleTokens.keys.toSet());
+        allocateSceneId('$selectedId-style', document.styleTokens.keys.toSet());
     _updateDocument(
       document.copyWith(
         styleTokens: {...document.styleTokens, token: style},
@@ -773,7 +517,7 @@ class SceneEditor extends ChangeNotifier {
     if (selectedIds.isEmpty) return;
     final token =
         selectedNode.styleToken ??
-        _allocateId(
+        allocateSceneId(
           '$selectedId-style-preview',
           document.styleTokens.keys.toSet(),
         );
@@ -843,26 +587,14 @@ class SceneEditor extends ChangeNotifier {
     if (!canDuplicateNode) {
       throw StateError('Layout slots can only be added once.');
     }
-    final ids = _getReservedIds();
-    final subtree = getSelectionSubtree();
-    final copies = {
-      for (final node in subtree) node.id: _allocateId('${node.id}-copy', ids),
-    };
-    _updateDocument(
-      document.copyWith(
-        nodes: [
-          for (final node in document.nodes) ...[
-            node,
-            if (copies.containsKey(node.id))
-              node.copyWith(
-                id: copies[node.id],
-                parentId: copies[node.parentId] ?? node.parentId,
-              ),
-          ],
-        ],
+    _applyMutation(
+      buildDuplicatedSelectionDocument(
+        document: document,
+        subtree: getSelectionSubtree(),
+        selectedId: selectedId,
+        selectedIds: selectedIds,
+        reservedIds: getReservedSceneIds(document, layout),
       ),
-      selectedId: copies[selectedId]!,
-      selectedIds: {for (final id in selectedIds) copies[id]!},
     );
   }
 
@@ -870,35 +602,30 @@ class SceneEditor extends ChangeNotifier {
     if (!tryApplyDraft()) return;
     final reason = deletionBlockReason;
     if (reason != null) throw StateError(reason);
-    final ids = getSelectionSubtree().map((node) => node.id).toSet();
-    final index = document.nodes.indexWhere((node) => node.id == selectedId);
-    final nodes = document.nodes
-        .where((node) => !ids.contains(node.id))
-        .toList();
-    final next = nodes[math.min(index, nodes.length - 1)].id;
-    _updateDocument(
-      document.copyWith(nodes: nodes),
-      selectedId: next,
-      selectedIds: {next},
+    _applyMutation(
+      buildRemovedNodesDocument(
+        document: document,
+        removedIds: getSelectionSubtree().map((node) => node.id).toSet(),
+        primaryTargetId: selectedId,
+        currentSelectedId: selectedId,
+        currentSelectedIds: selectedIds,
+        collapseSelectionToNext: true,
+      ),
     );
   }
 
   void _removeNode(String nodeId) {
     final reason = getDeletionBlockReason(nodeId);
     if (reason != null) throw StateError(reason);
-    final ids = getDescendantIds(document, [nodeId]);
-    final index = document.nodes.indexWhere((node) => node.id == nodeId);
-    final nodes = document.nodes
-        .where((node) => !ids.contains(node.id))
-        .toList();
-    _updateDocument(
-      document.copyWith(nodes: nodes),
-      selectedId: ids.contains(selectedId)
-          ? nodes[math.min(index, nodes.length - 1)].id
-          : selectedId,
-      selectedIds: selectedIds.difference(ids).isEmpty
-          ? {nodes[math.min(index, nodes.length - 1)].id}
-          : selectedIds.difference(ids),
+    _applyMutation(
+      buildRemovedNodesDocument(
+        document: document,
+        removedIds: getDescendantIds(document, [nodeId]),
+        primaryTargetId: nodeId,
+        currentSelectedId: selectedId,
+        currentSelectedIds: selectedIds,
+        collapseSelectionToNext: false,
+      ),
     );
   }
 
@@ -953,26 +680,12 @@ class SceneEditor extends ChangeNotifier {
     );
   }
 
-  List<SceneNode> getSelectionLayoutNodes() {
-    final geometry = _calculateReferenceGeometry();
-    final result = <SceneNode>[];
-    for (final node in selectedNodes) {
-      final rect = geometry[node.id]!.rect;
-      final size = getParentContentSize(node, geometry);
-      final origin = _getParentContentOrigin(node);
-      result.add(
-        node.copyWith(
-          rect: SceneRect(
-            x: (rect.left - origin.dx) / size.width,
-            y: (rect.top - origin.dy) / size.height,
-            width: rect.width / size.width,
-            height: rect.height / size.height,
-          ),
-        ),
-      );
-    }
-    return result;
-  }
+  List<SceneNode> getSelectionLayoutNodes() => getSceneSelectionLayoutNodes(
+    document,
+    selectedNodes,
+    _calculateReferenceGeometry(),
+    _safeArea,
+  );
 
   void undo() {
     if (!tryApplyDraft() || !canUndo) return;
