@@ -176,7 +176,10 @@ List<FrameMetricSample> _readFrameSamples(
             sample,
             'vsync_overhead_ms',
           ).toDouble(),
-          'total_span_ms': readRequiredNumber(sample, 'total_span_ms').toDouble(),
+          'total_span_ms': readRequiredNumber(
+            sample,
+            'total_span_ms',
+          ).toDouble(),
         }
       else
         throw FormatException('$label contains an invalid frame sample.'),
@@ -198,11 +201,12 @@ List<FrameMetricSample> _readFrameSamples(
     final value = arguments[++index];
     if (argument == '--input') {
       inputs.add(value);
-    } else if (output != null) {
-      throw ArgumentError('Duplicate --output option.');
-    } else {
-      output = value;
+      continue;
     }
+    if (output != null) {
+      throw ArgumentError('Duplicate --output option.');
+    }
+    output = value;
   }
   if (inputs.isEmpty) {
     throw ArgumentError('At least one --input is required.');
