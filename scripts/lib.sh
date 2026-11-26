@@ -70,3 +70,46 @@ akari_run_dev_cli() {
   cd -- "$repo_root"
   exec fvm dart run packages/akari_cli/bin/akari.dart "$@"
 }
+
+akari_is_pid_running() {
+  local pid="$1" line
+  [[ -n "$pid" ]] || return 1
+  kill -0 "$pid" >/dev/null 2>&1 || return 1
+  if [[ -e "/proc/$pid/status" ]]; then
+    while IFS= read -r line; do
+      if [[ "$line" == State:* ]]; then
+        [[ "$line" != $'State:\tZ'* && "$line" != $'State:\tX'* && "$line" != $'State:\tx'* ]]
+        return
+      fi
+    done < "/proc/$pid/status" 2>/dev/null || return 1
+  fi
+  return 0
+}
+
+akari_stop_pid() {
+  local pid="$1"
+  if [[ -z "$pid" ]]; then
+    return 0
+  fi
+  if akari_is_pid_running "$pid"; then
+    kill "$pid" >/dev/null 2>&1 || true
+    for _ in {1..30}; do
+      if ! akari_is_pid_running "$pid"; then
+        break
+      fi
+      sleep 0.1
+    done
+    if akari_is_pid_running "$pid"; then
+      kill -KILL "$pid" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+akari_terminate_pid() {
+  local pid="$1"
+  if [[ -z "$pid" ]]; then
+    return 0
+  fi
+  akari_stop_pid "$pid"
+  wait "$pid" >/dev/null 2>&1 || true
+}

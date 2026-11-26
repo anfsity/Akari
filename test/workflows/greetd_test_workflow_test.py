@@ -85,6 +85,7 @@ elif name == 'chmod':
             target.chmod(0o755)
         (self.root / "frontend").mkdir()
         (self.root / 'scripts').mkdir()
+        shutil.copy2(SOURCE.parent / 'lib.sh', self.root / 'scripts/lib.sh')
         shutil.copy2(SOURCE.parents[1] / 'system/splash.sh', self.root / 'scripts/splash.sh')
         for path in [self.root / "frontend/greeter", self.root / "backend"]:
             path.touch()

@@ -698,6 +698,7 @@ elif command == 'swaymsg':
     def test_launch_pins_release_and_publishes_readable_real_login_logs(self):
         release = self.root / 'release'
         (release / 'scripts').mkdir(parents=True)
+        (release / 'scripts/lib.sh').write_text((REPOSITORY / 'scripts/lib.sh').read_text())
         (release / 'scripts/splash.sh').write_text((REPOSITORY / 'system/splash.sh').read_text())
         (self.root / 'logs').mkdir()
         source = (REPOSITORY / 'system/launch.sh').read_text()

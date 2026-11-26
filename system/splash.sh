@@ -1,49 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$script_dir/lib.sh" ]]; then
+  # shellcheck source=../scripts/lib.sh
+  source "$script_dir/lib.sh"
+else
+  # shellcheck source=../scripts/lib.sh
+  source "$script_dir/../scripts/lib.sh"
+fi
+
 # Run on the private bus after backend readiness, keeping bus startup out of
 # the gap after the animation. wait acknowledges DRM release before startup.
 splash_pid=''
 compositor_pid=''
 splash_status=0
-is_pid_running() {
-  local pid="$1" line
-  kill -0 "$pid" 2>/dev/null || return 1
-  if [[ -e "/proc/$pid/status" ]]; then
-    while IFS= read -r line; do
-      if [[ "$line" == State:* ]]; then
-        [[ "$line" != $'State:\tZ'* && "$line" != $'State:\tX'* && "$line" != $'State:\tx'* ]]
-        return
-      fi
-    done < "/proc/$pid/status" 2>/dev/null || return 1
-  fi
-  return 0
-}
-
-terminate_child() {
-  local pid="$1"
-  if [[ -z "$pid" ]]; then
-    return 0
-  fi
-  if is_pid_running "$pid"; then
-    kill "$pid" 2>/dev/null || true
-    for _ in {1..30}; do
-      if ! is_pid_running "$pid"; then
-        break
-      fi
-      sleep 0.1
-    done
-    if is_pid_running "$pid"; then
-      kill -KILL "$pid" 2>/dev/null || true
-    fi
-  fi
-  wait "$pid" 2>/dev/null || true
-}
 
 cleanup() {
   trap '' INT TERM HUP
   for child in "$splash_pid" "$compositor_pid"; do
-    terminate_child "$child"
+    akari_terminate_pid "$child"
   done
   # Sway exec children have no controlling terminal. Keep VT cleanup in this
   # launcher, which retains greetd's terminal until the compositor has exited.
@@ -61,4 +37,7 @@ splash_pid=''
 printf 'event=splash_finished status=%s\n' "$splash_status" >> "$AKARI_LOG_DIR/lifecycle.log"
 "$@" <&0 &
 compositor_pid=$!
-wait "$compositor_pid"
+compositor_status=0
+wait "$compositor_pid" || compositor_status=$?
+compositor_pid=''
+exit "$compositor_status"
