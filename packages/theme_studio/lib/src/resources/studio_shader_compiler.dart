@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -35,13 +36,73 @@ class StudioShaderCompiler {
       <String, ({String source, Future<ui.FragmentProgram> program})>{};
   final _dispatchLocks = <String, Future<void>>{};
 
-  static final _includePattern = RegExp(
-    r'^\s*#\s*include\s+(?:"([^"]*)"|<([^>]*)>)',
+  static final _includeDirectivePattern = RegExp(
+    r'^\s*#\s*include\b(.*)$',
     multiLine: true,
   );
+  static final _includeTargetPattern = RegExp(r'^(?:"([^"]*)"|<([^>]*)>)$');
+  static const _compileTimeout = Duration(seconds: 30);
   static int _nextCacheId = 0;
   static final _activeTempLoadsByCache = <String, int>{};
   static final _cleanedCaches = <String>{};
+
+  static String _normalizePreprocessorSource(String source) {
+    final joined = source.replaceAll(RegExp(r'\\\r?\n'), '');
+    final buffer = StringBuffer();
+    var inString = false;
+    var escaping = false;
+    for (var i = 0; i < joined.length; i++) {
+      final current = joined.codeUnitAt(i);
+      final next = i + 1 < joined.length ? joined.codeUnitAt(i + 1) : -1;
+      if (inString) {
+        buffer.writeCharCode(current);
+        if (current == 0x0A /* \n */ ) {
+          inString = false;
+          escaping = false;
+        } else if (escaping) {
+          escaping = false;
+        } else if (current == 0x5C /* \ */ ) {
+          escaping = true;
+        } else if (current == 0x22 /* " */ ) {
+          inString = false;
+        }
+        continue;
+      }
+      if (current == 0x22 /* " */ ) {
+        inString = true;
+        buffer.writeCharCode(current);
+        continue;
+      }
+      if (current == 0x2F /* / */ && next == 0x2F /* / */ ) {
+        i += 2;
+        while (i < joined.length && joined.codeUnitAt(i) != 0x0A /* \n */ ) {
+          i++;
+        }
+        if (i < joined.length) buffer.writeCharCode(0x0A);
+        continue;
+      }
+      if (current == 0x2F /* / */ && next == 0x2A /* * */ ) {
+        buffer.write(' ');
+        i += 2;
+        while (i + 1 < joined.length &&
+            !(joined.codeUnitAt(i) == 0x2A /* * */ &&
+                joined.codeUnitAt(i + 1) == 0x2F /* / */ )) {
+          if (joined.codeUnitAt(i) == 0x0A /* \n */ ) {
+            buffer.writeCharCode(0x0A);
+          }
+          i++;
+        }
+        if (i + 1 < joined.length) {
+          i++;
+        } else {
+          i = joined.length;
+        }
+        continue;
+      }
+      buffer.writeCharCode(current);
+    }
+    return buffer.toString();
+  }
 
   String _findCompiler() {
     if (compilerPath != null) return compilerPath!;
@@ -109,8 +170,16 @@ class StudioShaderCompiler {
     final visited = <String>{};
 
     void validateSource(String content, String currentDirPath) {
-      for (final match in _includePattern.allMatches(content)) {
-        final included = (match.group(1) ?? match.group(2))!;
+      final normalized = _normalizePreprocessorSource(content);
+      for (final match in _includeDirectivePattern.allMatches(normalized)) {
+        final rawTarget = match.group(1)!.trim();
+        final targetMatch = _includeTargetPattern.firstMatch(rawTarget);
+        if (targetMatch == null) {
+          throw FormatException(
+            'Shader #include path must stay within the current theme: $rawTarget',
+          );
+        }
+        final included = (targetMatch.group(1) ?? targetMatch.group(2))!;
         final segments = parseSafeRelativeSegments(included);
         if (segments == null) {
           throw FormatException(
@@ -127,6 +196,11 @@ class StudioShaderCompiler {
             included,
           );
           if (resolved != null) {
+            if (!FileSystemEntity.isFileSync(resolved)) {
+              throw FormatException(
+                'Shader #include path must stay within the current theme: $included',
+              );
+            }
             if (visited.add(resolved)) {
               validateSource(
                 File(resolved).readAsStringSync(),
@@ -188,7 +262,7 @@ class StudioShaderCompiler {
       await input.writeAsString(source);
       final output = '${staging.path}/shader.iplr';
       final reflection = '${staging.path}/reflection.json';
-      final result = await Process.run(compiler.path, [
+      final process = await Process.start(compiler.path, [
         '--sksl',
         '--runtime-stage-gles',
         '--runtime-stage-gles3',
@@ -203,8 +277,28 @@ class StudioShaderCompiler {
         '--include=${compiler.parent.path}/shader_lib',
         '--verbose',
       ]);
-      if (result.exitCode != 0) {
-        throw FormatException('${result.stderr}\n${result.stdout}'.trim());
+      final stdoutFuture = process.stdout
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .join();
+      final stderrFuture = process.stderr
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .join();
+      final int exitCode;
+      try {
+        exitCode = await process.exitCode.timeout(_compileTimeout);
+      } on TimeoutException {
+        process.kill();
+        await Future.wait<Object?>([
+          process.exitCode.catchError((_) => -1),
+          stdoutFuture.catchError((_) => ''),
+          stderrFuture.catchError((_) => ''),
+        ]);
+        throw const FormatException('Shader compilation timed out.');
+      }
+      final stdoutText = await stdoutFuture;
+      final stderrText = await stderrFuture;
+      if (exitCode != 0) {
+        throw FormatException('$stderrText\n$stdoutText'.trim());
       }
       final data = jsonDecode(
         await File(reflection).readAsString(),
