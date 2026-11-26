@@ -40,6 +40,10 @@
 !/scripts/**
 !/.github/
 !/.github/**
+!/.agents/
+!/.agents/**
+!/.githooks/
+!/.githooks/**
 
 # Generated, local, and editor-specific artifacts remain ignored.
 **/.dart_tool/

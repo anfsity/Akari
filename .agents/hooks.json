@@ -1,0 +1,16 @@
+{
+  "auto-format": {
+    "PostToolUse": [
+      {
+        "matcher": "edit_file|write_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/format-on-write.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

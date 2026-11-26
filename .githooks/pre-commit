@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd -- "$repo_root"
+
+declare -a staged_targets=()
+while IFS= read -r -d '' file; do
+  case "$file" in
+    *.g.dart)
+      ;;
+    *.dart|*.rs)
+      if [[ -f "$file" ]]; then
+        staged_targets+=("$file")
+      fi
+      ;;
+  esac
+done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+
+if [[ "${#staged_targets[@]}" -eq 0 ]]; then
+  exit 0
+fi
+
+declare -a fully_staged=()
+declare -a partially_staged=()
+
+for file in "${staged_targets[@]}"; do
+  if git diff --quiet -- "$file"; then
+    fully_staged+=("$file")
+  else
+    partially_staged+=("$file")
+  fi
+done
+
+if [[ "${#fully_staged[@]}" -gt 0 ]]; then
+  "$repo_root/scripts/format-files.sh" "${fully_staged[@]}"
+  git add -- "${fully_staged[@]}"
+fi
+
+if [[ "${#partially_staged[@]}" -gt 0 ]]; then
+  if ! "$repo_root/scripts/format-files.sh" --check "${partially_staged[@]}"; then
+    printf 'Partially staged files are not formatted:\n' >&2
+    printf '  %s\n' "${partially_staged[@]}" >&2
+    printf 'Run ./scripts/format-files.sh and stage your changes before committing.\n' >&2
+    exit 1
+  fi
+fi
