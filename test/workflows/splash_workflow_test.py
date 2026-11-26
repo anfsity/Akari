@@ -116,9 +116,13 @@ if not (root / 'backend-started').exists():
             with self.subTest(signal=termination):
                 for name in ['renderer.pid', 'released']:
                     (self.root / name).unlink(missing_ok=True)
-                process = subprocess.Popen(['bash', self.launcher],
-                                           env={**self.environment, 'HOLD': '30'},
-                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                process = subprocess.Popen(
+                    ['bash', self.launcher],
+                    env={**self.environment, 'HOLD': '30'},
+                    preexec_fn=lambda: signal.signal(signal.SIGHUP, signal.SIG_DFL),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
                 try:
                     deadline = time.monotonic() + 10
                     while (not (self.root / 'renderer.pid').exists()
@@ -191,7 +195,11 @@ if os.environ['HOLD'] == '1':
                     env={**os.environ, 'FIXTURE': directory, 'XDG_RUNTIME_DIR': directory,
                          'AKARI_LOG_DIR': str(root / 'logs'), 'AKARI_START_BACKEND': '0',
                          'HOLD': '0' if termination is None else '1'},
-                    start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    preexec_fn=lambda: signal.signal(signal.SIGHUP, signal.SIG_DFL),
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
                 try:
                     deadline = time.monotonic() + 10
                     while (not (root / 'bus.json').exists()

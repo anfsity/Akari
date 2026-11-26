@@ -18,6 +18,9 @@ const _standaloneWorkflowSuites = [
   'display_profile_test.py',
   'display_layout_test.py',
   'sway_session_test.py',
+  'login_workflow_test.py',
+  'gaze_pam_test.py',
+  'splash_workflow_test.py',
 ];
 
 RunPlan createVerificationPlan(
@@ -56,9 +59,8 @@ RunPlan createVerificationPlan(
   };
   final workflowSuites = [
     for (final suite in _standaloneWorkflowSuites)
-      if (File(
-        getJoinedPath(repoRoot.path, 'test/workflows/$suite'),
-      ).existsSync())
+      if (File(getJoinedPath(repoRoot.path, 'test/workflows/$suite'))
+          .existsSync())
         suite,
   ];
 
