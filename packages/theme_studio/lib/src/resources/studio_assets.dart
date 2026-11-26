@@ -128,7 +128,9 @@ class StudioAssets {
       final base = root.endsWith(Platform.pathSeparator)
           ? root
           : '$root${Platform.pathSeparator}';
-      final relativeParent = target == root ? '' : target.substring(base.length);
+      final relativeParent = target == root
+          ? ''
+          : target.substring(base.length);
       assets = relativeParent.isEmpty
           ? _rootDirectoryPath
           : '$_rootDirectoryPath/$relativeParent';
@@ -174,7 +176,12 @@ class StudioAssets {
       (entry) =>
           entry == expected || (entry is Map && entry['path'] == expected),
     );
-    if ((!shader && hasEntry('assets/')) || hasEntry(relative)) {
+    final slash = relative.lastIndexOf('/');
+    final parentDirectory = slash >= 0
+        ? relative.substring(0, slash + 1)
+        : null;
+    if ((!shader && parentDirectory != null && hasEntry(parentDirectory)) ||
+        hasEntry(relative)) {
       return original;
     }
     if (flutter == null) {
