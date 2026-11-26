@@ -42,16 +42,19 @@ Future<StepResult> runStep({
       // their descendants, including Flutter/backend processes, not just setsid.
       final process = await Process.start(
         'setsid',
-        step.command,
+        ['--', ...step.command],
         workingDirectory: getAbsolutePath(repoRoot, step.workingDirectory),
         environment: step.environment.isEmpty
             ? null
             : {...Platform.environment, ...step.environment},
       );
+      var exited = false;
       for (final signal in [ProcessSignal.sigint, ProcessSignal.sigterm]) {
         signals.add(
           signal.watch().listen((_) {
-            Process.killPid(-process.pid, signal);
+            if (!exited) {
+              Process.killPid(-process.pid, signal);
+            }
           }),
         );
       }
@@ -59,6 +62,7 @@ Future<StepResult> runStep({
       if (!step.interactive && abortSignal != null) {
         unawaited(
           abortSignal.then((_) {
+            if (exited) return;
             terminatedByAbort = true;
             Process.killPid(-process.pid, ProcessSignal.sigterm);
           }),
@@ -83,7 +87,11 @@ Future<StepResult> runStep({
         format == RunOutputFormat.text ? stderr : null,
         redactor,
       );
-      processExitCode = await process.exitCode;
+      try {
+        processExitCode = await process.exitCode;
+      } finally {
+        exited = true;
+      }
       await Future.wait([stdoutCopy, stderrCopy]);
       if (terminatedByAbort && processExitCode != 0) {
         failure ??= 'Aborted after another step failed.';
@@ -140,7 +148,9 @@ Future<void> _copyOutput(
   // Redact whole lines: a pipe chunk can split a secret across boundaries.
   // Chunk-local replacement would leak fragments into both logs and mirrors.
   var pending = '';
-  await for (final chunk in input.transform(const Utf8Decoder(allowMalformed: true))) {
+  await for (final chunk in input.transform(
+    const Utf8Decoder(allowMalformed: true),
+  )) {
     pending += chunk;
     var lineEnd = pending.indexOf('\n');
     while (lineEnd >= 0) {
