@@ -31,6 +31,11 @@ const repositoryScripts = [
     'Build Dart API documentation.',
   ),
   ScriptDefinition(
+    'format-files.sh',
+    ScriptKind.tool,
+    'Format or check Dart and Rust files.',
+  ),
+  ScriptDefinition(
     'verify-docs.py',
     ScriptKind.tool,
     'Check a built documentation site; requires the site directory.',
