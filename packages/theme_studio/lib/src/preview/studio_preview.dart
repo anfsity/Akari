@@ -5,13 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:theme_sdk/theme_sdk.dart';
 
 import '../authoring/studio_components.dart';
-import '../model/node_geometry.dart';
+import '../model/node_geometry.dart' show NodeResizeHandle;
 import '../model/studio_input.dart';
 import '../model/studio_preferences.dart';
 import '../model/studio_scenario.dart';
 import 'smart_guides.dart';
+import 'studio_preview_drag.dart';
 import 'studio_preview_host.dart';
 import 'studio_preview_overlays.dart';
+import 'studio_preview_scene.dart';
 import 'studio_rulers.dart';
 import 'studio_viewport.dart';
 
@@ -107,8 +109,8 @@ class StudioPreview extends StatefulWidget {
 class _StudioPreviewState extends State<StudioPreview>
     with SingleTickerProviderStateMixin {
   final _canvas = GlobalKey();
-  _NodeDrag? _drag;
-  final _otherDrags = <_NodeDrag>[];
+  PreviewNodeDrag? _drag;
+  final _otherDrags = <PreviewNodeDrag>[];
   Offset? _marqueeStart;
   final _marqueeRect = ValueNotifier<Rect?>(null);
   Set<String> _marqueeSelection = {};
@@ -132,55 +134,30 @@ class _StudioPreviewState extends State<StudioPreview>
               document.canvas.referenceWidth.toDouble(),
               document.canvas.referenceHeight.toDouble(),
             ),
-        safeArea: document.canvas.useSafeArea
-            ? MediaQuery.paddingOf(context)
-            : EdgeInsets.zero,
+        safeArea: getEffectiveSceneSafeArea(
+          document.canvas,
+          MediaQuery.paddingOf(context),
+        ),
         minHitTarget: widget.theme.bundle.tokens.minHitTarget,
         fontFamilies: sceneFontFamilies.value,
       );
 
-  _NodeDrag _createDrag(
+  PreviewNodeDrag _createDrag(
+    Map<String, SceneNodeGeometry> geometry,
     SceneNode node,
     RenderBox canvas,
     Offset start,
     NodeResizeHandle? handle,
-  ) {
-    final geometry = _getGeometry(widget.document);
-    final parent = node.parentId == null
-        ? null
-        : widget.document.nodes.firstWhere(
-            (entry) => entry.id == node.parentId,
-          );
-    final padding = parent == null
-        ? (widget.document.canvas.useSafeArea
-              ? MediaQuery.paddingOf(context)
-              : EdgeInsets.zero)
-        : EdgeInsets.all(parent.layout!.padding);
-    final parentSize = parent == null
-        ? canvas.size
-        : geometry[parent.id]!.rect.size;
-    final parentMatrix =
-        (parent == null
-              ? Matrix4.identity()
-              : geometry[parent.id]!.worldTransform.clone())
-          ..translateByDouble(padding.left, padding.top, 0, 1);
-    final parentInverse = Matrix4.zero();
-    final determinant = parentInverse.copyInverse(parentMatrix);
-    return _NodeDrag(
-      source: node,
-      canvas: canvas,
-      start: start,
-      tool: widget.tool,
-      handle: handle,
-      parentSize: Size(
-        (parentSize.width - padding.horizontal).clamp(1, double.infinity),
-        (parentSize.height - padding.vertical).clamp(1, double.infinity),
-      ),
-      parentInverse: determinant == 0 || !determinant.isFinite
-          ? Matrix4.identity()
-          : parentInverse,
-    );
-  }
+  ) => createPreviewNodeDrag(
+    document: widget.document,
+    geometry: geometry,
+    node: node,
+    canvas: canvas,
+    start: start,
+    tool: widget.tool,
+    handle: handle,
+    rootSafeArea: MediaQuery.paddingOf(context),
+  );
 
   void _startDrag(
     String id,
@@ -205,7 +182,8 @@ class _StudioPreviewState extends State<StudioPreview>
     if (canvas is! RenderBox) return;
     setState(() {
       final start = canvas.globalToLocal(details.globalPosition);
-      _drag = _createDrag(node, canvas, start, handle);
+      final geometry = _getGeometry(widget.document);
+      _drag = _createDrag(geometry, node, canvas, start, handle);
       _otherDrags.clear();
       if (handle == null && widget.tool == StudioCanvasTool.move) {
         final ids = {..._selectedIds, id};
@@ -214,29 +192,16 @@ class _StudioPreviewState extends State<StudioPreview>
               ids.contains(other.id) &&
               !ids.contains(other.parentId) &&
               other.parentId == node.parentId) {
-            _otherDrags.add(_createDrag(other, canvas, start, null));
+            _otherDrags.add(_createDrag(geometry, other, canvas, start, null));
           }
         }
-        final geometry = _getGeometry(widget.document);
-        final drags = [_drag!, ..._otherDrags];
-        final bounds = drags
-            .map((drag) => geometry[drag.source.id]!.rect)
-            .reduce((a, b) => a.expandToInclude(b));
-        final insets = parent == null
-            ? (widget.document.canvas.useSafeArea
-                  ? MediaQuery.paddingOf(context)
-                  : EdgeInsets.zero)
-            : EdgeInsets.all(parent.layout!.padding);
-        final size = _drag!.parentSize;
-        final rect = SceneRect(
-          x: (bounds.left - insets.left) / size.width,
-          y: (bounds.top - insets.top) / size.height,
-          width: bounds.width / size.width,
-          height: bounds.height / size.height,
+        assignGroupMovementBounds(
+          drags: [_drag!, ..._otherDrags],
+          document: widget.document,
+          geometry: geometry,
+          parent: parent,
+          rootSafeArea: MediaQuery.paddingOf(context),
         );
-        for (final drag in drags) {
-          drag.movementBounds = rect;
-        }
       }
     });
   }
@@ -245,7 +210,7 @@ class _StudioPreviewState extends State<StudioPreview>
     final drag = _drag;
     if (drag == null) return;
     var position = details.globalPosition;
-    SceneNode calculate(_NodeDrag drag) => drag.calculateNode(
+    SceneNode calculate(PreviewNodeDrag drag) => drag.calculateNode(
       position,
       lockAspectRatio:
           widget.lockAspectRatio || HardwareKeyboard.instance.isShiftPressed,
@@ -263,48 +228,18 @@ class _StudioPreviewState extends State<StudioPreview>
         !HardwareKeyboard.instance.isAltPressed &&
         drag.tool == StudioCanvasTool.move &&
         drag.handle == null) {
-      final nodes = [
-        updated,
-        for (final other in _otherDrags) calculate(other),
-      ];
-      final ids = getDescendantIds(
-        widget.document,
-        nodes.map((node) => node.id),
-      );
-      final candidates = {for (final node in nodes) node.id: node};
-      final geometry = _getGeometry(
-        widget.document.copyWith(
-          nodes: [
-            for (final node in widget.document.nodes)
-              candidates[node.id] ?? node,
-          ],
-        ),
-      );
-      final moving = nodes
-          .map((node) => geometry[node.id]!.bounds)
-          .reduce((a, b) => a.expandToInclude(b));
-      final predicates = _getActivePredicates();
-      final guides = calculateSmartGuides(
-        moving: moving,
-        targets: [
-          for (final node in widget.document.nodes)
-            if (!ids.contains(node.id) &&
-                node.id != drag.source.parentId &&
-                _isVisible(node, predicates))
-              geometry[node.id]!.bounds,
+      final guides = calculatePreviewDragSnap(
+        document: widget.document,
+        primaryDrag: drag,
+        movedNodes: [
+          updated,
+          for (final other in _otherDrags) calculate(other),
         ],
-        canvasSize: drag.canvas.size,
-        tolerance: 6 / _viewportScale,
-        verticalGuides: widget.showRulers
-            ? widget.document.guides
-                  .where((guide) => guide.axis == SceneGuideAxis.vertical)
-                  .map((guide) => guide.position * drag.canvas.size.width)
-            : const [],
-        horizontalGuides: widget.showRulers
-            ? widget.document.guides
-                  .where((guide) => guide.axis == SceneGuideAxis.horizontal)
-                  .map((guide) => guide.position * drag.canvas.size.height)
-            : const [],
+        calculateGeometry: _getGeometry,
+        activePredicates: _getActivePredicates(),
+        isNodeVisible: _isVisible,
+        viewportScale: _viewportScale,
+        showRulers: widget.showRulers,
       );
       position = drag.canvas.localToGlobal(
         drag.canvas.globalToLocal(position) + guides.correction,
@@ -480,7 +415,7 @@ class _StudioPreviewState extends State<StudioPreview>
     );
   }
 
-  Set<ScenePredicate> _getActivePredicates() => _getPreviewPredicates(
+  Set<ScenePredicate> _getActivePredicates() => getPreviewPredicates(
     _simulation,
     widget.playbackElapsed == null
         ? widget.dormant
@@ -604,7 +539,7 @@ class _StudioPreviewState extends State<StudioPreview>
     }
     final playback = ScenePlayback(
       elapsed: elapsed,
-      from: _getPreviewPredicates(
+      from: getPreviewPredicates(
         _sourceSimulation ??= StudioPreviewHost(
           scenario: widget.transition.fromScenario,
         ),
@@ -724,7 +659,7 @@ class _StudioPreviewState extends State<StudioPreview>
                   onPanCancel: widget.readOnly || widget.interactive
                       ? null
                       : _cancelMarquee,
-                  child: _PreviewScene(
+                  child: PreviewScene(
                     theme: widget.theme,
                     document: document,
                     referenceSize: referenceSize,
@@ -818,7 +753,7 @@ class _StudioPreviewState extends State<StudioPreview>
     }
   }
 
-  Widget _buildSelectableNode(SceneNode node, Widget child) => _PreviewNode(
+  Widget _buildSelectableNode(SceneNode node, Widget child) => PreviewNode(
     nodeId: node.id,
     interactive: widget.interactive,
     onSelect: () => _selectOnTap(node.id),
@@ -833,267 +768,15 @@ class _StudioPreviewState extends State<StudioPreview>
   );
 
   Widget _buildInteractiveFrame(SceneNode node, Widget child) =>
-      widget.interactive
-      ? child
-      : Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerCancel: (_) => _stopDrag(commit: false),
-          child: GestureDetector(
-            key: ValueKey('preview-${node.id}'),
-            behavior: HitTestBehavior.translucent,
-            onTap: () => _selectOnTap(node.id),
-            onPanStart: widget.readOnly
-                ? null
-                : (details) => _startDrag(node.id, details),
-            onPanUpdate: widget.readOnly ? null : _updateDrag,
-            onPanEnd: widget.readOnly ? null : (_) => _stopDrag(commit: true),
-            onPanCancel: () => _stopDrag(commit: false),
-            child: child,
-          ),
-        );
-}
-
-/// One gesture owns its source and transient result together. Calculations
-/// always use the gesture's source, while notifications compare the last result.
-class _NodeDrag {
-  _NodeDrag({
-    required this.source,
-    required this.canvas,
-    required this.start,
-    required this.tool,
-    this.handle,
-    required this.parentSize,
-    required this.parentInverse,
-  }) : preview = source;
-
-  final SceneNode source;
-  final RenderBox canvas;
-  final Offset start;
-  final Size parentSize;
-  final Matrix4 parentInverse;
-  final StudioCanvasTool tool;
-  final NodeResizeHandle? handle;
-  SceneNode preview;
-  SceneRect? movementBounds;
-
-  SceneNode calculateNode(
-    Offset globalPosition, {
-    required bool lockAspectRatio,
-    required double minHitTarget,
-    double? gridSize,
-  }) {
-    // Convert through the canvas so node transforms and viewport zoom do not
-    // change the direction or speed of the pointer's movement.
-    final delta =
-        MatrixUtils.transformPoint(
-          parentInverse,
-          canvas.globalToLocal(globalPosition),
-        ) -
-        MatrixUtils.transformPoint(parentInverse, start);
-    if (handle case final handle?) {
-      return calculateResizedNode(
-        source: source,
-        canvasSize: parentSize,
-        handle: handle,
-        delta: delta,
-        lockAspectRatio: lockAspectRatio,
-        minHitTarget: minHitTarget,
-        gridSize: gridSize,
+      PreviewInteractiveFrame(
+        nodeId: node.id,
+        readOnly: widget.readOnly,
+        interactive: widget.interactive,
+        onSelect: () => _selectOnTap(node.id),
+        onStartDrag: (details) => _startDrag(node.id, details),
+        onUpdateDrag: _updateDrag,
+        onStopDrag: () => _stopDrag(commit: true),
+        onCancelDrag: () => _stopDrag(commit: false),
+        child: child,
       );
-    }
-    return switch (tool) {
-      StudioCanvasTool.move => _calculateMovedNode(delta, gridSize),
-      StudioCanvasTool.scale => source.copyWith(
-        transform: source.transform.copyWith(
-          scaleX: _calculateScale(
-            source.transform.scaleX,
-            delta.dx / canvas.size.width,
-          ),
-          scaleY: _calculateScale(
-            source.transform.scaleY,
-            delta.dy / canvas.size.height,
-          ),
-        ),
-      ),
-      StudioCanvasTool.rotate => source.copyWith(
-        transform: source.transform.copyWith(
-          rotationZ:
-              source.transform.rotationZ + 360 * delta.dx / canvas.size.width,
-        ),
-      ),
-      StudioCanvasTool.rotate3d => source.copyWith(
-        transform: source.transform.copyWith(
-          rotationX:
-              source.transform.rotationX - 180 * delta.dy / canvas.size.height,
-          rotationY:
-              source.transform.rotationY + 180 * delta.dx / canvas.size.width,
-        ),
-      ),
-    };
-  }
-
-  SceneNode _calculateMovedNode(Offset delta, double? gridSize) {
-    final bounds = movementBounds ?? source.rect;
-    final moved = calculateMovedRect(
-      rect: bounds,
-      canvasSize: parentSize,
-      delta: delta,
-      gridSize: gridSize,
-    );
-    return source.copyWith(
-      rect: source.rect.copyWith(
-        x: source.rect.x + moved.x - bounds.x,
-        y: source.rect.y + moved.y - bounds.y,
-      ),
-    );
-  }
-
-  bool hasGeometryChange(SceneNode node) =>
-      node.rect.x != preview.rect.x ||
-      node.rect.y != preview.rect.y ||
-      node.rect.width != preview.rect.width ||
-      node.rect.height != preview.rect.height ||
-      node.transform.scaleX != preview.transform.scaleX ||
-      node.transform.scaleY != preview.transform.scaleY ||
-      node.transform.rotationX != preview.transform.rotationX ||
-      node.transform.rotationY != preview.transform.rotationY ||
-      node.transform.rotationZ != preview.transform.rotationZ;
-
-  // Retain mirrored axes and keep scale usable at the canvas edge. Scaling
-  // changes the transform, while resizing changes the component's layout rect.
-  double _calculateScale(double source, double delta) =>
-      (source < 0 ? -1 : 1) * (source.abs() + delta * 3).clamp(0.01, 100.0);
 }
-
-/// Material and localization belong to the compiled theme preview. Editor
-/// controls keep using shadcn; design mode keeps authoring hit tests stable.
-class _PreviewScene extends StatelessWidget {
-  const _PreviewScene({
-    required this.theme,
-    required this.document,
-    required this.referenceSize,
-    required this.interactive,
-    required this.wakeProgress,
-    required this.activePredicates,
-    required this.nodeBuilder,
-    required this.frameBuilder,
-    required this.playback,
-    required this.contentDecorator,
-    required this.assetImageResolver,
-    required this.assetSvgLoader,
-    required this.assetFontLoader,
-    required this.shaderLoader,
-  });
-
-  final ThemeDefinition theme;
-  final SceneDocument document;
-  final bool interactive;
-  final Animation<double> wakeProgress;
-  final Set<ScenePredicate> activePredicates;
-  final SceneNodeBuilder nodeBuilder;
-  final SceneFrameBuilder frameBuilder;
-  final ScenePlayback? playback;
-  final SceneFrameBuilder contentDecorator;
-  final SceneImageProviderResolver? assetImageResolver;
-  final SceneSvgLoader? assetSvgLoader;
-  final SceneFontLoader? assetFontLoader;
-  final SceneShaderLoader? shaderLoader;
-  final Size referenceSize;
-
-  @override
-  Widget build(BuildContext context) => MaterialApp(
-    debugShowCheckedModeBanner: false,
-    theme: theme.materialTheme,
-    home: MediaQuery(
-      data: MediaQuery.of(context).copyWith(
-        size: referenceSize,
-        disableAnimations:
-            !interactive || MediaQuery.disableAnimationsOf(context),
-      ),
-      child: Scaffold(
-        body: SceneRuntime(
-          document: document,
-          theme: theme.bundle,
-          backgroundBlurSigma: getBackgroundBlurAnimation(
-            document.background,
-            wakeProgress,
-          ),
-          activePredicates: activePredicates,
-          nodeBuilder: nodeBuilder,
-          frameBuilder: frameBuilder,
-          playback: playback,
-          contentDecorator: contentDecorator,
-          assetImageResolver: assetImageResolver,
-          assetSvgLoader: assetSvgLoader,
-          assetFontLoader: assetFontLoader,
-          shaderLoader: shaderLoader,
-        ),
-      ),
-    ),
-  );
-}
-
-class _PreviewNode extends StatelessWidget {
-  const _PreviewNode({
-    required this.nodeId,
-    required this.interactive,
-    required this.onSelect,
-    required this.onDoubleTap,
-    required this.onStartDrag,
-    required this.onUpdateDrag,
-    required this.onStopDrag,
-    required this.onCancelDrag,
-    required this.child,
-  });
-
-  final String nodeId;
-  final bool interactive;
-  final VoidCallback onSelect;
-  final VoidCallback onDoubleTap;
-  final GestureDragStartCallback? onStartDrag;
-  final GestureDragUpdateCallback onUpdateDrag;
-  final GestureDragEndCallback onStopDrag;
-  final GestureDragCancelCallback onCancelDrag;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Listener(
-    onPointerDown: interactive
-        ? null
-        : (event) {
-            if (event.buttons == kPrimaryMouseButton) onSelect();
-          },
-    // Flutter reports an accepted pan's pointer cancellation as onPanEnd.
-    // Clear the draft first so a cancelled pointer cannot commit a move.
-    onPointerCancel: interactive ? null : (_) => onCancelDrag(),
-    child: GestureDetector(
-      key: ValueKey('preview-$nodeId'),
-      behavior: HitTestBehavior.opaque,
-      // Consume single taps immediately selected by the pointer listener so
-      // double-click recognition cannot pass them to the blank-canvas tool.
-      onTap: interactive ? null : () {},
-      onDoubleTap: interactive ? null : onDoubleTap,
-      dragStartBehavior: DragStartBehavior.down,
-      onPanStart: onStartDrag,
-      onPanUpdate: interactive ? null : onUpdateDrag,
-      onPanEnd: interactive ? null : onStopDrag,
-      onPanCancel: interactive ? null : onCancelDrag,
-      child: ExcludeFocus(
-        excluding: !interactive,
-        child: IgnorePointer(ignoring: !interactive, child: child),
-      ),
-    ),
-  );
-}
-
-Set<ScenePredicate> _getPreviewPredicates(
-  StudioPreviewHost simulation,
-  bool dormant,
-) => getActiveScenePredicates(
-  service: simulation.host.serviceSlots.value,
-  auth: simulation.host.authPromptSlots.value,
-  account: simulation.host.accountPickerSlots.value,
-  session: simulation.host.sessionPickerSlots.value,
-  power: simulation.host.powerSlots.value,
-  dormant: dormant,
-);
