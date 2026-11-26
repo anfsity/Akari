@@ -1445,6 +1445,7 @@ async fn failed_previous_cancel_does_not_block_replacement_and_prompts_are_sanit
     assert!(!text.contains('\u{001b}'));
     assert_eq!(text.chars().count(), 512);
 
+    wait_for_state(&proxy, "WaitingForInput").await;
     proxy.call::<_, _, ()>("Cancel", &(second,)).await.unwrap();
     server.finish().await;
 }

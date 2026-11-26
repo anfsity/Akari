@@ -376,11 +376,6 @@ async fn consume_response(
                                 Some(&emitter),
                             )
                             .await;
-                        if cancellation.is_cancelled() {
-                            return Err(
-                                finish_cancellation(actor, attempt_id, Some(&emitter)).await
-                            );
-                        }
                         return Ok(());
                     }
                     PromptDisposition::AutoAcknowledge => {
