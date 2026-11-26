@@ -231,10 +231,9 @@ class ThemeSession {
       _process.kill();
     } else {
       try {
-        await _sendRequest(
-          'app.stop',
-          {'appId': _appId},
-        ).timeout(const Duration(seconds: 2));
+        await _sendRequest('app.stop', {
+          'appId': _appId,
+        }).timeout(const Duration(seconds: 2));
       } catch (_) {
         _process.kill();
       }
@@ -285,9 +284,23 @@ class ThemeSession {
       stdout.writeln(line);
       return;
     }
-    final messages = jsonDecode(line) as List;
+    final List<dynamic> messages;
+    try {
+      final decoded = jsonDecode(line);
+      if (decoded is! List<dynamic>) {
+        stdout.writeln(line);
+        return;
+      }
+      messages = decoded;
+    } on Object {
+      stdout.writeln(line);
+      return;
+    }
     for (final value in messages) {
-      final message = value as Map<String, dynamic>;
+      if (value is! Map<String, dynamic>) {
+        continue;
+      }
+      final message = value;
       final id = message['id'];
       if (id is int) {
         _requests.remove(id)?.complete(message);
@@ -323,8 +336,12 @@ class ThemeSession {
     _generator?.kill();
     // Settle requests before cancelling protocol delivery. An in-flight reload
     // or stop must not await a reply from a process that has already exited.
-    for (final request in _requests.values) {
-      request.complete({'error': 'Flutter session closed.'});
+    final pending = List.of(_requests.values);
+    _requests.clear();
+    for (final request in pending) {
+      if (!request.isCompleted) {
+        request.complete({'error': 'Flutter session closed.'});
+      }
     }
     for (final subscription in _subscriptions) {
       await subscription.cancel();
