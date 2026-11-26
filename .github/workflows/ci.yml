@@ -28,9 +28,13 @@ jobs:
 
       - name: Install Linux build and test dependencies
         run: |
+          cached_install_ok=false
           if [ "${{ steps.apt-cache.outputs.cache-hit }}" = "true" ] && compgen -G "$HOME/.cache/apt-archives/*.deb" >/dev/null; then
-            sudo dpkg -i "$HOME/.cache/apt-archives"/*.deb
-          else
+            if sudo apt-get install -y --no-install-recommends "$HOME/.cache/apt-archives"/*.deb; then
+              cached_install_ok=true
+            fi
+          fi
+          if [ "$cached_install_ok" != "true" ]; then
             mkdir -p "$HOME/.cache/apt-archives/partial"
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends \
