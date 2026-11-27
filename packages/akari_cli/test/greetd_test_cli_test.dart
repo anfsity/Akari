@@ -74,6 +74,17 @@ Future<void> main(List<String> arguments) async {
   });
   tearDown(() => temporary.delete(recursive: true));
 
+  Map<String, String> getIsolatedEnvironment([
+    Map<String, String> overrides = const {},
+  ]) =>
+      {
+          ...Platform.environment,
+          'PATH': '${bin.path}:${Platform.environment['PATH']}',
+        }
+        ..remove('AKARI_FLUTTER_BIN')
+        ..remove('AKARI_DART_BIN')
+        ..addAll(overrides);
+
   Future<ProcessResult> runFixture(
     List<String> arguments, {
     Map<String, String> environment = const {},
@@ -88,13 +99,13 @@ Future<void> main(List<String> arguments) async {
         ...arguments,
       ],
       workingDirectory: temporary.path,
-      environment: {
-        'PATH': '${bin.path}:${Platform.environment['PATH']}',
+      includeParentEnvironment: false,
+      environment: getIsolatedEnvironment({
         'INSTALLATION': installation.path,
         'REPOSITORY': _repoRoot.path,
         'CALLS': '${temporary.path}/calls.json',
         ...environment,
-      },
+      }),
     );
   }
 
@@ -218,7 +229,8 @@ Future<void> main(List<String> arguments) async {
             '--dry-run',
           ],
           workingDirectory: temporary.path,
-          environment: {'PATH': '${bin.path}:${Platform.environment['PATH']}'},
+          includeParentEnvironment: false,
+          environment: getIsolatedEnvironment(),
         );
         expect(result.exitCode, 0, reason: '${result.stderr}');
         final plan =
@@ -241,27 +253,31 @@ Future<void> main(List<String> arguments) async {
     },
   );
 
-  test('dry runs do not request privilege and install preserves SDK overrides', () async {
-    for (final target in ['install', 'start', 'restore']) {
-      final result = await runFixture(
-        [target, '--dry-run'],
-        environment: {'AKARI_DART_BIN': 'SDK with spaces/bin/dart'},
-      );
-      expect(result.exitCode, 0, reason: '${result.stderr}');
-      final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
-      expect(plan['dry_run'], isTrue);
-      if (target == 'install') {
-        expect(
-          plan['invocation'],
-          contains(
-            'AKARI_DART_BIN=${_repoRoot.path}/SDK with spaces/bin/dart',
-          ),
+  test(
+    'dry runs do not request privilege and install preserves SDK overrides',
+    () async {
+      for (final target in ['install', 'start', 'restore']) {
+        final result = await runFixture(
+          [target, '--dry-run'],
+          environment: {'AKARI_DART_BIN': 'SDK with spaces/bin/dart'},
         );
-        expect((plan['invocation'] as List).last, installation.path);
+        expect(result.exitCode, 0, reason: '${result.stderr}');
+        final plan =
+            jsonDecode(result.stdout as String) as Map<String, dynamic>;
+        expect(plan['dry_run'], isTrue);
+        if (target == 'install') {
+          expect(
+            plan['invocation'],
+            contains(
+              'AKARI_DART_BIN=${_repoRoot.path}/SDK with spaces/bin/dart',
+            ),
+          );
+          expect((plan['invocation'] as List).last, installation.path);
+        }
       }
-    }
-    expect(File('${temporary.path}/calls.json').existsSync(), isFalse);
-  });
+      expect(File('${temporary.path}/calls.json').existsSync(), isFalse);
+    },
+  );
 
   test('root lifecycle calls do not request sudo again', () async {
     final result = await runFixture(
