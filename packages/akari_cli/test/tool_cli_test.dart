@@ -16,10 +16,17 @@ import 'package:akari_cli/src/theme/host.dart';
 import 'package:akari_cli/src/theme/model.dart';
 import 'package:akari_cli/src/theme/project.dart';
 
+import 'cli_test_snapshots.dart';
+
 final _repoRoot = findRepositoryRoot();
+late final String _akariSnapshot;
 
 void main() {
   late Directory tempRoot;
+
+  setUpAll(() async {
+    _akariSnapshot = await ensureAkariCliSnapshot(_repoRoot);
+  });
 
   setUp(() async {
     tempRoot = await Directory.systemTemp.createTemp('akari-tool-cli-test-');
@@ -1277,11 +1284,7 @@ Future<ProcessResult> _runTool(
   childEnvironment.addAll(environment);
   return Process.run(
     dartCommand.first,
-    [
-      ...dartCommand.skip(1),
-      '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
-      ...arguments,
-    ],
+    [...dartCommand.skip(1), _akariSnapshot, ...arguments],
     workingDirectory: _repoRoot.path,
     environment: childEnvironment,
     includeParentEnvironment: false,

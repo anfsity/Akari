@@ -7,6 +7,8 @@ import 'package:akari_cli/src/execution/paths.dart';
 
 import 'package:akari_cli/src/sdk_commands.dart';
 
+import 'cli_test_snapshots.dart';
+
 final _repoRoot = findRepositoryRoot();
 
 void main() {
@@ -14,9 +16,10 @@ void main() {
     'standalone splash holds one renderer without preparing a theme',
     () async {
       final dart = getDartCommand(_repoRoot);
+      final snapshot = await ensureAkariCliSnapshot(_repoRoot);
       final result = await Process.run(dart.first, [
         ...dart.skip(1),
-        '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
+        snapshot,
         'run',
         'splash',
         '--light',
@@ -34,7 +37,7 @@ void main() {
         '--hold',
         '--light',
       ]);
-    expect(steps.last['interactive'], isFalse);
+      expect(steps.last['interactive'], isFalse);
     },
   );
 }

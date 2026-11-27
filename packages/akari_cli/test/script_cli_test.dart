@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:test/test.dart';
 
@@ -10,9 +9,16 @@ import 'package:akari_cli/src/cli/definition.dart';
 import 'package:akari_cli/src/cli/scripts.dart';
 import 'package:akari_cli/src/sdk_commands.dart';
 
+import 'cli_test_snapshots.dart';
+
 final _repoRoot = findRepositoryRoot();
 
 void main() {
+  late String akariSnapshot;
+  setUpAll(() async {
+    akariSnapshot = await ensureAkariCliSnapshot(_repoRoot);
+  });
+
   test('every script is classified and bound commands reference a tool', () {
     final scripts = findRepositoryScripts(_repoRoot);
     expect(
@@ -48,6 +54,11 @@ Future<void> main(List<String> arguments) async {
   exitCode = await runScriptCommand(command, CliArguments(remaining), Directory.current);
 }
 ''');
+      final runnerSnapshot = await compileDartKernelSnapshot(
+        _repoRoot,
+        source: runner,
+        output: File('${root.path}/runner.dill'),
+      );
       final dart = getDartCommand(_repoRoot);
       const arguments = ['--help', r'$(touch unexpected)', 'path with spaces'];
       for (final command in [
@@ -56,8 +67,7 @@ Future<void> main(List<String> arguments) async {
       ]) {
         final result = await Process.run(dart.first, [
           ...dart.skip(1),
-          '--packages=${Isolate.packageConfigSync!.toFilePath()}',
-          runner.path,
+          runnerSnapshot,
           ...command,
           '--',
           ...arguments,
@@ -71,12 +81,11 @@ Future<void> main(List<String> arguments) async {
 
   test('script discovery and dry runs work outside the repository', () async {
     final dart = getDartCommand(_repoRoot);
-    Future<ProcessResult> run(List<String> arguments) =>
-        Process.run(dart.first, [
-          ...dart.skip(1),
-          '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
-          ...arguments,
-        ], workingDirectory: Directory.systemTemp.path);
+    Future<ProcessResult> run(List<String> arguments) => Process.run(
+      dart.first,
+      [...dart.skip(1), akariSnapshot, ...arguments],
+      workingDirectory: Directory.systemTemp.path,
+    );
     final inventory = await run(['script', 'list', '--format', 'json']);
     expect(inventory.exitCode, 0, reason: '${inventory.stderr}');
     expect(

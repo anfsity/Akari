@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:test/test.dart';
 
@@ -9,13 +8,53 @@ import 'package:akari_cli/src/execution/paths.dart';
 import 'package:akari_cli/src/commands/greetd_test.dart';
 import 'package:akari_cli/src/sdk_commands.dart';
 
+import 'cli_test_snapshots.dart';
+
 final _repoRoot = findRepositoryRoot();
 
 void main() {
+  Directory? runnerDirectory;
+  late String akariSnapshot;
+  late String runnerSnapshot;
   late Directory temporary;
   late Directory installation;
   late Directory bin;
-  late File runner;
+
+  setUpAll(() async {
+    akariSnapshot = await ensureAkariCliSnapshot(_repoRoot);
+    final directory = await Directory.systemTemp.createTemp(
+      'akari-greetd-runner-',
+    );
+    runnerDirectory = directory;
+    final runnerSource = File('${directory.path}/runner.dart');
+    await runnerSource.writeAsString('''
+import 'dart:io';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/commands/greetd_test.dart';
+import '${_repoRoot.uri}packages/akari_cli/lib/src/cli/definition.dart';
+Future<void> main(List<String> arguments) async {
+  try {
+    exitCode = await runGreetdTestCommand(
+      getCliCommand('greetd-test ' + arguments.first),
+      arguments.skip(1).toList(),
+      installation: Directory(Platform.environment['INSTALLATION']!),
+      repoRoot: Directory(Platform.environment['REPOSITORY']!),
+    );
+  } on FormatException catch (error) {
+    stderr.writeln(error.message);
+    exitCode = 2;
+  } catch (error) {
+    stderr.writeln(error);
+    exitCode = 1;
+  }
+}
+''');
+    runnerSnapshot = await compileDartKernelSnapshot(
+      _repoRoot,
+      source: runnerSource,
+      output: File('${directory.path}/runner.dill'),
+    );
+  });
+  tearDownAll(() => runnerDirectory?.delete(recursive: true));
 
   setUp(() async {
     temporary = await Directory.systemTemp.createTemp('akari-greetd-cli-');
@@ -49,28 +88,6 @@ elif name == 'systemctl':
     for (final name in ['id', 'sudo', 'systemctl']) {
       await Link('${bin.path}/$name').create(boundary.path);
     }
-    runner = File('${temporary.path}/runner.dart');
-    await runner.writeAsString('''
-import 'dart:io';
-import '${_repoRoot.uri}packages/akari_cli/lib/src/commands/greetd_test.dart';
-import '${_repoRoot.uri}packages/akari_cli/lib/src/cli/definition.dart';
-Future<void> main(List<String> arguments) async {
-  try {
-    exitCode = await runGreetdTestCommand(
-      getCliCommand('greetd-test ' + arguments.first),
-      arguments.skip(1).toList(),
-      installation: Directory(Platform.environment['INSTALLATION']!),
-      repoRoot: Directory(Platform.environment['REPOSITORY']!),
-    );
-  } on FormatException catch (error) {
-    stderr.writeln(error.message);
-    exitCode = 2;
-  } catch (error) {
-    stderr.writeln(error);
-    exitCode = 1;
-  }
-}
-''');
   });
   tearDown(() => temporary.delete(recursive: true));
 
@@ -92,12 +109,7 @@ Future<void> main(List<String> arguments) async {
     final dart = getDartCommand(_repoRoot);
     return Process.run(
       dart.first,
-      [
-        ...dart.skip(1),
-        '--packages=${Isolate.packageConfigSync!.toFilePath()}',
-        runner.path,
-        ...arguments,
-      ],
+      [...dart.skip(1), runnerSnapshot, ...arguments],
       workingDirectory: temporary.path,
       includeParentEnvironment: false,
       environment: getIsolatedEnvironment({
@@ -127,7 +139,7 @@ Future<void> main(List<String> arguments) async {
     ]) {
       final result = await Process.run(dart.first, [
         ...dart.skip(1),
-        '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
+        akariSnapshot,
         'greetd-test',
         if (target.isNotEmpty) target,
         '--help',
@@ -216,7 +228,7 @@ Future<void> main(List<String> arguments) async {
           dart.first,
           [
             ...dart.skip(1),
-            '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
+            akariSnapshot,
             'greetd-test',
             target,
             if (target == 'install') ...['--theme', 'relative theme'],

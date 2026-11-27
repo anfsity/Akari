@@ -11,10 +11,16 @@ import 'package:akari_cli/src/execution/model.dart';
 import 'package:akari_cli/src/sdk_commands.dart';
 import 'package:akari_cli/src/theme/display_profile.dart';
 
+import 'cli_test_snapshots.dart';
+
 final _repoRoot = findRepositoryRoot();
 
 void main() {
+  late String akariSnapshot;
   late Directory temp;
+  setUpAll(() async {
+    akariSnapshot = await ensureAkariCliSnapshot(_repoRoot);
+  });
   setUp(() async {
     temp = await Directory.systemTemp.createTemp('akari-sway-cli-');
   });
@@ -24,11 +30,7 @@ void main() {
     final dart = getDartCommand(_repoRoot);
     return Process.run(
       dart.first,
-      [
-        ...dart.skip(1),
-        '${_repoRoot.path}/packages/akari_cli/bin/akari.dart',
-        ...arguments,
-      ],
+      [...dart.skip(1), akariSnapshot, ...arguments],
       workingDirectory: _repoRoot.path,
       environment: {'XDG_STATE_HOME': temp.path},
     );
@@ -62,7 +64,10 @@ void main() {
     );
     expect(steps.last['id'], 'theme.sway');
     final command = steps.last['command'] as List;
-    expect(command, contains(endsWith('${_repoRoot.path}/scripts/debug-dbus.sh')));
+    expect(
+      command,
+      contains(endsWith('${_repoRoot.path}/scripts/debug-dbus.sh')),
+    );
     expect(command, contains(endsWith('scripts/sway-session.py')));
     expect(command, contains(endsWith('themes/fallback')));
     expect(command, isNot(contains(contains('apps/greeter/lib/main.dart'))));
