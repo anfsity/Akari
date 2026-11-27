@@ -46,13 +46,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       'check-toolchain.sh',
     ]);
     expect(
-      await completeBashWords([
-        'akari',
-        'script',
-        'run',
-        '--dry-run',
-        'check',
-      ]),
+      await completeBashWords(['akari', 'script', 'run', '--dry-run', 'check']),
       ['check-toolchain.sh'],
     );
     expect(await completeBashWords(['akari', 'script', 'run', 'lib']), isEmpty);
@@ -246,71 +240,74 @@ printf '%s\\0' "\${COMPREPLY[@]}"
     expect(buffers[18].trimRight(), 'akari login disable-gaze');
   });
 
-  test('installation preserves startup content and works outside the repository', () async {
-    final prefix = Directory('${temp.path}/prefix with spaces and \' quote');
-    final rc = File('${temp.path}/.bashrc');
-    await rc.writeAsString('# existing configuration\n');
-    for (var index = 0; index < 2; index++) {
-      await installCli(
-        repoRoot: _repoRoot,
-        prefix: prefix,
-        rcFile: rc,
-        shell: 'bash',
+  test(
+    'installation preserves startup content and works outside the repository',
+    () async {
+      final prefix = Directory('${temp.path}/prefix with spaces and \' quote');
+      final rc = File('${temp.path}/.bashrc');
+      await rc.writeAsString('# existing configuration\n');
+      for (var index = 0; index < 2; index++) {
+        await installCli(
+          repoRoot: _repoRoot,
+          prefix: prefix,
+          rcFile: rc,
+          shell: 'bash',
+        );
+      }
+      final startup = await rc.readAsString();
+      expect(startup, startsWith('# existing configuration\n'));
+      expect('if [ -f'.allMatches(startup), hasLength(1));
+      final project = Directory('${temp.path}/relative theme');
+      await Directory('${project.path}/lib').create(recursive: true);
+      await File('${project.path}/pubspec.yaml')
+          .writeAsString('name: theme_ocean\n');
+      await File('${project.path}/lib/theme.dart')
+          .writeAsString('buildOceanTheme() {}');
+      await File('${project.path}/lib/ocean.scene.json').writeAsString('{}');
+      final result = await Process.run(
+        '${prefix.path}/bin/akari',
+        ['build', '-t', 'relative theme', '-m', 'debug', '--dry-run'],
+        workingDirectory: temp.path,
+        environment: {'AKARI_DART_BIN': Platform.resolvedExecutable},
       );
-    }
-    final startup = await rc.readAsString();
-    expect(startup, startsWith('# existing configuration\n'));
-    expect('if [ -f'.allMatches(startup), hasLength(1));
-    final project = Directory('${temp.path}/relative theme');
-    await Directory('${project.path}/lib').create(recursive: true);
-    await File('${project.path}/pubspec.yaml')
-        .writeAsString('name: theme_ocean\n');
-    await File('${project.path}/lib/theme.dart')
-        .writeAsString('buildOceanTheme() {}');
-    await File('${project.path}/lib/ocean.scene.json').writeAsString('{}');
-    final result = await Process.run(
-      '${prefix.path}/bin/akari',
-      ['build', '-t', 'relative theme', '-m', 'debug', '--dry-run'],
-      workingDirectory: temp.path,
-      environment: {'AKARI_DART_BIN': Platform.resolvedExecutable},
-    );
-    expect(result.exitCode, 0, reason: '${result.stderr}');
-    final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
-    expect(plan['command'], 'build');
-    expect(
-      (plan['steps'] as List).singleWhere(
-        (step) => (step as Map<String, dynamic>)['id'] == 'theme.pub_get',
-      )['working_directory'],
-      project.path,
-    );
-    final studio = await Process.run(
-      '${prefix.path}/bin/akari',
-      ['run', 'studio', '-t', 'relative theme', '--dry-run'],
-      workingDirectory: temp.path,
-      environment: {'AKARI_DART_BIN': Platform.resolvedExecutable},
-    );
-    expect(studio.exitCode, 0, reason: '${studio.stderr}');
-    final studioPlan =
-        jsonDecode(studio.stdout as String) as Map<String, dynamic>;
-    expect(studioPlan['command'], 'run studio');
-    expect(
-      ((studioPlan['steps'] as List).last as Map<String, dynamic>)['id'],
-      'theme.studio',
-    );
-    expect(
-      (studioPlan['artifacts'] as Map<String, dynamic>)['host_project'],
-      endsWith('/studio'),
-    );
-    final activation = await Process.run('bash', [
-      '--noprofile',
-      '--norc',
-      '-c',
-      '. ${_quote(rc.path)}; command -v akari; complete -p akari',
-    ]);
-    expect(activation.exitCode, 0, reason: '${activation.stderr}');
-    expect(activation.stdout, contains('${prefix.path}/bin/akari'));
-    expect(activation.stdout, contains('-F _akari akari'));
-  });
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      final plan = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+      expect(plan['command'], 'build');
+      expect(
+        (plan['steps'] as List).singleWhere(
+          (step) => (step as Map<String, dynamic>)['id'] == 'theme.pub_get',
+        )['working_directory'],
+        project.path,
+      );
+      final studio = await Process.run(
+        '${prefix.path}/bin/akari',
+        ['run', 'studio', '-t', 'relative theme', '--dry-run'],
+        workingDirectory: temp.path,
+        environment: {'AKARI_DART_BIN': Platform.resolvedExecutable},
+      );
+      expect(studio.exitCode, 0, reason: '${studio.stderr}');
+      final studioPlan =
+          jsonDecode(studio.stdout as String) as Map<String, dynamic>;
+      expect(studioPlan['command'], 'run studio');
+      expect(
+        ((studioPlan['steps'] as List).last as Map<String, dynamic>)['id'],
+        'theme.studio',
+      );
+      expect(
+        (studioPlan['artifacts'] as Map<String, dynamic>)['host_project'],
+        endsWith('/studio'),
+      );
+      final activation = await Process.run('bash', [
+        '--noprofile',
+        '--norc',
+        '-c',
+        '. ${_quote(rc.path)}; command -v akari; complete -p akari',
+      ]);
+      expect(activation.exitCode, 0, reason: '${activation.stderr}');
+      expect(activation.stdout, contains('${prefix.path}/bin/akari'));
+      expect(activation.stdout, contains('-F _akari akari'));
+    },
+  );
 
   test('zsh environment registers completion and syntax checks pass', () async {
     final prefix = Directory('${temp.path}/prefix');
@@ -331,7 +328,7 @@ printf '%s\\0' "\${COMPREPLY[@]}"
       environment: {'HOME': temp.path, 'ZDOTDIR': temp.path},
     );
     expect(result.exitCode, 0, reason: '${result.stderr}');
-    expect(result.stdout, contains('_akari'));
+    expect(result.stdout, contains('_akari'), reason: '${result.stderr}');
     expect(result.stdout, contains('${prefix.path}/bin/akari'));
     for (final shell in ['bash', 'zsh']) {
       final file = File('${temp.path}/syntax.$shell');

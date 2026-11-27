@@ -42,7 +42,7 @@ case ":\$PATH:" in
   *:${encodeShellArgument(launcher.parent.path)}:*) ;;
   *) export PATH=${encodeShellArgument(launcher.parent.path)}:"\$PATH" ;;
 esac
-${shell == 'zsh' ? 'if (( ! \$+functions[compdef] )); then\n  autoload -Uz compinit\n  compinit\nfi\n' : ''}. ${encodeShellArgument(completion.path)}
+${shell == 'zsh' ? 'if (( ! \$+functions[compdef] )); then\n  autoload -Uz compinit\n  compinit -i\nfi\n' : ''}. ${encodeShellArgument(completion.path)}
 ''');
   await rcFile.parent.create(recursive: true);
   final startup = await rcFile.exists() ? await rcFile.readAsString() : '';

@@ -44,7 +44,7 @@ try:
     drain_output(0.1)
     setup = (
         "PROMPT='AKARI> '; KEYTIMEOUT=1; autoload -Uz compinit; "
-        f"compinit -d {shlex.quote(str(output / 'zcompdump'))}; "
+        f"compinit -i -d {shlex.quote(str(output / 'zcompdump'))}; "
         f"source {shlex.quote(completion)}; "
         "dump-buffer() { "
         f"print -r -- \"$BUFFER\" >> {shlex.quote(str(buffers))}; "
