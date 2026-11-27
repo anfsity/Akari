@@ -111,7 +111,7 @@ elif name == 'app':
             'import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(60)'])
         (root / 'descendant.pid').write_text(str(child.pid))
     print('theme started', flush=True)
-    time.sleep(float(os.environ.get('APP_DURATION', '1.8')))
+    time.sleep(float(os.environ.get('APP_DURATION', '0.7')))
     sys.exit(int(os.environ.get('APP_EXIT', '0')))
 ''')
         handler.chmod(0o755)
@@ -126,7 +126,10 @@ elif name == 'app':
                             'WAYLAND_DISPLAY': 'outer-wayland',
                             'XDG_RUNTIME_DIR': str(self.root / 'outer'),
                             'SWAYSOCK': 'outer-sway-socket',
-                            'AKARI_DISPLAY_SOURCE': 'greetd-login'}
+                            'AKARI_DISPLAY_SOURCE': 'greetd-login',
+                            'AKARI_SWAY_POLL_INTERVAL': '0.01',
+                            'AKARI_SWAY_SCREENSHOT_DELAY': '0.02',
+                            'AKARI_SWAY_INITIAL_TIMEOUT': '0.5'}
         self.command = [sys.executable, str(ROOT / 'scripts/sway-session.py'),
                         '--log-dir', str(self.root / 'session'), '--backend', 'headless',
                         '--', str(self.bin / 'app')]
@@ -204,7 +207,7 @@ elif name == 'app':
         self.assert_processes_stopped()
 
     def test_fullscreen_and_retiling_keep_scale_without_failing_session(self):
-        result = self.run_hyprland_session(FULLSCREEN_AFTER='3', RETILE_AFTER='5', APP_DURATION='3')
+        result = self.run_hyprland_session(FULLSCREEN_AFTER='3', RETILE_AFTER='5', APP_DURATION='1.0')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         report = self.get_report()
         self.assertTrue(report['matched'])

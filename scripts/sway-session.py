@@ -121,7 +121,9 @@ def get_session_environment(parent_environment, runtime, backend, output_count):
     outer_display = environment.get('WAYLAND_DISPLAY')
     outer_runtime = environment.get('XDG_RUNTIME_DIR')
     for key in ['DISPLAY', 'SWAYSOCK', 'WAYLAND_DISPLAY', 'WAYLAND_SOCKET',
-                'WLR_WAYLAND_DISPLAY', 'AKARI_DISPLAY_SOURCE', 'AKARI_TEST_RUN']:
+                'WLR_WAYLAND_DISPLAY', 'AKARI_DISPLAY_SOURCE', 'AKARI_TEST_RUN',
+                'AKARI_SWAY_POLL_INTERVAL', 'AKARI_SWAY_SCREENSHOT_DELAY',
+                'AKARI_SWAY_INITIAL_TIMEOUT']:
         environment.pop(key, None)
     environment.update(XDG_RUNTIME_DIR=str(runtime), WLR_BACKENDS=backend,
                        GDK_BACKEND='wayland', XDG_CURRENT_DESKTOP='Sway',
@@ -159,7 +161,21 @@ def _prepare_session_workspace(directory, target, hyprland):
     return runtime, config, screenshots
 
 
-def _wait_for_sway_sockets(runtime, sway, directory, environment, is_interrupted):
+def _get_float_env(environment, name, default, *, minimum=0.0):
+    raw = environment.get(name, '').strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError as error:
+        raise ValueError(f'Invalid {name}: {raw}') from error
+    if not math.isfinite(value) or value < minimum:
+        raise ValueError(f'Invalid {name}: {raw}')
+    return value
+
+
+def _wait_for_sway_sockets(runtime, sway, directory, environment, is_interrupted,
+                           poll_interval=0.1):
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline and not is_interrupted():
         sockets = list(runtime.glob('sway-ipc.*.sock'))
@@ -169,7 +185,7 @@ def _wait_for_sway_sockets(runtime, sway, directory, environment, is_interrupted
             return True
         if sway.poll() is not None:
             raise RuntimeError(f'Sway exited before startup; see {directory / "sway.log"}.')
-        time.sleep(.1)
+        time.sleep(poll_interval)
     if is_interrupted():
         return False
     raise RuntimeError('Timed out waiting for inner Sway sockets.')
@@ -180,9 +196,10 @@ def _resolve_expected_outputs(parent_environment, sway, target, hyprland, curren
             if hyprland else target)
 
 
-def _wait_for_initial_outputs(environment, parent_environment, sway, target, hyprland, directory, is_interrupted):
+def _wait_for_initial_outputs(environment, parent_environment, sway, target, hyprland, directory,
+                              is_interrupted, timeout=3.0, poll_interval=0.1):
     # Wait for mapping and output configuration before launching the theme.
-    deadline = time.monotonic() + 3
+    deadline = time.monotonic() + timeout
     while True:
         raw = get_sway_reply(environment, '-t', 'get_outputs')
         actual = get_outputs(raw)
@@ -195,7 +212,7 @@ def _wait_for_initial_outputs(environment, parent_environment, sway, target, hyp
             break
         if is_interrupted():
             return None
-        time.sleep(.1)
+        time.sleep(poll_interval)
     write_json_atomic(directory / 'outputs.json', raw, mode=0o644)
     if expected is None:
         raise RuntimeError('Timed out waiting for owned Hyprland output windows.')
@@ -234,7 +251,8 @@ def _capture_screenshots(environment, current, screenshots, report, report_path)
 
 
 def _monitor_session(app, sway, environment, parent_environment, target, hyprland,
-                     directory, screenshots, report, report_path, update_report, is_interrupted):
+                     directory, screenshots, report, report_path, update_report, is_interrupted,
+                     poll_interval=0.2, reconcile_interval=0.1, screenshot_delay=1.0):
     target_names = {output['name'] for output in target}
     ready_at = None
     while app.poll() is None and not is_interrupted():
@@ -249,7 +267,7 @@ def _monitor_session(app, sway, environment, parent_environment, target, hyprlan
         if hyprland and update_output_scales(environment, expected, current):
             # Output configuration is applied asynchronously. Reconcile on
             # the next poll, as at startup, before verifying or capturing.
-            time.sleep(.1)
+            time.sleep(reconcile_interval)
             continue
         if (expected != report['effective_target']
                 or get_output_differences(report['actual'], current)):
@@ -260,17 +278,24 @@ def _monitor_session(app, sway, environment, parent_environment, target, hyprlan
             if visible == target_names:
                 if ready_at is None:
                     ready_at = time.monotonic()
-                if time.monotonic() - ready_at >= 1:
+                if time.monotonic() - ready_at >= screenshot_delay:
                     _capture_screenshots(environment, current, screenshots, report, report_path)
             else:
                 ready_at = None
-        time.sleep(.2)
+        time.sleep(poll_interval)
 
 
 def start_session(directory, backend, command):
     profile = json.loads(os.environ['AKARI_DISPLAY_PROFILE_JSON'])
     target = get_virtual_outputs(profile, backend)
     parent_environment = dict(os.environ)
+    poll_interval = _get_float_env(
+        parent_environment, 'AKARI_SWAY_POLL_INTERVAL', 0.2, minimum=0.005)
+    startup_poll = min(0.1, poll_interval)
+    screenshot_delay = _get_float_env(
+        parent_environment, 'AKARI_SWAY_SCREENSHOT_DELAY', 1.0, minimum=0.0)
+    initial_timeout = _get_float_env(
+        parent_environment, 'AKARI_SWAY_INITIAL_TIMEOUT', 3.0, minimum=0.05)
     hyprland = (backend == 'wayland' and not parent_environment.get('SWAYSOCK')
                 and bool(parent_environment.get('HYPRLAND_INSTANCE_SIGNATURE')))
     runtime, config, screenshots = _prepare_session_workspace(directory, target, hyprland)
@@ -318,10 +343,12 @@ def start_session(directory, backend, command):
         sway = subprocess.Popen(['sway', '--unsupported-gpu', '-c', str(config)],
                                 env=environment, stdout=sway_log, stderr=subprocess.STDOUT,
                                 start_new_session=True)
-        if not _wait_for_sway_sockets(runtime, sway, directory, environment, is_interrupted):
+        if not _wait_for_sway_sockets(runtime, sway, directory, environment, is_interrupted,
+                                      poll_interval=startup_poll):
             return interrupted
         initial = _wait_for_initial_outputs(
-            environment, parent_environment, sway, target, hyprland, directory, is_interrupted)
+            environment, parent_environment, sway, target, hyprland, directory, is_interrupted,
+            timeout=initial_timeout, poll_interval=startup_poll)
         if initial is None:
             return interrupted
         expected, actual = initial
@@ -332,7 +359,9 @@ def start_session(directory, backend, command):
         output_thread = _start_output_forwarder(app, app_log)
         _monitor_session(
             app, sway, environment, parent_environment, target, hyprland,
-            directory, screenshots, report, report_path, update_report, is_interrupted)
+            directory, screenshots, report, report_path, update_report, is_interrupted,
+            poll_interval=poll_interval, reconcile_interval=startup_poll,
+            screenshot_delay=screenshot_delay)
         if interrupted:
             return interrupted
         raw, current = record_sway_outputs(directory, environment)
