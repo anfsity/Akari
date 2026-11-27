@@ -1,6 +1,21 @@
 name: Documentation
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'packages/theme_sdk/**'
+      - 'packages/scene/**'
+      - 'packages/scene_schema/**'
+      - 'packages/greeter_components/**'
+      - 'scripts/build-api-docs.sh'
+      - 'scripts/verify-docs.py'
+      - 'dartdoc_options.yaml'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.fvmrc'
+      - '.github/workflows/docs.yml'
   pull_request:
     paths:
       - 'docs/**'
