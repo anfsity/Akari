@@ -558,10 +558,13 @@ sys.exit(1)
         steps.any((step) => step['id'] == 'theme_default.analyze'),
         isFalse,
       );
-      expect(
-        steps.singleWhere((step) => step['id'] == 'flutter.analyze')['command'],
-        isNot(contains('apps/greeter/lib/main.dart')),
-      );
+      final workspaceAnalyze =
+          steps.singleWhere(
+                (step) => step['id'] == 'workspace.analyze',
+              )['command']
+              as List;
+      expect(workspaceAnalyze, isNot(contains('apps/greeter/lib/main.dart')));
+      expect(workspaceAnalyze, isNot(contains('themes/default')));
     },
   );
 
@@ -620,19 +623,16 @@ sys.exit(1)
       steps
           .where((step) => step.id.endsWith('.analyze'))
           .map((step) => step.id),
-      unorderedEquals([
-        'flutter.analyze',
-        'scene_schema.analyze',
-        'scene_codegen.analyze',
-        'theme_project.analyze',
-        'akari_cli.analyze',
-        'greeter_harness.analyze',
-        'scene.analyze',
-        'greeter_ui.analyze',
-        'greeter_components.analyze',
-        'theme_sdk.analyze',
-        'theme_studio.analyze',
-        'theme_ocean.analyze',
+      unorderedEquals(['workspace.analyze', 'theme_ocean.analyze']),
+    );
+    expect(
+      steps.singleWhere((step) => step.id == 'workspace.analyze').command,
+      containsAll([
+        'apps/greeter/lib/app',
+        'apps/greeter/lib/infrastructure',
+        'apps/greeter/test',
+        'apps/greeter/lib/main.dart',
+        'packages',
       ]),
     );
   });
@@ -876,7 +876,8 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
               (step['id'] as String).startsWith('scene.') ||
               (step['id'] as String).startsWith('greeter_ui.') ||
               (step['id'] as String).startsWith('flutter.') ||
-              (step['id'] as String) == 'dbus.smoke')
+              step['id'] == 'workspace.analyze' ||
+              step['id'] == 'dbus.smoke')
             step['id'] as String: (step['command'] as List).cast<String>(),
       };
       expect(
@@ -895,6 +896,7 @@ exec ${dartCommand.map(_shellQuote).join(' ')} "\$@"
         sdkSteps.entries
             .where(
               (entry) =>
+                  entry.key == 'workspace.analyze' ||
                   entry.key.startsWith('flutter.') ||
                   entry.key.startsWith('scene.') ||
                   entry.key.startsWith('greeter_ui.'),

@@ -11,13 +11,13 @@ import 'theme.dart' show createBackendBuildStep;
 
 const _standaloneWorkflowSuites = [
   'greetd_test_workflow_test.py',
-  'greetd_screenshot_test.py',
-  'display_profile_test.py',
-  'display_layout_test.py',
   'sway_session_test.py',
-  'login_workflow_test.py',
-  'gaze_pam_test.py',
   'splash_workflow_test.py',
+  'gaze_pam_test.py',
+  'login_workflow_test.py',
+  'display_profile_test.py',
+  'greetd_screenshot_test.py',
+  'display_layout_test.py',
 ];
 
 RunPlan createVerificationPlan(
@@ -46,20 +46,50 @@ RunPlan createVerificationPlan(
   final defaultSceneStep = sceneSteps.contains('scenes.generate_theme_default')
       ? const ['scenes.generate_theme_default']
       : const <String>[];
+  final workspaceThemes = [
+    for (final theme in themes)
+      if (isWorkspaceMember(repoRoot, theme.directory)) theme,
+  ];
   final externalThemes = [
+    for (final theme in themes)
+      if (!isWorkspaceMember(repoRoot, theme.directory)) theme,
+  ];
+  final externalGenerationThemes = [
     for (final theme in generationThemes)
       if (!isWorkspaceMember(repoRoot, theme.directory)) theme,
   ];
   final externalPubGetIds = {
-    for (final theme in externalThemes)
+    for (final theme in externalGenerationThemes)
       theme.packageName: '${theme.packageName}.pub_get',
   };
+  final workspaceSceneSteps = [
+    for (final theme in generationThemes)
+      if (isWorkspaceMember(repoRoot, theme.directory))
+        'scenes.generate_${theme.packageName}',
+  ];
   final workflowSuites = [
     for (final suite in _standaloneWorkflowSuites)
       if (File(getJoinedPath(repoRoot.path, 'test/workflows/$suite'))
           .existsSync())
         suite,
   ];
+  final processors = Platform.numberOfProcessors;
+  final outerConcurrency = processors.clamp(2, 8);
+  final packageTestJobs = (processors ~/ outerConcurrency).clamp(1, 2);
+  final heavyTestJobs = (processors ~/ 2).clamp(2, 4);
+  final flutter = getFlutterCommand(repoRoot);
+
+  RunStep? createFlutterPackageTest(
+    String packageName, {
+    required List<String> dependencies,
+    int? concurrency,
+  }) => _createFlutterTestStep(
+    repoRoot,
+    Directory(getJoinedPath(repoRoot.path, 'packages/$packageName')),
+    packageName,
+    dependencies: dependencies,
+    concurrency: concurrency ?? packageTestJobs,
+  );
 
   return RunPlan(
     command: 'verify',
@@ -70,18 +100,20 @@ RunPlan createVerificationPlan(
         command: ['bash', 'scripts/check-toolchain.sh'],
         dependencies: [],
       ),
+      for (final suite in workflowSuites)
+        RunStep(
+          id: 'workflows.${suite.replaceFirst('_test.py', '')}',
+          command: ['python3', '-m', 'unittest', suite],
+          workingDirectory: 'test/workflows',
+          dependencies: const [],
+        ),
       const RunStep(
         id: 'rust.format',
         command: ['cargo', 'fmt', '--all', '--', '--check'],
         workingDirectory: 'crates',
         dependencies: [],
       ),
-      const RunStep(
-        id: 'rust.check',
-        command: ['cargo', 'check', '--locked', '--workspace'],
-        workingDirectory: 'crates',
-        dependencies: ['rust.format'],
-      ),
+      createBackendBuildStep(BackendMode.mock, BuildMode.debug, null),
       // Serialize Cargo steps that share crates/target: Cargo releases its
       // build lock before running test binaries, so concurrent feature builds
       // would overwrite crates/target/debug/backend mid-test while blocking
@@ -99,7 +131,7 @@ RunPlan createVerificationPlan(
           'warnings',
         ],
         workingDirectory: 'crates',
-        dependencies: ['rust.check'],
+        dependencies: ['rust.format'],
       ),
       const RunStep(
         id: 'rust.clippy_mock',
@@ -136,23 +168,16 @@ RunPlan createVerificationPlan(
         workingDirectory: 'crates/akari-splash',
         dependencies: ['backend.test_mock'],
       ),
-      if (workflowSuites.isNotEmpty)
-        RunStep(
-          id: 'workflows.test',
-          command: ['python3', '-m', 'unittest', ...workflowSuites],
-          workingDirectory: 'test/workflows',
-          dependencies: const [],
-        ),
       RunStep(
         id: 'workspace.pub_get',
-        command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+        command: [...flutter, 'pub', 'get'],
         workingDirectory: '.',
         dependencies: const ['toolchain.check'],
       ),
-      for (final theme in externalThemes)
+      for (final theme in externalGenerationThemes)
         RunStep(
           id: externalPubGetIds[theme.packageName]!,
-          command: [...getFlutterCommand(repoRoot), 'pub', 'get'],
+          command: [...flutter, 'pub', 'get'],
           workingDirectory: theme.directory.path,
           dependencies: const ['workspace.pub_get'],
         ),
@@ -163,44 +188,56 @@ RunPlan createVerificationPlan(
           externalPubGetIds[theme.packageName] ?? 'workspace.pub_get',
         ],
       ),
+      ?createFlutterPackageTest(
+        'theme_studio',
+        dependencies: const ['workspace.pub_get'],
+        concurrency: heavyTestJobs,
+      ),
+      _createDartTestStep(repoRoot, 'akari_cli', concurrency: packageTestJobs),
       RunStep(
-        id: 'flutter.analyze',
+        id: 'workspace.analyze',
         command: [
-          ...getFlutterCommand(repoRoot),
+          ...flutter,
           'analyze',
           '--no-pub',
-          'lib/app',
-          'lib/infrastructure',
+          'apps/greeter/lib/app',
+          'apps/greeter/lib/infrastructure',
+          'apps/greeter/test',
+          if (!selectedThemeOnly) 'apps/greeter/lib/main.dart',
+          'packages',
+          for (final theme in workspaceThemes)
+            getRelativePath(repoRoot, theme.directory.path),
+        ],
+        workingDirectory: '.',
+        dependencies: ['workspace.pub_get', ...workspaceSceneSteps],
+      ),
+      for (final theme in workspaceThemes)
+        ?_createFlutterTestStep(
+          repoRoot,
+          theme.directory,
+          theme.packageName,
+          dependencies: ['scenes.generate_${theme.packageName}'],
+          concurrency: packageTestJobs,
+        ),
+      RunStep(
+        id: 'flutter.test',
+        command: [
+          ...flutter,
           'test',
-          if (!selectedThemeOnly) 'lib/main.dart',
+          '--no-pub',
+          '--concurrency=$packageTestJobs',
         ],
         workingDirectory: 'apps/greeter',
         dependencies: ['workspace.pub_get', ...sceneSteps],
       ),
-      RunStep(
-        id: 'flutter.test',
-        command: [...getFlutterCommand(repoRoot), 'test', '--no-pub'],
-        workingDirectory: 'apps/greeter',
-        dependencies: ['workspace.pub_get', ...sceneSteps],
-      ),
       for (final packageName in [
-        'scene_schema',
-        'scene_codegen',
-        'theme_project',
-        'akari_cli',
-      ])
-        ..._getDartPackageVerificationSteps(repoRoot, packageName),
-      for (final packageName in [
-        'scene',
         'greeter_ui',
         'greeter_harness',
+        'scene',
         'greeter_components',
         'theme_sdk',
-        'theme_studio',
       ])
-        ..._getFlutterPackageVerificationSteps(
-          repoRoot,
-          Directory(getJoinedPath(repoRoot.path, 'packages/$packageName')),
+        ?createFlutterPackageTest(
           packageName,
           dependencies: [
             'workspace.pub_get',
@@ -208,20 +245,37 @@ RunPlan createVerificationPlan(
               ...defaultSceneStep,
           ],
         ),
-      for (final theme in themes)
-        ..._getFlutterPackageVerificationSteps(
+      for (final packageName in [
+        'theme_project',
+        'scene_codegen',
+        'scene_schema',
+      ])
+        _createDartTestStep(
+          repoRoot,
+          packageName,
+          concurrency: packageTestJobs,
+        ),
+      for (final theme in externalThemes) ...[
+        RunStep(
+          id: '${theme.packageName}.analyze',
+          command: [...flutter, 'analyze', '--no-pub'],
+          workingDirectory: theme.directory.path,
+          dependencies: ['scenes.generate_${theme.packageName}'],
+        ),
+        ?_createFlutterTestStep(
           repoRoot,
           theme.directory,
           theme.packageName,
           dependencies: ['scenes.generate_${theme.packageName}'],
+          concurrency: packageTestJobs,
         ),
-      createBackendBuildStep(BackendMode.mock, BuildMode.debug, null),
+      ],
       RunStep(
         id: 'dbus.smoke',
         command: [
           'bash',
           '${repoRoot.path}/scripts/debug-dbus.sh',
-          ...getFlutterCommand(repoRoot),
+          ...flutter,
           'test',
           '--no-pub',
           'test/dbus_gateway_smoke.dart',
@@ -240,11 +294,12 @@ RunPlan createVerificationPlan(
   );
 }
 
-List<RunStep> _getFlutterPackageVerificationSteps(
+RunStep? _createFlutterTestStep(
   Directory repoRoot,
   Directory directory,
   String packageName, {
   required List<String> dependencies,
+  required int concurrency,
 }) {
   final testDirectory = Directory(getJoinedPath(directory.path, 'test'));
   final hasTests =
@@ -253,40 +308,33 @@ List<RunStep> _getFlutterPackageVerificationSteps(
           .listSync(recursive: true, followLinks: false)
           .whereType<File>()
           .any((file) => file.path.endsWith('_test.dart'));
-  final flutter = getFlutterCommand(repoRoot);
-
-  return [
-    RunStep(
-      id: '$packageName.analyze',
-      command: [...flutter, 'analyze', '--no-pub'],
-      workingDirectory: directory.path,
-      dependencies: dependencies,
-    ),
-    if (hasTests)
-      RunStep(
-        id: '$packageName.test',
-        command: [...flutter, 'test', '--no-pub'],
-        workingDirectory: directory.path,
-        dependencies: dependencies,
-      ),
-  ];
+  if (!hasTests) return null;
+  return RunStep(
+    id: '$packageName.test',
+    command: [
+      ...getFlutterCommand(repoRoot),
+      'test',
+      '--no-pub',
+      '--concurrency=$concurrency',
+    ],
+    workingDirectory: directory.path,
+    dependencies: dependencies,
+  );
 }
 
-List<RunStep> _getDartPackageVerificationSteps(
+RunStep _createDartTestStep(
   Directory repoRoot,
-  String packageName,
-) {
-  final dart = getDartCommand(repoRoot);
-  return [
-    for (final operation in [
-      ('analyze', ['analyze']),
-      ('test', ['test']),
-    ])
-      RunStep(
-        id: '$packageName.${operation.$1}',
-        command: [...dart, ...operation.$2],
-        workingDirectory: 'packages/$packageName',
-        dependencies: const ['workspace.pub_get'],
-      ),
-  ];
+  String packageName, {
+  required int concurrency,
+}) {
+  return RunStep(
+    id: '$packageName.test',
+    command: [
+      ...getDartCommand(repoRoot),
+      'test',
+      '--concurrency=$concurrency',
+    ],
+    workingDirectory: 'packages/$packageName',
+    dependencies: const ['workspace.pub_get'],
+  );
 }
