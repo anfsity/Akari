@@ -9,6 +9,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/anfsity/Akari/actions/workflows/ci.yml"><img src="https://github.com/anfsity/Akari/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://anfsity.github.io/Akari/"><img src="https://github.com/anfsity/Akari/actions/workflows/docs.yml/badge.svg" alt="Documentation" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0" /></a>
+</p>
+
+<p align="center">
   <a href="https://anfsity.github.io/Akari/">Documentation</a> ·
   <a href="https://anfsity.github.io/Akari/zh-cn/">中文文档</a> ·
   <a href="docs/getting-started/quick-start.md">Quick Start</a> ·
@@ -129,14 +135,31 @@ akari install --theme themes/default
 akari login enable
 ```
 
-To rollback or revert:
+To check status, rollback, or uninstall:
 
 ```sh
+akari login status     # Inspect installed release and boot selection
 akari login rollback   # Switch to the previous deployed version
 akari login disable    # Restore previous display manager
+akari uninstall        # Remove Akari login installation (retains preferences & logs)
+```
+
+If you ever need to disable Akari from a TTY without the repository or Dart SDK, run:
+
+```sh
+sudo python3 /opt/akari/manage.py disable
 ```
 
 For keyring PAM configuration (`--keyring auto|gnome|kwallet`), Gaze face authentication setup, and recovery procedures, see [production deployment](docs/reference/cli.md#production-login-installation).
+
+## Compatibility & Known Limitations
+
+- **Verified environment**: Full bare-metal deployment (`akari install` + `akari login enable`) has currently been tested only on **Arch Linux (`systemd`, `greetd`, `Sway` greeter compositor, `Hyprland` target session)**.
+- **Other distros & GPUs**: `akari install` / `configure-keyring` includes package support for `pacman`, `apt-get`, and `dnf`, while `akari login enable-gaze` is currently scoped to stock Arch Linux PAM rules (`system-local-login`, `system-login`, `system-auth`). Non-Arch distributions, NVIDIA proprietary DRM, multi-GPU laptops, and other compositors have not yet been boot-tested.
+- **Known display handoff gap**: Brief black screens/mode-setting flashes can still occur between GRUB, `akari-splash`, Sway, and the target compositor startup.
+- **Help wanted**:
+  - Seamless boot/session display handoff without black screens ([Issue #6](https://github.com/anfsity/Akari/issues/6))
+  - Cross-distro, GPU driver, and compositor compatibility reports ([Issue #7](https://github.com/anfsity/Akari/issues/7))
 
 ## Documentation
 
@@ -150,6 +173,10 @@ Full documentation and guides are available on the [documentation site](https://
 | **Display & Scaling** | [Display and DPI testing](docs/guides/display-testing.md) |
 | **greetd Validation** | [greetd integration testing](docs/guides/greetd-testing.md) |
 | **Architecture & Codebase** | [Architecture overview](docs/architecture/overview.md) · [Code map](docs/architecture/code-map.md) |
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for Akari's privilege-separation boundaries and instructions on privately reporting security issues.
 
 ## License
 
