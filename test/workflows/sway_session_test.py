@@ -111,7 +111,24 @@ elif name == 'app':
             'import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(60)'])
         (root / 'descendant.pid').write_text(str(child.pid))
     print('theme started', flush=True)
-    time.sleep(float(os.environ.get('APP_DURATION', '0.7')))
+    if 'APP_DURATION' in os.environ:
+        time.sleep(float(os.environ['APP_DURATION']))
+    else:
+        report_path = root / 'session/display-report.json'
+        wait_changes = int(os.environ.get('WAIT_OUTPUT_CHANGES', '0'))
+        wait_scale = os.environ.get('WAIT_SCALE')
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            try:
+                data = json.loads(report_path.read_text())
+            except (OSError, json.JSONDecodeError):
+                data = {}
+            changes = sum(check.get('stage') == 'output-change' for check in data.get('checks', []))
+            actual = data.get('actual', [])
+            scale_ok = not wait_scale or (actual and float(actual[0].get('scale', -1)) == float(wait_scale))
+            if len(data.get('screenshots', [])) >= len(outputs) and changes >= wait_changes and scale_ok:
+                break
+            time.sleep(.02)
     sys.exit(int(os.environ.get('APP_EXIT', '0')))
 ''')
         handler.chmod(0o755)
@@ -127,16 +144,15 @@ elif name == 'app':
                             'XDG_RUNTIME_DIR': str(self.root / 'outer'),
                             'SWAYSOCK': 'outer-sway-socket',
                             'AKARI_DISPLAY_SOURCE': 'greetd-login',
-                            'AKARI_SWAY_POLL_INTERVAL': '0.01',
-                            'AKARI_SWAY_SCREENSHOT_DELAY': '0.02',
-                            'AKARI_SWAY_INITIAL_TIMEOUT': '0.5'}
+                            'AKARI_SWAY_POLL_INTERVAL': '0.02',
+                            'AKARI_SWAY_SCREENSHOT_DELAY': '0.02'}
         self.command = [sys.executable, str(ROOT / 'scripts/sway-session.py'),
                         '--log-dir', str(self.root / 'session'), '--backend', 'headless',
                         '--', str(self.bin / 'app')]
 
     def run_session(self, **environment):
         return subprocess.run(self.command, env={**self.environment, **environment},
-                              capture_output=True, text=True, timeout=12)
+                              capture_output=True, text=True, timeout=30)
 
     def get_report(self):
         return json.loads((self.root / 'session/display-report.json').read_text())
@@ -207,7 +223,7 @@ elif name == 'app':
         self.assert_processes_stopped()
 
     def test_fullscreen_and_retiling_keep_scale_without_failing_session(self):
-        result = self.run_hyprland_session(FULLSCREEN_AFTER='3', RETILE_AFTER='5', APP_DURATION='1.0')
+        result = self.run_hyprland_session(FULLSCREEN_AFTER='3', RETILE_AFTER='5', WAIT_OUTPUT_CHANGES='2')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         report = self.get_report()
         self.assertTrue(report['matched'])
@@ -244,7 +260,7 @@ elif name == 'app':
         self.assert_processes_stopped()
 
     def test_moving_to_a_different_monitor_updates_scale(self):
-        result = self.run_hyprland_session(MOVE_AFTER='4')
+        result = self.run_hyprland_session(MOVE_AFTER='4', WAIT_SCALE='0.5')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.get_report()['actual'][0]['scale'], .5)
         self.assertEqual(self.get_report()['effective_target'][0]['host_monitor'], 'DP-1')
@@ -272,7 +288,7 @@ elif name == 'app':
         self.assert_processes_stopped()
 
     def test_initial_output_mismatch_retains_target_and_actual_without_launching_theme(self):
-        result = self.run_session(DRIFT_AFTER='0')
+        result = self.run_session(DRIFT_AFTER='0', AKARI_SWAY_INITIAL_TIMEOUT='0.5')
         self.assertEqual(result.returncode, 1)
         report = self.get_report()
         self.assertFalse(report['matched'])
