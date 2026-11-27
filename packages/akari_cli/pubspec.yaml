@@ -2,7 +2,7 @@ name: akari_cli
 description: Pure Dart development, verification, and deployment CLI for Akari.
 publish_to: none
 resolution: workspace
-version: 1.0.0
+version: 0.1.0
 
 environment:
   sdk: ^3.13.2

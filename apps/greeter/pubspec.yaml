@@ -2,7 +2,7 @@ name: greeter
 description: Compile-time themeable Flutter greeter for Akari.
 publish_to: none
 resolution: workspace
-version: 1.0.0+1
+version: 0.1.0+1
 
 environment:
   sdk: ^3.13.2
