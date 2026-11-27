@@ -30,6 +30,15 @@ Build your login screen with custom Flutter components, backgrounds, and animati
 
 > Named after Akari Hankui (半杭朱理) from *Asobi no Kankei*, a character I love.
 
+## Showcase
+
+https://github.com/user-attachments/assets/8062b487-7d72-44b5-802a-ac2a47c95b96
+
+<sub>
+Shown in order: native DRM/KMS startup splash (<code>akari-splash</code>), Terrace theme with a custom wallpaper, built-in <code>preset1</code> GLSL wet-glass shader with face-to-password fallback, and live shader tuning in Theme Studio (WIP).<br />
+Credits: Terrace showcase wallpaper is <em>Hello world</em> by ashima (<a href="https://www.pixiv.net/artworks/71187447">Pixiv #71187447</a>; the built-in <code>themes/default</code> ships an original minimalist backdrop instead). <code>preset1</code> is a procedural Flutter Canvas + GLSL recreation inspired by a Wallpaper Engine animated background, and the avatar is a GPT-generated portrait of Akari Hankui.
+</sub>
+
 ## Features
 
 - **Custom Themes**: Compose Flutter widgets using the Theme SDK with typed login state, session selection, and power actions. Each theme owns its components, visual tokens, and assets.
