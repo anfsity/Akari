@@ -16,7 +16,6 @@ Akari is currently in pre-1.0 development. Security fixes are applied to the `ma
 
 Please **do not** report security vulnerabilities—such as authentication bypasses, privilege escalation, PAM stack corruption, or credential leaks—through public GitHub issues.
 
-Instead, report them privately:
+Instead, report them privately via [GitHub Private Vulnerability Reporting](https://github.com/anfsity/Akari/security/advisories/new).
 
-- Check the repository's **Security** tab (`https://github.com/anfsity/Akari/security`) for **Private vulnerability reporting** if enabled, or reach out directly to `@anfsity` to coordinate a private report before public disclosure.
 - When sharing logs (`akari login logs`, `~/.local/state/akari/sessions/`) or system configuration (`/etc/pam.d/greetd`, `/etc/akari/`), review them first and redact any sensitive local environment details.
