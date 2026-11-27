@@ -8,6 +8,7 @@
 !/.fvmrc
 !/.gitignore
 !/README.md
+!/SECURITY.md
 !/analysis_options.yaml
 !/LICENSE
 !/dartdoc_options.yaml
