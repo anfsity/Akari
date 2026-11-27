@@ -59,5 +59,5 @@ npm run preview
 
 文档站点托管于 `https://anfsity.github.io/Akari/`，使用 GitHub Actions（`.github/workflows/docs.yml`）构建并部署：
 
-- **触发方式**：在 `main` 分支手动运行 **Documentation** 工作流，或推送/手动触发 `gh-pages` 分支上的发布工作流（会以 `source_ref: main` 调用主工作流）。
+- **触发方式**：在 `main` 分支推送或提交 PR 修改手册/公开 API 源码时自动触发，也可在 `main` 分支手动运行 **Documentation** 工作流，或推送/手动触发 `gh-pages` 分支上的发布工作流（会以 `source_ref: main` 调用主工作流）。
 - **构建流程**：自动构建 Starlight 手册与 `dart doc` API 参考，通过 `npm run verify` 校验后，将 `docs/site/dist/` 直接作为 GitHub Pages 产物发布。

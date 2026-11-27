@@ -59,5 +59,5 @@ Generated directories (`docs/site/dist/`, `docs/site/public/api/`, and `docs/sit
 
 The handbook is published to `https://anfsity.github.io/Akari/` via GitHub Actions (`.github/workflows/docs.yml`):
 
-- **Triggers**: Manual **Documentation** workflow dispatch on `main`, or pushing/dispatching on the `gh-pages` branch (which invokes the `main` workflow with `source_ref: main`).
+- **Triggers**: Automatic runs on `main` pushes or pull requests modifying handbook/API sources, manual **Documentation** workflow dispatch on `main`, or pushing/dispatching on the `gh-pages` branch (which invokes the `main` workflow with `source_ref: main`).
 - **Pipeline**: Builds the Starlight site and `dart doc` reference, runs `npm run verify`, and uploads `docs/site/dist/` directly as a GitHub Pages artifact.
