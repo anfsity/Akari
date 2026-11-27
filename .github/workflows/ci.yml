@@ -3,12 +3,26 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'SECURITY.md'
+      - 'AGENTS.md'
+      - 'LICENSE'
+      - '.github/workflows/docs.yml'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'SECURITY.md'
+      - 'AGENTS.md'
+      - 'LICENSE'
+      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
